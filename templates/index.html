@@ -103,7 +103,7 @@
         <p><strong>Known Site Dimensions:</strong> {{ results.known_width }} ft × {{ results.known_length }} ft</p>
         <p><strong>Snapped Tank Dimensions:</strong> {{ results.tank_width }} ft × {{ results.tank_length }} ft × {{ results.tank_height }} ft</p>
         <p>AquaCell Tank Storage: {{ results.tank_storage }} ft³</p>
-        <p>Stone Backfill Storage: {{ results.total_stone_storage }} ft³</p>
+        Stone Backfill Storage: {{ results.stone_storage if results and results.stone_storage is not none else '—' }} ft³
         <p class="highlight"><strong>Total System Storage:</strong> {{ results.total_storage }} ft³</p>
 
         <h3>Bill of Materials</h3>
