@@ -105,13 +105,9 @@ def download_pdf():
     stone_void = float(request.form.get('stone_void', 0.40))
     pipe_connectors = int(request.form.get('pipe_connectors', 0))
     top_adapters_12 = int(request.form.get('top_adapters_12', 0))
-
-    # Read the price calculated by JavaScript (from the hidden field)
     total_aquacell_cost = request.form.get('totalAquaCellCost', '—')
 
-    # ─────────────────────────────────────────────────────────────
-    # RECALCULATE EVERYTHING LOCALLY (so PDF always matches UI)
-    # ─────────────────────────────────────────────────────────────
+    # Recalculate everything
     MODULE_WID = 1.9685
     MODULE_LEN = 3.937
     crates_wide = math.floor(known_width / MODULE_WID)
@@ -134,7 +130,6 @@ def download_pdf():
     gross_tank_vol = num_crates * (MODULE_WID * MODULE_LEN * tank_height / layers)
     tank_storage = gross_tank_vol * void_ratio
 
-    # Stone backfill calculation
     outer_width = tank_width + 2 * perimeter_stone_width
     outer_length = tank_length + 2 * perimeter_stone_width
     total_system_depth = base_stone + tank_height + cover_stone
@@ -142,7 +137,6 @@ def download_pdf():
     total_stone_storage = (total_excavation_vol - gross_tank_vol) * stone_void
     total_storage = tank_storage + total_stone_storage
 
-    # Side plates (your exact formula)
     tank_perimeter = 2 * (tank_width + tank_length)
     side_plates = round(tank_perimeter * (layers * 1.312336) / 5.17)
 
@@ -150,16 +144,35 @@ def download_pdf():
     bottom_plates = crates_wide * crates_long if config == 'SC' else 0
 
     # ─────────────────────────────────────────────────────────────
-    # BUILD PDF
+    # BUILD PDF - LOGO ABOVE HEADER (Larger & Cleaner)
     # ─────────────────────────────────────────────────────────────
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
     w, h = letter
     y = h - 50
 
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(50, y, "AquaCell V12 Crate Calculator - Underground Stormwater System")
-    y -= 30
+         # Logo centered at the very top - EVEN BIGGER (final size)
+    try:
+        import os
+        from reportlab.lib.utils import ImageReader
+        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wavin-logo.png')
+        if os.path.exists(logo_path):
+            logo = ImageReader(logo_path)
+            c.drawImage(logo, 146, h - 172, width=320, height=135, preserveAspectRatio=True, mask='auto')
+            print("✅ Logo loaded successfully (large & centered)")
+        else:
+            raise Exception("File not found")
+    except Exception as e:
+        print(f"❌ Logo failed: {e}")
+        c.setFont("Helvetica-Bold", 18)
+        c.drawString(50, h - 95, "WAVIN")
+
+    # Title text BELOW the larger logo
+    c.setFont("Helvetica-Bold", 18)
+    c.drawString(50, h - 205, "AquaCell v.12 Crate Calculator")
+    c.setFont("Helvetica", 14)
+    c.drawString(50, h - 225, "Underground Stormwater System")
+    y = h - 265   # extra space after logo + title
 
     c.setFont("Helvetica", 12)
     lines = [
@@ -186,6 +199,20 @@ def download_pdf():
     for line in lines:
         c.drawString(50, y, line)
         y -= 20
+
+    # Disclaimer
+    c.setFont("Helvetica", 9)
+    disclaimer = (
+        "Disclaimer: This calculator provides preliminary, conceptual estimates only and is not a stamped engineering "
+        "design. Wavin’s assistance in sizing or product selection is advisory and does not constitute design responsibility "
+        "or guarantee system performance. The Engineer of Record (EoR) is solely responsible for verifying all design."
+    )
+    from textwrap import wrap
+    wrapped = wrap(disclaimer, width=110)
+    y = 110
+    for line in wrapped:
+        c.drawString(50, y, line)
+        y -= 12
 
     c.setFont("Helvetica", 9)
     c.drawString(50, 40, f"Generated {datetime.datetime.now().strftime('%m/%d/%Y %H:%M')} | Polypropylene Crates for Retention/Detention")
