@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AquaCell V12 Crate Calculator</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f8f9fa; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.1); }
+        h1 { color: #0056b3; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        label { display: block; margin: 8px 0 4px; font-weight: bold; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        .calculate { background: #0056b3; color: white; }
+        .reset { background: #6c757d; color: white; }
+        .pdf { background: #28a745; color: white; }
+        .results { margin-top: 30px; padding: 20px; background: #e7f3ff; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #aaa; padding: 8px; text-align: left; }
+        .highlight { font-weight: bold; color: #0056b3; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>AquaCell V12 Crate Calculator</h1>
+    <p><strong>Polypropylene Stackable Crates for Underground Stormwater Retention / Detention / Infiltration</strong></p>
+
+    <form method="POST" id="mainForm">
+
+        <div class="form-grid">
+            <div>
+                <label>Project Name</label>
+                <input type="text" name="project_name" placeholder="Enter here" value="{{ form_data.get('project_name', '') }}">
+                <label>Project Number</label>
+                <input type="text" name="project_num" placeholder="Enter here" value="{{ form_data.get('project_num', '') }}">
+                <label>Location (City, State)</label>
+                <input type="text" name="location" placeholder="Enter here" value="{{ form_data.get('location', '') }}">
+            </div>
+            <div>
+                <label>Client / Estimator</label>
+                <input type="text" name="client" placeholder="Enter here" value="{{ form_data.get('client', '') }}">
+                <label>Configuration</label>
+                <select name="config">
+                    <option value="SC" {{ 'selected' if form_data.get('config') == 'SC' else '' }}>Standard Configuration (SC)</option>
+                    <option value="EX" {{ 'selected' if form_data.get('config') == 'EX' else '' }}>Extra Strong (EX)</option>
+                </select>
+                <label>Number of Layers</label>
+                <select name="layers">
+                    <option value="1" {{ 'selected' if form_data.get('layers') == '1' else '' }}>1</option>
+                    <option value="2" {{ 'selected' if form_data.get('layers') == '2' else '' }}>2</option>
+                    <option value="3" {{ 'selected' if form_data.get('layers') == '3' else '' }}>3</option>
+                    <option value="4" {{ 'selected' if form_data.get('layers') == '4' else '' }}>4</option>
+                    <option value="5" {{ 'selected' if form_data.get('layers') == '5' else '' }}>5</option>
+                    <option value="6" {{ 'selected' if form_data.get('layers') == '6' else '' }}>6</option>
+                    <option value="7" {{ 'selected' if form_data.get('layers') == '7' else '' }}>7</option>
+                    <option value="8" {{ 'selected' if form_data.get('layers') == '8' else '' }}>8</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-grid" style="margin-top:20px">
+            <div>
+                <label>Known Width (ft) — from plans</label>
+                <input type="number" step="0.01" name="known_width" min="0" placeholder="Enter here" value="{{ form_data.get('known_width', '') }}">
+                <label>Known Length (ft) — from plans</label>
+                <input type="number" step="0.01" name="known_length" min="0" placeholder="Enter here" value="{{ form_data.get('known_length', '') }}">
+                <label>Perimeter Stone Width (ft)</label>
+                <input type="number" step="0.1" name="perimeter_stone_width" min="0" placeholder="Enter here" value="{{ form_data.get('perimeter_stone_width', '') }}">
+            </div>
+            <div>
+                <label>Cover Stone Depth (ft)</label>
+                <input type="number" step="0.1" name="cover_stone" min="0" placeholder="Enter here" value="{{ form_data.get('cover_stone', '') }}">
+                <label>Base Stone Depth (ft)</label>
+                <input type="number" step="0.001" name="base_stone" min="0" placeholder="Enter here" value="{{ form_data.get('base_stone', '') }}">
+                <label>Stone Void Ratio</label>
+                <input type="number" step="0.01" name="stone_void" min="0" max="1" placeholder="Enter here" value="{{ form_data.get('stone_void', '') }}">
+            </div>
+        </div>
+
+        <div class="form-grid" style="margin-top:20px">
+            <div>
+                <label>8-12" Pipe Connector (2476631200)</label>
+                <input type="number" name="pipe_connectors" min="0" placeholder="Enter quantity" value="{{ form_data.get('pipe_connectors', '') }}">
+            </div>
+            <div>
+                <label>12" Top Adapter (3085857)</label>
+                <input type="number" name="top_adapters_12" min="0" placeholder="Enter quantity" value="{{ form_data.get('top_adapters_12', '') }}">
+            </div>
+        </div>
+
+        <button type="submit" class="calculate" style="margin-top:25px">Calculate System</button>
+        <button type="button" onclick="document.getElementById('mainForm').reset(); window.location.reload();" 
+                class="reset" style="margin-top:25px; margin-left:15px;">Reset Form</button>
+
+        {% if results %}
+        <button type="submit" formaction="/download_pdf" formmethod="post" class="pdf" style="margin-top:25px; margin-left:15px;">Download PDF Report</button>
+        {% endif %}
+    </form>
+
+    {% if results %}
+    <div class="results">
+        <h2>Results – {{ results.config }} Configuration ({{ results.layers }} Layers)</h2>
+        <p><strong>Known Site Dimensions:</strong> {{ results.known_width }} ft × {{ results.known_length }} ft</p>
+        <p><strong>Snapped Tank Dimensions:</strong> {{ results.tank_width }} ft × {{ results.tank_length }} ft × {{ results.tank_height }} ft</p>
+        <p>AquaCell Tank Storage: {{ results.tank_storage }} ft³</p>
+        <p>Stone Backfill Storage: {{ results.total_stone_storage }} ft³</p>
+        <p class="highlight"><strong>Total System Storage:</strong> {{ results.total_storage }} ft³</p>
+
+        <h3>Bill of Materials</h3>
+        <table>
+            <tr><th>Item</th><th>Quantity</th></tr>
+            <tr><td>Base Units</td><td>{{ results.base_units }}</td></tr>
+            <tr><td>Side Plates</td><td>{{ results.side_plates }}</td></tr>
+            <tr><td>Bottom Plates</td><td>{{ results.bottom_plates }}</td></tr>
+            <tr><td>8-12" Pipe Connectors (2476631200)</td><td>{{ results.pipe_connectors }}</td></tr>
+            <tr><td>12" Top Adapters (3085857)</td><td>{{ results.top_adapters_12 }}</td></tr>
+        </table>
+    
+<!-- PRICE ESTIMATION CARD (uses only AquaCell Tank Storage) -->
+        <div style="margin-top: 25px; padding: 20px; background: #1e2a44; color: white; border-radius: 8px;">
+            <h3 style="margin-top:0; color:#00b0ff;">Price Estimation</h3>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div>
+                    <label style="display:block; margin-bottom:5px; color:#ccc;">AquaCell Cost per ft³ (USD$)</label>
+                    <input type="number" id="costPerFt3" step="0.01" placeholder="e.g., 2.75" 
+                           style="width:100%; padding:10px; border:none; border-radius:4px; font-size:16px;">
+                </div>
+                <div style="align-self: end;">
+                    <button onclick="calculateAquaCellPrice()" 
+                            style="width:100%; padding:12px; background:#00b0ff; color:white; border:none; border-radius:4px; font-size:16px; cursor:pointer;">
+                        Calculate AquaCell Price
+                    </button>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div style="background:#112033; padding:12px; border-radius:4px;">
+                    <div style="font-size:0.9em; color:#ccc;">Net AquaCell Storage Used (ft³)</div>
+                    <div id="priceCrateStorage" style="font-size:1.4em; font-weight:bold; color:#00ffaa;">—</div>
+                </div>
+                <div style="background:#112033; padding:12px; border-radius:4px;">
+                    <div style="font-size:0.9em; color:#ccc;">Total AquaCell Cost (USD$)</div>
+                    <div id="priceTotalCost" style="font-size:1.4em; font-weight:bold; color:#00ffaa;">—</div>
+                </div>
+            </div>
+
+            <!-- Hidden field for PDF -->
+            <input type="hidden" id="hiddenTotalAquaCellCost" name="totalAquaCellCost" value="">
+
+            <div style="margin-top:15px; font-size:0.85em; color:#aaa; line-height:1.3;">
+                Pricing Disclaimer: Price provided as an estimate only of AquaCell cost based on client inputs. 
+                Actual price quote for material subject to change upon review of plans. Estimated pricing valid 30 days beyond the date of submission.
+            </div>
+        </div> 
+
+        <p style="margin-top:15px; font-size:0.9em;">Generated {{ results.date }} • Based on Wavin AquaCell SC/EX technical data (Dec 2025 docs)</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function calculateAquaCellPrice() {
+    const costPerFt3 = parseFloat(document.getElementById('costPerFt3').value);
+    if (!isFinite(costPerFt3) || costPerFt3 <= 0) {
+        alert('Please enter a valid cost per cubic foot.');
+        return;
+    }
+
+    // Pull ONLY AquaCell Tank Storage (green line in Results)
+    const tankStorageElement = document.querySelector('p:nth-of-type(3)'); // AquaCell Tank Storage line
+    const tankStorageText = tankStorageElement ? tankStorageElement.textContent : '';
+    const netStorage = parseFloat(tankStorageText.replace(/[^0-9.]/g, ''));
+
+    if (!isFinite(netStorage) || netStorage <= 0) {
+        alert('Run CALCULATE first to generate AquaCell storage volume.');
+        return;
+    }
+
+    const totalCost = costPerFt3 * netStorage;
+
+    document.getElementById('priceCrateStorage').textContent = netStorage.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+    document.getElementById('priceTotalCost').textContent = totalCost.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+
+    // Pass to PDF
+    document.getElementById('hiddenTotalAquaCellCost').value = totalCost.toFixed(2);
+}
+</script>
+
+</body>
+</html>
