@@ -9,13 +9,18 @@ app = Flask(__name__)
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    results = None
+    form_data = {}
+
     if request.method == 'POST':
-        # Clean input handling - no leftover test project data
+        # ─────────────────────────────────────────────────────────────
+        # READ ALL FORM DATA FIRST (this fixes the UnboundLocalError)
+        # ─────────────────────────────────────────────────────────────
         project_name = request.form.get('project_name', '')
         project_num = request.form.get('project_num', '')
         location = request.form.get('location', '')
         client = request.form.get('client', '')
-        config = request.form.get('config', 'SC')
+        config = request.form.get('config', 'SC')                    # ← must be here first
         layers = int(request.form.get('layers', 3))
         known_width = float(request.form.get('known_width', 0))
         known_length = float(request.form.get('known_length', 0))
@@ -26,6 +31,9 @@ def index():
         pipe_connectors = int(request.form.get('pipe_connectors', 0))
         top_adapters_12 = int(request.form.get('top_adapters_12', 0))
 
+            # ─────────────────────────────────────────────────────────────
+        # CALCULATIONS - FIXED FOR EX (side plates + rounding + stone display)
+        # ─────────────────────────────────────────────────────────────
         MODULE_WID = 1.9685
         MODULE_LEN = 3.937
         crates_wide = math.floor(known_width / MODULE_WID)
@@ -36,11 +44,11 @@ def index():
         if config == 'SC':
             layer_heights = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]
             void_ratio = 0.95486
-            bottom_plates_per_unit = 1
-        else:
+            side_multiplier = 1.312336
+        else:  # EX Configuration
             layer_heights = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
             void_ratio = 0.92633
-            bottom_plates_per_unit = 0
+            side_multiplier = 1.509186351
 
         tank_height = layer_heights[layers-1] if layers <= len(layer_heights) else layer_heights[-1]
 
@@ -48,42 +56,48 @@ def index():
         gross_tank_vol = num_crates * (MODULE_WID * MODULE_LEN * tank_height / layers)
         tank_storage = gross_tank_vol * void_ratio
 
-        # Correct stone backfill calculation
+        # Stone backfill
         outer_width = tank_width + 2 * perimeter_stone_width
         outer_length = tank_length + 2 * perimeter_stone_width
         total_system_depth = base_stone + tank_height + cover_stone
         total_excavation_vol = outer_width * outer_length * total_system_depth
         total_stone_storage = (total_excavation_vol - gross_tank_vol) * stone_void
-
         total_storage = tank_storage + total_stone_storage
 
-        # Side plates (your exact formula)
+        # Side plates - NOW CONFIG-SPECIFIC
         tank_perimeter = 2 * (tank_width + tank_length)
-        side_plates = round(tank_perimeter * (layers * 1.312336) / 5.17)
+        side_plates = round(tank_perimeter * (layers * side_multiplier) / 5.17)
 
-        base_units = num_crates
-        bottom_plates = crates_wide * crates_long if config == 'SC' else 0
+        # BOM (already correct from last fix)
+        if config == 'SC':
+            base_units = num_crates
+            bottom_plates = crates_wide * crates_long
+        else:  # EX
+            base_units = num_crates * 2
+            bottom_plates = 0
 
         results = {
-            'known_width': known_width,
-            'known_length': known_length,
-            'tank_width': round(tank_width, 2),
-            'tank_length': round(tank_length, 2),
-            'tank_height': round(tank_height, 2),
-            'tank_storage': round(tank_storage, 1),
-            'total_stone_storage': round(total_stone_storage, 1),
-            'total_storage': round(total_storage, 1),
-            'base_units': int(base_units),
-            'side_plates': int(side_plates),
-            'bottom_plates': int(bottom_plates),
-            'pipe_connectors': pipe_connectors,
-            'top_adapters_12': top_adapters_12,
             'config': config,
             'layers': layers,
-            'date': datetime.date.today().strftime('%m/%d/%Y')
+            'known_width': known_width,
+            'known_length': known_length,
+            'tank_width': round(tank_width, 2),      # ← rounded to hundredths
+            'tank_length': round(tank_length, 2),    # ← rounded to hundredths
+            'tank_height': round(tank_height, 2),    # ← rounded to hundredths
+            'tank_storage': round(tank_storage, 1),
+            'stone_storage': round(total_stone_storage, 1),   # ← ensures it displays
+            'total_storage': round(total_storage, 1),
+            'base_units': base_units,
+            'side_plates': side_plates,
+            'bottom_plates': bottom_plates,
+            'pipe_connectors': pipe_connectors,
+            'top_adapters_12': top_adapters_12,
         }
 
-        return render_template('index.html', results=results, form_data=request.form)
+        form_data = request.form
+
+    # Render the page (works for both GET and POST)
+    return render_template('index.html', results=results, form_data=form_data)
 
     # First load = completely clean / fresh form
     return render_template('index.html', form_data={})
@@ -105,9 +119,13 @@ def download_pdf():
     stone_void = float(request.form.get('stone_void', 0.40))
     pipe_connectors = int(request.form.get('pipe_connectors', 0))
     top_adapters_12 = int(request.form.get('top_adapters_12', 0))
+
+    # Read price from hidden field (set by "Calculate AquaCell Price" button)
     total_aquacell_cost = request.form.get('totalAquaCellCost', '—')
 
-    # Recalculate everything
+    # ─────────────────────────────────────────────────────────────
+    # RECALCULATE EVERYTHING (EX fixes + rounding)
+    # ─────────────────────────────────────────────────────────────
     MODULE_WID = 1.9685
     MODULE_LEN = 3.937
     crates_wide = math.floor(known_width / MODULE_WID)
@@ -118,11 +136,11 @@ def download_pdf():
     if config == 'SC':
         layer_heights = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]
         void_ratio = 0.95486
-        bottom_plates_per_unit = 1
-    else:
+        side_multiplier = 1.312336
+    else:  # EX Configuration
         layer_heights = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
         void_ratio = 0.92633
-        bottom_plates_per_unit = 0
+        side_multiplier = 1.509186351
 
     tank_height = layer_heights[layers-1] if layers <= len(layer_heights) else layer_heights[-1]
 
@@ -130,6 +148,7 @@ def download_pdf():
     gross_tank_vol = num_crates * (MODULE_WID * MODULE_LEN * tank_height / layers)
     tank_storage = gross_tank_vol * void_ratio
 
+    # Stone backfill
     outer_width = tank_width + 2 * perimeter_stone_width
     outer_length = tank_length + 2 * perimeter_stone_width
     total_system_depth = base_stone + tank_height + cover_stone
@@ -137,21 +156,27 @@ def download_pdf():
     total_stone_storage = (total_excavation_vol - gross_tank_vol) * stone_void
     total_storage = tank_storage + total_stone_storage
 
+    # Side plates (config-specific)
     tank_perimeter = 2 * (tank_width + tank_length)
-    side_plates = round(tank_perimeter * (layers * 1.312336) / 5.17)
+    side_plates = round(tank_perimeter * (layers * side_multiplier) / 5.17)
 
-    base_units = num_crates
-    bottom_plates = crates_wide * crates_long if config == 'SC' else 0
+    # BOM (EX double base units)
+    if config == 'SC':
+        base_units = num_crates
+        bottom_plates = crates_wide * crates_long
+    else:
+        base_units = num_crates * 2
+        bottom_plates = 0
 
     # ─────────────────────────────────────────────────────────────
-    # BUILD PDF - LOGO ABOVE HEADER (Larger & Cleaner)
+    # BUILD PDF
     # ─────────────────────────────────────────────────────────────
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
     w, h = letter
     y = h - 50
 
-         # Logo centered at the very top - EVEN BIGGER (final size)
+    # Large centered logo above title
     try:
         import os
         from reportlab.lib.utils import ImageReader
@@ -159,20 +184,15 @@ def download_pdf():
         if os.path.exists(logo_path):
             logo = ImageReader(logo_path)
             c.drawImage(logo, 146, h - 172, width=320, height=135, preserveAspectRatio=True, mask='auto')
-            print("✅ Logo loaded successfully (large & centered)")
-        else:
-            raise Exception("File not found")
-    except Exception as e:
-        print(f"❌ Logo failed: {e}")
+    except:
         c.setFont("Helvetica-Bold", 18)
         c.drawString(50, h - 95, "WAVIN")
 
-    # Title text BELOW the larger logo
     c.setFont("Helvetica-Bold", 18)
-    c.drawString(50, h - 205, "AquaCell v.12 Crate Calculator")
+    c.drawString(50, h - 205, "AquaCell V12 Crate Calculator")
     c.setFont("Helvetica", 14)
     c.drawString(50, h - 225, "Underground Stormwater System")
-    y = h - 265   # extra space after logo + title
+    y = h - 265
 
     c.setFont("Helvetica", 12)
     lines = [
