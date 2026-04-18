@@ -15,6 +15,7 @@
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { border: 1px solid #aaa; padding: 8px; text-align: left; }
         .highlight { font-weight: bold; color: #0056b3; }
+        .geo-section { background: #f0f8ff; padding: 15px; border-radius: 6px; margin: 20px 0; }
     </style>
 </head>
 <body>
@@ -85,6 +86,14 @@
             </div>
         </div>
 
+        <!-- Geotextile Waste Input -->
+        <div class="form-grid" style="margin-top:20px">
+            <div>
+                <label>Geotextile Waste/Overlap (%)</label>
+                <input type="number" step="1" name="geoWaste" min="0" value="{{ form_data.get('geoWaste', '0') }}" placeholder="0">
+            </div>
+        </div>
+
         <div style="margin-top: 30px; display: flex; gap: 12px; flex-wrap: wrap;">
             <button type="submit" style="background:#007bff; color:white; padding:12px 24px; border:none; border-radius:6px; font-size:16px; cursor:pointer;">
                 Calculate System
@@ -116,12 +125,24 @@
             <h3>Bill of Materials</h3>
             <table>
                 <tr><th>Item</th><th>Quantity</th></tr>
-                <tr><td>Base Units</td><td>{{ results.base_units }}</td></tr>
-                <tr><td>Side Plates</td><td>{{ results.side_plates }}</td></tr>
-                <tr><td>Bottom Plates</td><td>{{ results.bottom_plates }}</td></tr>
+                <tr><td>Base Unit (3091506)</td><td>{{ results.base_units }}</td></tr>
+                <tr><td>Side Plate (2476600003)</td><td>{{ results.side_plates }}</td></tr>
+                <tr><td>Bottom Plate (2476600001)</td><td>{{ results.bottom_plates }}</td></tr>
                 <tr><td>8-12" Pipe Connectors (2476631200)</td><td>{{ results.pipe_connectors }}</td></tr>
                 <tr><td>12" Top Adapters (3085857)</td><td>{{ results.top_adapters_12 }}</td></tr>
             </table>
+
+            <!-- GEOTEXTILE SECTION - Now BELOW BOM and ABOVE Price Estimation -->
+            <div class="geo-section">
+                <h3>Geotextile Fabric Requirements (Non-woven - Burrito Style Wrap)</h3>
+                <table>
+                    <tr><th>Item</th><th>Quantity (ft²)</th></tr>
+                    <tr><td>Geotextile - AquaCell Only</td><td>{{ results.geoTank }}</td></tr>
+                    <tr><td>Geotextile - Stone Envelope</td><td>{{ results.geoStone }}</td></tr>
+                    <tr><td><strong>Total Geotextile (AquaCell + Stone)</strong></td><td><strong>{{ results.geoTotal }}</strong></td></tr>
+                    <tr><td>Geotextile Waste/Overlap (%)</td><td>{{ results.geoWaste }}%</td></tr>
+                </table>
+            </div>
 
             <!-- PRICE ESTIMATION CARD -->
             <div style="margin-top: 25px; padding: 20px; background: #1e2a44; color: white; border-radius: 8px;">
@@ -190,7 +211,7 @@ function downloadPDF() {
     .catch(() => alert('Error downloading PDF. Please run "Calculate System" first.'));
 }
 
-// CALCULATE AQUACELL PRICE - FINAL ROBUST VERSION
+// CALCULATE AQUACELL PRICE
 function calculateAquaCellPrice() {
     const costPerFt3 = parseFloat(document.getElementById('costPerFt3').value);
     if (!isFinite(costPerFt3) || costPerFt3 <= 0) {
@@ -207,24 +228,21 @@ function calculateAquaCellPrice() {
     }
 
     const netStorage = parseFloat(match[1].replace(/,/g, ''));
-
     if (!isFinite(netStorage) || netStorage <= 0) {
-        alert('Run "Calculate System" first to generate AquaCell storage volume.');
+        alert('Run "Calculate System" first.');
         return;
     }
 
     const totalCost = costPerFt3 * netStorage;
-
     document.getElementById('priceCrateStorage').textContent = netStorage.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
     document.getElementById('priceTotalCost').textContent = totalCost.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
-
     document.getElementById('hiddenTotalAquaCellCost').value = totalCost.toFixed(2);
 }
 
-// EXPORT PROJECT AS JSON
+// EXPORT / IMPORT functions (unchanged)
 function exportProject() {
     const formData = {};
-    const inputs = document.querySelectorAll('input, select, textarea');
+    const inputs = document.querySelectorAll('input, select');
     inputs.forEach(input => {
         if (input.name) formData[input.name] = input.value;
     });
@@ -240,7 +258,6 @@ function exportProject() {
     URL.revokeObjectURL(url);
 }
 
-// IMPORT PROJECT FROM JSON
 function importProject(event) {
     const file = event.target.files[0];
     if (!file) return;
