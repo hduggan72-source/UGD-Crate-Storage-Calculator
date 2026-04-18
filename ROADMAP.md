@@ -35,7 +35,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Stage storage table (cumulative volume by elevation, with CSV export)
 - Multi-tank / multiple system support
 - Excavation slope calculator integration (with variable H:V ratios)
-- Load / cover depth validation (H-10, HS-20, HS-25) with visual indicators
+- Load / cover depth validation (H-10, HS-20, HS-25) with visual indicators (PASS/FAIL) with listed FoS based on legacy calculator
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
 - Auto quote number generation (e.g., AC-2026-001)
 - Optional 3D isometric view of the crate layout
@@ -43,6 +43,14 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Print-friendly one-page layout improvements (12" increment tip already noted)
 - Integration of Wavin installation details (access ports, geogrid, compaction notes)
 - Dark/light theme toggle for UI
+- Separate Quote Sheet & BOM Command buttons to generate individual pages with different disclaimers as needed
+- Variable area input field that will allow for correct calculation of side plates when complex tank is scaled
+- Logo/banner on main UI page
+- Revisit RESET PAGE command as the individual input fields do not reset, only the summary and price card
+- PASS/FAIL VALIDATIONS (Minimum volume vs. required, minimum/maximum depths (cover and total install)
+- hidden pages that prepends/appends when PDF is created (cover sheet, standard detail, specs, etc.)
+- Amount of Top Adapters calculated based on total volume of tank calculated (=FLOOR(volume/3532,1)
+- qustion mark symbol which links to minimum requirements of the specific entry field (ex. perimeter, base stone)
 
 ## Change Log
 - **2026-04-18** – Improved PDF report (smaller fonts, restored logo, full disclaimer, better spacing). Geotextile section finalized below BOM.
