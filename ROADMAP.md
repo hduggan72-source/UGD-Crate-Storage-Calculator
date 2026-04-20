@@ -30,10 +30,10 @@ Professional web-based calculator for designing and quoting underground stormwat
   - Scale bar + clean engineering style  
   - “Download Layout PNG” button on results page  
   - Include in PDF report (optional)
+  - Multi-tank / multiple system support
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 - Stage storage table (cumulative volume by elevation, with CSV export)
-- Multi-tank / multiple system support
 - Excavation slope calculator integration (with variable H:V ratios)
 - Load / cover depth validation (H-10, HS-20, HS-25) with visual indicators (PASS/FAIL) with listed FoS based on legacy calculator
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
