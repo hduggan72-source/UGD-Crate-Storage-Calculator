@@ -19,7 +19,6 @@ Professional web-based calculator for designing and quoting underground stormwat
   - Wavin logo restored at top
   - Full disclaimer visible at bottom
   - Clean one-page layout
-- [x] Price estimation card (with hidden field for PDF)
 - [x] JSON import/export for saving projects
 - [x] Reset form and basic mobile compatibility
 - [X] Multi-tank / multiple system support
@@ -33,6 +32,7 @@ Professional web-based calculator for designing and quoting underground stormwat
   - Include in PDF report (optional)
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
+- Price estimation card (with hidden field for PDF) - already added, but turned off during multi-tank calculation additions
 - Stage storage table (cumulative volume by elevation, with CSV export)
 - Excavation slope calculator integration (with variable H:V ratios)
 - Load / cover depth validation (H-10, HS-20, HS-25) with visual indicators (PASS/FAIL) with listed FoS based on legacy calculator
