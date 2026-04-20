@@ -22,6 +22,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [x] Price estimation card (with hidden field for PDF)
 - [x] JSON import/export for saving projects
 - [x] Reset form and basic mobile compatibility
+- [X] Multi-tank / multiple system support
 
 ## Next Up (High Priority – Do These Next)
 - [ ] **Visual Crate Generator**  
@@ -30,7 +31,6 @@ Professional web-based calculator for designing and quoting underground stormwat
   - Scale bar + clean engineering style  
   - “Download Layout PNG” button on results page  
   - Include in PDF report (optional)
-  - Multi-tank / multiple system support
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 - Stage storage table (cumulative volume by elevation, with CSV export)
