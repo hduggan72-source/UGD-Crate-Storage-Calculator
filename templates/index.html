@@ -18,6 +18,7 @@
         .geo-section { background: #f0f8ff; padding: 15px; border-radius: 6px; margin: 20px 0; }
         .status-pass { color: #2ecc71; font-weight: bold; }
         .status-fail { color: #e74c3c; font-weight: bold; }
+        .note { font-size: 0.9em; color: #666; margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -59,33 +60,39 @@
             </div>
         </div>
 
-        <!-- Dimensions & Materials -->
+        <!-- Dimensions & Perimeter Override -->
         <div class="form-grid" style="margin-top:20px">
             <div>
                 <label>Known Width (ft) — from plans</label>
                 <input type="number" step="0.01" name="known_width" min="0" placeholder="Enter here" value="{{ form_data.get('known_width', '') }}">
                 <label>Known Length (ft) — from plans</label>
                 <input type="number" step="0.01" name="known_length" min="0" placeholder="Enter here" value="{{ form_data.get('known_length', '') }}">
-                <label>Perimeter Stone Width (ft)</label>
-                <input type="number" step="0.1" name="perimeter_stone_width" min="0" placeholder="Enter here" value="{{ form_data.get('perimeter_stone_width', '') }}">
+                
+                <label>Actual Tank Perimeter (ft) — optional override for complex shapes</label>
+                <input type="number" step="0.01" name="tank_perimeter" min="0" 
+                       placeholder="Leave blank to auto-calculate 2×(W+L)" 
+                       value="{{ form_data.get('tank_perimeter', '') }}">
+                <div class="note">Use this for L-shaped, stepped, or irregular crate layouts to get accurate side plate count</div>
             </div>
             <div>
+                <label>Perimeter Stone Width (ft)</label>
+                <input type="number" step="0.1" name="perimeter_stone_width" min="0" placeholder="Enter here" value="{{ form_data.get('perimeter_stone_width', '') }}">
                 <label>Cover Stone Depth (ft)</label>
                 <input type="number" step="0.1" name="cover_stone" min="0" placeholder="Enter here" value="{{ form_data.get('cover_stone', '') }}">
                 <label>Base Stone Depth (ft)</label>
                 <input type="number" step="0.001" name="base_stone" min="0" placeholder="Enter here" value="{{ form_data.get('base_stone', '') }}">
-                <label>Stone Void Ratio</label>
-                <input type="number" step="0.01" name="stone_void" min="0" max="1" placeholder="Enter here" value="{{ form_data.get('stone_void', '') }}">
             </div>
         </div>
 
-        <!-- Minimum Storage + Geo Waste -->
+        <!-- Minimum Storage, Stone Void, Geo Waste -->
         <div class="form-grid" style="margin-top:20px">
             <div>
                 <label>Minimum Required Storage Volume (ft³)</label>
                 <input type="number" step="0.1" name="min_storage" min="0" placeholder="e.g., 5000" value="{{ form_data.get('min_storage', '') }}">
             </div>
             <div>
+                <label>Stone Void Ratio</label>
+                <input type="number" step="0.01" name="stone_void" min="0" max="1" placeholder="Enter here" value="{{ form_data.get('stone_void', '') }}">
                 <label>Geotextile Waste/Overlap (%)</label>
                 <input type="number" step="1" name="geoWaste" min="0" value="{{ form_data.get('geoWaste', '0') }}" placeholder="0">
             </div>
@@ -127,6 +134,7 @@
             <h2>Results – {{ results.config }} Configuration ({{ results.layers }} Layers)</h2>
             <p><strong>Known Site Dimensions:</strong> {{ results.known_width }} ft × {{ results.known_length }} ft</p>
             <p><strong>Snapped Tank Dimensions:</strong> {{ results.tank_width }} ft × {{ results.tank_length }} ft × {{ results.tank_height }} ft</p>
+            <p><strong>Used Perimeter for Side Plates:</strong> {{ results.used_perimeter }} ft</p>
             <p>AquaCell Tank Storage: {{ results.tank_storage }} ft³</p>
             <p>Stone Backfill Storage: {{ results.stone_storage }} ft³</p>
             <p class="highlight"><strong>Total System Storage:</strong> {{ results.total_storage }} ft³</p>
@@ -194,7 +202,7 @@
 </div>
 
 <script>
-// All JavaScript functions (already working from previous fix)
+// RESET FORM
 function resetForm() {
     document.getElementById('mainForm').reset();
     const resultsDiv = document.querySelector('.results');
@@ -204,6 +212,7 @@ function resetForm() {
     document.getElementById('hiddenTotalAquaCellCost').value = '';
 }
 
+// DOWNLOAD PDF
 function downloadPDF() {
     const form = document.getElementById('mainForm');
     const formData = new FormData(form);
@@ -234,6 +243,7 @@ function downloadPDF() {
     });
 }
 
+// PRICE CALCULATION
 function calculateAquaCellPrice() {
     const costPerFt3 = parseFloat(document.getElementById('costPerFt3').value);
     if (!isFinite(costPerFt3) || costPerFt3 <= 0) {
@@ -261,6 +271,7 @@ function calculateAquaCellPrice() {
     document.getElementById('hiddenTotalAquaCellCost').value = totalCost.toFixed(2);
 }
 
+// EXPORT PROJECT
 function exportProject() {
     const formData = {};
     const inputs = document.querySelectorAll('#mainForm input, #mainForm select');
@@ -281,6 +292,7 @@ function exportProject() {
     URL.revokeObjectURL(url);
 }
 
+// IMPORT PROJECT
 function importProject(event) {
     const file = event.target.files[0];
     if (!file) return;
