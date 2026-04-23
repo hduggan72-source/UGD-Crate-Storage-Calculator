@@ -67,8 +67,16 @@ def index():
         total_stone_storage = (total_excavation_vol - gross_tank_vol) * stone_void
         total_storage = tank_storage + total_stone_storage
 
-        # Side plates
-        tank_perimeter = 2 * (tank_width + tank_length)
+        # ─────────────────────────────────────────────────────────────
+        # ACTUAL TANK PERIMETER OVERRIDE (High Priority Feature)
+        # ─────────────────────────────────────────────────────────────
+        tank_perimeter_override = request.form.get('tank_perimeter')
+        if tank_perimeter_override and tank_perimeter_override.strip():
+            tank_perimeter = float(tank_perimeter_override)
+        else:
+            tank_perimeter = 2 * (tank_width + tank_length)
+
+        # Side plates use the (possibly overridden) perimeter
         side_plates = round(tank_perimeter * (layers * side_multiplier) / 5.17)
 
         # BOM
@@ -82,7 +90,7 @@ def index():
         # Burrito-style Geotextile (always wrapped)
         tank_area = tank_width * tank_length
         tank_peri = 2 * (tank_width + tank_length)
-        geo_tank = tank_area + (tank_peri * tank_height) + tank_area   # top + sides + bottom
+        geo_tank = tank_area + (tank_peri * tank_height) + tank_area
 
         outer_area = outer_width * outer_length
         geo_stone = outer_area + (2 * (outer_width + outer_length) * total_system_depth) + outer_area
@@ -119,6 +127,8 @@ def index():
             # Minimum storage validation
             'min_storage': round(min_storage, 1) if min_storage is not None else None,
             'storage_status': storage_status,
+            # Perimeter override display
+            'used_perimeter': round(tank_perimeter, 2),
         }
 
         form_data = request.form
@@ -149,9 +159,7 @@ def download_pdf():
     min_storage_str = request.form.get('min_storage')
     min_storage = float(min_storage_str) if min_storage_str and min_storage_str.strip() else None
 
-    # ─────────────────────────────────────────────────────────────
-    # RECALCULATE EVERYTHING
-    # ─────────────────────────────────────────────────────────────
+    # Tank dimensions
     MODULE_WID = 1.9685
     MODULE_LEN = 3.937
     crates_wide = math.floor(known_width / MODULE_WID)
@@ -181,7 +189,15 @@ def download_pdf():
     total_stone_storage = (total_excavation_vol - gross_tank_vol) * stone_void
     total_storage = tank_storage + total_stone_storage
 
-    tank_perimeter = 2 * (tank_width + tank_length)
+    # ─────────────────────────────────────────────────────────────
+    # ACTUAL TANK PERIMETER OVERRIDE
+    # ─────────────────────────────────────────────────────────────
+    tank_perimeter_override = request.form.get('tank_perimeter')
+    if tank_perimeter_override and tank_perimeter_override.strip():
+        tank_perimeter = float(tank_perimeter_override)
+    else:
+        tank_perimeter = 2 * (tank_width + tank_length)
+
     side_plates = round(tank_perimeter * (layers * side_multiplier) / 5.17)
 
     if config == 'SC':
@@ -214,7 +230,6 @@ def download_pdf():
     w, h = letter
     y = h - 80
 
-    # Logo attempt
     try:
         from reportlab.lib.utils import ImageReader
         import os
@@ -241,6 +256,7 @@ def download_pdf():
         f"Config: {config} — {layers} Layers",
         f"Known Site Dimensions: {known_width:.1f} ft × {known_length:.1f} ft",
         f"Snapped Tank: {tank_width:.2f} ft × {tank_length:.2f} ft × {tank_height:.2f} ft",
+        f"Used Perimeter (Side Plates): {tank_perimeter:.2f} ft",
         f"AquaCell Tank Storage: {tank_storage:.1f} ft³",
         f"Stone Storage: {total_stone_storage:.1f} ft³",
         f"Total System Storage: {total_storage:.1f} ft³",
