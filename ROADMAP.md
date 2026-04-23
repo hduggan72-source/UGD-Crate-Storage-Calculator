@@ -11,6 +11,8 @@ Professional web-based calculator for designing and quoting underground stormwat
   - Base Unit (3091506)
   - Side Plate (2476600003)
   - Bottom Plate (2476600001)
+  - 8-12" Pipe Connector (2476631200)
+  - 12" Top Adapter (3085857)
 - [x] Burrito-style geotextile logic (AquaCell tank + full stone envelope always wrapped, including bottom of base stone)
 - [x] Geotextile section placed **below** Bill of Materials and **above** Price Estimation card
 - [x] Geotextile Waste/Overlap (%) input with live multiplier
@@ -22,6 +24,8 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [x] JSON import/export for saving projects
 - [x] Reset form and basic mobile compatibility
 - [X] Multi-tank / multiple system support
+- [X] Minimum Required Storage Volume input field added
+- [ ] 
 
 ## Next Up (High Priority – Do These Next)
 - [ ] **Visual Crate Generator**  
