@@ -16,6 +16,8 @@
         th, td { border: 1px solid #aaa; padding: 8px; text-align: left; }
         .highlight { font-weight: bold; color: #0056b3; }
         .geo-section { background: #f0f8ff; padding: 15px; border-radius: 6px; margin: 20px 0; }
+        .status-pass { color: #2ecc71; font-weight: bold; }
+        .status-fail { color: #e74c3c; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -25,6 +27,7 @@
 
     <form id="mainForm" method="post" action="/">
 
+        <!-- Project Info -->
         <div class="form-grid">
             <div>
                 <label>Project Name</label>
@@ -56,6 +59,7 @@
             </div>
         </div>
 
+        <!-- Dimensions & Materials -->
         <div class="form-grid" style="margin-top:20px">
             <div>
                 <label>Known Width (ft) — from plans</label>
@@ -75,6 +79,19 @@
             </div>
         </div>
 
+        <!-- Minimum Storage + Geo Waste -->
+        <div class="form-grid" style="margin-top:20px">
+            <div>
+                <label>Minimum Required Storage Volume (ft³)</label>
+                <input type="number" step="0.1" name="min_storage" min="0" placeholder="e.g., 5000" value="{{ form_data.get('min_storage', '') }}">
+            </div>
+            <div>
+                <label>Geotextile Waste/Overlap (%)</label>
+                <input type="number" step="1" name="geoWaste" min="0" value="{{ form_data.get('geoWaste', '0') }}" placeholder="0">
+            </div>
+        </div>
+
+        <!-- Accessories -->
         <div class="form-grid" style="margin-top:20px">
             <div>
                 <label>8-12" Pipe Connector (2476631200)</label>
@@ -83,14 +100,6 @@
             <div>
                 <label>12" Top Adapter (3085857)</label>
                 <input type="number" name="top_adapters_12" min="0" placeholder="Enter quantity" value="{{ form_data.get('top_adapters_12', '') }}">
-            </div>
-        </div>
-
-        <!-- Geotextile Waste Input -->
-        <div class="form-grid" style="margin-top:20px">
-            <div>
-                <label>Geotextile Waste/Overlap (%)</label>
-                <input type="number" step="1" name="geoWaste" min="0" value="{{ form_data.get('geoWaste', '0') }}" placeholder="0">
             </div>
         </div>
 
@@ -119,8 +128,16 @@
             <p><strong>Known Site Dimensions:</strong> {{ results.known_width }} ft × {{ results.known_length }} ft</p>
             <p><strong>Snapped Tank Dimensions:</strong> {{ results.tank_width }} ft × {{ results.tank_length }} ft × {{ results.tank_height }} ft</p>
             <p>AquaCell Tank Storage: {{ results.tank_storage }} ft³</p>
-            <p>Stone Backfill Storage: {{ results.stone_storage if results.stone_storage is not none else '—' }} ft³</p>
+            <p>Stone Backfill Storage: {{ results.stone_storage }} ft³</p>
             <p class="highlight"><strong>Total System Storage:</strong> {{ results.total_storage }} ft³</p>
+
+            {% if results.min_storage is not none %}
+            <p><strong>Minimum Required Storage:</strong> {{ results.min_storage }} ft³ 
+               <span class="{{ 'status-pass' if results.storage_status == 'PASS' else 'status-fail' }}">
+                   → {{ results.storage_status }}
+               </span>
+            </p>
+            {% endif %}
 
             <h3>Bill of Materials</h3>
             <table>
@@ -132,19 +149,18 @@
                 <tr><td>12" Top Adapters (3085857)</td><td>{{ results.top_adapters_12 }}</td></tr>
             </table>
 
-            <!-- GEOTEXTILE SECTION - Now BELOW BOM and ABOVE Price Estimation -->
             <div class="geo-section">
                 <h3>Geotextile Fabric Requirements (Non-woven - Burrito Style Wrap)</h3>
                 <table>
                     <tr><th>Item</th><th>Quantity (ft²)</th></tr>
                     <tr><td>Geotextile - AquaCell Only</td><td>{{ results.geoTank }}</td></tr>
                     <tr><td>Geotextile - Stone Envelope</td><td>{{ results.geoStone }}</td></tr>
-                    <tr><td><strong>Total Geotextile (AquaCell + Stone)</strong></td><td><strong>{{ results.geoTotal }}</strong></td></tr>
-                    <tr><td>Geotextile Waste/Overlap (%)</td><td>{{ results.geoWaste }}%</td></tr>
+                    <tr><td><strong>Total Geotextile</strong></td><td><strong>{{ results.geoTotal }}</strong></td></tr>
+                    <tr><td>Waste/Overlap (%)</td><td>{{ results.geoWaste }}%</td></tr>
                 </table>
             </div>
 
-            <!-- PRICE ESTIMATION CARD -->
+            <!-- Price Estimation -->
             <div style="margin-top: 25px; padding: 20px; background: #1e2a44; color: white; border-radius: 8px;">
                 <h3 style="margin-top:0; color:#00b0ff;">Price Estimation</h3>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
@@ -169,7 +185,6 @@
                         <div id="priceTotalCost" style="font-size:1.4em; font-weight:bold; color:#00ffaa;">—</div>
                     </div>
                 </div>
-
                 <input type="hidden" id="hiddenTotalAquaCellCost" name="totalAquaCellCost" value="">
             </div>
         </div>
@@ -179,7 +194,7 @@
 </div>
 
 <script>
-// RESET FORM
+// All JavaScript functions (already working from previous fix)
 function resetForm() {
     document.getElementById('mainForm').reset();
     const resultsDiv = document.querySelector('.results');
@@ -189,29 +204,36 @@ function resetForm() {
     document.getElementById('hiddenTotalAquaCellCost').value = '';
 }
 
-// DOWNLOAD PDF REPORT
 function downloadPDF() {
     const form = document.getElementById('mainForm');
     const formData = new FormData(form);
-    formData.append('totalAquaCellCost', document.getElementById('hiddenTotalAquaCellCost').value || '—');
+    const hiddenCost = document.getElementById('hiddenTotalAquaCellCost').value || '—';
+    formData.append('totalAquaCellCost', hiddenCost);
     
     fetch('/download_pdf', {
         method: 'POST',
         body: formData
     })
-    .then(response => response.blob())
+    .then(response => {
+        if (!response.ok) throw new Error('PDF generation failed');
+        return response.blob();
+    })
     .then(blob => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = 'AquaCell_V12_Report.pdf';
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
         URL.revokeObjectURL(url);
     })
-    .catch(() => alert('Error downloading PDF. Please run "Calculate System" first.'));
+    .catch(err => {
+        console.error(err);
+        alert('Error downloading PDF. Make sure you clicked "Calculate System" first.');
+    });
 }
 
-// CALCULATE AQUACELL PRICE
 function calculateAquaCellPrice() {
     const costPerFt3 = parseFloat(document.getElementById('costPerFt3').value);
     if (!isFinite(costPerFt3) || costPerFt3 <= 0) {
@@ -239,22 +261,23 @@ function calculateAquaCellPrice() {
     document.getElementById('hiddenTotalAquaCellCost').value = totalCost.toFixed(2);
 }
 
-// EXPORT / IMPORT functions (unchanged)
 function exportProject() {
     const formData = {};
-    const inputs = document.querySelectorAll('input, select');
+    const inputs = document.querySelectorAll('#mainForm input, #mainForm select');
     inputs.forEach(input => {
         if (input.name) formData[input.name] = input.value;
     });
     const timestamp = new Date().toISOString().slice(0,10);
-    const projectName = (document.querySelector('input[name="project_name"]')?.value || 'PROJECT').replace(/[^a-zA-Z0-9]/g, '_');
+    const projectName = (document.querySelector('input[name="project_name"]')?.value || 'PROJECT').replace(/[^a-zA-Z0-9\-_]/g, '_');
     const jsonString = JSON.stringify(formData, null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `AquaCell_${projectName}_${timestamp}.json`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
 
@@ -271,13 +294,13 @@ function importProject(event) {
             });
             alert('✅ Project loaded successfully! Click "Calculate System" to refresh results.');
         } catch (err) {
-            alert('❌ Error reading JSON file.');
+            console.error(err);
+            alert('❌ Error reading JSON file. Please select a valid AquaCell export file.');
         }
     };
     reader.readAsText(file);
     event.target.value = '';
 }
 </script>
-
 </body>
 </html>
