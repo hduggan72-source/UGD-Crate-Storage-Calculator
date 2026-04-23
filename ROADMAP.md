@@ -25,7 +25,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [x] Reset form and basic mobile compatibility
 - [X] Multi-tank / multiple system support
 - [X] Minimum Required Storage Volume input field added
-- [ ] 
+- [X] Variable area input field that will allow for correct calculation of side plates when complex tank is scaled
 
 ## Next Up (High Priority – Do These Next)
 - [ ] **Visual Crate Generator**  
@@ -49,7 +49,6 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Integration of Wavin installation details (access ports, geogrid, compaction notes)
 - Dark/light theme toggle for UI
 - Separate Quote Sheet & BOM Command buttons to generate individual pages with different disclaimers as needed
-- Variable area input field that will allow for correct calculation of side plates when complex tank is scaled
 - Logo/banner on main UI page
 - Revisit RESET PAGE command as the individual input fields do not reset, only the summary and price card
 - PASS/FAIL VALIDATIONS (Minimum volume vs. required, minimum/maximum depths (cover and total install)
