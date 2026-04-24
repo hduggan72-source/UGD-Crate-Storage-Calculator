@@ -4,25 +4,63 @@
     <meta charset="UTF-8">
     <title>AquaCell V12 Crate Calculator</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background: #f8f9fa; }
-        .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.1); }
-        h1 { color: #0056b3; }
+        :root {
+            --bg: #f8f9fa;
+            --card: white;
+            --text: #212529;
+            --accent: #007bff;
+            --border: #dee2e6;
+            --highlight: #e7f3ff;
+        }
+        [data-theme="dark"] {
+            --bg: #0f172a;
+            --card: #1e2937;
+            --text: #e2e8f0;
+            --accent: #60a5fa;
+            --border: #334155;
+            --highlight: #1e3a8a;
+        }
+
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 40px; 
+            background: var(--bg); 
+            color: var(--text); 
+            transition: all 0.3s;
+        }
+        .container { 
+            max-width: 1100px; 
+            margin: auto; 
+            background: var(--card); 
+            padding: 30px; 
+            border-radius: 8px; 
+            box-shadow: 0 0 15px rgba(0,0,0,0.1); 
+            border: 1px solid var(--border);
+            position: relative;
+        }
+        h1 { color: var(--accent); }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         label { display: block; margin: 8px 0 4px; font-weight: bold; }
-        input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        input, select { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--text); }
         button { padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        .results { margin-top: 30px; padding: 20px; background: #e7f3ff; border-radius: 8px; }
+        .results { margin-top: 30px; padding: 20px; background: var(--highlight); border-radius: 8px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #aaa; padding: 8px; text-align: left; }
-        .highlight { font-weight: bold; color: #0056b3; }
+        th, td { border: 1px solid var(--border); padding: 8px; text-align: left; }
+        .highlight { font-weight: bold; color: var(--accent); }
         .geo-section { background: #f0f8ff; padding: 15px; border-radius: 6px; margin: 20px 0; }
+        [data-theme="dark"] .geo-section { background: #1e3a8a; }
         .status-pass { color: #2ecc71; font-weight: bold; }
         .status-fail { color: #e74c3c; font-weight: bold; }
         .note { font-size: 0.9em; color: #666; margin-top: 4px; }
+        [data-theme="dark"] .note { color: #94a3b8; }
+        .suggested { font-size: 0.85em; color: #28a745; font-style: italic; }
+        .theme-toggle { position: absolute; top: 20px; right: 30px; font-size: 26px; cursor: pointer; background: none; border: none; }
     </style>
 </head>
 <body>
 <div class="container">
+    <button class="theme-toggle" id="themeToggle" title="Toggle Theme">☀️</button>
+
     <h1>AquaCell V12 Crate Calculator</h1>
     <p><strong>Polypropylene Stackable Crates for Underground Stormwater Retention / Detention / Infiltration</strong></p>
 
@@ -32,7 +70,7 @@
         <div class="form-grid">
             <div>
                 <label>Project Name</label>
-                <input type="text" name="project_name" placeholder="Enter here" value="{{ form_data.get('project_name', '') }}">
+                <input type="text" name="project_name" id="project_name" placeholder="Enter here" value="{{ form_data.get('project_name', '') }}">
                 <label>Project Number</label>
                 <input type="text" name="project_num" placeholder="Enter here" value="{{ form_data.get('project_num', '') }}">
                 <label>Location (City, State)</label>
@@ -60,41 +98,49 @@
             </div>
         </div>
 
-        <!-- Dimensions & Perimeter Override -->
+        <!-- Elevations -->
         <div class="form-grid" style="margin-top:20px">
             <div>
-                <label>Known Width (ft) — from plans</label>
-                <input type="number" step="0.01" name="known_width" min="0" placeholder="Enter here" value="{{ form_data.get('known_width', '') }}">
-                <label>Known Length (ft) — from plans</label>
-                <input type="number" step="0.01" name="known_length" min="0" placeholder="Enter here" value="{{ form_data.get('known_length', '') }}">
-                
-                <label>Actual Tank Perimeter (ft) — optional override for complex shapes</label>
-                <input type="number" step="0.01" name="tank_perimeter" min="0" 
-                       placeholder="Leave blank to auto-calculate 2×(W+L)" 
-                       value="{{ form_data.get('tank_perimeter', '') }}">
-                <div class="note">Use this for L-shaped, stepped, or irregular crate layouts to get accurate side plate count</div>
+                <label>Estimated Surface Elevation (ft)</label>
+                <input type="number" step="0.01" name="surface_elev" placeholder="e.g., 850.50" value="{{ form_data.get('surface_elev', '') }}">
+                <label>AquaCell Tank Bottom Elevation (ft)</label>
+                <input type="number" step="0.01" name="tank_bottom_elev" placeholder="e.g., 840.00" value="{{ form_data.get('tank_bottom_elev', '') }}">
             </div>
             <div>
-                <label>Perimeter Stone Width (ft)</label>
-                <input type="number" step="0.1" name="perimeter_stone_width" min="0" placeholder="Enter here" value="{{ form_data.get('perimeter_stone_width', '') }}">
-                <label>Cover Stone Depth (ft)</label>
-                <input type="number" step="0.1" name="cover_stone" min="0" placeholder="Enter here" value="{{ form_data.get('cover_stone', '') }}">
-                <label>Base Stone Depth (ft)</label>
-                <input type="number" step="0.001" name="base_stone" min="0" placeholder="Enter here" value="{{ form_data.get('base_stone', '') }}">
+                <label>Known Width (ft) — from plans</label>
+                <input type="number" step="0.01" name="known_width" min="0" value="{{ form_data.get('known_width', '') }}">
+                <label>Known Length (ft) — from plans</label>
+                <input type="number" step="0.01" name="known_length" min="0" value="{{ form_data.get('known_length', '') }}">
             </div>
         </div>
 
-        <!-- Minimum Storage, Stone Void, Geo Waste -->
+        <!-- Dimensions & Stone -->
+        <div class="form-grid" style="margin-top:20px">
+            <div>
+                <label>Actual Tank Perimeter (ft) — optional override</label>
+                <input type="number" step="0.01" name="tank_perimeter" min="0" placeholder="Leave blank for auto" value="{{ form_data.get('tank_perimeter', '') }}">
+                <label>Perimeter Stone Width (ft)</label>
+                <input type="number" step="0.1" name="perimeter_stone_width" min="0" value="{{ form_data.get('perimeter_stone_width', '') }}">
+            </div>
+            <div>
+                <label>Cover Stone Depth (ft)</label>
+                <input type="number" step="0.1" name="cover_stone" min="0" value="{{ form_data.get('cover_stone', '') }}">
+                <label>Base Stone Depth (ft)</label>
+                <input type="number" step="0.001" name="base_stone" min="0" value="{{ form_data.get('base_stone', '') }}">
+            </div>
+        </div>
+
+        <!-- Minimum Storage + Void + Geo -->
         <div class="form-grid" style="margin-top:20px">
             <div>
                 <label>Minimum Required Storage Volume (ft³)</label>
-                <input type="number" step="0.1" name="min_storage" min="0" placeholder="e.g., 5000" value="{{ form_data.get('min_storage', '') }}">
+                <input type="number" step="0.1" name="min_storage" min="0" value="{{ form_data.get('min_storage', '') }}">
             </div>
             <div>
                 <label>Stone Void Ratio</label>
-                <input type="number" step="0.01" name="stone_void" min="0" max="1" placeholder="Enter here" value="{{ form_data.get('stone_void', '') }}">
+                <input type="number" step="0.01" name="stone_void" min="0" max="1" value="{{ form_data.get('stone_void', '') }}">
                 <label>Geotextile Waste/Overlap (%)</label>
-                <input type="number" step="1" name="geoWaste" min="0" value="{{ form_data.get('geoWaste', '0') }}" placeholder="0">
+                <input type="number" step="1" name="geoWaste" min="0" value="{{ form_data.get('geoWaste', '0') }}">
             </div>
         </div>
 
@@ -102,48 +148,42 @@
         <div class="form-grid" style="margin-top:20px">
             <div>
                 <label>8-12" Pipe Connector (2476631200)</label>
-                <input type="number" name="pipe_connectors" min="0" placeholder="Enter quantity" value="{{ form_data.get('pipe_connectors', '') }}">
+                <input type="number" name="pipe_connectors" min="0" value="{{ form_data.get('pipe_connectors', '') }}">
             </div>
             <div>
                 <label>12" Top Adapter (3085857)</label>
-                <input type="number" name="top_adapters_12" min="0" placeholder="Enter quantity" value="{{ form_data.get('top_adapters_12', '') }}">
+                <input type="number" name="top_adapters_12" id="top_adapters_12" min="0" value="{{ form_data.get('top_adapters_12', '') }}">
+                <div id="topAdapterSuggestion" class="suggested"></div>
             </div>
         </div>
 
         <div style="margin-top: 30px; display: flex; gap: 12px; flex-wrap: wrap;">
-            <button type="submit" style="background:#007bff; color:white; padding:12px 24px; border:none; border-radius:6px; font-size:16px; cursor:pointer;">
-                Calculate System
-            </button>
-            <button type="button" onclick="resetForm()" style="background:#6c757d; color:white; padding:12px 24px; border:none; border-radius:6px; font-size:16px; cursor:pointer;">
-                Reset Form
-            </button>
-            <button type="button" onclick="downloadPDF()" style="background:#28a745; color:white; padding:12px 24px; border:none; border-radius:6px; font-size:16px; cursor:pointer;">
-                Download PDF Report
-            </button>
-            <button type="button" onclick="exportProject()" style="background:#17a2b8; color:white; padding:12px 24px; border:none; border-radius:6px; font-size:16px; cursor:pointer;">
-                Export Project (JSON)
-            </button>
-            <button type="button" onclick="document.getElementById('importFile').click()" style="background:#ffc107; color:#212529; padding:12px 24px; border:none; border-radius:6px; font-size:16px; cursor:pointer;">
-                Import Project (JSON)
-            </button>
+            <button type="submit" style="background:#007bff; color:white;">Calculate System</button>
+            <button type="button" onclick="resetForm()" style="background:#6c757d; color:white;">Reset Form</button>
+            <button type="button" onclick="downloadPDF()" style="background:#28a745; color:white;">Download PDF Report</button>
+            <button type="button" onclick="exportProject()" style="background:#17a2b8; color:white;">Export Project (JSON)</button>
+            <button type="button" onclick="document.getElementById('importFile').click()" style="background:#ffc107; color:#212529;">Import Project (JSON)</button>
             <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importProject(event)">
         </div>
 
         {% if results %}
         <div class="results">
             <h2>Results – {{ results.config }} Configuration ({{ results.layers }} Layers)</h2>
-            <p><strong>Known Site Dimensions:</strong> {{ results.known_width }} ft × {{ results.known_length }} ft</p>
+            <p><strong>Surface Elevation:</strong> {{ results.surface_elev }} ft</p>
+            <p><strong>Tank Bottom Elevation:</strong> {{ results.tank_bottom_elev }} ft</p>
+            <p><strong>Tank Top Elevation:</strong> {{ results.tank_top_elev }} ft</p>
+            <p><strong>Actual Cover Depth:</strong> {{ results.cover_depth }} ft 
+               <span class="{{ 'status-pass' if results.cover_status == 'PASS' else 'status-fail' }}">→ {{ results.cover_status }}</span>
+            </p>
             <p><strong>Snapped Tank Dimensions:</strong> {{ results.tank_width }} ft × {{ results.tank_length }} ft × {{ results.tank_height }} ft</p>
-            <p><strong>Used Perimeter for Side Plates:</strong> {{ results.used_perimeter }} ft</p>
+            <p><strong>Used Perimeter:</strong> {{ results.used_perimeter }} ft</p>
             <p>AquaCell Tank Storage: {{ results.tank_storage }} ft³</p>
             <p>Stone Backfill Storage: {{ results.stone_storage }} ft³</p>
             <p class="highlight"><strong>Total System Storage:</strong> {{ results.total_storage }} ft³</p>
 
             {% if results.min_storage is not none %}
-            <p><strong>Minimum Required Storage:</strong> {{ results.min_storage }} ft³ 
-               <span class="{{ 'status-pass' if results.storage_status == 'PASS' else 'status-fail' }}">
-                   → {{ results.storage_status }}
-               </span>
+            <p><strong>Minimum Required Storage:</strong> {{ results.min_storage }} ft³ → 
+               <span class="{{ 'status-pass' if results.storage_status == 'PASS' else 'status-fail' }}">{{ results.storage_status }}</span>
             </p>
             {% endif %}
 
@@ -153,18 +193,17 @@
                 <tr><td>Base Unit (3091506)</td><td>{{ results.base_units }}</td></tr>
                 <tr><td>Side Plate (2476600003)</td><td>{{ results.side_plates }}</td></tr>
                 <tr><td>Bottom Plate (2476600001)</td><td>{{ results.bottom_plates }}</td></tr>
-                <tr><td>8-12" Pipe Connectors (2476631200)</td><td>{{ results.pipe_connectors }}</td></tr>
-                <tr><td>12" Top Adapters (3085857)</td><td>{{ results.top_adapters_12 }}</td></tr>
+                <tr><td>8-12" Pipe Connectors</td><td>{{ results.pipe_connectors }}</td></tr>
+                <tr><td>12" Top Adapters</td><td>{{ results.top_adapters_12 }}</td></tr>
             </table>
 
             <div class="geo-section">
-                <h3>Geotextile Fabric Requirements (Non-woven - Burrito Style Wrap)</h3>
+                <h3>Geotextile (Burrito Wrap)</h3>
                 <table>
                     <tr><th>Item</th><th>Quantity (ft²)</th></tr>
-                    <tr><td>Geotextile - AquaCell Only</td><td>{{ results.geoTank }}</td></tr>
-                    <tr><td>Geotextile - Stone Envelope</td><td>{{ results.geoStone }}</td></tr>
-                    <tr><td><strong>Total Geotextile</strong></td><td><strong>{{ results.geoTotal }}</strong></td></tr>
-                    <tr><td>Waste/Overlap (%)</td><td>{{ results.geoWaste }}%</td></tr>
+                    <tr><td>AquaCell Only</td><td>{{ results.geoTank }}</td></tr>
+                    <tr><td>Stone Envelope</td><td>{{ results.geoStone }}</td></tr>
+                    <tr><td><strong>Total</strong></td><td><strong>{{ results.geoTotal }}</strong></td></tr>
                 </table>
             </div>
 
@@ -182,7 +221,6 @@
                         </button>
                     </div>
                 </div>
-
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                     <div style="background:#112033; padding:12px; border-radius:4px;">
                         <div style="font-size:0.9em; color:#ccc;">Net AquaCell Storage Used (ft³)</div>
@@ -202,117 +240,119 @@
 </div>
 
 <script>
-// RESET FORM
+// Theme Toggle
+const toggleBtn = document.getElementById('themeToggle');
+const saved = localStorage.getItem('theme') || 'light';
+if (saved === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    toggleBtn.textContent = '🌙';
+}
+toggleBtn.addEventListener('click', () => {
+    if (document.documentElement.getAttribute('data-theme') === 'dark') {
+        document.documentElement.removeAttribute('data-theme');
+        toggleBtn.textContent = '☀️';
+        localStorage.setItem('theme', 'light');
+    } else {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        toggleBtn.textContent = '🌙';
+        localStorage.setItem('theme', 'dark');
+    }
+});
+
+// All other functions (reset, download, export, import, price, suggestion)
 function resetForm() {
     document.getElementById('mainForm').reset();
     const resultsDiv = document.querySelector('.results');
     if (resultsDiv) resultsDiv.innerHTML = '';
     document.getElementById('priceCrateStorage').textContent = '—';
     document.getElementById('priceTotalCost').textContent = '—';
-    document.getElementById('hiddenTotalAquaCellCost').value = '';
 }
 
-// DOWNLOAD PDF
 function downloadPDF() {
     const form = document.getElementById('mainForm');
     const formData = new FormData(form);
-    const hiddenCost = document.getElementById('hiddenTotalAquaCellCost').value || '—';
-    formData.append('totalAquaCellCost', hiddenCost);
+    formData.append('totalAquaCellCost', document.getElementById('hiddenTotalAquaCellCost').value || '—');
     
-    fetch('/download_pdf', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => {
-        if (!response.ok) throw new Error('PDF generation failed');
-        return response.blob();
-    })
+    const projectName = (document.getElementById('project_name').value || 'Project').trim()
+                        .replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
+    
+    fetch('/download_pdf', { method: 'POST', body: formData })
+    .then(r => r.blob())
     .then(blob => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'AquaCell_V12_Report.pdf';
-        document.body.appendChild(a);
+        a.download = `AquaCell_${projectName}.pdf`;
         a.click();
-        document.body.removeChild(a);
         URL.revokeObjectURL(url);
     })
-    .catch(err => {
-        console.error(err);
-        alert('Error downloading PDF. Make sure you clicked "Calculate System" first.');
-    });
+    .catch(() => alert('PDF download failed. Try Calculate first.'));
 }
 
-// PRICE CALCULATION
 function calculateAquaCellPrice() {
-    const costPerFt3 = parseFloat(document.getElementById('costPerFt3').value);
-    if (!isFinite(costPerFt3) || costPerFt3 <= 0) {
+    const cost = parseFloat(document.getElementById('costPerFt3').value);
+    if (!isFinite(cost) || cost <= 0) {
         alert('Please enter a valid cost per cubic foot.');
         return;
     }
-
-    const pageText = document.body.innerText || document.body.textContent;
-    const match = pageText.match(/AquaCell Tank Storage:\s*([\d,]+\.?\d*)/i);
-    
+    const match = document.body.innerText.match(/AquaCell Tank Storage:\s*([\d,]+\.?\d*)/i);
     if (!match) {
-        alert('Run "Calculate System" first to generate AquaCell storage volume.');
+        alert('Run Calculate System first.');
         return;
     }
-
-    const netStorage = parseFloat(match[1].replace(/,/g, ''));
-    if (!isFinite(netStorage) || netStorage <= 0) {
-        alert('Run "Calculate System" first.');
-        return;
-    }
-
-    const totalCost = costPerFt3 * netStorage;
-    document.getElementById('priceCrateStorage').textContent = netStorage.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
-    document.getElementById('priceTotalCost').textContent = totalCost.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
-    document.getElementById('hiddenTotalAquaCellCost').value = totalCost.toFixed(2);
+    const storage = parseFloat(match[1].replace(/,/g, ''));
+    const total = cost * storage;
+    document.getElementById('priceCrateStorage').textContent = storage.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+    document.getElementById('priceTotalCost').textContent = total.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+    document.getElementById('hiddenTotalAquaCellCost').value = total.toFixed(2);
 }
 
-// EXPORT PROJECT
 function exportProject() {
-    const formData = {};
-    const inputs = document.querySelectorAll('#mainForm input, #mainForm select');
-    inputs.forEach(input => {
-        if (input.name) formData[input.name] = input.value;
+    const data = {};
+    document.querySelectorAll('#mainForm input, #mainForm select').forEach(el => {
+        if (el.name) data[el.name] = el.value;
     });
-    const timestamp = new Date().toISOString().slice(0,10);
-    const projectName = (document.querySelector('input[name="project_name"]')?.value || 'PROJECT').replace(/[^a-zA-Z0-9\-_]/g, '_');
-    const jsonString = JSON.stringify(formData, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
+    const proj = (document.getElementById('project_name').value || 'Project').trim().replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
+    const ts = new Date().toISOString().slice(0,10);
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `AquaCell_${projectName}_${timestamp}.json`;
-    document.body.appendChild(a);
+    a.download = `AquaCell_${proj}_${ts}.json`;
     a.click();
-    document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
 
-// IMPORT PROJECT
 function importProject(event) {
     const file = event.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = e => {
         try {
             const data = JSON.parse(e.target.result);
-            Object.keys(data).forEach(key => {
-                const field = document.querySelector(`[name="${key}"]`);
-                if (field) field.value = data[key];
+            Object.keys(data).forEach(k => {
+                const el = document.querySelector(`[name="${k}"]`);
+                if (el) el.value = data[k];
             });
-            alert('✅ Project loaded successfully! Click "Calculate System" to refresh results.');
-        } catch (err) {
-            console.error(err);
-            alert('❌ Error reading JSON file. Please select a valid AquaCell export file.');
-        }
+            alert('✅ Project loaded! Click Calculate System.');
+        } catch(err) { alert('Invalid JSON'); }
     };
     reader.readAsText(file);
     event.target.value = '';
 }
+
+function updateSuggestion() {
+    const div = document.getElementById('topAdapterSuggestion');
+    const m = document.body.innerText.match(/AquaCell Tank Storage:\s*([\d,]+)/i);
+    if (m) {
+        const v = parseFloat(m[1].replace(/,/g,''));
+        if (v > 0) div.textContent = `Suggested: ${Math.max(1, Math.floor(v/3500))} (1 per ~3500 ft³)`;
+    }
+}
+
+window.addEventListener('load', () => {
+    if (document.querySelector('.results')) updateSuggestion();
+});
 </script>
 </body>
 </html>
