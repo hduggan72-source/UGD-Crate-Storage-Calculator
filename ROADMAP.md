@@ -26,6 +26,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [X] Multi-tank / multiple system support
 - [X] Minimum Required Storage Volume input field added
 - [X] Variable area input field that will allow for correct calculation of side plates when complex tank is scaled
+- [X] Add project name to filename extension on all exported files (PDF, JSON, .CSV)
 
 ## Next Up (High Priority – Do These Next)
 - [ ] **Visual Crate Generator**  
@@ -37,7 +38,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 - Add Individual Tank names/location/designation
-- add project name to filename extension on all exported files (PDF, JSON, .CSV)
+
 - Price estimation card (with hidden field for PDF) - already added, but turned off during multi-tank calculation additions
 - add calculation for price per cubic foot on the output PDF Summary (from customer input or calculated total)
 - Stage storage table (cumulative volume by elevation, with CSV export)
