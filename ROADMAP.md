@@ -27,6 +27,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [X] Minimum Required Storage Volume input field added
 - [X] Variable area input field that will allow for correct calculation of side plates when complex tank is scaled
 - [X] Add project name to filename extension on all exported files (PDF, JSON, .CSV)
+- [X] Amount of Top Adapters calculated based on total volume of tank calculated (=FLOOR(volume/3532,1)
 
 ## Next Up (High Priority – Do These Next)
 - [ ] **Visual Crate Generator**  
@@ -56,7 +57,6 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Revisit RESET PAGE command as the individual input fields do not reset, only the summary and price card
 - PASS/FAIL VALIDATIONS (Minimum volume vs. required, minimum/maximum depths (cover and total install)
 - hidden pages that prepends/appends when PDF is created (cover sheet, standard detail, specs, etc.)
-- Amount of Top Adapters calculated based on total volume of tank calculated (=FLOOR(volume/3532,1)
 - qustion mark symbol which links to minimum requirements of the specific entry field (ex. perimeter, base stone)
 
 ## Change Log
