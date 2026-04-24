@@ -28,6 +28,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [X] Variable area input field that will allow for correct calculation of side plates when complex tank is scaled
 - [X] Add project name to filename extension on all exported files (PDF, JSON, .CSV)
 - [X] Amount of Top Adapters calculated based on total volume of tank calculated (=FLOOR(volume/3532,1)
+- [X] Dark/light theme toggle for UI
 
 ## Next Up (High Priority – Do These Next)
 - [ ] **Visual Crate Generator**  
@@ -51,7 +52,6 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Cost database with unit pricing persistence
 - Print-friendly one-page layout improvements (12" increment tip already noted)
 - Integration of Wavin installation details (access ports, geogrid, compaction notes)
-- Dark/light theme toggle for UI
 - Separate Quote Sheet & BOM Command buttons to generate individual pages with different disclaimers as needed
 - Logo/banner on main UI page
 - Revisit RESET PAGE command as the individual input fields do not reset, only the summary and price card
