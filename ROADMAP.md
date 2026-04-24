@@ -37,7 +37,9 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 - Add Individual Tank names/location/designation
+- add project name to filename extension on all exported files (PDF, JSON, .CSV)
 - Price estimation card (with hidden field for PDF) - already added, but turned off during multi-tank calculation additions
+- add calculation for price per cubic foot on the output PDF Summary (from customer input or calculated total)
 - Stage storage table (cumulative volume by elevation, with CSV export)
 - Excavation slope calculator integration (with variable H:V ratios)
 - Load / cover depth validation (H-10, HS-20, HS-25) with visual indicators (PASS/FAIL) with listed FoS based on legacy calculator
