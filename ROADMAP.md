@@ -29,6 +29,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [X] Add project name to filename extension on all exported files (PDF, JSON, .CSV)
 - [X] Amount of Top Adapters calculated based on total volume of tank calculated (=FLOOR(volume/3532,1)
 - [X] Dark/light theme toggle for UI
+- [X] Load / cover depth validation (H-10, HS-20, HS-25) with visual indicators (PASS/FAIL)
 
 ## Next Up (High Priority – Do These Next)
 - [ ] **Visual Crate Generator**  
@@ -40,12 +41,10 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 - Add Individual Tank names/location/designation
-
 - Price estimation card (with hidden field for PDF) - already added, but turned off during multi-tank calculation additions
 - add calculation for price per cubic foot on the output PDF Summary (from customer input or calculated total)
 - Stage storage table (cumulative volume by elevation, with CSV export)
 - Excavation slope calculator integration (with variable H:V ratios)
-- Load / cover depth validation (H-10, HS-20, HS-25) with visual indicators (PASS/FAIL) with listed FoS based on legacy calculator
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
 - Auto quote number generation (e.g., AC-2026-001)
 - Optional 3D isometric view of the crate layout
@@ -58,6 +57,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - PASS/FAIL VALIDATIONS (Minimum volume vs. required, minimum/maximum depths (cover and total install)
 - hidden pages that prepends/appends when PDF is created (cover sheet, standard detail, specs, etc.)
 - qustion mark symbol which links to minimum requirements of the specific entry field (ex. perimeter, base stone)
+- Add calculated safety factor (FoS) related to top cover depth for anything that is < the minimum cover recommended
 
 ## Change Log
 - **2026-04-18** – Improved PDF report (smaller fonts, restored logo, full disclaimer, better spacing). Geotextile section finalized below BOM.
