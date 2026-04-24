@@ -30,6 +30,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [X] Amount of Top Adapters calculated based on total volume of tank calculated (=FLOOR(volume/3532,1)
 - [X] Dark/light theme toggle for UI
 - [X] Load / cover depth validation (H-10, HS-20, HS-25) with visual indicators (PASS/FAIL)
+- [X] Qustion mark symbol which links to minimum requirements of the specific entry field (ex. perimeter, base stone)
 
 ## Next Up (High Priority – Do These Next)
 - [ ] **Visual Crate Generator**  
@@ -54,9 +55,8 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Separate Quote Sheet & BOM Command buttons to generate individual pages with different disclaimers as needed
 - Logo/banner on main UI page
 - Revisit RESET PAGE command as the individual input fields do not reset, only the summary and price card
-- PASS/FAIL VALIDATIONS (Minimum volume vs. required, minimum/maximum depths (cover and total install)
+- PASS/FAIL VALIDATIONS (minimum/maximum depths (total install)
 - hidden pages that prepends/appends when PDF is created (cover sheet, standard detail, specs, etc.)
-- qustion mark symbol which links to minimum requirements of the specific entry field (ex. perimeter, base stone)
 - Add calculated safety factor (FoS) related to top cover depth for anything that is < the minimum cover recommended
 
 ## Change Log
