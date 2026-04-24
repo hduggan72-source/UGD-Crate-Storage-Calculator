@@ -54,7 +54,40 @@
         .note { font-size: 0.9em; color: #666; margin-top: 4px; }
         [data-theme="dark"] .note { color: #94a3b8; }
         .suggested { font-size: 0.85em; color: #28a745; font-style: italic; }
-        .theme-toggle { position: absolute; top: 20px; right: 30px; font-size: 26px; cursor: pointer; background: none; border: none; }
+
+        /* Help Icon Tooltip */
+        .help-icon {
+            cursor: help;
+            color: var(--accent);
+            font-size: 1.2em;
+            margin-left: 6px;
+            display: inline-block;
+            position: relative;
+        }
+        .help-icon:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--card);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 10px 14px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            width: max-content;
+            max-width: 280px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 100;
+            font-size: 0.9em;
+            line-height: 1.3;
+            text-align: left;
+        }
+        .theme-toggle { 
+            position: absolute; top: 20px; right: 30px; font-size: 26px; 
+            cursor: pointer; background: none; border: none; z-index: 10;
+        }
     </style>
 </head>
 <body>
@@ -107,25 +140,46 @@
                 <input type="number" step="0.01" name="tank_bottom_elev" placeholder="e.g., 840.00" value="{{ form_data.get('tank_bottom_elev', '') }}">
             </div>
             <div>
+                <label>Traffic Load Required 
+                    <span class="help-icon" data-tooltip="HS-20 is most common for roads/parking lots.
+H-10: min cover SC/EX = 1.0 ft
+HS-20: min cover SC = 1.5 ft | EX = 1.33 ft
+HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
+                </label>
+                <select name="traffic_load">
+                    <option value="H10" {{ 'selected' if form_data.get('traffic_load') == 'H10' else '' }}>H-10 Traffic</option>
+                    <option value="HS20" {{ 'selected' if form_data.get('traffic_load') == 'HS20' else '' }} selected>HS-20 Traffic</option>
+                    <option value="HS25" {{ 'selected' if form_data.get('traffic_load') == 'HS25' else '' }}>HS-25 Traffic</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Dimensions -->
+        <div class="form-grid" style="margin-top:20px">
+            <div>
                 <label>Known Width (ft) — from plans</label>
                 <input type="number" step="0.01" name="known_width" min="0" value="{{ form_data.get('known_width', '') }}">
                 <label>Known Length (ft) — from plans</label>
                 <input type="number" step="0.01" name="known_length" min="0" value="{{ form_data.get('known_length', '') }}">
-            </div>
-        </div>
-
-        <!-- Dimensions & Stone -->
-        <div class="form-grid" style="margin-top:20px">
-            <div>
-                <label>Actual Tank Perimeter (ft) — optional override</label>
+                <label>Actual Tank Perimeter (ft) — optional override 
+                    <span class="help-icon" data-tooltip="Leave blank for simple rectangle.
+Use this field for L-shaped, U-shaped, or irregular tank layouts
+to get accurate side-plate count.">?</span>
+                </label>
                 <input type="number" step="0.01" name="tank_perimeter" min="0" placeholder="Leave blank for auto" value="{{ form_data.get('tank_perimeter', '') }}">
-                <label>Perimeter Stone Width (ft)</label>
-                <input type="number" step="0.1" name="perimeter_stone_width" min="0" value="{{ form_data.get('perimeter_stone_width', '') }}">
             </div>
             <div>
+                <label>Perimeter Stone Width (ft) 
+                    <span class="help-icon" data-tooltip="Minimum recommended = 1.0 ft (12 inches) on all sides
+for proper stone envelope and compaction.">?</span>
+                </label>
+                <input type="number" step="0.1" name="perimeter_stone_width" min="0" value="{{ form_data.get('perimeter_stone_width', '') }}">
                 <label>Cover Stone Depth (ft)</label>
                 <input type="number" step="0.1" name="cover_stone" min="0" value="{{ form_data.get('cover_stone', '') }}">
-                <label>Base Stone Depth (ft)</label>
+                <label>Base Stone Depth (ft) 
+                    <span class="help-icon" data-tooltip="Minimum 4 inches (0.333 ft) foundation layer required
+for proper load distribution and drainage.">?</span>
+                </label>
                 <input type="number" step="0.001" name="base_stone" min="0" value="{{ form_data.get('base_stone', '') }}">
             </div>
         </div>
@@ -133,13 +187,22 @@
         <!-- Minimum Storage + Void + Geo -->
         <div class="form-grid" style="margin-top:20px">
             <div>
-                <label>Minimum Required Storage Volume (ft³)</label>
+                <label>Minimum Required Storage Volume (ft³) 
+                    <span class="help-icon" data-tooltip="Total system storage (AquaCell + stone) must meet or exceed this value.
+PASS/FAIL shown in results.">?</span>
+                </label>
                 <input type="number" step="0.1" name="min_storage" min="0" value="{{ form_data.get('min_storage', '') }}">
             </div>
             <div>
-                <label>Stone Void Ratio</label>
+                <label>Stone Void Ratio 
+                    <span class="help-icon" data-tooltip="Typical value = 0.40 (40%) for clean #57 stone.
+Adjust if using different aggregate.">?</span>
+                </label>
                 <input type="number" step="0.01" name="stone_void" min="0" max="1" value="{{ form_data.get('stone_void', '') }}">
-                <label>Geotextile Waste/Overlap (%)</label>
+                <label>Geotextile Waste/Overlap (%) 
+                    <span class="help-icon" data-tooltip="Typical 10-15% for overlaps, seams, and waste.
+Burrito-wrap style includes top, sides, and bottom.">?</span>
+                </label>
                 <input type="number" step="1" name="geoWaste" min="0" value="{{ form_data.get('geoWaste', '0') }}">
             </div>
         </div>
@@ -169,7 +232,7 @@
         {% if results %}
         <div class="results">
             <h2>Results – {{ results.config }} Configuration ({{ results.layers }} Layers)</h2>
-            <p><strong>Surface Elevation:</strong> {{ results.surface_elev }} ft</p>
+            <p><strong>Estimated Surface Elevation:</strong> {{ results.surface_elev }} ft</p>
             <p><strong>Tank Bottom Elevation:</strong> {{ results.tank_bottom_elev }} ft</p>
             <p><strong>Tank Top Elevation:</strong> {{ results.tank_top_elev }} ft</p>
             <p><strong>Actual Cover Depth:</strong> {{ results.cover_depth }} ft 
@@ -242,8 +305,8 @@
 <script>
 // Theme Toggle
 const toggleBtn = document.getElementById('themeToggle');
-const saved = localStorage.getItem('theme') || 'light';
-if (saved === 'dark') {
+const savedTheme = localStorage.getItem('theme') || 'light';
+if (savedTheme === 'dark') {
     document.documentElement.setAttribute('data-theme', 'dark');
     toggleBtn.textContent = '🌙';
 }
@@ -259,7 +322,6 @@ toggleBtn.addEventListener('click', () => {
     }
 });
 
-// All other functions (reset, download, export, import, price, suggestion)
 function resetForm() {
     document.getElementById('mainForm').reset();
     const resultsDiv = document.querySelector('.results');
@@ -286,7 +348,7 @@ function downloadPDF() {
         a.click();
         URL.revokeObjectURL(url);
     })
-    .catch(() => alert('PDF download failed. Try Calculate first.'));
+    .catch(() => alert('PDF download failed. Try Calculate System first.'));
 }
 
 function calculateAquaCellPrice() {
