@@ -38,24 +38,94 @@
             border: 1px solid var(--border);
             position: relative;
         }
-        h1 { color: var(--accent); }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        label { display: block; margin: 8px 0 4px; font-weight: bold; }
-        input, select { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--text); }
-        button { padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        .results { margin-top: 30px; padding: 20px; background: var(--highlight); border-radius: 8px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid var(--border); padding: 8px; text-align: left; }
-        .highlight { font-weight: bold; color: var(--accent); }
-        .geo-section { background: #f0f8ff; padding: 15px; border-radius: 6px; margin: 20px 0; }
-        [data-theme="dark"] .geo-section { background: #1e3a8a; }
-        .status-pass { color: #2ecc71; font-weight: bold; }
-        .status-fail { color: #e74c3c; font-weight: bold; }
-        .note { font-size: 0.9em; color: #666; margin-top: 4px; }
-        [data-theme="dark"] .note { color: #94a3b8; }
-        .suggested { font-size: 0.85em; color: #28a745; font-style: italic; }
-
-        /* Help Icon Tooltip */
+        .header { 
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+            margin-bottom: 20px; 
+        }
+        .header img { 
+            height: 70px; 
+        }
+        h1 { 
+            color: var(--accent); 
+            margin: 0; 
+        }
+        .form-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 20px; 
+        }
+        label { 
+            display: block; 
+            margin: 8px 0 4px; 
+            font-weight: bold; 
+        }
+        input, select { 
+            width: 100%; 
+            padding: 8px; 
+            border: 1px solid var(--border); 
+            border-radius: 4px; 
+            background: var(--card); 
+            color: var(--text); 
+        }
+        button { 
+            padding: 12px 24px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 16px; 
+        }
+        .results { 
+            margin-top: 30px; 
+            padding: 20px; 
+            background: var(--highlight); 
+            border-radius: 8px; 
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 15px; 
+        }
+        th, td { 
+            border: 1px solid var(--border); 
+            padding: 8px; 
+            text-align: left; 
+        }
+        .highlight { 
+            font-weight: bold; 
+            color: var(--accent); 
+        }
+        .geo-section { 
+            background: #f0f8ff; 
+            padding: 15px; 
+            border-radius: 6px; 
+            margin: 20px 0; 
+        }
+        [data-theme="dark"] .geo-section { 
+            background: #1e3a8a; 
+        }
+        .status-pass { 
+            color: #2ecc71; 
+            font-weight: bold; 
+        }
+        .status-fail { 
+            color: #e74c3c; 
+            font-weight: bold; 
+        }
+        .note { 
+            font-size: 0.9em; 
+            color: #666; 
+            margin-top: 4px; 
+        }
+        [data-theme="dark"] .note { 
+            color: #94a3b8; 
+        }
+        .suggested { 
+            font-size: 0.85em; 
+            color: #28a745; 
+            font-style: italic; 
+        }
         .help-icon {
             cursor: help;
             color: var(--accent);
@@ -85,8 +155,14 @@
             text-align: left;
         }
         .theme-toggle { 
-            position: absolute; top: 20px; right: 30px; font-size: 26px; 
-            cursor: pointer; background: none; border: none; z-index: 10;
+            position: absolute; 
+            top: 20px; 
+            right: 30px; 
+            font-size: 26px; 
+            cursor: pointer; 
+            background: none; 
+            border: none; 
+            z-index: 10;
         }
     </style>
 </head>
@@ -94,8 +170,14 @@
 <div class="container">
     <button class="theme-toggle" id="themeToggle" title="Toggle Theme">☀️</button>
 
-    <h1>AquaCell V12 Crate Calculator</h1>
-    <p><strong>Polypropylene Stackable Crates for Underground Stormwater Retention / Detention / Infiltration</strong></p>
+    <!-- Logo Header -->
+    <div class="header">
+        <img src="/static/aquacell-logo.png" alt="AquaCell Logo" onerror="this.style.display='none';">
+        <div>
+            <h1>AquaCell V12 Crate Calculator</h1>
+            <p><strong>Polypropylene Stackable Crates for Underground Stormwater Retention / Detention / Infiltration</strong></p>
+        </div>
+    </div>
 
     <form id="mainForm" method="post" action="/">
 
@@ -148,7 +230,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 </label>
                 <select name="traffic_load">
                     <option value="H10" {{ 'selected' if form_data.get('traffic_load') == 'H10' else '' }}>H-10 Traffic</option>
-                    <option value="HS20" {{ 'selected' if form_data.get('traffic_load') == 'HS20' else '' }} selected>HS-20 Traffic</option>
+                    <option value="HS20" {{ 'selected' if form_data.get('traffic_load') == 'HS20' else '' }}>HS-20 Traffic</option>
                     <option value="HS25" {{ 'selected' if form_data.get('traffic_load') == 'HS25' else '' }}>HS-25 Traffic</option>
                 </select>
             </div>
@@ -243,6 +325,7 @@ Burrito-wrap style includes top, sides, and bottom.">?</span>
             <p>AquaCell Tank Storage: {{ results.tank_storage }} ft³</p>
             <p>Stone Backfill Storage: {{ results.stone_storage }} ft³</p>
             <p class="highlight"><strong>Total System Storage:</strong> {{ results.total_storage }} ft³</p>
+            <p class="highlight"><strong>Estimated Stone Backfill Volume to Purchase:</strong> {{ results.stone_backfill_bulk_ft3 }} ft³ ({{ results.stone_backfill_bulk_yd3 }} yd³)</p>
 
             {% if results.min_storage is not none %}
             <p><strong>Minimum Required Storage:</strong> {{ results.min_storage }} ft³ → 
@@ -334,10 +417,8 @@ function downloadPDF() {
     const form = document.getElementById('mainForm');
     const formData = new FormData(form);
     formData.append('totalAquaCellCost', document.getElementById('hiddenTotalAquaCellCost').value || '—');
-    
     const projectName = (document.getElementById('project_name').value || 'Project').trim()
                         .replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
-    
     fetch('/download_pdf', { method: 'POST', body: formData })
     .then(r => r.blob())
     .then(blob => {
@@ -348,7 +429,7 @@ function downloadPDF() {
         a.click();
         URL.revokeObjectURL(url);
     })
-    .catch(() => alert('PDF download failed. Try Calculate System first.'));
+    .catch(() => alert('PDF download failed. Try Calculate first.'));
 }
 
 function calculateAquaCellPrice() {
