@@ -14,6 +14,18 @@ MIN_COVER = {
     'EX': {'H10': 1.0, 'HS20': 1.33, 'HS25': 1.83}
 }
 
+# Maximum allowable COVER depth (surface to top of tank) from Wavin literature
+MAX_COVER = {
+    'SC': {'H10': 14.4, 'HS20': 14.4, 'HS25': 14.1},
+    'EX': {'H10': 26.2, 'HS20': 26.2, 'HS25': 26.1}
+}
+
+# Compressive strength from loading model Excel
+MAX_COMPRESSIVE_STRENGTH = {
+    'SC': 70,   # psi - Standard
+    'EX': 100   # psi - Extra Strong
+}
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     results = None
@@ -112,11 +124,24 @@ def index():
         tank_top_elev = None
         cover_depth = None
         cover_status = None
+        max_cover_status = None
+        max_cover_req = None
+        fos_dead = None
+        dead_load_psi = None
         if surface_elev is not None and tank_bottom_elev is not None:
             tank_top_elev = tank_bottom_elev + tank_height
             cover_depth = surface_elev - tank_top_elev
             min_cover_req = MIN_COVER[config].get(traffic_load, 1.0)
             cover_status = "PASS" if cover_depth >= min_cover_req else "FAIL"
+
+            # MAXIMUM ALLOWABLE COVER DEPTH VALIDATION
+            max_cover_req = MAX_COVER[config].get(traffic_load, 999)
+            max_cover_status = "PASS" if cover_depth <= max_cover_req else "FAIL"
+
+            # NEW: Factor of Safety from Loading Model (Dead Load + Live Load reference)
+            max_strength = MAX_COMPRESSIVE_STRENGTH[config]
+            dead_load_psi = round(cover_depth * 120 / 144, 2) if cover_depth > 0 else 0
+            fos_dead = round(max_strength / dead_load_psi, 2) if dead_load_psi > 0 else None
 
         storage_status = "PASS" if min_storage is None or total_storage >= min_storage else "FAIL"
 
@@ -148,10 +173,15 @@ def index():
             'tank_top_elev': round(tank_top_elev, 2) if tank_top_elev is not None else None,
             'cover_depth': round(cover_depth, 2) if cover_depth is not None else None,
             'cover_status': cover_status,
+            'max_cover_req': round(max_cover_req, 1) if max_cover_req else None,
+            'max_cover_status': max_cover_status,
             'traffic_load': traffic_load,
             'stone_backfill_bulk_ft3': round(stone_backfill_bulk_ft3, 1),
             'stone_backfill_bulk_yd3': round(stone_backfill_bulk_yd3, 2),
             'project_notes': project_notes,
+            'max_compressive_strength': MAX_COMPRESSIVE_STRENGTH[config],
+            'dead_load_psi': dead_load_psi,
+            'fos_dead': fos_dead,
         }
 
         form_data = request.form
@@ -161,7 +191,7 @@ def index():
 
 @app.route('/download_pdf', methods=['POST'])
 def download_pdf():
-    # FULL RECALCULATION
+    # FULL RECALCULATION (identical to index route)
     project_name = request.form.get('project_name', 'Untitled Project')
     project_num = request.form.get('project_num', '')
     location = request.form.get('location', '')
@@ -243,15 +273,27 @@ def download_pdf():
     geo_stone *= (1 + waste_factor)
     geo_total = geo_tank + geo_stone
 
-    # Elevation & Cover
+    # Elevation & Cover Logic + FoS
     tank_top_elev = None
     cover_depth = None
     cover_status = None
+    max_cover_status = None
+    max_cover_req = None
+    fos_dead = None
+    dead_load_psi = None
     if surface_elev is not None and tank_bottom_elev is not None:
         tank_top_elev = tank_bottom_elev + tank_height
         cover_depth = surface_elev - tank_top_elev
         min_cover_req = MIN_COVER[config].get(traffic_load, 1.0)
         cover_status = "PASS" if cover_depth >= min_cover_req else "FAIL"
+
+        max_cover_req = MAX_COVER[config].get(traffic_load, 999)
+        max_cover_status = "PASS" if cover_depth <= max_cover_req else "FAIL"
+
+        # FoS from Loading Model (Dead Load)
+        max_strength = MAX_COMPRESSIVE_STRENGTH[config]
+        dead_load_psi = round(cover_depth * 120 / 144, 2) if cover_depth and cover_depth > 0 else 0
+        fos_dead = round(max_strength / dead_load_psi, 2) if dead_load_psi > 0 else None
 
     # ====================== PDF GENERATION ======================
     buffer = io.BytesIO()
@@ -278,6 +320,9 @@ def download_pdf():
         f"Tank Bottom Elevation: {tank_bottom_elev if tank_bottom_elev is not None else '—'} ft",
         f"Tank Top Elevation: {tank_top_elev if tank_top_elev is not None else '—'} ft",
         f"Actual Cover Depth: {cover_depth:.2f} ft → {cover_status if cover_status else '—'}",
+        f"Maximum Allowable Cover Depth: {max_cover_req:.1f} ft → {max_cover_status if max_cover_status else '—'}",
+        f"Dead Load Pressure: {dead_load_psi} psi",
+        f"Factor of Safety (Dead Load): {fos_dead if fos_dead else '—'}",
         f"Traffic Load: {traffic_load}",
         f"Snapped Tank: {tank_width:.2f} ft × {tank_length:.2f} ft × {tank_height:.2f} ft",
         f"AquaCell Tank Storage: {tank_storage:.1f} ft³",
