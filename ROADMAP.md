@@ -31,6 +31,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [X] Dark/light theme toggle for UI
 - [X] Load / cover depth validation (H-10, HS-20, HS-25) with visual indicators (PASS/FAIL)
 - [X] Qustion mark symbol which links to minimum requirements of the specific entry field (ex. perimeter, base stone)
+- [X] Logo/banner on main UI page
 
 ## Next Up (High Priority – Do These Next)
 - [ ] **Visual Crate Generator**  
@@ -41,7 +42,9 @@ Professional web-based calculator for designing and quoting underground stormwat
   - Include in PDF report (optional)
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
-- Add Individual Tank names/location/designation
+- Auto quote number generation (e.g., AC-2026-001) / Override to enter own project number (add to PDF Summary export)
+- Update disclaimer from V10 - add to PDF Summary and bottom of UX page below price card
+- Add Individual Tank names/location/designation (MULTI-TANK BRANCH)
 - Price estimation card (with hidden field for PDF) - already added, but turned off during multi-tank calculation additions
 - add calculation for price per cubic foot on the output PDF Summary (from customer input or calculated total)
 - Stage storage table (cumulative volume by elevation, with CSV export)
@@ -53,11 +56,14 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Print-friendly one-page layout improvements (12" increment tip already noted)
 - Integration of Wavin installation details (access ports, geogrid, compaction notes)
 - Separate Quote Sheet & BOM Command buttons to generate individual pages with different disclaimers as needed
-- Logo/banner on main UI page
 - Revisit RESET PAGE command as the individual input fields do not reset, only the summary and price card
 - PASS/FAIL VALIDATIONS (minimum/maximum depths (total install)
 - hidden pages that prepends/appends when PDF is created (cover sheet, standard detail, specs, etc.)
 - Add calculated safety factor (FoS) related to top cover depth for anything that is < the minimum cover recommended
+- 
+- <div class="disclaimer">
+        <strong>Disclaimer:</strong> This calculator provides <em>preliminary, conceptual estimates only</em> and is <em>not a stamped engineering design</em>. Wavin’s assistance in sizing or product selection is advisory and does not constitute design responsibility or guarantee system performance. The Engineer of Record (EoR) is solely responsible for verifying all design parameters and site conditions, including hydrology, structural requirements, soils, environmental factors, and integration with the overall stormwater system. AquaCell dimensions and assumptions (including usable storage and unit base areas) follow published product data. <strong>Final layouts, capacities, and installation depths must be confirmed by a licensed Professional Engineer</strong> using project‑specific plans (grading, pipe sizes and materials, invert elevations, loading conditions, and applicable codes/standards).
+      </div>
 
 ## Change Log
 - **2026-04-18** – Improved PDF report (smaller fonts, restored logo, full disclaimer, better spacing). Geotextile section finalized below BOM.
