@@ -61,13 +61,17 @@
             margin: 8px 0 4px; 
             font-weight: bold; 
         }
-        input, select { 
+        input, select, textarea { 
             width: 100%; 
             padding: 8px; 
             border: 1px solid var(--border); 
             border-radius: 4px; 
             background: var(--card); 
             color: var(--text); 
+        }
+        textarea { 
+            min-height: 120px; 
+            resize: vertical; 
         }
         button { 
             padding: 12px 24px; 
@@ -302,6 +306,12 @@ Burrito-wrap style includes top, sides, and bottom.">?</span>
             </div>
         </div>
 
+        <!-- NEW PROJECT NOTES FIELD -->
+        <div style="margin-top:25px;">
+            <label>Project Notes / Special Instructions / Assumptions</label>
+            <textarea name="project_notes" placeholder="Enter any additional notes, assumptions, special requirements, or comments here...">{{ form_data.get('project_notes', '') }}</textarea>
+        </div>
+
         <div style="margin-top: 30px; display: flex; gap: 12px; flex-wrap: wrap;">
             <button type="submit" style="background:#007bff; color:white;">Calculate System</button>
             <button type="button" onclick="resetForm()" style="background:#6c757d; color:white;">Reset Form</button>
@@ -331,6 +341,10 @@ Burrito-wrap style includes top, sides, and bottom.">?</span>
             <p><strong>Minimum Required Storage:</strong> {{ results.min_storage }} ft³ → 
                <span class="{{ 'status-pass' if results.storage_status == 'PASS' else 'status-fail' }}">{{ results.storage_status }}</span>
             </p>
+            {% endif %}
+
+            {% if results.project_notes %}
+            <p><strong>Project Notes:</strong> {{ results.project_notes | replace('\n', '<br>') | safe }}</p>
             {% endif %}
 
             <h3>Bill of Materials</h3>
@@ -452,7 +466,7 @@ function calculateAquaCellPrice() {
 
 function exportProject() {
     const data = {};
-    document.querySelectorAll('#mainForm input, #mainForm select').forEach(el => {
+    document.querySelectorAll('#mainForm input, #mainForm select, #mainForm textarea').forEach(el => {
         if (el.name) data[el.name] = el.value;
     });
     const proj = (document.getElementById('project_name').value || 'Project').trim().replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
