@@ -32,6 +32,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [X] Load / cover depth validation (H-10, HS-20, HS-25) with visual indicators (PASS/FAIL)
 - [X] Qustion mark symbol which links to minimum requirements of the specific entry field (ex. perimeter, base stone)
 - [X] Logo/banner on main UI page
+- [X] Project Notes Field
 
 ## Next Up (High Priority – Do These Next)
 - [ ] **Visual Crate Generator**  
@@ -60,7 +61,6 @@ Professional web-based calculator for designing and quoting underground stormwat
 - PASS/FAIL VALIDATIONS (minimum/maximum depths (total install)
 - hidden pages that prepends/appends when PDF is created (cover sheet, standard detail, specs, etc.)
 - Add calculated safety factor (FoS) related to top cover depth for anything that is < the minimum cover recommended
-- 
 - <div class="disclaimer">
         <strong>Disclaimer:</strong> This calculator provides <em>preliminary, conceptual estimates only</em> and is <em>not a stamped engineering design</em>. Wavin’s assistance in sizing or product selection is advisory and does not constitute design responsibility or guarantee system performance. The Engineer of Record (EoR) is solely responsible for verifying all design parameters and site conditions, including hydrology, structural requirements, soils, environmental factors, and integration with the overall stormwater system. AquaCell dimensions and assumptions (including usable storage and unit base areas) follow published product data. <strong>Final layouts, capacities, and installation depths must be confirmed by a licensed Professional Engineer</strong> using project‑specific plans (grading, pipe sizes and materials, invert elevations, loading conditions, and applicable codes/standards).
       </div>
