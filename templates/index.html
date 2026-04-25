@@ -168,6 +168,17 @@
             border: none; 
             z-index: 10;
         }
+        .footnote {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 15px;
+            line-height: 1.4;
+            border-top: 1px solid var(--border);
+            padding-top: 10px;
+        }
+        [data-theme="dark"] .footnote {
+            color: #94a3b8;
+        }
     </style>
 </head>
 <body>
@@ -306,7 +317,7 @@ Burrito-wrap style includes top, sides, and bottom.">?</span>
             </div>
         </div>
 
-        <!-- NEW PROJECT NOTES FIELD -->
+        <!-- Project Notes -->
         <div style="margin-top:25px;">
             <label>Project Notes / Special Instructions / Assumptions</label>
             <textarea name="project_notes" placeholder="Enter any additional notes, assumptions, special requirements, or comments here...">{{ form_data.get('project_notes', '') }}</textarea>
@@ -330,6 +341,19 @@ Burrito-wrap style includes top, sides, and bottom.">?</span>
             <p><strong>Actual Cover Depth:</strong> {{ results.cover_depth }} ft 
                <span class="{{ 'status-pass' if results.cover_status == 'PASS' else 'status-fail' }}">→ {{ results.cover_status }}</span>
             </p>
+            <p><strong>Maximum Allowable Cover Depth:</strong> {{ results.max_cover_req }} ft 
+               <span class="{{ 'status-pass' if results.max_cover_status == 'PASS' else 'status-fail' }}">→ {{ results.max_cover_status }}</span>
+            </p>
+            <p><strong>Dead Load Pressure:</strong> {{ results.dead_load_psi }} psi</p>
+            <p><strong>Factor of Safety (Dead Load):</strong> {{ results.fos_dead if results.fos_dead else '—' }}</p>
+
+            <!-- FOOTNOTE EXPLAINING CALCULATION -->
+            <div class="footnote">
+                <strong>Note on calculations:</strong><br>
+                Dead Load Pressure (psi) = Cover Depth (ft) × 120 pcf ÷ 144<br>
+                Factor of Safety (Dead Load) = Maximum Compressive Strength of AquaCell (70 psi for SC / 100 psi for EX) ÷ Dead Load Pressure
+            </div>
+
             <p><strong>Snapped Tank Dimensions:</strong> {{ results.tank_width }} ft × {{ results.tank_length }} ft × {{ results.tank_height }} ft</p>
             <p><strong>Used Perimeter:</strong> {{ results.used_perimeter }} ft</p>
             <p>AquaCell Tank Storage: {{ results.tank_storage }} ft³</p>
