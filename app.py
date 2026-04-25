@@ -36,6 +36,7 @@ def index():
         pipe_connectors = int(request.form.get('pipe_connectors') or 0)
         top_adapters_12 = int(request.form.get('top_adapters_12') or 0)
         geo_waste = float(request.form.get('geoWaste') or 0)
+        project_notes = request.form.get('project_notes', '')
 
         surface_elev = float(request.form.get('surface_elev') or 0) if request.form.get('surface_elev') else None
         tank_bottom_elev = float(request.form.get('tank_bottom_elev') or 0) if request.form.get('tank_bottom_elev') else None
@@ -150,6 +151,7 @@ def index():
             'traffic_load': traffic_load,
             'stone_backfill_bulk_ft3': round(stone_backfill_bulk_ft3, 1),
             'stone_backfill_bulk_yd3': round(stone_backfill_bulk_yd3, 2),
+            'project_notes': project_notes,
         }
 
         form_data = request.form
@@ -159,7 +161,7 @@ def index():
 
 @app.route('/download_pdf', methods=['POST'])
 def download_pdf():
-    # FULL RECALCULATION (identical to index route)
+    # FULL RECALCULATION
     project_name = request.form.get('project_name', 'Untitled Project')
     project_num = request.form.get('project_num', '')
     location = request.form.get('location', '')
@@ -175,6 +177,7 @@ def download_pdf():
     pipe_connectors = int(request.form.get('pipe_connectors') or 0)
     top_adapters_12 = int(request.form.get('top_adapters_12') or 0)
     geo_waste = float(request.form.get('geoWaste') or 0)
+    project_notes = request.form.get('project_notes', '')
 
     surface_elev = float(request.form.get('surface_elev') or 0) if request.form.get('surface_elev') else None
     tank_bottom_elev = float(request.form.get('tank_bottom_elev') or 0) if request.form.get('tank_bottom_elev') else None
@@ -255,7 +258,7 @@ def download_pdf():
     c = canvas.Canvas(buffer, pagesize=letter)
     w, h = letter
 
-    # LOGO (now using absolute path)
+    # Logo
     logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
     if os.path.exists(logo_path):
         c.drawImage(logo_path, 50, h - 100, width=180, height=60, preserveAspectRatio=True)
@@ -281,6 +284,9 @@ def download_pdf():
         f"Stone Storage: {total_stone_storage:.1f} ft³",
         f"Total System Storage: {total_storage:.1f} ft³",
         f"Estimated Stone Backfill Volume to Purchase: {stone_backfill_bulk_ft3:.1f} ft³ ({stone_backfill_bulk_yd3:.2f} yd³)",
+        "",
+        "Project Notes:",
+        project_notes if project_notes else "—",
         "",
         "Bill of Materials",
         f"Base Unit (3091506) ................ {base_units}",
