@@ -46,6 +46,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 - Auto quote number generation (e.g., AC-2026-001) / Override to enter own project number (add to PDF Summary export)
+- Fix the Stage Storage card color in DARD mode
 - Add Individual Tank names/location/designation (MULTI-TANK BRANCH)
 - Price estimation card (with hidden field for PDF) - already added, but turned off during multi-tank calculation additions
 - Stage storage table (cumulative volume by elevation, with CSV export)
