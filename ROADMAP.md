@@ -35,6 +35,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [X] Project Notes Field
 - [X] PASS/FAIL VALIDATIONS (minimum/maximum depths (total install)
 - [X] Add calculated safety factor (FoS) related to top cover depth for anything that is < the minimum cover recommended
+- [X] Stage storage table (cumulative volume by elevation, with CSV export)
 
 ## Next Up (High Priority – Do These Next)
 - [ ] **Visual Crate Generator**  
@@ -46,10 +47,9 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 - Auto quote number generation (e.g., AC-2026-001) / Override to enter own project number (add to PDF Summary export)
-- Fix the Stage Storage card color in DARD mode
+- Fix the Stage Storage card color in DARK mode
 - Add Individual Tank names/location/designation (MULTI-TANK BRANCH)
 - Price estimation card (with hidden field for PDF) - already added, but turned off during multi-tank calculation additions
-- Stage storage table (cumulative volume by elevation, with CSV export)
 - Excavation slope calculator integration (with variable H:V ratios)
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
 - Optional 3D isometric view of the crate layout
