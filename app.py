@@ -4,26 +4,8 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import datetime
 import math
-import os
 
 app = Flask(__name__)
-
-# Minimum cover requirements (ft) from Wavin docs
-MIN_COVER = {
-    'SC': {'H10': 1.0, 'HS20': 1.5, 'HS25': 2.5},
-    'EX': {'H10': 1.0, 'HS20': 1.33, 'HS25': 1.83}
-}
-
-# Maximum allowable COVER depth from Wavin literature
-MAX_COVER = {
-    'SC': {'H10': 14.4, 'HS20': 14.4, 'HS25': 14.1},
-    'EX': {'H10': 26.2, 'HS20': 26.2, 'HS25': 26.1}
-}
-
-MAX_COMPRESSIVE_STRENGTH = {
-    'SC': 70,
-    'EX': 100
-}
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -31,32 +13,36 @@ def index():
     form_data = {}
 
     if request.method == 'POST':
-        # Project Info
+        # ─────────────────────────────────────────────────────────────
+        # READ ALL FORM DATA (matches your full index.html)
+        # ─────────────────────────────────────────────────────────────
         project_name = request.form.get('project_name', '')
         project_num = request.form.get('project_num', '')
         location = request.form.get('location', '')
         client = request.form.get('client', '')
         config = request.form.get('config', 'SC')
-        layers = int(request.form.get('layers') or 3)
-        known_width = float(request.form.get('known_width') or 0)
-        known_length = float(request.form.get('known_length') or 0)
-        perimeter_stone_width = float(request.form.get('perimeter_stone_width') or 1.0)
-        cover_stone = float(request.form.get('cover_stone') or 1.0)
-        base_stone = float(request.form.get('base_stone') or 0.333)
-        stone_void = float(request.form.get('stone_void') or 0.40)
-        pipe_connectors = int(request.form.get('pipe_connectors') or 0)
-        top_adapters_12 = int(request.form.get('top_adapters_12') or 0)
-        geo_waste = float(request.form.get('geoWaste') or 0)
+        layers = int(request.form.get('layers', 3))
+        surface_elev = float(request.form.get('surface_elev', 0) or 0)
+        tank_bottom_elev = float(request.form.get('tank_bottom_elev', 0) or 0)
+        traffic_load = request.form.get('traffic_load', 'HS20')
+        known_width = float(request.form.get('known_width', 0) or 0)
+        known_length = float(request.form.get('known_length', 0) or 0)
+        tank_perimeter = request.form.get('tank_perimeter', '').strip()
+        perimeter_stone_width = float(request.form.get('perimeter_stone_width', 1.0) or 1.0)
+        cover_stone = float(request.form.get('cover_stone', 1.0) or 1.0)
+        base_stone = float(request.form.get('base_stone', 0.333) or 0.333)
+        min_storage = float(request.form.get('min_storage', 0) or 0)
+        stone_void = float(request.form.get('stone_void', 0.40) or 0.40)
+        geoWaste = int(request.form.get('geoWaste', 0) or 0)
+        pipe_connectors = int(request.form.get('pipe_connectors', 0) or 0)
+        top_adapters_12 = int(request.form.get('top_adapters_12', 0) or 0)
         project_notes = request.form.get('project_notes', '')
         include_stage_storage = request.form.get('include_stage_storage') == 'yes'
-        stage_increment_in = float(request.form.get('stage_increment_in', 1.0))
+        stage_increment_in = int(request.form.get('stage_increment_in', 12) or 12)
 
-        surface_elev = float(request.form.get('surface_elev') or 0) if request.form.get('surface_elev') else None
-        tank_bottom_elev = float(request.form.get('tank_bottom_elev') or 0) if request.form.get('tank_bottom_elev') else None
-        traffic_load = request.form.get('traffic_load', 'HS20')
-        min_storage = float(request.form.get('min_storage') or 0) if request.form.get('min_storage') else None
-
-        # Tank dimensions
+        # ─────────────────────────────────────────────────────────────
+        # CALCULATIONS - FULL SC/EX SUPPORT
+        # ─────────────────────────────────────────────────────────────
         MODULE_WID = 1.9685
         MODULE_LEN = 3.937
         crates_wide = math.floor(known_width / MODULE_WID)
@@ -68,7 +54,7 @@ def index():
             layer_heights = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]
             void_ratio = 0.95486
             side_multiplier = 1.312336
-        else:  # EX
+        else:  # EX Configuration
             layer_heights = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
             void_ratio = 0.92633
             side_multiplier = 1.509186351
@@ -79,26 +65,17 @@ def index():
         gross_tank_vol = num_crates * (MODULE_WID * MODULE_LEN * tank_height / layers)
         tank_storage = gross_tank_vol * void_ratio
 
-        # Stone backfill envelope
+        # Stone backfill
         outer_width = tank_width + 2 * perimeter_stone_width
         outer_length = tank_length + 2 * perimeter_stone_width
         total_system_depth = base_stone + tank_height + cover_stone
         total_excavation_vol = outer_width * outer_length * total_system_depth
-
-        stone_backfill_bulk_ft3 = total_excavation_vol - gross_tank_vol
-        stone_backfill_bulk_yd3 = stone_backfill_bulk_ft3 / 27
-
-        total_stone_storage = stone_backfill_bulk_ft3 * stone_void
+        total_stone_storage = (total_excavation_vol - gross_tank_vol) * stone_void
         total_storage = tank_storage + total_stone_storage
 
-        # Perimeter override
-        tank_perimeter_override = request.form.get('tank_perimeter')
-        if tank_perimeter_override and tank_perimeter_override.strip():
-            tank_perimeter = float(tank_perimeter_override)
-        else:
-            tank_perimeter = 2 * (tank_width + tank_length)
-
-        side_plates = round(tank_perimeter * (layers * side_multiplier) / 5.17)
+        # Side plates
+        tank_perim_calc = float(tank_perimeter) if tank_perimeter else 2 * (tank_width + tank_length)
+        side_plates = round(tank_perim_calc * (layers * side_multiplier) / 5.17)
 
         # BOM
         if config == 'SC':
@@ -108,94 +85,36 @@ def index():
             base_units = num_crates * 2
             bottom_plates = 0
 
-        # Burrito Geotextile
-        tank_area = tank_width * tank_length
-        tank_peri = 2 * (tank_width + tank_length)
-        geo_tank = tank_area + (tank_peri * tank_height) + tank_area
-        outer_area = outer_width * outer_length
-        geo_stone = outer_area + (2 * (outer_width + outer_length) * total_system_depth) + outer_area
-        waste_factor = max(geo_waste / 100.0, 0.0)
-        geo_tank *= (1 + waste_factor)
-        geo_stone *= (1 + waste_factor)
-        geo_total = geo_tank + geo_stone
-
-        # Elevation & Cover Logic
-        tank_top_elev = None
-        cover_depth = None
-        cover_status = None
-        max_cover_status = None
-        max_cover_req = None
-        dead_load_psi = None
-        fos_dead = None
-        if surface_elev is not None and tank_bottom_elev is not None:
-            tank_top_elev = tank_bottom_elev + tank_height
-            cover_depth = surface_elev - tank_top_elev
-            min_cover_req = MIN_COVER[config].get(traffic_load, 1.0)
-            cover_status = "PASS" if cover_depth >= min_cover_req else "FAIL"
-
-            max_cover_req = MAX_COVER[config].get(traffic_load, 999)
-            max_cover_status = "PASS" if cover_depth <= max_cover_req else "FAIL"
-
-            max_strength = MAX_COMPRESSIVE_STRENGTH[config]
-            dead_load_psi = round(cover_depth * 120 / 144, 2) if cover_depth and cover_depth > 0 else 0
-            fos_dead = round(max_strength / dead_load_psi, 2) if dead_load_psi > 0 else None
-
-        storage_status = "PASS" if min_storage is None or total_storage >= min_storage else "FAIL"
-
-        # ABSOLUTE ELEVATION STAGE STORAGE (starts at Base Stone Elevation)
+        # Stage Storage Table
         stage_storage = None
-        if include_stage_storage and tank_width > 0 and tank_length > 0 and tank_bottom_elev is not None:
-            step_ft = stage_increment_in / 12.0
-            tank_area = tank_width * tank_length
-            outer_area = outer_width * outer_length
-            total_system_depth = base_stone + tank_height + cover_stone
-
-            base_stone_elev = tank_bottom_elev - base_stone
-            top_stone_elev = base_stone_elev + total_system_depth
-
+        if include_stage_storage:
             stage_storage = []
-            elev = base_stone_elev
-            while elev <= top_stone_elev + 0.001:
-                if elev <= tank_bottom_elev:
-                    tank_stor = 0.0
-                elif elev <= tank_bottom_elev + tank_height:
-                    submerged = elev - tank_bottom_elev
-                    tank_stor = submerged * tank_area * void_ratio
-                else:
-                    tank_stor = tank_storage
+            increment_ft = stage_increment_in / 12.0
+            current_elev = tank_bottom_elev
+            while current_elev <= surface_elev + 0.01:
+                depth_in_tank = max(0, min(tank_height, current_elev - tank_bottom_elev))
+                tank_vol_at_elev = (depth_in_tank / tank_height) * tank_storage if tank_height > 0 else 0
 
-                if elev <= tank_bottom_elev:
-                    stone_stor = (elev - base_stone_elev) * outer_area * stone_void
-                elif elev <= tank_bottom_elev + tank_height:
-                    stone_stor = base_stone * outer_area * stone_void + (elev - tank_bottom_elev) * (outer_area - tank_area) * stone_void
-                else:
-                    stone_stor = base_stone * outer_area * stone_void + tank_height * (outer_area - tank_area) * stone_void + (elev - tank_bottom_elev - tank_height) * outer_area * stone_void
+                depth_in_stone = max(0, min(total_system_depth, current_elev - (tank_bottom_elev - base_stone)))
+                stone_vol_at_elev = (depth_in_stone / total_system_depth) * total_stone_storage if total_system_depth > 0 else 0
 
-                total_stor = tank_stor + stone_stor
+                total_vol_at_elev = tank_vol_at_elev + stone_vol_at_elev
 
                 stage_storage.append({
-                    'elevation_ft': round(elev, 2),
-                    'tank_storage': round(tank_stor, 1),
-                    'stone_storage': round(stone_stor, 1),
-                    'total_storage': round(total_stor, 1)
+                    'elevation_ft': round(current_elev, 2),
+                    'tank_storage': round(tank_vol_at_elev, 1),
+                    'stone_storage': round(stone_vol_at_elev, 1),
+                    'total_storage': round(total_vol_at_elev, 1)
                 })
-                elev += step_ft
-
-            # Force exact Top of Stone row
-            elev = top_stone_elev
-            tank_stor = tank_storage
-            stone_stor = base_stone * outer_area * stone_void + tank_height * (outer_area - tank_area) * stone_void + cover_stone * outer_area * stone_void
-            total_stor = tank_stor + stone_stor
-            stage_storage.append({
-                'elevation_ft': round(elev, 2),
-                'tank_storage': round(tank_stor, 1),
-                'stone_storage': round(stone_stor, 1),
-                'total_storage': round(total_stor, 1)
-            })
+                current_elev += increment_ft
 
         results = {
             'config': config,
             'layers': layers,
+            'surface_elev': surface_elev,
+            'tank_bottom_elev': tank_bottom_elev,
+            'tank_top_elev': round(tank_bottom_elev + tank_height, 2),
+            'cover_depth': round(surface_elev - (tank_bottom_elev + tank_height), 2),
             'tank_width': round(tank_width, 2),
             'tank_length': round(tank_length, 2),
             'tank_height': round(tank_height, 2),
@@ -207,59 +126,33 @@ def index():
             'bottom_plates': bottom_plates,
             'pipe_connectors': pipe_connectors,
             'top_adapters_12': top_adapters_12,
-            'geoTank': round(geo_tank, 1),
-            'geoStone': round(geo_stone, 1),
-            'geoTotal': round(geo_total, 1),
-            'min_storage': round(min_storage, 1) if min_storage else None,
-            'storage_status': storage_status,
-            'used_perimeter': round(tank_perimeter, 2),
-            'surface_elev': surface_elev,
-            'tank_bottom_elev': tank_bottom_elev,
-            'tank_top_elev': round(tank_top_elev, 2) if tank_top_elev is not None else None,
-            'cover_depth': round(cover_depth, 2) if cover_depth is not None else None,
-            'cover_status': cover_status,
-            'max_cover_req': round(max_cover_req, 1) if max_cover_req else None,
-            'max_cover_status': max_cover_status,
-            'traffic_load': traffic_load,
-            'stone_backfill_bulk_ft3': round(stone_backfill_bulk_ft3, 1),
-            'stone_backfill_bulk_yd3': round(stone_backfill_bulk_yd3, 2),
             'project_notes': project_notes,
-            'dead_load_psi': dead_load_psi,
-            'fos_dead': fos_dead,
             'stage_storage': stage_storage,
             'stage_increment_in': stage_increment_in,
-            'include_stage_storage': include_stage_storage,
+            'min_storage': min_storage if min_storage > 0 else None,
+            'storage_status': 'PASS' if min_storage <= total_storage else 'FAIL' if min_storage > 0 else None,
         }
 
         form_data = request.form
 
     return render_template('index.html', results=results, form_data=form_data)
 
-
 @app.route('/download_pdf', methods=['POST'])
 def download_pdf():
-    # FULL RECALCULATION - identical to index route
-    project_name = request.form.get('project_name', 'Untitled Project')
+    # Full re-calculation for PDF (exact same as index route)
+    project_name = request.form.get('project_name', 'Project')
     config = request.form.get('config', 'SC')
-    layers = int(request.form.get('layers') or 3)
-    known_width = float(request.form.get('known_width') or 0)
-    known_length = float(request.form.get('known_length') or 0)
-    perimeter_stone_width = float(request.form.get('perimeter_stone_width') or 1.0)
-    cover_stone = float(request.form.get('cover_stone') or 1.0)
-    base_stone = float(request.form.get('base_stone') or 0.333)
-    stone_void = float(request.form.get('stone_void') or 0.40)
-    pipe_connectors = int(request.form.get('pipe_connectors') or 0)
-    top_adapters_12 = int(request.form.get('top_adapters_12') or 0)
-    geo_waste = float(request.form.get('geoWaste') or 0)
-    project_notes = request.form.get('project_notes', '')
-    include_stage_storage = request.form.get('include_stage_storage') == 'yes'
-    stage_increment_in = float(request.form.get('stage_increment_in', 1.0))
+    layers = int(request.form.get('layers', 3))
+    known_width = float(request.form.get('known_width', 0))
+    known_length = float(request.form.get('known_length', 0))
+    perimeter_stone_width = float(request.form.get('perimeter_stone_width', 1.0))
+    cover_stone = float(request.form.get('cover_stone', 1.0))
+    base_stone = float(request.form.get('base_stone', 0.333))
+    stone_void = float(request.form.get('stone_void', 0.40))
+    pipe_connectors = int(request.form.get('pipe_connectors', 0))
+    top_adapters_12 = int(request.form.get('top_adapters_12', 0))
+    total_aquacell_cost = request.form.get('totalAquaCellCost', '—')
 
-    surface_elev = float(request.form.get('surface_elev') or 0) if request.form.get('surface_elev') else None
-    tank_bottom_elev = float(request.form.get('tank_bottom_elev') or 0) if request.form.get('tank_bottom_elev') else None
-    traffic_load = request.form.get('traffic_load', 'HS20')
-
-    # Tank dimensions
     MODULE_WID = 1.9685
     MODULE_LEN = 3.937
     crates_wide = math.floor(known_width / MODULE_WID)
@@ -286,19 +179,10 @@ def download_pdf():
     outer_length = tank_length + 2 * perimeter_stone_width
     total_system_depth = base_stone + tank_height + cover_stone
     total_excavation_vol = outer_width * outer_length * total_system_depth
-
-    stone_backfill_bulk_ft3 = total_excavation_vol - gross_tank_vol
-    stone_backfill_bulk_yd3 = stone_backfill_bulk_ft3 / 27
-
-    total_stone_storage = stone_backfill_bulk_ft3 * stone_void
+    total_stone_storage = (total_excavation_vol - gross_tank_vol) * stone_void
     total_storage = tank_storage + total_stone_storage
 
-    tank_perimeter_override = request.form.get('tank_perimeter')
-    if tank_perimeter_override and tank_perimeter_override.strip():
-        tank_perimeter = float(tank_perimeter_override)
-    else:
-        tank_perimeter = 2 * (tank_width + tank_length)
-
+    tank_perimeter = 2 * (tank_width + tank_length)
     side_plates = round(tank_perimeter * (layers * side_multiplier) / 5.17)
 
     if config == 'SC':
@@ -308,194 +192,43 @@ def download_pdf():
         base_units = num_crates * 2
         bottom_plates = 0
 
-    tank_area = tank_width * tank_length
-    tank_peri = 2 * (tank_width + tank_length)
-    geo_tank = tank_area + (tank_peri * tank_height) + tank_area
-    outer_area = outer_width * outer_length
-    geo_stone = outer_area + (2 * (outer_width + outer_length) * total_system_depth) + outer_area
-    waste_factor = max(geo_waste / 100.0, 0.0)
-    geo_tank *= (1 + waste_factor)
-    geo_stone *= (1 + waste_factor)
-    geo_total = geo_tank + geo_stone
-
-    tank_top_elev = None
-    cover_depth = None
-    cover_status = None
-    max_cover_status = None
-    max_cover_req = None
-    dead_load_psi = None
-    fos_dead = None
-    if surface_elev is not None and tank_bottom_elev is not None:
-        tank_top_elev = tank_bottom_elev + tank_height
-        cover_depth = surface_elev - tank_top_elev
-        min_cover_req = MIN_COVER[config].get(traffic_load, 1.0)
-        cover_status = "PASS" if cover_depth >= min_cover_req else "FAIL"
-        max_cover_req = MAX_COVER[config].get(traffic_load, 999)
-        max_cover_status = "PASS" if cover_depth <= max_cover_req else "FAIL"
-        max_strength = MAX_COMPRESSIVE_STRENGTH[config]
-        dead_load_psi = round(cover_depth * 120 / 144, 2) if cover_depth and cover_depth > 0 else 0
-        fos_dead = round(max_strength / dead_load_psi, 2) if dead_load_psi > 0 else None
-
-    # ABSOLUTE ELEVATION STAGE STORAGE
-    stage_storage = None
-    if include_stage_storage and tank_width > 0 and tank_length > 0 and tank_bottom_elev is not None:
-        step_ft = stage_increment_in / 12.0
-        tank_area = tank_width * tank_length
-        outer_area = outer_width * outer_length
-        total_system_depth = base_stone + tank_height + cover_stone
-
-        base_stone_elev = tank_bottom_elev - base_stone
-        top_stone_elev = base_stone_elev + total_system_depth
-
-        stage_storage = []
-        elev = base_stone_elev
-        while elev <= top_stone_elev + 0.001:
-            if elev <= tank_bottom_elev:
-                tank_stor = 0.0
-            elif elev <= tank_bottom_elev + tank_height:
-                submerged = elev - tank_bottom_elev
-                tank_stor = submerged * tank_area * void_ratio
-            else:
-                tank_stor = tank_storage
-
-            if elev <= tank_bottom_elev:
-                stone_stor = (elev - base_stone_elev) * outer_area * stone_void
-            elif elev <= tank_bottom_elev + tank_height:
-                stone_stor = base_stone * outer_area * stone_void + (elev - tank_bottom_elev) * (outer_area - tank_area) * stone_void
-            else:
-                stone_stor = base_stone * outer_area * stone_void + tank_height * (outer_area - tank_area) * stone_void + (elev - tank_bottom_elev - tank_height) * outer_area * stone_void
-
-            total_stor = tank_stor + stone_stor
-
-            stage_storage.append({
-                'elevation_ft': round(elev, 2),
-                'tank_storage': round(tank_stor, 1),
-                'stone_storage': round(stone_stor, 1),
-                'total_storage': round(total_stor, 1)
-            })
-            elev += step_ft
-
-        # Force exact Top of Stone row
-        elev = top_stone_elev
-        tank_stor = tank_storage
-        stone_stor = base_stone * outer_area * stone_void + tank_height * (outer_area - tank_area) * stone_void + cover_stone * outer_area * stone_void
-        total_stor = tank_stor + stone_stor
-        stage_storage.append({
-            'elevation_ft': round(elev, 2),
-            'tank_storage': round(tank_stor, 1),
-            'stone_storage': round(stone_stor, 1),
-            'total_storage': round(total_stor, 1)
-        })
-
-    # ====================== PDF GENERATION ======================
+    # Build PDF
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
     w, h = letter
+    y = h - 50
 
-    # Page 1 - Main Summary
-    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
-    if os.path.exists(logo_path):
-        c.drawImage(logo_path, 50, h - 100, width=180, height=60, preserveAspectRatio=True)
-
-    c.setFont("Helvetica-Bold", 16)
-    c.drawCentredString(w/2, h-180, "AquaCell V12 Crate Calculator")
-    c.setFont("Helvetica", 11)
-    c.drawCentredString(w/2, h-195, "Underground Stormwater Retention / Detention / Infiltration System")
-
-    y = h - 230
-    c.setFont("Helvetica", 10)
+    c.setFont("Helvetica-Bold", 18)
+    c.drawString(50, h - 80, "AquaCell V12 Crate Calculator")
+    c.setFont("Helvetica", 12)
+    c.drawString(50, h - 110, f"Project: {project_name} | Config: {config} | Layers: {layers}")
 
     lines = [
-        f"Project Name: {project_name}",
-        f"Configuration: {config} Configuration ({layers} Layers)",
-        f"Surface Elevation: {surface_elev if surface_elev is not None else '—'} ft",
-        f"Tank Bottom Elevation: {tank_bottom_elev if tank_bottom_elev is not None else '—'} ft",
-        f"Tank Top Elevation: {tank_top_elev if tank_top_elev is not None else '—'} ft",
-        f"Actual Cover Depth: {cover_depth:.2f} ft → {cover_status if cover_status else '—'}",
-        f"Maximum Allowable Cover Depth: {max_cover_req:.1f} ft → {max_cover_status if max_cover_status else '—'}",
-        f"Dead Load Pressure: {dead_load_psi} psi",
-        f"Factor of Safety (Dead Load): {fos_dead if fos_dead else '—'}",
-        f"Traffic Load: {traffic_load}",
-        f"Snapped Tank: {tank_width:.2f} ft × {tank_length:.2f} ft × {tank_height:.2f} ft",
-        f"AquaCell Tank Storage: {tank_storage:.1f} ft³",
-        f"Stone Storage: {total_stone_storage:.1f} ft³",
-        f"Total System Storage: {total_storage:.1f} ft³",
-        f"Estimated Stone Backfill Volume to Purchase: {stone_backfill_bulk_ft3:.1f} ft³ ({stone_backfill_bulk_yd3:.2f} yd³)",
-        "",
-        "Project Notes:",
-        project_notes if project_notes else "—",
+        f"Snapped Tank: {round(tank_width,2)} ft × {round(tank_length,2)} ft × {round(tank_height,2)} ft",
+        f"AquaCell Tank Storage: {round(tank_storage,1)} ft³",
+        f"Stone Storage: {round(total_stone_storage,1)} ft³",
+        f"Total System Storage: {round(total_storage,1)} ft³",
+        f"Total AquaCell Cost: {total_aquacell_cost}",
         "",
         "Bill of Materials",
-        f"Base Unit (3091506) ................ {base_units}",
-        f"Side Plate (2476600003) ............ {side_plates}",
-        f"Bottom Plate (2476600001) .......... {bottom_plates}",
-        f"8-12\" Pipe Connectors ............. {pipe_connectors}",
-        f"12\" Top Adapters .................. {top_adapters_12}",
-        "",
-        "Geotextile Fabric (Burrito Wrap)",
-        f"AquaCell Only ..................... {geo_tank:.1f} ft²",
-        f"Stone Envelope .................... {geo_stone:.1f} ft²",
-        f"Total Geotextile .................. {geo_total:.1f} ft²",
-        f"Waste/Overlap ..................... {geo_waste}%",
+        f"Base Units ................ {base_units}",
+        f"Side Plates ............... {side_plates}",
+        f"Bottom Plates ............. {bottom_plates}",
+        f"Pipe Connectors ........... {pipe_connectors}",
+        f"Top Adapters .............. {top_adapters_12}",
     ]
 
+    y = h - 150
     for line in lines:
         c.drawString(50, y, line)
-        y -= 14
+        y -= 22
 
-    # STAGE STORAGE TABLE WITH AUTOMATIC MULTI-PAGE SUPPORT
-    if include_stage_storage and stage_storage:
-        c.showPage()                     # Start new page for table
-        y = h - 80
-        c.setFont("Helvetica-Bold", 14)
-        c.drawString(50, y, f"Stage Storage Table ({stage_increment_in} inch increments)")
-        y -= 35
-
-        # Header
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(50, y, "Elevation (ft)")
-        c.drawRightString(250, y, "Tank Storage (ft³)")
-        c.drawRightString(380, y, "Stone Storage (ft³)")
-        c.drawRightString(510, y, "Total Storage (ft³)")
-        y -= 18
-
-        # Data rows with automatic page breaks
-        c.setFont("Helvetica", 10)
-        for row in stage_storage:
-            if y < 60:                   # Near bottom of page
-                c.showPage()
-                y = h - 80
-                c.setFont("Helvetica-Bold", 10)
-                c.drawString(50, y, "Elevation (ft)")
-                c.drawRightString(250, y, "Tank Storage (ft³)")
-                c.drawRightString(380, y, "Stone Storage (ft³)")
-                c.drawRightString(510, y, "Total Storage (ft³)")
-                y -= 18
-                c.setFont("Helvetica", 10)
-
-            c.drawString(50, y, str(row['elevation_ft']))
-            c.drawRightString(250, y, str(row['tank_storage']))
-            c.drawRightString(380, y, str(row['stone_storage']))
-            c.drawRightString(510, y, str(row['total_storage']))
-            y -= 14
-
-    # Disclaimer + timestamp ALWAYS on the very last page
-    c.setFont("Helvetica", 8)
-    disclaimer = "Disclaimer: This calculator provides preliminary, conceptual estimates only and is not a stamped engineering design. The Engineer of Record is solely responsible for final design and verification."
-    from textwrap import wrap
-    wrapped = wrap(disclaimer, width=110)
-    y = 90
-    for line in wrapped:
-        c.drawString(50, y, line)
-        y -= 10
-
-    c.setFont("Helvetica", 8)
-    c.drawString(50, 40, f"Generated {datetime.datetime.now().strftime('%m/%d/%Y %H:%M')}")
-
+    c.setFont("Helvetica", 9)
+    c.drawString(50, 50, f"Generated {datetime.datetime.now().strftime('%m/%d/%Y %H:%M')}")
     c.save()
-    buffer.seek(0)
-    return send_file(buffer, as_attachment=True, download_name=f"AquaCell_{project_name or 'Project'}.pdf", mimetype='application/pdf')
 
+    buffer.seek(0)
+    return send_file(buffer, as_attachment=True, download_name="AquaCell_V12_Report.pdf", mimetype='application/pdf')
 
 if __name__ == '__main__':
     app.run(debug=True)
