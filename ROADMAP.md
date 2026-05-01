@@ -41,12 +41,19 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [ ] **Visual Crate Generator**  
   - Matplotlib-generated Plan View (crate grid, snapped footprint label, perimeter stone highlight)  
   - Section/Elevation View (stacked layers + compacted stone base)  
-  - Scale bar + clean engineering style  
+  - Scale bar + clean engineering style (elevations added from client inputs) 
   - “Download Layout PNG” button on results page  
   - Include in PDF report (optional)
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
+- QUOTE SHEET branch, separate app or hidden option that will accept a specific JSON with materials estimates
+- Add Estimator information to the PDF Summary report
+- Metric option
 - Auto quote number generation (e.g., AC-2026-001) / Override to enter own project number (add to PDF Summary export)
+- Project Notes field needs to be able to wrap (currently runs off page)
+- Add part codes to Bottom Plate and 12" Top Adapters to PDF Summary report
+- Add Minimum Required Volume to the PDF Summary report
+- Add LIVE load calculations (per ACF feedback)
 - Fix the Stage Storage card color in DARK mode
 - Add Individual Tank names/location/designation (MULTI-TANK BRANCH)
 - Price estimation card (with hidden field for PDF) - already added, but turned off during multi-tank calculation additions
