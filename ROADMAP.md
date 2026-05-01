@@ -47,7 +47,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 - QUOTE SHEET branch, separate app or hidden option that will accept a specific JSON with materials estimates
-- Add Estimator information to the PDF Summary report
+- Add Estimator information & QUOTE NUMBER to the PDF Summary report
 - Metric option
 - Auto quote number generation (e.g., AC-2026-001) / Override to enter own project number (add to PDF Summary export)
 - Project Notes field needs to be able to wrap (currently runs off page)
