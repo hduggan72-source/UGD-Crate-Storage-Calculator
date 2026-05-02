@@ -45,15 +45,10 @@ Professional web-based calculator for designing and quoting underground stormwat
   - Include in PDF report (optional)
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
-- Auto quote number generation (e.g., AC-2026-001) / Override to enter own project number (add to PDF Summary export)
-- Add Individual Tank names/location/designation (MULTI-TANK BRANCH)
-- Price estimation card (with hidden field for PDF) - already added, but turned off during multi-tank calculation additions
 - Stage storage table (cumulative volume by elevation, with CSV export)
 - Excavation slope calculator integration (with variable H:V ratios)
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
 - Optional 3D isometric view of the crate layout
-- Cost database with unit pricing persistence
-- Print-friendly one-page layout improvements (12" increment tip already noted)
 - Integration of Wavin installation details (access ports, geogrid, compaction notes)
 - Separate Quote Sheet & BOM Command buttons to generate individual pages with different disclaimers as needed
 - hidden pages that prepends/appends when PDF is created (cover sheet, standard detail, specs, etc.)
