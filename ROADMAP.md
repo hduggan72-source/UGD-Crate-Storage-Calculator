@@ -43,6 +43,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 
  
  ## Next Up (High Priority – Do These Next)
+-"?" pop-ups are missing from UI/UX main page
 - % waste on UI was zero, but calculated at 10% on PDF Summary report (FIX)
 - Include Schematicc in PDF report (optional to user just like stage storage)
 - Scale bar + clean engineering style
