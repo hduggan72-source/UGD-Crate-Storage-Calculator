@@ -35,17 +35,16 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [X] Project Notes Field
 - [X] PASS/FAIL VALIDATIONS (minimum/maximum depths (total install)
 - [X] Add calculated safety factor (FoS) related to top cover depth for anything that is < the minimum cover recommended
-
-## Next Up (High Priority – Do These Next)
-- [ ] **Visual Crate Generator**  
-  - Matplotlib-generated Plan View (crate grid, snapped footprint label, perimeter stone highlight)  
-  - Section/Elevation View (stacked layers + compacted stone base)  
-  - Scale bar + clean engineering style  
-  - “Download Layout PNG” button on results page  
-  - Include in PDF report (optional)
+- [X] **Visual Crate Generator**
+- [X]  Matplotlib-generated Plan View (crate grid, snapped footprint label, perimeter stone highlight)  
+ 
+ ## Next Up (High Priority – Do These Next)
+- Include in PDF report (optional)
+- Scale bar + clean engineering style
+- Section/Elevation View (stacked layers + compacted stone base)   
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
-- Stage storage table (cumulative volume by elevation, with CSV export)
+- Stage storage table with CSV export
 - Excavation slope calculator integration (with variable H:V ratios)
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
 - Optional 3D isometric view of the crate layout
