@@ -39,6 +39,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [X]  Matplotlib-generated Plan View (crate grid, snapped footprint label, perimeter stone highlight)  
  
  ## Next Up (High Priority – Do These Next)
+- % waste on UI was zero, but calculated at 10% on PDF Summary report (FIX)
 - Include in PDF report (optional)
 - Scale bar + clean engineering style
 - Section/Elevation View (stacked layers + compacted stone base)   
