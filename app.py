@@ -260,7 +260,7 @@ def download_pdf():
     y -= 90
 
     c.setFont("Helvetica-Bold", 18)
-    c.drawString(50, y, "AquaCell v13 Crate Calculator")
+    c.drawString(50, y, "AquaCell V12 Crate Calculator")
     y -= 22
     c.setFont("Helvetica", 11)
     c.drawString(50, y, "Underground Stormwater Retention / Detention / Infiltration System")
@@ -308,20 +308,20 @@ def download_pdf():
         f"Stone Storage: {round(total_stone_storage,1)} ft³",
         f"Total System Storage: {round(total_storage,1)} ft³",
         "",
-        f"Estimated Total Stone Backfill: {stone_backfill_bulk_ft3} ft³ ({stone_backfill_bulk_yd3} yd³)",
+        f"Estimated Stone Backfill Volume to Purchase: {stone_backfill_bulk_ft3} ft³ ({stone_backfill_bulk_yd3} yd³)",
         "",
         "Bill of Materials",
         f"Base Unit (3091506) ................ {base_units}",
         f"Side Plate (2476600003) ............ {side_plates}",
         f"Bottom Plate (2476600001) .......... {bottom_plates}",
-        f"8-12\" Pipe Connectors (2476631200) ............... {pipe_connectors}",
-        f"12\" Top Adapters (3085857).................... {top_adapters_12}",
+        f"8-12\" Pipe Connectors ............... {pipe_connectors}",
+        f"12\" Top Adapters .................... {top_adapters_12}",
         "",
-        "Geotextile Fabric (Top, Bottom, Sides)",
+        "Geotextile Fabric (Burrito Wrap)",
         f"AquaCell Only .................... {geoTank} ft²",
         f"Stone Envelope .................... {geoStone} ft²",
         f"Total Geotextile .................... {geoTotal} ft²",
-        f"Waste/Overlap ..................... {geo_waste}%",
+        "Waste/Overlap .................... 10.0%",
     ]
 
     for line in lines:
@@ -376,7 +376,7 @@ def download_pdf():
     c.save()
 
     buffer.seek(0)
-    return send_file(buffer, as_attachment=True, download_name="AquaCell_v13_Report.pdf", mimetype='application/pdf')
+    return send_file(buffer, as_attachment=True, download_name="AquaCell_V12_Report.pdf", mimetype='application/pdf')
 
 if __name__ == '__main__':
     app.run(debug=True)
