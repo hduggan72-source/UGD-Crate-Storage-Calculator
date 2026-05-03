@@ -38,7 +38,6 @@ def index():
         include_stage_storage = request.form.get('include_stage_storage') == 'yes'
         stage_increment_in = int(request.form.get('stage_increment_in', 12) or 12)
 
-        # Core calculations
         MODULE_WID = 1.9685
         MODULE_LEN = 3.937
         crates_wide = math.floor(known_width / MODULE_WID)
@@ -79,19 +78,15 @@ def index():
             base_units = num_crates * 2
             bottom_plates = 0
 
-        # FIXED: Proper burrito-wrap geotextile for AquaCell Only (bottom + sides + top)
         tank_top_bottom_area = 2 * tank_width * tank_length
         tank_sides_area = used_perimeter * tank_height
         geoTank = round((tank_top_bottom_area + tank_sides_area) * 1.15, 1)
-
-        # Stone Envelope (outer box surfaces)
         geoStone = round((outer_width * outer_length * 2 + outer_width * total_system_depth * 2 + outer_length * total_system_depth * 2) * 1.15, 1)
         geoTotal = round(geoTank + geoStone, 1)
 
         stone_backfill_bulk_ft3 = round(total_stone_storage * 1.10, 1)
         stone_backfill_bulk_yd3 = round(stone_backfill_bulk_ft3 / 27, 2)
 
-        # Stage Storage
         stage_storage = None
         if include_stage_storage:
             stage_storage = []
@@ -113,12 +108,9 @@ def index():
                 })
                 current_elev += increment_ft
 
-        # Cover depth & status
         cover_depth = round(surface_elev - (tank_bottom_elev + tank_height), 2)
         max_cover_req = 20 if config == 'SC' else 30
         cover_status = 'PASS' if cover_depth <= max_cover_req else 'FAIL'
-
-        # Dead load & Factor of Safety
         dead_load_psi = round(cover_stone * 120 / 144, 2)
         max_compressive = 70 if config == 'SC' else 100
         fos_dead = round(max_compressive / dead_load_psi, 2) if dead_load_psi > 0 else None
@@ -166,7 +158,6 @@ def index():
 
 @app.route('/download_pdf', methods=['POST'])
 def download_pdf():
-    # Read all form fields
     project_name = request.form.get('project_name', 'Project')
     config = request.form.get('config', 'SC')
     layers = int(request.form.get('layers', 3))
@@ -185,7 +176,7 @@ def download_pdf():
     include_stage_storage = request.form.get('include_stage_storage') == 'yes'
     stage_increment_in = int(request.form.get('stage_increment_in', 12) or 12)
 
-    # Same calculations
+    # Calculations
     MODULE_WID = 1.9685
     MODULE_LEN = 3.937
     crates_wide = math.floor(known_width / MODULE_WID)
@@ -226,18 +217,15 @@ def download_pdf():
         base_units = num_crates * 2
         bottom_plates = 0
 
-    # FIXED: Proper burrito-wrap geotextile for AquaCell Only
     tank_top_bottom_area = 2 * tank_width * tank_length
     tank_sides_area = used_perimeter * tank_height
     geoTank = round((tank_top_bottom_area + tank_sides_area) * 1.15, 1)
-
     geoStone = round((outer_width * outer_length * 2 + outer_width * total_system_depth * 2 + outer_length * total_system_depth * 2) * 1.15, 1)
     geoTotal = round(geoTank + geoStone, 1)
 
     stone_backfill_bulk_ft3 = round(total_stone_storage * 1.10, 1)
     stone_backfill_bulk_yd3 = round(stone_backfill_bulk_ft3 / 27, 2)
 
-    # Stage Storage (unchanged)
     stage_storage_lines = []
     if include_stage_storage:
         increment_ft = stage_increment_in / 12.0
@@ -249,33 +237,43 @@ def download_pdf():
             depth_in_stone = max(0, min(total_system_depth, current_elev - (tank_bottom_elev - base_stone)))
             stone_vol = (depth_in_stone / total_system_depth) * total_stone_storage if total_system_depth > 0 else 0
             total_vol = tank_vol + stone_vol
-            stage_storage_lines.append((
-                round(current_elev, 2),
-                round(tank_vol, 1),
-                round(stone_vol, 1),
-                round(total_vol, 1)
-            ))
+            stage_storage_lines.append((round(current_elev, 2), round(tank_vol, 1), round(stone_vol, 1), round(total_vol, 1)))
             current_elev += increment_ft
 
-    # Build PDF (unchanged layout)
+    # Build PDF
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
     y = height - 70
 
-    # Logo + Header
+    # Logo (top left)
     logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
     if os.path.exists(logo_path):
         img = ImageReader(logo_path)
         c.drawImage(img, 50, y - 30, width=180, height=60, preserveAspectRatio=True, mask='auto')
+
+    # TIMESTAMP — UPPER RIGHT CORNER ONLY
+    c.setFont("Helvetica", 9)
+    timestamp = f"Generated {datetime.datetime.now().strftime('%m/%d/%Y %H:%M')}"
+    c.drawRightString(width - 50, y - 10, timestamp)
+
     y -= 90
+
     c.setFont("Helvetica-Bold", 18)
-    c.drawString(50, y, "AquaCell V12 Crate Calculator")
-    y -= 20
+    c.drawString(50, y, "AquaCell v13 Crate Calculator")
+    y -= 22
     c.setFont("Helvetica", 11)
     c.drawString(50, y, "Underground Stormwater Retention / Detention / Infiltration System")
-    y -= 30
+    y -= 18
 
+    # Disclaimer
+    c.setFont("Helvetica", 8)
+    c.drawString(50, y, "Disclaimer: This calculator provides preliminary, conceptual estimates only and is not a stamped engineering")
+    y -= 12
+    c.drawString(50, y, "design. The Engineer of Record is solely responsible for final design and verification.")
+    y -= 22
+
+    # Project details
     c.setFont("Helvetica", 10)
     c.drawString(50, y, f"Project Name: {project_name}   Configuration: {config} Configuration ({layers} Layers)")
     y -= 18
@@ -310,16 +308,16 @@ def download_pdf():
         f"Stone Storage: {round(total_stone_storage,1)} ft³",
         f"Total System Storage: {round(total_storage,1)} ft³",
         "",
-        f"Estimated Stone Backfill Volume to Purchase: {stone_backfill_bulk_ft3} ft³ ({stone_backfill_bulk_yd3} yd³)",
+        f"Estimated Total Stone Backfill: {stone_backfill_bulk_ft3} ft³ ({stone_backfill_bulk_yd3} yd³)",
         "",
         "Bill of Materials",
         f"Base Unit (3091506) ................ {base_units}",
         f"Side Plate (2476600003) ............ {side_plates}",
         f"Bottom Plate (2476600001) .......... {bottom_plates}",
-        f"8-12\" Pipe Connectors ............... {pipe_connectors}",
-        f"12\" Top Adapters .................... {top_adapters_12}",
+        f"8-12\" Pipe Connectors (2476631200) ............... {pipe_connectors}",
+        f"12\" Top Adapters (3085857).................... {top_adapters_12}",
         "",
-        "Geotextile Fabric (Burrito Wrap)",
+        "Geotextile Fabric (Top, Bottom, Sides)",
         f"AquaCell Only .................... {geoTank} ft²",
         f"Stone Envelope .................... {geoStone} ft²",
         f"Total Geotextile .................... {geoTotal} ft²",
@@ -330,11 +328,11 @@ def download_pdf():
         c.drawString(50, y, line)
         y -= 18
 
+    # Page 1 footer (NO bottom timestamp)
     c.setFont("Helvetica", 9)
-    c.drawString(50, 70, f"Generated {datetime.datetime.now().strftime('%m/%d/%Y %H:%M')}")
-    c.drawRightString(width - 50, 70, "Page 1 of 2")
+    c.drawRightString(width - 50, 70, "Page 1 of 2" if include_stage_storage else "Page 1 of 1")
 
-    # Stage Storage Table
+    # Stage Storage (if enabled)
     if include_stage_storage and stage_storage_lines:
         c.showPage()
         y = height - 70
@@ -366,7 +364,6 @@ def download_pdf():
                 c.drawRightString(480, y, "Total Storage (ft³)")
                 y -= 20
                 c.setFont("Helvetica", 9)
-
             c.drawString(50, y, f"{elev}")
             c.drawRightString(240, y, f"{tank}")
             c.drawRightString(355, y, f"{stone}")
@@ -374,19 +371,7 @@ def download_pdf():
             y -= 15
 
         c.setFont("Helvetica", 9)
-        c.drawString(50, 70, f"Generated {datetime.datetime.now().strftime('%m/%d/%Y %H:%M')}")
         c.drawRightString(width - 50, 70, f"Page {page_num} of {page_num}")
-
-    # Disclaimer
-    c.setFont("Helvetica", 8)
-    disclaimer_text = [
-        "Disclaimer: This calculator provides preliminary, conceptual estimates only and is not a stamped engineering",
-        "design. The Engineer of Record is solely responsible for final design and verification."
-    ]
-    y = 120
-    for line in disclaimer_text:
-        c.drawString(50, y, line)
-        y -= 12
 
     c.save()
 
