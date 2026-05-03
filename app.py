@@ -376,7 +376,7 @@ def download_pdf():
     c.save()
 
     buffer.seek(0)
-    return send_file(buffer, as_attachment=True, download_name="AquaCell_V12_Report.pdf", mimetype='application/pdf')
+    return send_file(buffer, as_attachment=True, download_name="AquaCell_v13_Report.pdf", mimetype='application/pdf')
 
 if __name__ == '__main__':
     app.run(debug=True)
