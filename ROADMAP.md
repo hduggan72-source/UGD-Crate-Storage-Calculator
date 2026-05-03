@@ -37,12 +37,19 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [X] Add calculated safety factor (FoS) related to top cover depth for anything that is < the minimum cover recommended
 - [X] **Visual Crate Generator**
 - [X]  Matplotlib-generated Plan View (crate grid, snapped footprint label, perimeter stone highlight)  
+
+
  
  ## Next Up (High Priority – Do These Next)
 - % waste on UI was zero, but calculated at 10% on PDF Summary report (FIX)
-- Include in PDF report (optional)
+- Include Schematick in PDF report (optional to user just like stage storage)
 - Scale bar + clean engineering style
-- Section/Elevation View (stacked layers + compacted stone base)   
+- Section/Elevation View (stacked layers + compacted stone base)
+- when NO stage storage chart is selected, the PDF Summary generates one page, but disclaimer that appends the stage storage renders on the bottom of the 1st page over the geo wrap details.
+  when NO stage storage selected, only PAGE 1 SUMMARY PAGE generates. When Stage Storage IS selected, then pages 2 through whbatever is needed is appended to the Summary page. That way there is a clean separation between    Summary Page | Stage Storage | and future Schematic Plan
+- NOTES field needs to wrap text (currently now runs off page)
+
+
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 - Stage storage table with CSV export
