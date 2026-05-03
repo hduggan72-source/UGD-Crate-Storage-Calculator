@@ -321,7 +321,7 @@ def download_pdf():
         f"AquaCell Only .................... {geoTank} ft²",
         f"Stone Envelope .................... {geoStone} ft²",
         f"Total Geotextile .................... {geoTotal} ft²",
-        "Waste/Overlap .................... 10.0%",
+        f"Waste/Overlap ..................... {geo_waste}%",
     ]
 
     for line in lines:
