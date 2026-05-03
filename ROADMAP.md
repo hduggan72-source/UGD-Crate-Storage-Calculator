@@ -38,13 +38,14 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [X] **Visual Crate Generator**
 - [X]  Matplotlib-generated Plan View (crate grid, snapped footprint label, perimeter stone highlight)
 - [X]  When NO stage storage chart is selected, the PDF Summary generates one page, but disclaimer that appends the stage storage renders on the bottom of the 1st page over the geo wrap details.
-- [X]  Update to v13 from V12 (GITHUB FILES ONLY)
+- [X]  % waste on UI was zero, but calculated at 10% on PDF Summary report (FIX)
 
 
  
  ## Next Up (High Priority – Do These Next)
+ 
 -"?" pop-ups are missing from UI/UX main page
-- % waste on UI was zero, but calculated at 10% on PDF Summary report (FIX)
+- update to v13 from V12 (GITHUB FILES ONLY)
 - Include Schematicc in PDF report (optional to user just like stage storage)
 - Scale bar + clean engineering style
 - Section/Elevation View (stacked layers + compacted stone base)
