@@ -32,12 +32,14 @@ def index():
         base_stone = float(request.form.get('base_stone', 0.333) or 0.333)
         min_storage = float(request.form.get('min_storage', 0) or 0)
         stone_void = float(request.form.get('stone_void', 0.40) or 0.40)
+        geoWaste = int(request.form.get('geoWaste', 10) or 10)          # <--- now used for calculation
         pipe_connectors = int(request.form.get('pipe_connectors', 0) or 0)
         top_adapters_12 = int(request.form.get('top_adapters_12', 0) or 0)
         project_notes = request.form.get('project_notes', '')
         include_stage_storage = request.form.get('include_stage_storage') == 'yes'
         stage_increment_in = int(request.form.get('stage_increment_in', 12) or 12)
 
+        # Core calculations
         MODULE_WID = 1.9685
         MODULE_LEN = 3.937
         crates_wide = math.floor(known_width / MODULE_WID)
@@ -78,15 +80,22 @@ def index():
             base_units = num_crates * 2
             bottom_plates = 0
 
+        # FIXED: Dynamic geoWaste multiplier
+        multiplier = 1 + (geoWaste / 100.0)
         tank_top_bottom_area = 2 * tank_width * tank_length
         tank_sides_area = used_perimeter * tank_height
-        geoTank = round((tank_top_bottom_area + tank_sides_area) * 1.15, 1)
-        geoStone = round((outer_width * outer_length * 2 + outer_width * total_system_depth * 2 + outer_length * total_system_depth * 2) * 1.15, 1)
+        geoTank = round((tank_top_bottom_area + tank_sides_area) * multiplier, 1)
+
+        stone_top_bottom_area = 2 * outer_width * outer_length
+        stone_sides_area = 2 * (outer_width * total_system_depth + outer_length * total_system_depth)
+        geoStone = round((stone_top_bottom_area + stone_sides_area) * multiplier, 1)
+
         geoTotal = round(geoTank + geoStone, 1)
 
         stone_backfill_bulk_ft3 = round(total_stone_storage * 1.10, 1)
         stone_backfill_bulk_yd3 = round(stone_backfill_bulk_ft3 / 27, 2)
 
+        # Stage Storage
         stage_storage = None
         if include_stage_storage:
             stage_storage = []
@@ -150,6 +159,7 @@ def index():
             'geoTank': geoTank,
             'geoStone': geoStone,
             'geoTotal': geoTotal,
+            'geoWaste': geoWaste,
         }
 
         form_data = request.form
@@ -170,13 +180,14 @@ def download_pdf():
     cover_stone = float(request.form.get('cover_stone', 1.0))
     base_stone = float(request.form.get('base_stone', 0.333))
     stone_void = float(request.form.get('stone_void', 0.40))
+    geoWaste = int(request.form.get('geoWaste', 10) or 10)          # <--- now used
     pipe_connectors = int(request.form.get('pipe_connectors', 0))
     top_adapters_12 = int(request.form.get('top_adapters_12', 0))
     total_aquacell_cost = request.form.get('totalAquaCellCost', '—')
     include_stage_storage = request.form.get('include_stage_storage') == 'yes'
     stage_increment_in = int(request.form.get('stage_increment_in', 12) or 12)
 
-    # Calculations
+    # Same calculations as main route
     MODULE_WID = 1.9685
     MODULE_LEN = 3.937
     crates_wide = math.floor(known_width / MODULE_WID)
@@ -217,10 +228,16 @@ def download_pdf():
         base_units = num_crates * 2
         bottom_plates = 0
 
+    # FIXED: Dynamic geoWaste multiplier applied to quantities
+    multiplier = 1 + (geoWaste / 100.0)
     tank_top_bottom_area = 2 * tank_width * tank_length
     tank_sides_area = used_perimeter * tank_height
-    geoTank = round((tank_top_bottom_area + tank_sides_area) * 1.15, 1)
-    geoStone = round((outer_width * outer_length * 2 + outer_width * total_system_depth * 2 + outer_length * total_system_depth * 2) * 1.15, 1)
+    geoTank = round((tank_top_bottom_area + tank_sides_area) * multiplier, 1)
+
+    stone_top_bottom_area = 2 * outer_width * outer_length
+    stone_sides_area = 2 * (outer_width * total_system_depth + outer_length * total_system_depth)
+    geoStone = round((stone_top_bottom_area + stone_sides_area) * multiplier, 1)
+
     geoTotal = round(geoTank + geoStone, 1)
 
     stone_backfill_bulk_ft3 = round(total_stone_storage * 1.10, 1)
@@ -252,7 +269,7 @@ def download_pdf():
         img = ImageReader(logo_path)
         c.drawImage(img, 50, y - 30, width=180, height=60, preserveAspectRatio=True, mask='auto')
 
-    # TIMESTAMP — UPPER RIGHT CORNER ONLY
+    # Timestamp (upper right)
     c.setFont("Helvetica", 9)
     timestamp = f"Generated {datetime.datetime.now().strftime('%m/%d/%Y %H:%M')}"
     c.drawRightString(width - 50, y - 10, timestamp)
@@ -273,7 +290,7 @@ def download_pdf():
     c.drawString(50, y, "design. The Engineer of Record is solely responsible for final design and verification.")
     y -= 22
 
-    # Project details
+    # Project details and main content
     c.setFont("Helvetica", 10)
     c.drawString(50, y, f"Project Name: {project_name}   Configuration: {config} Configuration ({layers} Layers)")
     y -= 18
@@ -321,14 +338,13 @@ def download_pdf():
         f"AquaCell Only .................... {geoTank} ft²",
         f"Stone Envelope .................... {geoStone} ft²",
         f"Total Geotextile .................... {geoTotal} ft²",
-        "Waste/Overlap .................... 10.0%",
+        f"Waste/Overlap .................... {geoWaste}.0%",
     ]
 
     for line in lines:
         c.drawString(50, y, line)
         y -= 18
 
-    # Page 1 footer (NO bottom timestamp)
     c.setFont("Helvetica", 9)
     c.drawRightString(width - 50, 70, "Page 1 of 2" if include_stage_storage else "Page 1 of 1")
 
