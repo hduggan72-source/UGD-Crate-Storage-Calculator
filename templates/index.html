@@ -301,9 +301,13 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             <textarea name="project_notes" placeholder="Enter any additional notes, assumptions, special requirements, or comments here...">{{ form_data.get('project_notes', '') }}</textarea>
         </div>
 
-        <!-- STAGE STORAGE TOGGLE + INCREMENT -->
+        <!-- SCHEMATIC CHECKBOX + STAGE STORAGE TOGGLE + INCREMENT -->
         <div style="margin-top:25px; padding:15px; background:#f0f8ff; border-radius:6px;">
-            <label>
+            <label style="display:block;">
+                <input type="checkbox" name="include_schematic" id="include_schematic" value="yes" checked>
+                Include Schematic Layout in PDF Report
+            </label>
+            <label style="margin-top:12px;">
                 <input type="checkbox" name="include_stage_storage" value="yes" {{ 'checked' if form_data.get('include_stage_storage') == 'yes' else '' }}>
                 Include Stage Storage Table (for detention routing)
             </label>
@@ -392,8 +396,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 <tr><td>Base Unit (3091506)</td><td>{{ results.base_units }}</td></tr>
                 <tr><td>Side Plate (2476600003)</td><td>{{ results.side_plates }}</td></tr>
                 <tr><td>Bottom Plate (2476600001)</td><td>{{ results.bottom_plates }}</td></tr>
-                <tr><td>8-12" Pipe Connectors</td><td>{{ results.pipe_connectors }}</td></tr>
-                <tr><td>12" Top Adapters</td><td>{{ results.top_adapters_12 }}</td></tr>
+                <tr><td>8-12" Pipe Connectors (2476631200)</td><td>{{ results.pipe_connectors }}</td></tr>
+                <tr><td>12" Top Adapters (3085857)</td><td>{{ results.top_adapters_12 }}</td></tr>
             </table>
 
             <div class="geo-section">
@@ -482,6 +486,14 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const form = document.getElementById('mainForm');
         const formData = new FormData(form);
         formData.append('totalAquaCellCost', document.getElementById('hiddenTotalAquaCellCost').value || '—');
+
+        const canvas = document.getElementById('sheet');
+        const includeSchematic = document.getElementById('include_schematic').checked;
+        if (includeSchematic && canvas) {
+            const base64Image = canvas.toDataURL('image/png');
+            formData.append('schematic_image', base64Image);
+        }
+
         const projectName = (document.getElementById('project_name').value || 'Project').trim()
                             .replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
         fetch('/download_pdf', { method: 'POST', body: formData })
@@ -691,7 +703,6 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         setTimeout(() => win.print(), 400);
     }
 
-    // Auto-render schematic
     window.addEventListener('load', () => {
         setTimeout(() => {
             if (document.getElementById('knownLength').value) renderSheet();
