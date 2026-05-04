@@ -39,18 +39,19 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [X]  Matplotlib-generated Plan View (crate grid, snapped footprint label, perimeter stone highlight)
 - [X]  When NO stage storage chart is selected, the PDF Summary generates one page, but disclaimer that appends the stage storage renders on the bottom of the 1st page over the geo wrap details.
 - [X]  % waste on UI was zero, but calculated at 10% on PDF Summary report (FIX)
-
+- [X]  Include Schematicc in PDF report (optional to user just like stage storage)
+- [X]  When NO stage storage selected, only PAGE 1 SUMMARY PAGE generates. When Stage Storage IS selected, then pages 2 through whbatever is needed is appended to the Summary page. That way there is a clean separation between Summary Page | Stage Storage | and future Schematic Plan
+- [X]  Part #'s for pipe connectors & adapters added back to UI and PDF Summary Report
 
  
  ## Next Up (High Priority – Do These Next)
  
 -"?" pop-ups are missing from UI/UX main page
 - update to v13 from V12 (GITHUB FILES ONLY)
-- Include Schematicc in PDF report (optional to user just like stage storage)
 - Scale bar + clean engineering style
 - Section/Elevation View (stacked layers + compacted stone base)
-  when NO stage storage selected, only PAGE 1 SUMMARY PAGE generates. When Stage Storage IS selected, then pages 2 through whbatever is needed is appended to the Summary page. That way there is a clean separation between    Summary Page | Stage Storage | and future Schematic Plan
 - NOTES field needs to wrap text (currently now runs off page)
+- NOTES field is not appearing on the Page 1 of PDF Summary
 
 
 
