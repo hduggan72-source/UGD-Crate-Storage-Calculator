@@ -42,7 +42,7 @@ def index():
         include_schematic = request.form.get('include_schematic') == 'yes'
         stage_increment_in = int(request.form.get('stage_increment_in', 12) or 12)
 
-        # Core calculations (unchanged)
+        # Core calculations
         MODULE_WID = 1.9685
         MODULE_LEN = 3.937
         crates_wide = math.floor(known_width / MODULE_WID)
@@ -69,7 +69,8 @@ def index():
         outer_length = tank_length + 2 * perimeter_stone_width
         total_system_depth = base_stone + tank_height + cover_stone
         total_excavation_vol = outer_width * outer_length * total_system_depth
-        total_stone_storage = (total_excavation_vol - gross_tank_vol) * stone_void
+        stone_envelope_volume = total_excavation_vol - gross_tank_vol
+        total_stone_storage = stone_envelope_volume * stone_void
         total_storage = tank_storage + total_stone_storage
 
         used_perimeter = 2 * (tank_width + tank_length)
@@ -89,9 +90,11 @@ def index():
         geoStone = round((outer_width * outer_length * 2 + outer_width * total_system_depth * 2 + outer_length * total_system_depth * 2) * (1 + geoWaste / 100.0), 1)
         geoTotal = round(geoTank + geoStone, 1)
 
-        stone_backfill_bulk_ft3 = round(total_stone_storage * 1.10, 1)
+        # FIXED: Stone backfill volume to PURCHASE (bulk volume)
+        stone_backfill_bulk_ft3 = round(stone_envelope_volume * 1.10, 1)
         stone_backfill_bulk_yd3 = round(stone_backfill_bulk_ft3 / 27, 2)
 
+        # Stage Storage
         stage_storage = None
         if include_stage_storage:
             stage_storage = []
@@ -114,8 +117,20 @@ def index():
                 current_elev += increment_ft
 
         cover_depth = round(surface_elev - (tank_bottom_elev + tank_height), 2)
+
+        # NEW: Minimum cover requirement based on traffic load
+        if traffic_load == 'H10':
+            min_cover_req = 1.0
+        elif traffic_load == 'HS20':
+            min_cover_req = 1.5 if config == 'SC' else 1.33
+        elif traffic_load == 'HS25':
+            min_cover_req = 2.5 if config == 'SC' else 1.83
+        else:
+            min_cover_req = 1.0
+
         max_cover_req = 20 if config == 'SC' else 30
-        cover_status = 'PASS' if cover_depth <= max_cover_req else 'FAIL'
+        cover_status = 'PASS' if cover_depth >= min_cover_req else 'FAIL'
+
         dead_load_psi = round(cover_stone * 120 / 144, 2)
         max_compressive = 70 if config == 'SC' else 100
         fos_dead = round(max_compressive / dead_load_psi, 2) if dead_load_psi > 0 else None
@@ -129,7 +144,7 @@ def index():
             'cover_depth': cover_depth,
             'cover_status': cover_status,
             'max_cover_req': max_cover_req,
-            'max_cover_status': cover_status,
+            'max_cover_status': 'PASS' if cover_depth <= max_cover_req else 'FAIL',
             'dead_load_psi': dead_load_psi,
             'fos_dead': fos_dead,
             'traffic_load': traffic_load,
@@ -165,6 +180,7 @@ def index():
 
 @app.route('/download_pdf', methods=['POST'])
 def download_pdf():
+    # (All form reading and calculations are identical to the index route above)
     project_name = request.form.get('project_name', 'Project')
     config = request.form.get('config', 'SC')
     layers = int(request.form.get('layers', 3))
@@ -180,13 +196,12 @@ def download_pdf():
     geoWaste = int(request.form.get('geoWaste', 10) or 10)
     pipe_connectors = int(request.form.get('pipe_connectors', 0))
     top_adapters_12 = int(request.form.get('top_adapters_12', 0))
-    total_aquacell_cost = request.form.get('totalAquaCellCost', '—')
     include_stage_storage = request.form.get('include_stage_storage') == 'yes'
     include_schematic = request.form.get('include_schematic') == 'yes'
     schematic_image = request.form.get('schematic_image')
     stage_increment_in = int(request.form.get('stage_increment_in', 12) or 12)
 
-    # Same calculations as main route
+    # Core calculations (identical to index route)
     MODULE_WID = 1.9685
     MODULE_LEN = 3.937
     crates_wide = math.floor(known_width / MODULE_WID)
@@ -213,7 +228,8 @@ def download_pdf():
     outer_length = tank_length + 2 * perimeter_stone_width
     total_system_depth = base_stone + tank_height + cover_stone
     total_excavation_vol = outer_width * outer_length * total_system_depth
-    total_stone_storage = (total_excavation_vol - gross_tank_vol) * stone_void
+    stone_envelope_volume = total_excavation_vol - gross_tank_vol
+    total_stone_storage = stone_envelope_volume * stone_void
     total_storage = tank_storage + total_stone_storage
 
     used_perimeter = 2 * (tank_width + tank_length)
@@ -233,7 +249,8 @@ def download_pdf():
     geoStone = round((outer_width * outer_length * 2 + outer_width * total_system_depth * 2 + outer_length * total_system_depth * 2) * (1 + geoWaste / 100.0), 1)
     geoTotal = round(geoTank + geoStone, 1)
 
-    stone_backfill_bulk_ft3 = round(total_stone_storage * 1.10, 1)
+    # FIXED: Stone backfill volume to PURCHASE
+    stone_backfill_bulk_ft3 = round(stone_envelope_volume * 1.10, 1)
     stone_backfill_bulk_yd3 = round(stone_backfill_bulk_ft3 / 27, 2)
 
     stage_storage_lines = []
@@ -250,13 +267,32 @@ def download_pdf():
             stage_storage_lines.append((round(current_elev, 2), round(tank_vol, 1), round(stone_vol, 1), round(total_vol, 1)))
             current_elev += increment_ft
 
-    # Build PDF
+    # FIXED: Cover depth now checks minimum requirement for traffic load
+    cover_depth = round(surface_elev - (tank_bottom_elev + tank_height), 2)
+
+    if traffic_load == 'H10':
+        min_cover_req = 1.0
+    elif traffic_load == 'HS20':
+        min_cover_req = 1.5 if config == 'SC' else 1.33
+    elif traffic_load == 'HS25':
+        min_cover_req = 2.5 if config == 'SC' else 1.83
+    else:
+        min_cover_req = 1.0
+
+    max_cover_req = 20 if config == 'SC' else 30
+    cover_status = 'PASS' if cover_depth >= min_cover_req else 'FAIL'
+
+    dead_load_psi = round(cover_stone * 120 / 144, 2)
+    max_compressive = 70 if config == 'SC' else 100
+    fos_dead = round(max_compressive / dead_load_psi, 2) if dead_load_psi > 0 else None
+
+    # Build PDF (rest of the PDF code is unchanged except for using the new values)
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
     y = height - 70
 
-    # Logo + Timestamp + Header + Disclaimer + Summary (Page 1)
+    # Logo + Timestamp + Header + Disclaimer + Summary
     logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
     if os.path.exists(logo_path):
         img = ImageReader(logo_path)
@@ -291,16 +327,9 @@ def download_pdf():
     c.drawString(50, y, f"Tank Top Elevation: {round(tank_bottom_elev + tank_height, 2)} ft")
     y -= 18
 
-    cover_depth = round(surface_elev - (tank_bottom_elev + tank_height), 2)
-    max_cover_req = 20 if config == 'SC' else 30
-    cover_status = 'PASS' if cover_depth <= max_cover_req else 'FAIL'
-    dead_load_psi = round(cover_stone * 120 / 144, 2)
-    max_compressive = 70 if config == 'SC' else 100
-    fos_dead = round(max_compressive / dead_load_psi, 2) if dead_load_psi > 0 else None
-
     c.drawString(50, y, f"Actual Cover Depth: {cover_depth} ft → {cover_status}")
     y -= 18
-    c.drawString(50, y, f"Maximum Allowable Cover Depth: {max_cover_req} ft → {cover_status}")
+    c.drawString(50, y, f"Maximum Allowable Cover Depth: {max_cover_req} ft → {'PASS' if cover_depth <= max_cover_req else 'FAIL'}")
     y -= 18
     c.drawString(50, y, f"Dead Load Pressure: {dead_load_psi} psi")
     y -= 18
@@ -338,7 +367,7 @@ def download_pdf():
     c.setFont("Helvetica", 9)
     c.drawRightString(width - 50, 70, "Page 1 of 2" if include_stage_storage else "Page 1 of 1")
 
-    # Stage Storage (if enabled)
+    # Stage Storage (if enabled) - unchanged
     if include_stage_storage and stage_storage_lines:
         c.showPage()
         y = height - 70
@@ -379,7 +408,7 @@ def download_pdf():
         c.setFont("Helvetica", 9)
         c.drawRightString(width - 50, 70, f"Page {page_num} of {page_num}")
 
-    # Schematic Layout as LAST page (if enabled)
+    # Schematic as LAST page (if enabled) - unchanged
     if include_schematic and schematic_image:
         c.showPage()
         y = height - 50
