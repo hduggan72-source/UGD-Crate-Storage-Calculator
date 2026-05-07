@@ -48,6 +48,7 @@ Professional web-based calculator for designing and quoting underground stormwat
  
 -"?" pop-ups are missing from UI/UX main page
 - add Project # to PDF Summary page
+- add minimum storage volume to PDF Takeoff Report (on results card)
 - update to v13 from V12 (GITHUB FILES ONLY)
 - Scale bar + clean engineering style
 - Section/Elevation View (stacked layers + compacted stone base)
