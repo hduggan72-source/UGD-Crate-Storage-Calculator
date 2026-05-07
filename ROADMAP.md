@@ -53,7 +53,6 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Scale bar + clean engineering style
 - Section/Elevation View (stacked layers + compacted stone base)
 - NOTES field needs to wrap text (currently now runs off page)
-- NOTES field is not appearing on the Page 1 of PDF Summary
 - COVER STONE DEPTH NEEDS TO ROUND TO HUNDRETHS, NOT TENTHS
 
 
