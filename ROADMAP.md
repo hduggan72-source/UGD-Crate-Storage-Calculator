@@ -61,6 +61,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Add LIVE LOAD calculations to Results UX and PDF Summary page
 - COVER STONE DEPTH NEEDS TO ROUND TO HUNDRETHS, NOT TENTHS (??)
 - Add Storage volume vs. Elevation graphic chart (x/y axis)
+- UPDATE COVER DEPTH MAX NOTE FOR PASS/FAIL SC & EX (14.4,26.2)
 
 
 
