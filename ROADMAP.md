@@ -42,11 +42,12 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [X]  Include Schematicc in PDF report (optional to user just like stage storage)
 - [X]  When NO stage storage selected, only PAGE 1 SUMMARY PAGE generates. When Stage Storage IS selected, then pages 2 through whbatever is needed is appended to the Summary page. That way there is a clean separation between Summary Page | Stage Storage | and future Schematic Plan
 - [X]  Part #'s for pipe connectors & adapters added back to UI and PDF Summary Report
+- [X]  "?" pop-ups are missing from UI/UX main page
+  
 
  
  ## Next Up (High Priority – Do These Next)
  
--"?" pop-ups are missing from UI/UX main page
 - add Project # to PDF Summary page
 - add minimum storage volume to PDF Takeoff Report (on results card)
 - update to v13 from V12 (GITHUB FILES ONLY)
