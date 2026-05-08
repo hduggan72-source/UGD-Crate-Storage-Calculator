@@ -42,7 +42,6 @@ def index():
         include_schematic = request.form.get('include_schematic') == 'yes'
         stage_increment_in = int(request.form.get('stage_increment_in', 12) or 12)
 
-        # Core calculations
         MODULE_WID = 1.9685
         MODULE_LEN = 3.937
         crates_wide = math.floor(known_width / MODULE_WID)
@@ -90,11 +89,9 @@ def index():
         geoStone = round((outer_width * outer_length * 2 + outer_width * total_system_depth * 2 + outer_length * total_system_depth * 2) * (1 + geoWaste / 100.0), 1)
         geoTotal = round(geoTank + geoStone, 1)
 
-        # FIXED: Stone backfill volume to PURCHASE (bulk volume)
         stone_backfill_bulk_ft3 = round(stone_envelope_volume * 1.10, 1)
         stone_backfill_bulk_yd3 = round(stone_backfill_bulk_ft3 / 27, 2)
 
-        # Stage Storage
         stage_storage = None
         if include_stage_storage:
             stage_storage = []
@@ -118,7 +115,6 @@ def index():
 
         cover_depth = round(surface_elev - (tank_bottom_elev + tank_height), 2)
 
-        # NEW: Minimum cover requirement based on traffic load
         if traffic_load == 'H10':
             min_cover_req = 1.0
         elif traffic_load == 'HS20':
@@ -180,7 +176,6 @@ def index():
 
 @app.route('/download_pdf', methods=['POST'])
 def download_pdf():
-    # (All form reading and calculations are identical to the index route above)
     project_name = request.form.get('project_name', 'Project')
     config = request.form.get('config', 'SC')
     layers = int(request.form.get('layers', 3))
@@ -196,12 +191,12 @@ def download_pdf():
     geoWaste = int(request.form.get('geoWaste', 10) or 10)
     pipe_connectors = int(request.form.get('pipe_connectors', 0))
     top_adapters_12 = int(request.form.get('top_adapters_12', 0))
+    project_notes = request.form.get('project_notes', '')
     include_stage_storage = request.form.get('include_stage_storage') == 'yes'
     include_schematic = request.form.get('include_schematic') == 'yes'
     schematic_image = request.form.get('schematic_image')
     stage_increment_in = int(request.form.get('stage_increment_in', 12) or 12)
 
-    # Core calculations (identical to index route)
     MODULE_WID = 1.9685
     MODULE_LEN = 3.937
     crates_wide = math.floor(known_width / MODULE_WID)
@@ -249,7 +244,6 @@ def download_pdf():
     geoStone = round((outer_width * outer_length * 2 + outer_width * total_system_depth * 2 + outer_length * total_system_depth * 2) * (1 + geoWaste / 100.0), 1)
     geoTotal = round(geoTank + geoStone, 1)
 
-    # FIXED: Stone backfill volume to PURCHASE
     stone_backfill_bulk_ft3 = round(stone_envelope_volume * 1.10, 1)
     stone_backfill_bulk_yd3 = round(stone_backfill_bulk_ft3 / 27, 2)
 
@@ -267,7 +261,6 @@ def download_pdf():
             stage_storage_lines.append((round(current_elev, 2), round(tank_vol, 1), round(stone_vol, 1), round(total_vol, 1)))
             current_elev += increment_ft
 
-    # FIXED: Cover depth now checks minimum requirement for traffic load
     cover_depth = round(surface_elev - (tank_bottom_elev + tank_height), 2)
 
     if traffic_load == 'H10':
@@ -286,13 +279,12 @@ def download_pdf():
     max_compressive = 70 if config == 'SC' else 100
     fos_dead = round(max_compressive / dead_load_psi, 2) if dead_load_psi > 0 else None
 
-    # Build PDF (rest of the PDF code is unchanged except for using the new values)
+    # Build PDF
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
     y = height - 70
 
-    # Logo + Timestamp + Header + Disclaimer + Summary
     logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
     if os.path.exists(logo_path):
         img = ImageReader(logo_path)
@@ -331,10 +323,6 @@ def download_pdf():
     y -= 18
     c.drawString(50, y, f"Maximum Allowable Cover Depth: {max_cover_req} ft → {'PASS' if cover_depth <= max_cover_req else 'FAIL'}")
     y -= 18
-    c.drawString(50, y, f"Dead Load Pressure: {dead_load_psi} psi")
-    y -= 18
-    c.drawString(50, y, f"Factor of Safety (Dead Load): {fos_dead if fos_dead else '—'}")
-    y -= 18
     c.drawString(50, y, f"Traffic Load: {traffic_load}")
     y -= 25
 
@@ -344,8 +332,6 @@ def download_pdf():
         f"Stone Storage: {round(total_stone_storage,1)} ft³",
         f"Total System Storage: {round(total_storage,1)} ft³",
         "",
-        f"Estimated Stone Backfill Volume to Purchase: {stone_backfill_bulk_ft3} ft³ ({stone_backfill_bulk_yd3} yd³)",
-        "",
         "Bill of Materials",
         f"Base Unit (3091506) ................ {base_units}",
         f"Side Plate (2476600003) ............ {side_plates}",
@@ -353,10 +339,12 @@ def download_pdf():
         f"8-12\" Pipe Connectors (2476631200) ............... {pipe_connectors}",
         f"12\" Top Adapters (3085857) .................... {top_adapters_12}",
         "",
-        "Geotextile Fabric (Burrito Wrap)",
-        f"AquaCell Only .................... {geoTank} ft²",
-        f"Stone Envelope .................... {geoStone} ft²",
-        f"Total Geotextile .................... {geoTotal} ft²",
+        f"Estimated Stone Backfill Volume (with 10% added): {stone_backfill_bulk_ft3} ft³ ({stone_backfill_bulk_yd3} yd³)",
+        "",
+        "Geotextile Fabric",
+        f"AquaCell Only .................... {geoTank} ft² ({round(geoTank/9,1)} yd²)",
+        f"Stone Envelope .................... {geoStone} ft² ({round(geoStone/9,1)} yd²)",
+        f"Total Geotextile .................... {geoTotal} ft² ({round(geoTotal/9,1)} yd²)",
         f"Waste/Overlap .................... {geoWaste}.0%",
     ]
 
@@ -364,10 +352,28 @@ def download_pdf():
         c.drawString(50, y, line)
         y -= 18
 
+    # Project Notes with text wrapping
+    if project_notes.strip():
+        c.setFont("Helvetica", 9)
+        c.drawString(50, y, "Project Notes / Special Instructions / Assumptions:")
+        y -= 18
+        words = project_notes.split()
+        line = ""
+        for word in words:
+            if len(line) + len(word) > 90:
+                c.drawString(50, y, line)
+                y -= 14
+                line = word + " "
+            else:
+                line += word + " "
+        if line:
+            c.drawString(50, y, line)
+            y -= 18
+
     c.setFont("Helvetica", 9)
     c.drawRightString(width - 50, 70, "Page 1 of 2" if include_stage_storage else "Page 1 of 1")
 
-    # Stage Storage (if enabled) - unchanged
+    # Stage Storage (if enabled)
     if include_stage_storage and stage_storage_lines:
         c.showPage()
         y = height - 70
@@ -408,7 +414,7 @@ def download_pdf():
         c.setFont("Helvetica", 9)
         c.drawRightString(width - 50, 70, f"Page {page_num} of {page_num}")
 
-    # Schematic as LAST page (if enabled) - unchanged
+    # Schematic as LAST page
     if include_schematic and schematic_image:
         c.showPage()
         y = height - 50
