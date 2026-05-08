@@ -60,6 +60,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Section/Elevation View (stacked layers + compacted stone base)
 - Add LIVE LOAD calculations to Results UX and PDF Summary page
 - COVER STONE DEPTH NEEDS TO ROUND TO HUNDRETHS, NOT TENTHS (??)
+- Add Storage volume vs. Elevation graphic chart (x/y axis)
 
 
 
