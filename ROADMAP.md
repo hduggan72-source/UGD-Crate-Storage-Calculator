@@ -40,7 +40,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - [X]  When NO stage storage chart is selected, the PDF Summary generates one page, but disclaimer that appends the stage storage renders on the bottom of the 1st page over the geo wrap details.
 - [X]  % waste on UI was zero, but calculated at 10% on PDF Summary report (FIX)
 - [X]  Include Schematicc in PDF report (optional to user just like stage storage)
-- [X]  When NO stage storage selected, only PAGE 1 SUMMARY PAGE generates. When Stage Storage IS selected, then pages 2 through whbatever is needed is appended to the Summary page. That way there is a clean separation between Summary Page | Stage Storage | and future Schematic Plan
+- [X]  When NO stage storage selected, only PAGE 1 SUMMARY PAGE generates. When Stage Storage IS selected, then pages 2 through whbatever is needed is appended to the Summary page. That way there is a clean separation            between Summary Page | Stage Storage | and future Schematic Plan
 - [X]  Part #'s for pipe connectors & adapters added back to UI and PDF Summary Report
 - [X]  "?" pop-ups are missing from UI/UX main page
 - [X]  NOTES field needs to wrap text (currently now runs off page); ALSO MOVED TO BOTTOM OF PAGE
@@ -52,6 +52,7 @@ Professional web-based calculator for designing and quoting underground stormwat
     -  [X] Added square yards to the geotextile totals.
     -  [X] Add minimum storage volume to PDF Takeoff Report (on results card)
     -  [X] UPDATE COVER DEPTH MAX NOTE FOR PASS/FAIL SC & EX (14.4,26.2)
+    -  [X] COVER STONE DEPTH NEEDS TO ROUND TO HUNDRETHS, NOT TENTHS (??)
  
  ## Next Up (High Priority – Do These Next)
  
@@ -60,8 +61,8 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Scale bar + clean engineering style
 - Section/Elevation View (stacked layers + compacted stone base)
 - Add LIVE LOAD calculations to Results UX and PDF Summary page
-- COVER STONE DEPTH NEEDS TO ROUND TO HUNDRETHS, NOT TENTHS (??)
 - Add Storage volume vs. Elevation graphic chart (x/y axis)
+- FIX SECTION IN DARK MODE THAT IS WASHED OUT (SCHEMATIC & STAGE STORAGE SELECTION CARD)
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 - Stage storage table with CSV export
