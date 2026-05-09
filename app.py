@@ -124,12 +124,15 @@ def index():
         else:
             min_cover_req = 1.0
 
-        max_cover_req = 20 if config == 'SC' else 30
+        # UPDATED MAXIMUM ALLOWABLE COVER DEPTH
+        max_cover_req = 14.4 if config == 'SC' else 26.2
         cover_status = 'PASS' if cover_depth >= min_cover_req else 'FAIL'
 
         dead_load_psi = round(cover_stone * 120 / 144, 2)
         max_compressive = 70 if config == 'SC' else 100
         fos_dead = round(max_compressive / dead_load_psi, 2) if dead_load_psi > 0 else None
+
+        storage_status = 'PASS' if min_storage <= total_storage else 'FAIL' if min_storage > 0 else None
 
         results = {
             'config': config,
@@ -160,7 +163,7 @@ def index():
             'stage_storage': stage_storage,
             'stage_increment_in': stage_increment_in,
             'min_storage': min_storage if min_storage > 0 else None,
-            'storage_status': 'PASS' if min_storage <= total_storage else 'FAIL' if min_storage > 0 else None,
+            'storage_status': storage_status,
             'stone_backfill_bulk_ft3': stone_backfill_bulk_ft3,
             'stone_backfill_bulk_yd3': stone_backfill_bulk_yd3,
             'geoTank': geoTank,
@@ -192,6 +195,7 @@ def download_pdf():
     pipe_connectors = int(request.form.get('pipe_connectors', 0))
     top_adapters_12 = int(request.form.get('top_adapters_12', 0))
     project_notes = request.form.get('project_notes', '')
+    min_storage = float(request.form.get('min_storage', 0) or 0)
     include_stage_storage = request.form.get('include_stage_storage') == 'yes'
     include_schematic = request.form.get('include_schematic') == 'yes'
     schematic_image = request.form.get('schematic_image')
@@ -247,6 +251,8 @@ def download_pdf():
     stone_backfill_bulk_ft3 = round(stone_envelope_volume * 1.10, 1)
     stone_backfill_bulk_yd3 = round(stone_backfill_bulk_ft3 / 27, 2)
 
+    storage_status = 'PASS' if min_storage <= total_storage else 'FAIL' if min_storage > 0 else None
+
     stage_storage_lines = []
     if include_stage_storage:
         increment_ft = stage_increment_in / 12.0
@@ -272,7 +278,8 @@ def download_pdf():
     else:
         min_cover_req = 1.0
 
-    max_cover_req = 20 if config == 'SC' else 30
+    # UPDATED MAXIMUM ALLOWABLE COVER DEPTH (per your request)
+    max_cover_req = 14.4 if config == 'SC' else 26.2
     cover_status = 'PASS' if cover_depth >= min_cover_req else 'FAIL'
 
     dead_load_psi = round(cover_stone * 120 / 144, 2)
@@ -331,6 +338,9 @@ def download_pdf():
         f"AquaCell Tank Storage: {round(tank_storage,1)} ft³",
         f"Stone Storage: {round(total_stone_storage,1)} ft³",
         f"Total System Storage: {round(total_storage,1)} ft³",
+        f"Minimum Required Storage Volume: {min_storage} ft³ → {storage_status}" if min_storage > 0 else "",
+        "",
+        f"Estimated Stone Backfill Volume (with 10% added): {stone_backfill_bulk_ft3} ft³ ({stone_backfill_bulk_yd3} yd³)",
         "",
         "Bill of Materials",
         f"Base Unit (3091506) ................ {base_units}",
@@ -338,8 +348,6 @@ def download_pdf():
         f"Bottom Plate (2476600001) .......... {bottom_plates}",
         f"8-12\" Pipe Connectors (2476631200) ............... {pipe_connectors}",
         f"12\" Top Adapters (3085857) .................... {top_adapters_12}",
-        "",
-        f"Estimated Stone Backfill Volume (with 10% added): {stone_backfill_bulk_ft3} ft³ ({stone_backfill_bulk_yd3} yd³)",
         "",
         "Geotextile Fabric",
         f"AquaCell Only .................... {geoTank} ft² ({round(geoTank/9,1)} yd²)",
@@ -349,8 +357,9 @@ def download_pdf():
     ]
 
     for line in lines:
-        c.drawString(50, y, line)
-        y -= 18
+        if line:
+            c.drawString(50, y, line)
+            y -= 18
 
     # Project Notes with text wrapping
     if project_notes.strip():
