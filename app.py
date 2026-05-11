@@ -57,6 +57,9 @@ def index():
             layer_heights = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
             void_ratio = 0.92633
             side_multiplier = 1.509186351
+            
+        MODULE_WID = 1.9685  # 23.6"
+        MODULE_LEN = 3.937   # 47.2"
 
         tank_height = layer_heights[layers-1] if layers <= len(layer_heights) else layer_heights[-1]
 
