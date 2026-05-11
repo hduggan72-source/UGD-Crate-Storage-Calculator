@@ -177,7 +177,7 @@
         canvas#sheet { background: #ffffff; border: 1px solid #ccc; border-radius: 8px; width: 100%; max-width: 1400px; height: auto; display: block; margin: 0 auto; }
         .schematic-btns { margin-top: 12px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 
-        /* DARK MODE FIX - Checkbox / Options Section */
+        /* DARK MODE FIX */
         .options-container {
             margin-top:25px; 
             padding:15px; 
@@ -251,9 +251,9 @@
         <div class="form-grid" style="margin-top:20px">
             <div>
                 <label>Estimated Surface Elevation (ft)</label>
-                <input type="number" step="0.01" name="surface_elev" placeholder="e.g., 850.50" value="{{ form_data.get('surface_elev', '') }}">
+                <input type="number" step="0.01" name="surface_elev" id="surface_elev" placeholder="e.g., 850.50" value="{{ form_data.get('surface_elev', '') }}">
                 <label>AquaCell Tank Bottom Elevation (ft)</label>
-                <input type="number" step="0.01" name="tank_bottom_elev" placeholder="e.g., 840.00" value="{{ form_data.get('tank_bottom_elev', '') }}">
+                <input type="number" step="0.01" name="tank_bottom_elev" id="tank_bottom_elev" placeholder="e.g., 840.00" value="{{ form_data.get('tank_bottom_elev', '') }}">
             </div>
             <div>
                 <label>Traffic Load Required 
@@ -298,7 +298,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 <label>Base Stone Depth (ft) 
                     <span class="help-icon" data-tooltip="Depth of the stone below the bottom of the tank (typically 0.333 ft / 4 inches).">?</span>
                 </label>
-                <input type="number" step="0.001" name="base_stone" min="0" value="{{ form_data.get('base_stone', '') }}">
+                <input type="number" step="0.001" name="base_stone" id="base_stone" min="0" value="{{ form_data.get('base_stone', '') }}">
             </div>
         </div>
 
@@ -341,7 +341,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             <textarea name="project_notes" placeholder="Enter any additional notes, assumptions, special requirements, or comments here...">{{ form_data.get('project_notes', '') }}</textarea>
         </div>
 
-        <!-- SCHEMATIC CHECKBOX + STAGE STORAGE TOGGLE + INCREMENT (DARK MODE FIXED) -->
+        <!-- Options -->
         <div class="options-container">
             <label style="display:block;">
                 <input type="checkbox" name="include_schematic" id="include_schematic" value="yes" checked>
@@ -409,7 +409,6 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             <p><strong>Project Notes:</strong> {{ results.project_notes | replace('\n', '<br>') | safe }}</p>
             {% endif %}
 
-            <!-- STAGE STORAGE TABLE -->
             {% if results.stage_storage %}
             <h3>Stage Storage Table ({{ results.stage_increment_in }} inch increments)</h3>
             <table>
@@ -616,9 +615,10 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         if (document.querySelector('.results')) updateSuggestion();
     });
 
-    // ====================== FULL CONCEPTUAL SCHEMATIC ENGINE ======================
+    // ====================== SCHEMATIC ENGINE ======================
     const CL_IN = 47.2; const CW_IN = 23.6;
-    const CL_FT = CL_IN / 12; const CW_FT = CW_IN / 12;
+    const CRATE_LEN_FT = 3.94;
+    const CRATE_WID_FT = 1.97;
 
     const LAYER_HT = {
         SC: [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581],
@@ -630,14 +630,14 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const crates_wide = Math.floor(W * 12 / CW_IN);
         return {
             crates_long, crates_wide,
-            used_L: crates_long * CL_FT,
-            used_W: crates_wide * CW_FT,
-            margin_L: (L - crates_long * CL_FT)/2,
-            margin_W: (W - crates_wide * CW_FT)/2
+            used_L: crates_long * CRATE_LEN_FT,
+            used_W: crates_wide * CRATE_WID_FT,
+            margin_L: (L - crates_long * CRATE_LEN_FT)/2,
+            margin_W: (W - crates_wide * CRATE_WID_FT)/2
         };
     }
 
-    const COLORS = {frame:'#d0d0d0', text:'#000', muted:'#333', stoneFill:'#e6e6e6', stoneStroke:'#7d7d7d', crateFill:'#d5eaff', crateStroke:'#234c93', red:'#ff3b3b'};
+    const COLORS = {frame:'#d0d0d0', text:'#000', muted:'#333', stoneFill:'#e6e6e6', stoneStroke:'#7d7d7d', crateFill:'#d5eaff', crateStroke:'#234c93', red:'#ff3b3b', baseStone:'#7a7f89'};
 
     function drawPlan(ctx, state, b) {
         const {L, W, snap} = state;
@@ -645,7 +645,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         ctx.fillStyle = '#fff'; ctx.fillRect(b.x,b.y,b.w,b.h);
         ctx.strokeStyle = COLORS.frame; ctx.strokeRect(b.x,b.y,b.w,b.h);
 
-        const pxpf = Math.min((b.w-120)/L, (b.h-120)/W);
+        const pxpf = Math.min((b.w-140)/L, (b.h-180)/W);
         const ox = b.x+60, oy = b.y+60;
 
         const ring = 1.0;
@@ -654,51 +654,120 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         ctx.strokeRect(ox+(snap.margin_L-ring)*pxpf, oy+(snap.margin_W-ring)*pxpf, (snap.used_L+2*ring)*pxpf, (snap.used_W+2*ring)*pxpf);
 
         for(let i=0; i<snap.crates_long; i++) for(let j=0; j<snap.crates_wide; j++) {
-            const cx = ox + (snap.margin_L + i*CL_FT)*pxpf;
-            const cy = oy + (snap.margin_W + j*CW_FT)*pxpf;
+            const cx = ox + (snap.margin_L + i*CRATE_LEN_FT)*pxpf;
+            const cy = oy + (snap.margin_W + j*CRATE_WID_FT)*pxpf;
             ctx.fillStyle = COLORS.crateFill; ctx.strokeStyle = COLORS.crateStroke;
-            ctx.fillRect(cx,cy,CL_FT*pxpf,CW_FT*pxpf);
-            ctx.strokeRect(cx,cy,CL_FT*pxpf,CW_FT*pxpf);
+            ctx.fillRect(cx,cy,CRATE_LEN_FT*pxpf,CRATE_WID_FT*pxpf);
+            ctx.strokeRect(cx,cy,CRATE_LEN_FT*pxpf,CRATE_WID_FT*pxpf);
         }
 
-        ctx.strokeStyle = '#000'; ctx.lineWidth=2;
+        ctx.strokeStyle = '#000'; ctx.lineWidth=3;
         ctx.strokeRect(ox+snap.margin_L*pxpf, oy+snap.margin_W*pxpf, snap.used_L*pxpf, snap.used_W*pxpf);
 
-        ctx.setLineDash([8,6]); ctx.strokeStyle=COLORS.red;
+        ctx.setLineDash([8,6]); ctx.strokeStyle=COLORS.red; ctx.lineWidth=2;
         ctx.strokeRect(ox+(snap.margin_L-1)*pxpf, oy+(snap.margin_W-1)*pxpf, (snap.used_L+2)*pxpf, (snap.used_W+2)*pxpf);
         ctx.setLineDash([]);
 
-        ctx.fillStyle = COLORS.text; ctx.font = '600 14px Arial';
-        ctx.fillText(`PLAN VIEW — ${snap.crates_long}×${snap.crates_wide} crates | Used: ${snap.used_L.toFixed(2)}×${snap.used_W.toFixed(2)} ft`, b.x+20, b.y+25);
+        ctx.fillStyle = COLORS.text; ctx.font = '600 16px Arial';
+        ctx.fillText(`PLAN VIEW — Used footprint: ${snap.used_L.toFixed(2)} ft × ${snap.used_W.toFixed(2)} ft`, b.x+20, b.y+28);
+
+        // Scale Bar
+        const scaleFt = 10;
+        const scalePx = scaleFt * pxpf;
+        const sx = b.x + 60;
+        const sy = b.y + b.h - 70;
+        ctx.fillStyle = '#fff'; ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
+        ctx.fillRect(sx, sy, scalePx, 28);
+        ctx.strokeRect(sx, sy, scalePx, 28);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(sx + 8, sy + 8, scalePx - 16, 12);
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+        for(let i = 0; i <= scaleFt; i += 2) {
+            const tx = sx + 8 + (i / scaleFt) * (scalePx - 16);
+            ctx.beginPath(); ctx.moveTo(tx, sy + 8); ctx.lineTo(tx, sy + 20); ctx.stroke();
+        }
+        ctx.fillStyle = '#000'; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center';
+        ctx.fillText(`${scaleFt} ft`, sx + scalePx/2, sy + 48);
+
+        ctx.font = '12px Arial'; ctx.textAlign = 'right';
+        ctx.fillText(`1 Crate = ${CRATE_LEN_FT.toFixed(2)} ft × ${CRATE_WID_FT.toFixed(2)} ft`, b.x + b.w - 30, b.y + b.h - 25);
         ctx.restore();
     }
 
     function drawSection(ctx, state, b) {
+        const tankBottomElev = parseFloat(document.getElementById('tank_bottom_elev').value) || 0;
+        const baseStoneDepth = parseFloat(document.getElementById('base_stone').value) || 0.333;
+
+        const bottomOfBaseStone = tankBottomElev - baseStoneDepth;
         const heights = LAYER_HT[state.config] || LAYER_HT.SC;
-        const tank = heights[state.layers-1] || state.layers*1.33;
+        const tankHeight = heights[state.layers-1] || state.layers * 1.33;
+        const totalHeight = baseStoneDepth + tankHeight;
+
         ctx.save();
-        ctx.fillStyle = '#fff'; ctx.fillRect(b.x,b.y,b.w,b.h);
-        ctx.strokeStyle = '#ddd'; ctx.strokeRect(b.x,b.y,b.w,b.h);
+        ctx.fillStyle = '#fff'; ctx.fillRect(b.x, b.y, b.w, b.h);
+        ctx.strokeStyle = '#ddd'; ctx.strokeRect(b.x, b.y, b.w, b.h);
 
         ctx.fillStyle = '#f0f0f0'; ctx.fillRect(b.x, b.y, b.w, 40);
         ctx.fillStyle = '#000'; ctx.font = '600 16px Arial';
         ctx.fillText('SECTION VIEW — Base at Bottom', b.x+20, b.y+28);
 
-        const pxpf = (b.h - 100) / (tank + 1.5);
-        const ox = b.x + 80, oy = b.y + 60;
+        const pxpf = (b.h - 120) / (totalHeight + 1);
+        const ox = b.x + 120;
+        const oy = b.y + 60;
+        const bottomY = oy + totalHeight * pxpf;
 
-        for(let i=0; i<=Math.ceil(tank); i++) {
-            const y = oy + i*pxpf;
-            ctx.beginPath(); ctx.moveTo(ox,y); ctx.lineTo(b.w-80,y); ctx.stroke();
+        // Compacted Base Stone at BOTTOM
+        ctx.fillStyle = COLORS.baseStone;
+        ctx.strokeStyle = '#333';
+        ctx.fillRect(ox, bottomY - baseStoneDepth * pxpf, b.w - 240, baseStoneDepth * pxpf);
+        ctx.strokeRect(ox, bottomY - baseStoneDepth * pxpf, b.w - 240, baseStoneDepth * pxpf);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center';
+        ctx.fillText('Compacted Base Stone', ox + (b.w - 240)/2, bottomY - (baseStoneDepth * pxpf)/2 + 5);
+
+        // AquaCell Layers stacked upward
+        let currentBottom = bottomY - baseStoneDepth * pxpf;
+        for (let k = 0; k < state.layers; k++) {
+            const layerHt = (heights[k] || (k+1)*1.33) - (heights[k-1] || 0) || (tankHeight / state.layers);
+            const layerTop = currentBottom - layerHt * pxpf;
+
+            ctx.fillStyle = '#9fd7ff';
+            ctx.strokeStyle = '#234c93';
+            ctx.fillRect(ox, layerTop, b.w - 240, layerHt * pxpf);
+            ctx.strokeRect(ox, layerTop, b.w - 240, layerHt * pxpf);
+
+            ctx.fillStyle = '#000';
+            ctx.fillText(`Layer ${k+1}`, ox + (b.w - 240)/2, layerTop + (layerHt * pxpf)/2 + 5);
+
+            currentBottom = layerTop;
         }
 
-        const lh = tank / state.layers;
-        for(let k=0; k<state.layers; k++) {
-            const yy = oy + k * lh * pxpf;
-            ctx.fillStyle = '#9fd7ff'; ctx.fillRect(ox+40, yy, b.w-240, lh*pxpf);
-            ctx.strokeStyle = '#234c93'; ctx.strokeRect(ox+40, yy, b.w-240, lh*pxpf);
-            ctx.fillStyle = '#000'; ctx.fillText(`Layer ${k+1}`, ox+120, yy + lh*pxpf/2 + 5);
+        // Elevation Scale
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(ox - 60, oy); ctx.lineTo(ox - 60, bottomY); ctx.stroke();
+
+        ctx.font = '12px Arial'; ctx.textAlign = 'right'; ctx.fillStyle = '#000';
+
+        ctx.fillText(bottomOfBaseStone.toFixed(2), ox - 70, bottomY + 4);
+        ctx.beginPath(); ctx.moveTo(ox - 60, bottomY); ctx.lineTo(ox - 45, bottomY); ctx.stroke();
+
+        ctx.fillText(tankBottomElev.toFixed(2), ox - 70, bottomY - baseStoneDepth * pxpf + 4);
+        ctx.beginPath(); ctx.moveTo(ox - 60, bottomY - baseStoneDepth * pxpf); ctx.lineTo(ox - 45, bottomY - baseStoneDepth * pxpf); ctx.stroke();
+
+        let elev = tankBottomElev;
+        for (let k = 0; k < state.layers; k++) {
+            const layerHt = (heights[k] || (k+1)*1.33) - (heights[k-1] || 0) || (tankHeight / state.layers);
+            elev += layerHt;
+            const yPos = bottomY - baseStoneDepth * pxpf - (elev - tankBottomElev) * pxpf;
+            ctx.fillText(elev.toFixed(2), ox - 70, yPos + 4);
+            ctx.beginPath(); ctx.moveTo(ox - 60, yPos); ctx.lineTo(ox - 45, yPos); ctx.stroke();
         }
+
+        ctx.save();
+        ctx.translate(ox - 85, oy + totalHeight * pxpf / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('Elevation (ft)', 0, 0);
+        ctx.restore();
+
         ctx.restore();
     }
 
@@ -753,6 +822,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     document.getElementById('knownWidth').addEventListener('input', renderSheet);
     document.getElementById('layers').addEventListener('change', renderSheet);
     document.getElementById('modelType').addEventListener('change', renderSheet);
+    document.getElementById('tank_bottom_elev').addEventListener('input', renderSheet);
+    document.getElementById('base_stone').addEventListener('input', renderSheet);
 </script>
 </body>
 </html>
