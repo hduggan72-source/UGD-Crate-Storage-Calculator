@@ -55,12 +55,13 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] COVER STONE DEPTH NEEDS TO ROUND TO HUNDRETHS, NOT TENTHS (??)
 -  [X] FIX SECTION IN DARK MODE THAT IS WASHED OUT (SCHEMATIC & STAGE STORAGE SELECTION CARD)
 -  [X] Scale bar + clean engineering style
+-  [X] Section/Elevation View (stacked layers + compacted stone base)
+-  [X] added project name & number to the schematic layout 
  
  ## Next Up (High Priority – Do These Next)
  
 - add Project # to PDF Summary page
 - update to v13 from V12 (GITHUB FILES ONLY)
-- Section/Elevation View (stacked layers + compacted stone base)
 - Add LIVE LOAD calculations to Results UX and PDF Summary page
 - Add Storage volume vs. Elevation graphic chart (x/y axis)
 
