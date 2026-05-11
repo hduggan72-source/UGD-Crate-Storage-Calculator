@@ -51,15 +51,15 @@ Professional web-based calculator for designing and quoting underground stormwat
     -  [X] Removed "Burrito Wrap" from the Geotextile Fabric header
     -  [X] Added square yards to the geotextile totals.
     -  [X] Add minimum storage volume to PDF Takeoff Report (on results card)
-    -  [X] UPDATE COVER DEPTH MAX NOTE FOR PASS/FAIL SC & EX (14.4,26.2)
-    -  [X] COVER STONE DEPTH NEEDS TO ROUND TO HUNDRETHS, NOT TENTHS (??)
-    -  [X] FIX SECTION IN DARK MODE THAT IS WASHED OUT (SCHEMATIC & STAGE STORAGE SELECTION CARD)
+-  [X] UPDATE COVER DEPTH MAX NOTE FOR PASS/FAIL SC & EX (14.4,26.2)
+-  [X] COVER STONE DEPTH NEEDS TO ROUND TO HUNDRETHS, NOT TENTHS (??)
+-  [X] FIX SECTION IN DARK MODE THAT IS WASHED OUT (SCHEMATIC & STAGE STORAGE SELECTION CARD)
+-  [X] Scale bar + clean engineering style
  
  ## Next Up (High Priority – Do These Next)
  
 - add Project # to PDF Summary page
 - update to v13 from V12 (GITHUB FILES ONLY)
-- Scale bar + clean engineering style
 - Section/Elevation View (stacked layers + compacted stone base)
 - Add LIVE LOAD calculations to Results UX and PDF Summary page
 - Add Storage volume vs. Elevation graphic chart (x/y axis)
