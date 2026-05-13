@@ -63,6 +63,8 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Add LIVE LOAD calculations to Results UX and PDF Summary page
 - Add Storage volume vs. Elevation graphic chart (x/y axis)
 - check "used perimeter" value that is displayed on Results screen when complex shape is calculated (ex. 1511-02)
+- side panel that stays staic with executable command buttons (Calculate, Reset, download, export, etc.)
+- reformat thhe UI/UX into "Cards".
 
 
 
