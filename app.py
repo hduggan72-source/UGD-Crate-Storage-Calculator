@@ -37,6 +37,7 @@ def index():
         geoWaste = int(request.form.get('geoWaste', 10) or 10)
         pipe_connectors = int(request.form.get('pipe_connectors', 0) or 0)
         top_adapters_12 = int(request.form.get('top_adapters_12', 0) or 0)
+        top_adapters_16 = int(request.form.get('top_adapters_16', 0) or 0)
         project_notes = request.form.get('project_notes', '')
         include_stage_storage = request.form.get('include_stage_storage') == 'yes'
         include_schematic = request.form.get('include_schematic') == 'yes'
@@ -162,6 +163,7 @@ def index():
             'bottom_plates': bottom_plates,
             'pipe_connectors': pipe_connectors,
             'top_adapters_12': top_adapters_12,
+            'top_adapters_16': top_adapters_16,
             'project_notes': project_notes,
             'stage_storage': stage_storage,
             'stage_increment_in': stage_increment_in,
@@ -197,6 +199,7 @@ def download_pdf():
     geoWaste = int(request.form.get('geoWaste', 10) or 10)
     pipe_connectors = int(request.form.get('pipe_connectors', 0))
     top_adapters_12 = int(request.form.get('top_adapters_12', 0))
+    top_adapters_16 = int(request.form.get('top_adapters_16', 0))
     project_notes = request.form.get('project_notes', '')
     min_storage = float(request.form.get('min_storage', 0) or 0)
     include_stage_storage = request.form.get('include_stage_storage') == 'yes'
@@ -351,10 +354,11 @@ def download_pdf():
         f"Bottom Plate (2476600001) .......... {bottom_plates}",
         f"8-12\" Pipe Connectors (2476631200) ............... {pipe_connectors}",
         f"12\" Top Adapters (3085857) .................... {top_adapters_12}",
+        f"16\" Top Adapters (2476842000) .................... {top_adapters_16}",
         "",
         "Geotextile Fabric",
-        f"AquaCell Only .................... {geoTank} ft² ({round(geoTank/9,1)} yd²)",
-        f"Stone Envelope .................... {geoStone} ft² ({round(geoStone/9,1)} yd²)",
+        f"AquaCell Tank Only .................... {geoTank} ft² ({round(geoTank/9,1)} yd²)",
+        f"Stone Backfill Envelope .................... {geoStone} ft² ({round(geoStone/9,1)} yd²)",
         f"Total Geotextile .................... {geoTotal} ft² ({round(geoTotal/9,1)} yd²)",
         f"Waste/Overlap .................... {geoWaste}.0%",
     ]
