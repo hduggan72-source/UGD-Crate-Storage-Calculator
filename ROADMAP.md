@@ -58,23 +58,31 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] Section/Elevation View (stacked layers + compacted stone base)
  
  ## Next Up (High Priority – Do These Next)
+- pass/fail GREEN highlight entire "Total System Storage" if > than minimum required storage / RED if < than
+- 
 - add Project # to PDF Summary page
 - update to v13 from V12 (GITHUB FILES ONLY)
-- Add LIVE LOAD calculations to Results UX and PDF Summary page
+- Add LIVE LOAD & DEAD LOAD calculations to Results UX (NOT ON PDF SUMMARY)
 - Add Storage volume vs. Elevation graphic chart (x/y axis)
 - check "used perimeter" value that is displayed on Results screen when complex shape is calculated (ex. 1511-02)
 - side panel that stays staic with executable command buttons (Calculate, Reset, download, export, etc.)
-- reformat thhe UI/UX into "Cards".
-
-
+- reformat the UI/UX into "Cards"
+- input box for numbers width needs to be decreased (allowing more room for side panel executable commands)
+- Add Total system storage to side panel so it remains static as you scroll
+- Add page up/down scroll button to get to the top or bottom of page faster
+- 
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
+
+- Separate Quote Sheet & BOM Command buttons to generate individual pages with different disclaimers as needed
+- qr codes or hyperlinks to wavin.us or specific installation details
 - Stage storage table with CSV export
-- Excavation slope calculator integration (with variable H:V ratios)
+- STREAMLINE PDF SUMMARY TO JUST ESSENTIALS
+- USE CANVAS TO BUILD A TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
+- Excavation slope calculator integration (with variable H:V ratios) - FRONT END CALCULATIONS ONLY
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
 - Optional 3D isometric view of the crate layout
 - Integration of Wavin installation details (access ports, geogrid, compaction notes)
-- Separate Quote Sheet & BOM Command buttons to generate individual pages with different disclaimers as needed
 - hidden pages that prepends/appends when PDF is created (cover sheet, standard detail, specs, etc.)
 - <div class="disclaimer">
         <strong>Disclaimer:</strong> This calculator provides <em>preliminary, conceptual estimates only</em> and is <em>not a stamped engineering design</em>. Wavin’s assistance in sizing or product selection is advisory and does not constitute design responsibility or guarantee system performance. The Engineer of Record (EoR) is solely responsible for verifying all design parameters and site conditions, including hydrology, structural requirements, soils, environmental factors, and integration with the overall stormwater system. AquaCell dimensions and assumptions (including usable storage and unit base areas) follow published product data. <strong>Final layouts, capacities, and installation depths must be confirmed by a licensed Professional Engineer</strong> using project‑specific plans (grading, pipe sizes and materials, invert elevations, loading conditions, and applicable codes/standards).
