@@ -290,15 +290,15 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 <label>Perimeter Stone Width (ft) 
                     <span class="help-icon" data-tooltip="Thickness of the stone envelope surrounding the tank (typically 1.0 ft).">?</span>
                 </label>
-                <input type="number" step="0.001" name="perimeter_stone_width" min="0" value="{{ form_data.get('perimeter_stone_width', '') }}">
+                <input type="number" step="any" name="perimeter_stone_width" min="0" value="{{ form_data.get('perimeter_stone_width', '') }}">
                 <label>Cover Stone Depth (ft) 
                     <span class="help-icon" data-tooltip="Depth of the stone above the top of the tank.">?</span>
                 </label>
-                <input type="number" step="0.001" name="cover_stone" min="0" value="{{ form_data.get('cover_stone', '') }}">
+                <input type="number" step="any" name="cover_stone" min="0" value="{{ form_data.get('cover_stone', '') }}">
                 <label>Base Stone Depth (ft) 
                     <span class="help-icon" data-tooltip="Depth of the stone below the bottom of the tank (typically 0.333 ft / 4 inches).">?</span>
                 </label>
-                <input type="number" step="0.001" name="base_stone" id="base_stone" min="0" value="{{ form_data.get('base_stone', '') }}">
+                <input type="number" step="any" name="base_stone" id="base_stone" min="0" value="{{ form_data.get('base_stone', '') }}">
             </div>
         </div>
 
@@ -331,6 +331,11 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             <div>
                 <label>12" Top Adapter (3085857)</label>
                 <input type="number" name="top_adapters_12" id="top_adapters_12" min="0" value="{{ form_data.get('top_adapters_12', '') }}">
+                <div id="topAdapterSuggestion" class="suggested"></div>
+            </div>
+               <div>
+                <label>16" Top Adapter (2476842000)</label>
+                <input type="number" name="top_adapters_16" id="top_adapters_16" min="0" value="{{ form_data.get('top_adapters_16', '') }}">
                 <div id="topAdapterSuggestion" class="suggested"></div>
             </div>
         </div>
@@ -437,14 +442,15 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 <tr><td>Bottom Plate (2476600001)</td><td>{{ results.bottom_plates }}</td></tr>
                 <tr><td>8-12" Pipe Connectors (2476631200)</td><td>{{ results.pipe_connectors }}</td></tr>
                 <tr><td>12" Top Adapters (3085857)</td><td>{{ results.top_adapters_12 }}</td></tr>
+                <tr><td>16" Top Adapters (2476842000)</td><td>{{ results.top_adapters_16 }}</td></tr>
             </table>
 
             <div class="geo-section">
-                <h3>Geotextile (Burrito Wrap)</h3>
+                <h3>Geotextile Fabric</h3>
                 <table>
                     <tr><th>Item</th><th>Quantity (ft²)</th></tr>
-                    <tr><td>AquaCell Only</td><td>{{ results.geoTank }}</td></tr>
-                    <tr><td>Stone Envelope</td><td>{{ results.geoStone }}</td></tr>
+                    <tr><td>AquaCell Tank Only</td><td>{{ results.geoTank }}</td></tr>
+                    <tr><td>Stone Backfill Envelope</td><td>{{ results.geoStone }}</td></tr>
                     <tr><td><strong>Total</strong></td><td><strong>{{ results.geoTotal }}</strong></td></tr>
                 </table>
             </div>
