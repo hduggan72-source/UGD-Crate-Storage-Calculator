@@ -290,11 +290,11 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 <label>Perimeter Stone Width (ft) 
                     <span class="help-icon" data-tooltip="Thickness of the stone envelope surrounding the tank (typically 1.0 ft).">?</span>
                 </label>
-                <input type="number" step="0.01" name="perimeter_stone_width" min="0" value="{{ form_data.get('perimeter_stone_width', '') }}">
+                <input type="number" step="0.001" name="perimeter_stone_width" min="0" value="{{ form_data.get('perimeter_stone_width', '') }}">
                 <label>Cover Stone Depth (ft) 
                     <span class="help-icon" data-tooltip="Depth of the stone above the top of the tank.">?</span>
                 </label>
-                <input type="number" step="0.1" name="cover_stone" min="0" value="{{ form_data.get('cover_stone', '') }}">
+                <input type="number" step="0.001" name="cover_stone" min="0" value="{{ form_data.get('cover_stone', '') }}">
                 <label>Base Stone Depth (ft) 
                     <span class="help-icon" data-tooltip="Depth of the stone below the bottom of the tank (typically 0.333 ft / 4 inches).">?</span>
                 </label>
