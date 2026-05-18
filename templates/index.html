@@ -885,9 +885,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             }
             return '—';
         }
-        const baseUnits    = bomQty('3091506');
-        const sidePlates   = bomQty('2476600003');
-        const bottomPlates = bomQty('2476600001');
+        const baseUnits      = bomQty('3091506');
+        const sidePlates     = bomQty('2476600003');
+        const bottomPlates   = bomQty('2476600001');
+        const pipeConnectors = bomQty('2476631200');
+        const topAdapters12  = bomQty('3085857');
+        const topAdapters16  = bomQty('2476842000');
 
         // Depths
         const tankHeight   = extract(/Snapped Tank Dimensions:[\s\d.×ft]+×\s*([\d.]+)\s*ft/i);
@@ -897,10 +900,10 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             ? (parseFloat(tankHeight) + parseFloat(baseStoneVal) + parseFloat(coverStoneVal)).toFixed(2)
             : '—';
 
-        // Geotextile
-        const geoTank  = extract(/AquaCell Tank Only[\s\S]*?(\d[\d,]*\.?\d*)\s*ft²/i) || extract(/AquaCell Tank Only\s+([\d,]+\.?\d*)/i);
-        const geoStone = extract(/Stone Backfill Envelope[\s\S]*?(\d[\d,]*\.?\d*)\s*ft²/i) || extract(/Stone Backfill Envelope\s+([\d,]+\.?\d*)/i);
-        const geoTotal = extract(/Total[\s\S]*?Geotextile[\s\S]*?(\d[\d,]*\.?\d*)\s*ft²/i) || extract(/Total\s+([\d,]+\.?\d*)\s*ft²/i);
+        // Geotextile — read directly from the geo table by row label
+        const geoTank  = bomQty('AquaCell Tank Only');
+        const geoStone = bomQty('Stone Backfill Envelope');
+        const geoTotal = bomQty('Total');
 
         // Stone backfill bulk volume
         const stoneBulk = extract(/Estimated Stone Backfill Volume[^:]*:\s*([\d,]+\.?\d*)\s*ft³/i);
@@ -919,15 +922,15 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             `Base Unit (3091506) ea.:                 ${baseUnits}`,
             `Side Plates (2476600003) ea.:            ${sidePlates}`,
             `Bottom Plate (2476600001) ea.:           ${bottomPlates}`,
-            `8-12" Pipe Connectors (2476631200) ea.:  ${pipeConnectors}`,
-            `12" Top Adapters (3085857):              ${topAdapters}`,
+            `8-12" Pipe Connectors (2476631200) ea.: ${pipeConnectors}`,
+            `12" Top Adapters (3085857) ea.:          ${topAdapters12}`,
             `16" Top Adapters (2476842000) ea.:       ${topAdapters16}`,
             `AquaCell Tank Depth (ft.):               ${tankHeight}`,
             `System Depth (ft.):                      ${systemDepth}`,
             `AquaCell Tank Wrap Geotextile (ft²):     ${geoTank}`,
             `Stone Backfill Envelope Geotextile (ft²):${geoStone}`,
             `Total Geotextile (ft²):                  ${geoTotal}`,
-            `Estimated Stone Volume (with 10%) ft³:   ${stoneBulk}`,
+            `Total Estimated Stone Backfill Volume (with 10%) ft³: ${stoneBulk}`,
         ].join('\n');
 
         navigator.clipboard.writeText(emailText).then(() => {
