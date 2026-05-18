@@ -56,21 +56,21 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] FIX SECTION IN DARK MODE THAT IS WASHED OUT (SCHEMATIC & STAGE STORAGE SELECTION CARD)
 -  [X] Scale bar + clean engineering style
 -  [X] Section/Elevation View (stacked layers + compacted stone base)
+-  [X] Add page up/down scroll button to get to the top or bottom of page faster (by sections or card groups)
+-  [X] update to v14 from V12
+-  [X] side panel that stays staic with executable command buttons (Calculate, Reset, download, export, etc.)
+-  [X] reformat the UI/UX into "Cards"
+-  [X] added Quick Summary copy/paste for body of emails
  
  ## Next Up (High Priority – Do These Next)
 - pass/fail GREEN highlight entire "Total System Storage" if > than minimum required storage / RED if < than
 - Add page up/down scroll button to get to the top or bottom of page faster (by sections or card groups)
 - add Project # to PDF Summary page
-- update to v13 from V12 (GITHUB FILES ONLY)
 - Add LIVE LOAD & DEAD LOAD calculations to Results UX (NOT ON PDF SUMMARY)
 - Add Storage volume vs. Elevation graphic chart (x/y axis)- volume curve chart
 - check "used perimeter" value that is displayed on Results screen when complex shape is calculated (ex. 1511-02)
-- side panel that stays staic with executable command buttons (Calculate, Reset, download, export, etc.)
-- reformat the UI/UX into "Cards"
 - input box for numbers width needs to be decreased (allowing more room for side panel executable commands)
 - Add Total system storage to side panel so it remains static as you scroll
-
-- 
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 
