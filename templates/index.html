@@ -609,13 +609,22 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     });
 
     function resetForm() {
-        document.getElementById('mainForm').reset();
+        const form = document.getElementById('mainForm');
+        form.querySelectorAll('input[type="text"], input[type="number"]').forEach(el => { el.value = ''; });
+        form.querySelectorAll('select').forEach(el => { el.selectedIndex = 0; });
+        form.querySelectorAll('textarea').forEach(el => { el.value = ''; });
+        form.querySelectorAll('input[type="checkbox"]').forEach(el => { el.checked = true; });
         const resultsDiv = document.querySelector('.results');
         if (resultsDiv) resultsDiv.innerHTML = '';
         const cs = document.getElementById('priceCrateStorage');
         const tc = document.getElementById('priceTotalCost');
+        const cf = document.getElementById('costPerFt3');
         if (cs) cs.textContent = '—';
         if (tc) tc.textContent = '—';
+        if (cf) cf.value = '';
+        const canvas = document.getElementById('sheet');
+        if (canvas) { const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height); }
+        document.querySelectorAll('.suggested').forEach(el => el.textContent = '');
         document.getElementById('leftPanel').scrollTop = 0;
     }
 
