@@ -95,6 +95,7 @@ def index():
 
         stone_backfill_bulk_ft3 = round(stone_envelope_volume * 1.10, 1)
         stone_backfill_bulk_yd3 = round(stone_backfill_bulk_ft3 / 27, 2)
+        stone_backfill_bulk_tons = round(stone_backfill_bulk_ft3 * 100 / 2000, 2)  # ~100 pcf for crushed stone
 
         stage_storage = None
         if include_stage_storage:
@@ -171,6 +172,7 @@ def index():
             'storage_status': storage_status,
             'stone_backfill_bulk_ft3': stone_backfill_bulk_ft3,
             'stone_backfill_bulk_yd3': stone_backfill_bulk_yd3,
+            'stone_backfill_bulk_tons': stone_backfill_bulk_tons,
             'geoTank': geoTank,
             'geoStone': geoStone,
             'geoTotal': geoTotal,
@@ -256,6 +258,7 @@ def download_pdf():
 
     stone_backfill_bulk_ft3 = round(stone_envelope_volume * 1.10, 1)
     stone_backfill_bulk_yd3 = round(stone_backfill_bulk_ft3 / 27, 2)
+    stone_backfill_bulk_tons = round(stone_backfill_bulk_ft3 * 100 / 2000, 2)
 
     storage_status = 'PASS' if min_storage <= total_storage else 'FAIL' if min_storage > 0 else None
 
@@ -346,7 +349,8 @@ def download_pdf():
         f"Total System Storage: {round(total_storage,1)} ft³",
         f"Minimum Required Storage Volume: {min_storage} ft³ → {storage_status}" if min_storage > 0 else "",
         "",
-        f"Estimated Stone Backfill Volume (with 10% added): {stone_backfill_bulk_ft3} ft³ ({stone_backfill_bulk_yd3} yd³)",
+        f"Estimated Stone Backfill Volume (with 10% added): {stone_backfill_bulk_ft3} ft³ / {stone_backfill_bulk_yd3} yd³ / {stone_backfill_bulk_tons} US tons",
+        "  * Stone backfill provided by others. Quantity is an estimate for coordination purposes only.",
         "",
         "Bill of Materials",
         f"Base Unit (3091506) ................ {base_units}",
@@ -356,7 +360,7 @@ def download_pdf():
         f"12\" Top Adapters (3085857) .................... {top_adapters_12}",
         f"16\" Top Adapters (2476842000) .................... {top_adapters_16}",
         "",
-        "Geotextile Fabric",
+        "Geotextile Fabric (provided by others — quantities are estimates for coordination purposes only)",
         f"AquaCell Tank Only .................... {geoTank} ft² ({round(geoTank/9,1)} yd²)",
         f"Stone Backfill Envelope .................... {geoStone} ft² ({round(geoStone/9,1)} yd²)",
         f"Total Geotextile .................... {geoTotal} ft² ({round(geoTotal/9,1)} yd²)",
