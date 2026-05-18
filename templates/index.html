@@ -371,6 +371,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             <button type="submit" style="background:#007bff; color:white;">Calculate System</button>
             <button type="button" onclick="resetForm()" style="background:#6c757d; color:white;">Reset Form</button>
             <button type="button" onclick="downloadPDF()" style="background:#28a745; color:white;">Download PDF Report</button>
+            <button type="button" onclick="copyToEmail()" style="background:#6f42c1; color:white;">📋 Copy to Email</button>
             <button type="button" onclick="exportProject()" style="background:#17a2b8; color:white;">Export Project (JSON)</button>
             <button type="button" onclick="document.getElementById('importFile').click()" style="background:#ffc107; color:#212529;">Import Project (JSON)</button>
             <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importProject(event)">
@@ -830,6 +831,120 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     document.getElementById('modelType').addEventListener('change', renderSheet);
     document.getElementById('tank_bottom_elev').addEventListener('input', renderSheet);
     document.getElementById('base_stone').addEventListener('input', renderSheet);
+
+    // ====================== COPY TO EMAIL ======================
+    function copyToEmail() {
+        const resultsDiv = document.querySelector('.results');
+        if (!resultsDiv) {
+            alert('Please run "Calculate System" first to generate results.');
+            return;
+        }
+
+        // Helper: extract a value by regex from results text
+        const bodyText = resultsDiv.innerText;
+
+        function extract(pattern, fallback='—') {
+            const m = bodyText.match(pattern);
+            return m ? m[1].trim() : fallback;
+        }
+
+        // Pull values from rendered result elements
+        const config  = extract(/Results\s*[–-]\s*(\S+)\s*Configuration/i);
+        const layers  = extract(/Results\s*[–-]\s*\S+\s*Configuration\s*\((\d+)\s*Layer/i);
+        const configLabel = (config && layers) ? `${config}/${layers}` : '—';
+
+        // Storage
+        const minStorage    = extract(/Minimum Required Storage:\s*([\d,]+\.?\d*)/i);
+        const tankStorage   = extract(/AquaCell Tank Storage:\s*([\d,]+\.?\d*)/i);
+        const stoneStorage  = extract(/Stone Backfill Storage:\s*([\d,]+\.?\d*)/i);
+        const totalStorage  = extract(/Total System Storage:\s*([\d,]+\.?\d*)/i);
+
+        // Tank config / layers from select values
+        const configSelect = document.getElementById('modelType')?.value || config;
+        const layersSelect = document.getElementById('layers')?.value || layers;
+        const tankConfig   = `${configSelect}/${configSelect === 'EX' ? 'EX+' : 'SC'} ${layersSelect} Layer(s)`;
+
+        // Traffic load
+        const trafficRaw = document.querySelector('[name="traffic_load"]')?.value || '';
+        const trafficMap = { H10: 'H-10', HS20: 'HS-20', HS25: 'HS-25' };
+        const trafficLoad = trafficMap[trafficRaw] || trafficRaw;
+
+        // Tank geometry for area/perimeter from results text
+        const snappedMatch = bodyText.match(/Snapped Tank Dimensions:\s*([\d.]+)\s*ft\s*×\s*([\d.]+)\s*ft/i);
+        const areaFt2   = snappedMatch ? (parseFloat(snappedMatch[1]) * parseFloat(snappedMatch[2])).toFixed(1) : '—';
+        const perimFt   = extract(/Used Perimeter:\s*([\d.]+)/i);
+
+        // BOM — parse from table rows in the results div
+        function bomQty(label) {
+            const rows = resultsDiv.querySelectorAll('table tr');
+            for (const row of rows) {
+                if (row.innerText.includes(label)) {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 2) return cells[1].innerText.trim();
+                }
+            }
+            return '—';
+        }
+        const baseUnits    = bomQty('3091506');
+        const sidePlates   = bomQty('2476600003');
+        const bottomPlates = bomQty('2476600001');
+
+        // Depths
+        const tankHeight   = extract(/Snapped Tank Dimensions:[\s\d.×ft]+×\s*([\d.]+)\s*ft/i);
+        const baseStoneVal = document.querySelector('[name="base_stone"]')?.value || '—';
+        const coverStoneVal= document.querySelector('[name="cover_stone"]')?.value || '—';
+        const systemDepth  = (tankHeight !== '—' && baseStoneVal !== '—' && coverStoneVal !== '—')
+            ? (parseFloat(tankHeight) + parseFloat(baseStoneVal) + parseFloat(coverStoneVal)).toFixed(2)
+            : '—';
+
+        // Geotextile
+        const geoTank  = extract(/AquaCell Tank Only[\s\S]*?(\d[\d,]*\.?\d*)\s*ft²/i) || extract(/AquaCell Tank Only\s+([\d,]+\.?\d*)/i);
+        const geoStone = extract(/Stone Backfill Envelope[\s\S]*?(\d[\d,]*\.?\d*)\s*ft²/i) || extract(/Stone Backfill Envelope\s+([\d,]+\.?\d*)/i);
+        const geoTotal = extract(/Total[\s\S]*?Geotextile[\s\S]*?(\d[\d,]*\.?\d*)\s*ft²/i) || extract(/Total\s+([\d,]+\.?\d*)\s*ft²/i);
+
+        // Stone backfill bulk volume
+        const stoneBulk = extract(/Estimated Stone Backfill Volume[^:]*:\s*([\d,]+\.?\d*)\s*ft³/i);
+
+        const emailText = [
+            'AquaCell',
+            '',
+            `Minimum Required Storage (ft³):          ${minStorage}`,
+            `AquaCell Tank Storage (ft³):             ${tankStorage}`,
+            `Stone Backfill Storage (ft³):            ${stoneStorage}`,
+            `Total System Storage (ft³):              ${totalStorage}`,
+            `Tank Configuration/Layers:               ${configSelect}/${layersSelect} Layer(s)`,
+            `Traffic Load Required:                   ${trafficLoad}`,
+            `Area (ft²):                              ${areaFt2}`,
+            `Perimeter (ft.):                         ${perimFt}`,
+            `Base Unit (3091506) ea.:                 ${baseUnits}`,
+            `Side Plates (2476600003) ea.:            ${sidePlates}`,
+            `Bottom Plate (2476600001) ea.:           ${bottomPlates}`,
+            `8-12" Pipe Connectors (2476631200) ea.:  ${pipeConnectors}`,
+            `12" Top Adapters (3085857):              ${topAdapters}`,
+            `16" Top Adapters (2476842000) ea.:       ${topAdapters16}`,
+            `AquaCell Tank Depth (ft.):               ${tankHeight}`,
+            `System Depth (ft.):                      ${systemDepth}`,
+            `AquaCell Tank Wrap Geotextile (ft²):     ${geoTank}`,
+            `Stone Backfill Envelope Geotextile (ft²):${geoStone}`,
+            `Total Geotextile (ft²):                  ${geoTotal}`,
+            `Estimated Stone Volume (with 10%) ft³:   ${stoneBulk}`,
+        ].join('\n');
+
+        navigator.clipboard.writeText(emailText).then(() => {
+            alert('✅ Results copied to clipboard! Paste directly into your email.');
+        }).catch(() => {
+            // Fallback for browsers that block clipboard API
+            const ta = document.createElement('textarea');
+            ta.value = emailText;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            alert('✅ Results copied to clipboard! Paste directly into your email.');
+        });
+    }
 </script>
 </body>
 </html>
