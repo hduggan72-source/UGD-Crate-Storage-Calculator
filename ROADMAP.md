@@ -63,6 +63,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] added Quick Summary copy/paste for body of emails
  
  ## Next Up (High Priority – Do These Next)
+- add command to convert stone backfill & geotextile totals to desired dimensions (tons, cubic yards, cubic ft, square yards or ft) 
 - pass/fail GREEN highlight entire "Total System Storage" if > than minimum required storage / RED if < than
 - Add page up/down scroll button to get to the top or bottom of page faster (by sections or card groups)
 - add Project # to PDF Summary page
