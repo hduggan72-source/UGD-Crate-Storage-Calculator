@@ -310,7 +310,7 @@ def download_pdf():
     y -= 90
 
     c.setFont("Helvetica-Bold", 18)
-    c.drawString(50, y, "AquaCell V12 Crate Calculator")
+    c.drawString(50, y, "AquaCell V14 Crate Calculator")
     y -= 22
     c.setFont("Helvetica", 11)
     c.drawString(50, y, "Underground Stormwater Retention / Detention / Infiltration System")
@@ -453,7 +453,7 @@ def download_pdf():
     c.save()
 
     buffer.seek(0)
-    return send_file(buffer, as_attachment=True, download_name="AquaCell_V12_Report.pdf", mimetype='application/pdf')
+    return send_file(buffer, as_attachment=True, download_name="AquaCell_V14_Report.pdf", mimetype='application/pdf')
 
 if __name__ == '__main__':
     app.run(debug=True)
