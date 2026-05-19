@@ -67,6 +67,8 @@ Professional web-based calculator for designing and quoting underground stormwat
  
  ## Next Up (High Priority – Do These Next)
 - Add Storage volume vs. Elevation graphic chart (x/y axis)- volume curve chart
+- Remove Dead Load cover weight FOS
+- ask Claude about arriving at live load FOS calculations to be sure it aligns correctly with excel load calculator
 - pass/fail GREEN highlight entire "Total System Storage" if > than minimum required storage / RED if < than
 - add Project # to PDF Summary page
 
