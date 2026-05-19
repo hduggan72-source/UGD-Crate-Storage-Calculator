@@ -61,17 +61,14 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] side panel that stays staic with executable command buttons (Calculate, Reset, download, export, etc.)
 -  [X] reformat the UI/UX into "Cards"
 -  [X] added Quick Summary copy/paste for body of emails
+-  [X] add command to convert stone backfill & geotextile totals to desired dimensions (tons, cubic yards, cubic ft, square yards or ft)
+-  [X] Add page up/down scroll button to get to the top or bottom of page faster (by sections or card groups)
+-  [X] Add LIVE LOAD & DEAD LOAD calculations to Results UX (NOT ON PDF SUMMARY)
  
  ## Next Up (High Priority – Do These Next)
-- add command to convert stone backfill & geotextile totals to desired dimensions (tons, cubic yards, cubic ft, square yards or ft) 
-- pass/fail GREEN highlight entire "Total System Storage" if > than minimum required storage / RED if < than
-- Add page up/down scroll button to get to the top or bottom of page faster (by sections or card groups)
-- add Project # to PDF Summary page
-- Add LIVE LOAD & DEAD LOAD calculations to Results UX (NOT ON PDF SUMMARY)
 - Add Storage volume vs. Elevation graphic chart (x/y axis)- volume curve chart
-- check "used perimeter" value that is displayed on Results screen when complex shape is calculated (ex. 1511-02)
-- input box for numbers width needs to be decreased (allowing more room for side panel executable commands)
-- Add Total system storage to side panel so it remains static as you scroll
+- pass/fail GREEN highlight entire "Total System Storage" if > than minimum required storage / RED if < than
+- add Project # to PDF Summary page
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 
@@ -88,20 +85,6 @@ Professional web-based calculator for designing and quoting underground stormwat
 - <div class="disclaimer">
         <strong>Disclaimer:</strong> This calculator provides <em>preliminary, conceptual estimates only</em> and is <em>not a stamped engineering design</em>. Wavin’s assistance in sizing or product selection is advisory and does not constitute design responsibility or guarantee system performance. The Engineer of Record (EoR) is solely responsible for verifying all design parameters and site conditions, including hydrology, structural requirements, soils, environmental factors, and integration with the overall stormwater system. AquaCell dimensions and assumptions (including usable storage and unit base areas) follow published product data. <strong>Final layouts, capacities, and installation depths must be confirmed by a licensed Professional Engineer</strong> using project‑specific plans (grading, pipe sizes and materials, invert elevations, loading conditions, and applicable codes/standards).
       </div>
-
-## Change Log
-- **2026-04-18** – Improved PDF report (smaller fonts, restored logo, full disclaimer, better spacing). Geotextile section finalized below BOM.
-- **2026-04-17** – Moved geotextile below BOM, added part codes to Bill of Materials, implemented burrito-style geotextile wrap.
-- **2026-04-16** – Initial V12 Flask web app with SC/EX logic, storage calculations, BOM, price card, and basic PDF.
-
-## Notes & Design Decisions
-- Geotextile is always “burrito style” (tank fully wrapped + stone envelope fully wrapped, including bottom of base stone)
-- Geotextile section stays below Bill of Materials for better visual flow
-- PDF must remain clean and one-page when possible
-- All calculations must match legacy Excel as closely as possible
-- Visual generator should match the clean engineering style of the sample PNG (light blue crates, red perimeter line, layered section)
-
----
 
 **How to use this file:**
 - Open `ROADMAP.md` every time you work on the project.
