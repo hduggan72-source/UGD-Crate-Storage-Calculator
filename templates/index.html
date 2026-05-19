@@ -179,12 +179,103 @@
             cursor: pointer; 
             font-size: 16px; 
         }
-        .results { 
-            margin-top: 30px; 
-            padding: 20px; 
-            background: var(--highlight); 
-            border-radius: 8px; 
+        .results {
+            margin-top: 0;
         }
+        .result-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 14px;
+            overflow: hidden;
+        }
+        .result-card-header {
+            background: #1e3a8a;
+            color: #fff;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 0.02em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .result-card-header:hover { background: #1e4aa8; }
+        [data-theme="dark"] .result-card-header { background: #1e3a5f; }
+        [data-theme="dark"] .result-card-header:hover { background: #1e4a7a; }
+        .result-card-header .rc-arrow {
+            margin-left: auto;
+            font-size: 11px;
+            opacity: 0.7;
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+        }
+        .result-card-header.collapsed .rc-arrow { transform: rotate(-90deg); }
+        .result-card-body {
+            padding: 14px 16px;
+        }
+        .result-card-body.hidden { display: none; }
+
+        /* ── Floating scroll buttons ── */
+        .float-nav {
+            position: fixed;
+            bottom: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 200;
+        }
+        .float-nav.left  { left:  16px; }
+        .float-nav.right { right: 16px; }
+        .float-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1e3a8a;
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+            opacity: 0.85;
+            transition: opacity 0.15s, transform 0.15s;
+        }
+        .float-btn:hover { opacity: 1; transform: scale(1.1); }
+        [data-theme="dark"] .float-btn { background: #1e4aa8; }
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 5px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            gap: 12px;
+        }
+        .result-row:last-child { border-bottom: none; }
+        .result-label { color: var(--text); opacity: 0.75; flex-shrink: 0; }
+        .result-value { font-weight: 600; color: var(--text); text-align: right; }
+        .result-value.pass { color: #2ecc71; }
+        .result-value.fail { color: #e74c3c; }
+        .result-value.accent { color: var(--accent); font-size: 15px; }
+        .result-grid2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            padding: 4px 0;
+        }
+        .result-stat {
+            background: var(--bg);
+            border-radius: 6px;
+            padding: 10px 12px;
+        }
+        .result-stat-label { font-size: 11px; color: var(--text); opacity: 0.65; margin-bottom: 3px; }
+        .result-stat-value { font-size: 16px; font-weight: bold; color: var(--text); }
+        .result-stat-value.accent { color: var(--accent); }
         table { 
             width: 100%; 
             border-collapse: collapse; 
@@ -359,18 +450,71 @@
                         <span class="help-icon" data-tooltip="Minimum storage volume required for the project.">?</span>
                     </label>
                     <input type="number" step="0.1" name="min_storage" min="0" value="{{ form_data.get('min_storage', '') }}">
-                    <label>Known Width (ft) — from plans
-                        <span class="help-icon" data-tooltip="Enter the width from the site plans. The calculator will snap to the nearest whole crate module.">?</span>
-                    </label>
-                    <input type="number" step="0.01" name="known_width" id="knownWidth" min="0" value="{{ form_data.get('known_width', '') }}">
-                    <label>Known Length (ft) — from plans
-                        <span class="help-icon" data-tooltip="Enter the length from the site plans. The calculator will snap to the nearest whole crate module.">?</span>
-                    </label>
-                    <input type="number" step="0.01" name="known_length" id="knownLength" min="0" value="{{ form_data.get('known_length', '') }}">
-                    <label>Actual Tank Perimeter (ft) — optional override
-                        <span class="help-icon" data-tooltip="Optional override if you have a measured perimeter different from the calculated snapped value. Leave blank for auto-calculation.">?</span>
-                    </label>
-                    <input type="number" step="0.01" name="tank_perimeter" min="0" placeholder="Leave blank for auto" value="{{ form_data.get('tank_perimeter', '') }}">
+
+                    <!-- ── Shape Mode Toggle ── -->
+                    <div style="margin:14px 0 10px;">
+                        <div style="font-size:12px;font-weight:bold;color:var(--text);margin-bottom:6px;">Tank Shape Mode</div>
+                        <div style="display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;">
+                            <button type="button" id="shapeBtn_rect" onclick="setShapeMode('rectangle')"
+                                style="flex:1;padding:7px 4px;border:none;cursor:pointer;font-size:12px;font-weight:bold;background:#1e3a8a;color:#fff;">
+                                ▭ Rectangle
+                            </button>
+                            <button type="button" id="shapeBtn_complex" onclick="setShapeMode('complex')"
+                                style="flex:1;padding:7px 4px;border:none;cursor:pointer;font-size:12px;font-weight:bold;background:var(--card);color:var(--text);">
+                                ⬠ Complex Shape
+                            </button>
+                        </div>
+                    </div>
+                    <input type="hidden" name="shape_mode" id="shapeModeInput" value="{{ form_data.get('shape_mode', 'rectangle') }}">
+
+                    <!-- ── Rectangle inputs ── -->
+                    <div id="rectInputs">
+                        <label>Known Width (ft) — from plans
+                            <span class="help-icon" data-tooltip="Enter the width from the site plans. The calculator will snap to the nearest whole crate module.">?</span>
+                        </label>
+                        <input type="number" step="0.01" name="known_width" id="knownWidth" min="0" value="{{ form_data.get('known_width', '') }}">
+                        <label>Known Length (ft) — from plans
+                            <span class="help-icon" data-tooltip="Enter the length from the site plans. The calculator will snap to the nearest whole crate module.">?</span>
+                        </label>
+                        <input type="number" step="0.01" name="known_length" id="knownLength" min="0" value="{{ form_data.get('known_length', '') }}">
+                    </div>
+
+                    <!-- ── Complex Shape inputs ── -->
+                    <div id="complexInputs" style="display:none;">
+                        <div style="background:rgba(30,58,138,0.08);border:1px solid rgba(30,58,138,0.25);border-radius:6px;padding:9px 10px;margin-bottom:10px;font-size:11px;line-height:1.5;color:var(--text);">
+                            <strong>Complex Shape Mode</strong> — Enter your scaled plan values.
+                            The tool derives the second dimension, then snaps both to real crate
+                            module sizes (47.2" × 23.6") to get the true fitted area.
+                            Side plates use your scaled perimeter directly.
+                            Leave excavation fields blank to auto-estimate.
+                        </div>
+
+                        <label>Scaled Tank Footprint Area (ft²)
+                            <span class="help-icon" data-tooltip="The total area from your scaled plan inside the complex tank boundary. The tool will fit the crate grid inside this area to get the real snapped area.">?</span>
+                        </label>
+                        <input type="number" step="0.1" name="complex_scaled_area" id="complexScaledArea" min="0" value="{{ form_data.get('complex_scaled_area', '') }}">
+
+                        <label>Known Width or Length (ft) — from plans
+                            <span class="help-icon" data-tooltip="Enter ONE dimension you know from the plans (the longer or controlling dimension works best). The tool calculates the other dimension from the scaled area, then snaps both to crate modules.">?</span>
+                        </label>
+                        <input type="number" step="0.01" name="complex_known_dim" id="complexKnownDim" min="0" value="{{ form_data.get('complex_known_dim', '') }}">
+
+                        <label>Scaled Tank Perimeter (ft)
+                            <span class="help-icon" data-tooltip="Outer perimeter of the complex tank shape from your scaled plan. Used directly for side plate count and geotextile — not snapped.">?</span>
+                        </label>
+                        <input type="number" step="0.01" name="complex_tank_perim" id="complexTankPerim" min="0" value="{{ form_data.get('complex_tank_perim', '') }}">
+
+                        <label>Excavation Envelope Area (ft²) — optional
+                            <span class="help-icon" data-tooltip="Total excavation footprint including perimeter stone border. Leave blank to auto-estimate from snapped tank area + perimeter × stone width.">?</span>
+                        </label>
+                        <input type="number" step="0.1" name="complex_excav_area" id="complexExcavArea" min="0" placeholder="Leave blank to auto-estimate" value="{{ form_data.get('complex_excav_area', '') }}">
+
+                        <label>Excavation Envelope Perimeter (ft) — optional
+                            <span class="help-icon" data-tooltip="Outer perimeter of the full excavation. Leave blank to auto-estimate.">?</span>
+                        </label>
+                        <input type="number" step="0.01" name="complex_excav_perim" id="complexExcavPerim" min="0" placeholder="Leave blank to auto-estimate" value="{{ form_data.get('complex_excav_perim', '') }}">
+                    </div>
+
                 </div>
             </div>
 
@@ -485,176 +629,358 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
 
         {% if results %}
         <div class="results">
-            <h2>Results – {{ results.config }} Configuration ({{ results.layers }} Layers)</h2>
-            <p><strong>Estimated Surface Elevation:</strong> {{ results.surface_elev }} ft</p>
-            <p><strong>Tank Bottom Elevation:</strong> {{ results.tank_bottom_elev }} ft</p>
-            <p><strong>Tank Top Elevation:</strong> {{ results.tank_top_elev }} ft</p>
-            <p><strong>Actual Cover Depth:</strong> {{ results.cover_depth }} ft 
-               <span class="{{ 'status-pass' if results.cover_status == 'PASS' else 'status-fail' }}">→ {{ results.cover_status }}</span>
-            </p>
-            <p><strong>Maximum Allowable Cover Depth:</strong> {{ results.max_cover_req }} ft 
-               <span class="{{ 'status-pass' if results.max_cover_status == 'PASS' else 'status-fail' }}">→ {{ results.max_cover_status }}</span>
-            </p>
-            <p><strong>Dead Load Pressure:</strong> {{ results.dead_load_psi }} psi</p>
-            <p><strong>Factor of Safety (Dead Load):</strong> {{ results.fos_dead if results.fos_dead else '—' }}</p>
 
-            <div class="footnote">
-                <strong>Note on calculations:</strong><br>
-                Dead Load Pressure (psi) = Cover Depth (ft) × 120 pcf ÷ 144<br>
-                Factor of Safety (Dead Load) = Maximum Compressive Strength of AquaCell (70 psi for SC / 100 psi for EX) ÷ Dead Load Pressure
+            <!-- ── CARD 1: System Configuration ── -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>⚙ System Configuration</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body">
+                    <div class="result-row">
+                        <span class="result-label">Configuration / Layers</span>
+                        <span class="result-value">{{ results.config }} — {{ results.layers }} Layer(s)</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Traffic Load</span>
+                        <span class="result-value">{{ results.traffic_load }}</span>
+                    </div>
+
+                    {% if results.shape_mode == 'complex' %}
+                    <div style="background:rgba(30,58,138,0.08);border:1px solid rgba(30,58,138,0.25);border-radius:6px;padding:10px 12px;margin:10px 0;font-size:13px;">
+                        <div style="font-weight:bold;margin-bottom:6px;color:#1e3a8a;">⬠ Complex Shape Mode</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;">
+                            <span style="font-size:11px;opacity:0.7;">Scaled Plan Area</span>
+                            <span style="font-size:11px;opacity:0.7;">Scaled Perimeter</span>
+                            <strong>{{ results.complex_scaled_area }} ft²</strong>
+                            <strong>{{ results.complex_tank_perim }} ft</strong>
+                            <span style="font-size:11px;opacity:0.7;">Known Dimension</span>
+                            <span style="font-size:11px;opacity:0.7;">Derived Dimension</span>
+                            <strong>{{ results.complex_known_dim }} ft</strong>
+                            <strong>{{ (results.complex_scaled_area / results.complex_known_dim)|round(2) }} ft</strong>
+                        </div>
+                        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(30,58,138,0.2);font-size:12px;opacity:0.7;">Real-World Snapped Tank (crates fitted inside scaled area)</div>
+                        <strong style="font-size:14px;color:#1e3a8a;">
+                            {{ results.tank_width }} ft × {{ results.tank_length }} ft
+                            &nbsp;({{ results.complex_crates_known }} × {{ results.complex_crates_other }} crates/layer)
+                            &nbsp;= {{ results.complex_tank_area }} ft²
+                        </strong>
+                        <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;">
+                            <span style="font-size:11px;opacity:0.7;">Excav. Envelope Area</span>
+                            <span style="font-size:11px;opacity:0.7;">Excav. Envelope Perimeter</span>
+                            <strong>{{ results.complex_excav_area }} ft²</strong>
+                            <strong>{{ results.complex_excav_perim }} ft</strong>
+                        </div>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Tank Height</span>
+                        <span class="result-value">{{ results.tank_height }} ft</span>
+                    </div>
+                    {% else %}
+                    <div class="result-row">
+                        <span class="result-label">Snapped Tank Dimensions</span>
+                        <span class="result-value">{{ results.tank_width }} ft × {{ results.tank_length }} ft × {{ results.tank_height }} ft</span>
+                    </div>
+                    {% endif %}
+
+                    <div class="result-row">
+                        <span class="result-label">Tank Perimeter</span>
+                        <span class="result-value">{{ results.used_perimeter }} ft</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">AquaCell Tank Depth</span>
+                        <span class="result-value">{{ results.tank_height }} ft</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Total System Depth (tank + stone)</span>
+                        <span class="result-value">{{ (results.tank_height + (form_data.get('base_stone', 0.333)|float) + (form_data.get('cover_stone', 1.0)|float))|round(2) }} ft</span>
+                    </div>
+                </div>
             </div>
 
-            <p><strong>Snapped Tank Dimensions:</strong> {{ results.tank_width }} ft × {{ results.tank_length }} ft × {{ results.tank_height }} ft</p>
-            <p><strong>Used Perimeter:</strong> {{ results.used_perimeter }} ft</p>
-            <p>AquaCell Tank Storage: {{ results.tank_storage }} ft³</p>
-            <p>Stone Backfill Storage: {{ results.stone_storage }} ft³</p>
-            <p class="highlight"><strong>Total System Storage:</strong> {{ results.total_storage }} ft³</p>
-            <div class="footnote" style="margin-bottom:6px;">
-                <strong>Note:</strong> Stone backfill and geotextile fabric are <em>provided by others</em>. Quantities shown are estimates for budgeting and coordination purposes only.
-            </div>
-            <p class="highlight" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                <strong>Estimated Stone Backfill Volume to Purchase (with 10%):</strong>
-                <span id="stoneBulkDisplay" style="font-weight:bold;"></span>
-                <select id="stoneUnitSelect" onchange="updateStoneUnit()"
-                    style="padding:4px 8px; border-radius:4px; border:1px solid var(--border); background:var(--card); color:var(--text); font-size:13px; cursor:pointer;">
-                    <option value="ft3">ft³ — Cubic Feet</option>
-                    <option value="yd3">yd³ — Cubic Yards</option>
-                    <option value="tons">US Short Tons</option>
-                </select>
-            </p>
-            <script>
-                (function(){
-                    var _ft3  = {{ results.stone_backfill_bulk_ft3 }};
-                    var _yd3  = {{ results.stone_backfill_bulk_yd3 }};
-                    var _tons = {{ results.stone_backfill_bulk_tons }};
-                    window._stoneBulk = { ft3: _ft3, yd3: _yd3, tons: _tons };
-                    window.updateStoneUnit = function() {
-                        var sel  = document.getElementById('stoneUnitSelect');
-                        var disp = document.getElementById('stoneBulkDisplay');
-                        if (!sel || !disp) return;
-                        if (sel.value === 'ft3')  disp.textContent = _ft3.toLocaleString()  + ' ft³';
-                        if (sel.value === 'yd3')  disp.textContent = _yd3.toLocaleString()  + ' yd³';
-                        if (sel.value === 'tons') disp.textContent = _tons.toLocaleString() + ' US short tons';
-                    };
-                    window.updateStoneUnit();
-                })();
-            </script>
+            <!-- ── CARD 2: Cover & Load Verification ── -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>🛡 Cover &amp; Load Verification</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body">
 
-            {% if results.min_storage is not none %}
-            <p><strong>Minimum Required Storage:</strong> {{ results.min_storage }} ft³ → 
-               <span class="{{ 'status-pass' if results.storage_status == 'PASS' else 'status-fail' }}">{{ results.storage_status }}</span>
-            </p>
+                    <!-- Elevations -->
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:4px;">Elevations</div>
+                    <div class="result-row">
+                        <span class="result-label">Surface Elevation</span>
+                        <span class="result-value">{{ results.surface_elev }} ft</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Tank Bottom Elevation</span>
+                        <span class="result-value">{{ results.tank_bottom_elev }} ft</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Tank Top Elevation</span>
+                        <span class="result-value">{{ results.tank_top_elev }} ft</span>
+                    </div>
+
+                    <!-- Cover checks -->
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Cover Depth Checks</div>
+                    <div class="result-row">
+                        <span class="result-label">Actual Cover Depth</span>
+                        <span class="result-value {{ 'pass' if results.cover_status == 'PASS' else 'fail' }}">
+                            {{ results.cover_depth }} ft → {{ results.cover_status }}
+                        </span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Maximum Allowable Cover</span>
+                        <span class="result-value {{ 'pass' if results.max_cover_status == 'PASS' else 'fail' }}">
+                            {{ results.max_cover_req }} ft → {{ results.max_cover_status }}
+                        </span>
+                    </div>
+
+                    <!-- Dead load -->
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Dead Load (Cover Weight)</div>
+                    <div class="result-row">
+                        <span class="result-label">Dead Load Pressure</span>
+                        <span class="result-value">{{ results.dead_load_psi }} psi</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Factor of Safety — Dead Load</span>
+                        <span class="result-value {{ 'pass' if results.fos_dead and results.fos_dead >= 1.95 else 'fail' }}">
+                            {{ results.fos_dead if results.fos_dead else '—' }}
+                        </span>
+                    </div>
+
+                    <!-- Live load -->
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Live Load ({{ results.traffic_load }} Traffic — ASTM F2787)</div>
+                    <div class="result-row">
+                        <span class="result-label">Factored Live Load Pressure</span>
+                        <span class="result-value">{{ results.ll_psi if results.ll_psi else '—' }} psi</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Total Pressure (LL + DL)</span>
+                        <span class="result-value">
+                            {% if results.ll_psi and results.dead_load_psi %}
+                                {{ (results.ll_psi + results.dead_load_psi)|round(3) }} psi
+                            {% else %}—{% endif %}
+                        </span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Max Compressive Strength</span>
+                        <span class="result-value">{{ '70' if results.config == 'SC' else '100' }} psi ({{ results.config }})</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Factor of Safety — Live Load</span>
+                        <span class="result-value {{ 'pass' if results.fos_live_load and results.fos_live_load >= 1.75 else 'fail' }}">
+                            {{ results.fos_live_load if results.fos_live_load else '—' }}
+                        </span>
+                    </div>
+
+                    <div class="footnote" style="margin-top:10px;margin-bottom:0;font-size:11px;line-height:1.5;">
+                        <strong>Dead Load:</strong> Cover Depth × 120 pcf ÷ 144 &nbsp;|&nbsp;
+                        <strong>FoS DL</strong> = Max Strength ÷ DL Pressure &nbsp;|&nbsp; Min recommended: 1.95<br>
+                        <strong>Live Load:</strong> ASTM F2787 2V:1H distribution, m=1.2, IM=24.75%, LLDF=1.15 &nbsp;|&nbsp;
+                        <strong>FoS LL</strong> = Max Strength ÷ (LL + DL) &nbsp;|&nbsp; Min recommended: 1.75
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── CARD 3: Storage Summary ── -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>💧 Storage Summary</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body">
+                    {% if results.min_storage is not none %}
+                    <div class="result-row">
+                        <span class="result-label">Minimum Required Storage</span>
+                        <span class="result-value {{ 'pass' if results.storage_status == 'PASS' else 'fail' }}">
+                            {{ results.min_storage }} ft³ → {{ results.storage_status }}
+                        </span>
+                    </div>
+                    {% endif %}
+                    <div class="result-grid2" style="margin-top:8px;">
+                        <div class="result-stat">
+                            <div class="result-stat-label">AquaCell Tank Storage</div>
+                            <div class="result-stat-value" id="tankStorageStat">{{ results.tank_storage }} ft³</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Stone Backfill Storage</div>
+                            <div class="result-stat-value">{{ results.stone_storage }} ft³</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:10px;padding:12px;background:var(--bg);border-radius:6px;border-left:4px solid var(--accent);">
+                        <div style="font-size:11px;opacity:0.7;margin-bottom:4px;">Total System Storage</div>
+                        <div style="font-size:22px;font-weight:bold;color:var(--accent);">{{ results.total_storage }} ft³</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── CARD 4: Stone Backfill ── -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>🪨 Stone Backfill <span style="font-size:11px;font-weight:normal;opacity:0.75;">(provided by others)</span></span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body">
+                    <div style="font-size:12px;opacity:0.7;margin-bottom:8px;">Quantities are estimates for budgeting and coordination purposes only.</div>
+                    <div class="result-row">
+                        <span class="result-label">Purchase Volume (with 10% overage)</span>
+                        <span class="result-value" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                            <span id="stoneBulkDisplay" style="font-weight:700;color:var(--accent);"></span>
+                            <select id="stoneUnitSelect" onchange="updateStoneUnit()"
+                                style="padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:12px;cursor:pointer;">
+                                <option value="ft3">ft³ — Cubic Feet</option>
+                                <option value="yd3">yd³ — Cubic Yards</option>
+                                <option value="tons">US Short Tons</option>
+                            </select>
+                        </span>
+                    </div>
+                    <script>
+                        (function(){
+                            var _ft3  = {{ results.stone_backfill_bulk_ft3 }};
+                            var _yd3  = {{ results.stone_backfill_bulk_yd3 }};
+                            var _tons = {{ results.stone_backfill_bulk_tons }};
+                            window._stoneBulk = { ft3: _ft3, yd3: _yd3, tons: _tons };
+                            window.updateStoneUnit = function() {
+                                var sel  = document.getElementById('stoneUnitSelect');
+                                var disp = document.getElementById('stoneBulkDisplay');
+                                if (!sel || !disp) return;
+                                if (sel.value === 'ft3')  disp.textContent = _ft3.toLocaleString()  + ' ft³';
+                                if (sel.value === 'yd3')  disp.textContent = _yd3.toLocaleString()  + ' yd³';
+                                if (sel.value === 'tons') disp.textContent = _tons.toLocaleString() + ' US short tons';
+                            };
+                            window.updateStoneUnit();
+                        })();
+                    </script>
+                </div>
+            </div>
+
+            <!-- ── CARD 5: Bill of Materials ── -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>📦 Bill of Materials</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body" style="padding:0;">
+                    <table style="margin-top:0;">
+                        <tr><th>Item</th><th style="text-align:right;">Quantity</th></tr>
+                        <tr><td>Base Unit (3091506)</td><td style="text-align:right;font-weight:bold;">{{ results.base_units }}</td></tr>
+                        <tr><td>Side Plate (2476600003)</td><td style="text-align:right;font-weight:bold;">{{ results.side_plates }}</td></tr>
+                        <tr><td>Bottom Plate (2476600001)</td><td style="text-align:right;font-weight:bold;">{{ results.bottom_plates }}</td></tr>
+                        <tr><td>8-12" Pipe Connectors (2476631200)</td><td style="text-align:right;font-weight:bold;">{{ results.pipe_connectors }}</td></tr>
+                        <tr><td>12" Top Adapters (3085857)</td><td style="text-align:right;font-weight:bold;">{{ results.top_adapters_12 }}</td></tr>
+                        <tr><td>16" Top Adapters (2476842000)</td><td style="text-align:right;font-weight:bold;">{{ results.top_adapters_16 }}</td></tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ── CARD 6: Geotextile Fabric ── -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)">
+                    <span>🧵 Geotextile Fabric
+                    <span style="font-size:11px;font-weight:normal;opacity:0.75;">(provided by others)</span></span>
+                    <span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center;">
+                        <span style="display:inline-flex;border:1px solid rgba(255,255,255,0.3);border-radius:5px;overflow:hidden;" onclick="event.stopPropagation()">
+                            <button type="button" id="geoUnitFt2" onclick="setGeoUnit('ft2')"
+                                style="padding:2px 10px;border:none;cursor:pointer;background:rgba(255,255,255,0.25);color:#fff;font-size:11px;font-weight:bold;">ft²</button>
+                            <button type="button" id="geoUnitYd2" onclick="setGeoUnit('yd2')"
+                                style="padding:2px 10px;border:none;cursor:pointer;background:transparent;color:rgba(255,255,255,0.6);font-size:11px;">yd²</button>
+                        </span>
+                        <span class="rc-arrow">▼</span>
+                    </span>
+                </div>
+                <div class="result-card-body" style="padding:0;">
+                    <table style="margin-top:0;">
+                        <tr><th>Item</th><th id="geoUnitHeader" style="text-align:right;">Quantity (ft²)</th></tr>
+                        <tr><td>AquaCell Tank Only</td><td id="geoTankCell" style="text-align:right;font-weight:bold;"></td></tr>
+                        <tr><td>Stone Backfill Envelope</td><td id="geoStoneCell" style="text-align:right;font-weight:bold;"></td></tr>
+                        <tr><td><strong>Total Geotextile</strong></td><td id="geoTotalCell" style="text-align:right;font-weight:bold;"></td></tr>
+                        <tr><td style="font-size:12px;opacity:0.7;">Waste/Overlap</td><td style="text-align:right;font-size:12px;opacity:0.7;">{{ results.geoWaste }}%</td></tr>
+                    </table>
+                </div>
+                <script>
+                    (function(){
+                        var _gft2 = {{ results.geoTank }};
+                        var _sft2 = {{ results.geoStone }};
+                        var _tft2 = {{ results.geoTotal }};
+                        var _gyd2 = Math.round(_gft2 / 9 * 10) / 10;
+                        var _syd2 = Math.round(_sft2 / 9 * 10) / 10;
+                        var _tyd2 = Math.round(_tft2 / 9 * 10) / 10;
+                        window._geoVals = { ft2: { tank:_gft2, stone:_sft2, total:_tft2 }, yd2: { tank:_gyd2, stone:_syd2, total:_tyd2 } };
+                        window.setGeoUnit = function(unit) {
+                            var v = window._geoVals[unit];
+                            var lbl = unit === 'ft2' ? 'ft²' : 'yd²';
+                            document.getElementById('geoUnitHeader').textContent = 'Quantity (' + lbl + ')';
+                            document.getElementById('geoTankCell').textContent  = v.tank.toLocaleString()  + ' ' + lbl;
+                            document.getElementById('geoStoneCell').textContent = v.stone.toLocaleString() + ' ' + lbl;
+                            document.getElementById('geoTotalCell').innerHTML   = '<strong>' + v.total.toLocaleString() + ' ' + lbl + '</strong>';
+                            document.getElementById('geoUnitFt2').style.background = unit === 'ft2' ? 'rgba(255,255,255,0.25)' : 'transparent';
+                            document.getElementById('geoUnitFt2').style.color      = unit === 'ft2' ? '#fff' : 'rgba(255,255,255,0.6)';
+                            document.getElementById('geoUnitFt2').style.fontWeight = unit === 'ft2' ? 'bold' : 'normal';
+                            document.getElementById('geoUnitYd2').style.background = unit === 'yd2' ? 'rgba(255,255,255,0.25)' : 'transparent';
+                            document.getElementById('geoUnitYd2').style.color      = unit === 'yd2' ? '#fff' : 'rgba(255,255,255,0.6)';
+                            document.getElementById('geoUnitYd2').style.fontWeight = unit === 'yd2' ? 'bold' : 'normal';
+                            window._currentGeoUnit = unit;
+                        };
+                        window.setGeoUnit('ft2');
+                    })();
+                </script>
+            </div>
+
+            <!-- ── CARD 7: Price Estimation ── -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>💲 AquaCell Price Estimation</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                        <div>
+                            <label style="display:block;font-size:12px;opacity:0.7;margin-bottom:4px;">AquaCell Cost per ft³ (USD$)</label>
+                            <input type="number" id="costPerFt3" step="0.01" placeholder="e.g., 2.75"
+                                style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
+                        </div>
+                        <div style="align-self:end;">
+                            <button type="button" onclick="calculateAquaCellPrice()"
+                                style="width:100%;padding:10px;background:#00b0ff;color:white;border:none;border-radius:4px;font-size:14px;font-weight:bold;cursor:pointer;">
+                                Calculate Price
+                            </button>
+                        </div>
+                    </div>
+                    <div class="result-grid2">
+                        <div class="result-stat">
+                            <div class="result-stat-label">Net AquaCell Storage (ft³)</div>
+                            <div id="priceCrateStorage" class="result-stat-value" style="color:#00b0ff;">—</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Total AquaCell Cost (USD$)</div>
+                            <div id="priceTotalCost" class="result-stat-value" style="color:#00b0ff;">—</div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="hiddenTotalAquaCellCost" name="totalAquaCellCost" value="">
+                </div>
+            </div>
+
+            {% if results.stage_storage %}
+            <!-- ── CARD 8: Stage Storage Table ── -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>📈 Stage Storage Table ({{ results.stage_increment_in }}-inch increments)</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body" style="padding:0;">
+                    <table style="margin-top:0;">
+                        <tr>
+                            <th>Elevation (ft)</th>
+                            <th style="text-align:right;">Tank (ft³)</th>
+                            <th style="text-align:right;">Stone (ft³)</th>
+                            <th style="text-align:right;">Total (ft³)</th>
+                        </tr>
+                        {% for row in results.stage_storage %}
+                        <tr>
+                            <td>{{ row.elevation_ft }}</td>
+                            <td style="text-align:right;">{{ row.tank_storage }}</td>
+                            <td style="text-align:right;">{{ row.stone_storage }}</td>
+                            <td style="text-align:right;font-weight:bold;">{{ row.total_storage }}</td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
             {% endif %}
 
             {% if results.project_notes %}
-            <p><strong>Project Notes:</strong> {{ results.project_notes | replace('\n', '<br>') | safe }}</p>
+            <!-- ── CARD 9: Project Notes ── -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>📝 Project Notes</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body" style="font-size:13px;line-height:1.6;white-space:pre-wrap;">{{ results.project_notes }}</div>
+            </div>
             {% endif %}
 
-            {% if results.stage_storage %}
-            <h3>Stage Storage Table ({{ results.stage_increment_in }} inch increments)</h3>
-            <table>
-                <tr>
-                    <th>Elevation (ft)</th>
-                    <th>Tank Storage (ft³)</th>
-                    <th>Stone Storage (ft³)</th>
-                    <th>Total Storage (ft³)</th>
-                </tr>
-                {% for row in results.stage_storage %}
-                <tr>
-                    <td>{{ row.elevation_ft }}</td>
-                    <td>{{ row.tank_storage }}</td>
-                    <td>{{ row.stone_storage }}</td>
-                    <td><strong>{{ row.total_storage }}</strong></td>
-                </tr>
-                {% endfor %}
-            </table>
-            {% endif %}
-
-            <h3>Bill of Materials</h3>
-            <table>
-                <tr><th>Item</th><th>Quantity</th></tr>
-                <tr><td>Base Unit (3091506)</td><td>{{ results.base_units }}</td></tr>
-                <tr><td>Side Plate (2476600003)</td><td>{{ results.side_plates }}</td></tr>
-                <tr><td>Bottom Plate (2476600001)</td><td>{{ results.bottom_plates }}</td></tr>
-                <tr><td>8-12" Pipe Connectors (2476631200)</td><td>{{ results.pipe_connectors }}</td></tr>
-                <tr><td>12" Top Adapters (3085857)</td><td>{{ results.top_adapters_12 }}</td></tr>
-                <tr><td>16" Top Adapters (2476842000)</td><td>{{ results.top_adapters_16 }}</td></tr>
-            </table>
-
-            <div class="geo-section">
-                <h3 style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-                    Geotextile Fabric <span style="font-size:11px;font-weight:normal;color:#888;font-style:italic;">(provided by others)</span>
-                    <span style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:12px;font-weight:normal;">
-                        <button type="button" id="geoUnitFt2" onclick="setGeoUnit('ft2')"
-                            style="padding:3px 12px;border:none;cursor:pointer;background:#1e3a8a;color:#fff;font-size:12px;">ft²</button>
-                        <button type="button" id="geoUnitYd2" onclick="setGeoUnit('yd2')"
-                            style="padding:3px 12px;border:none;cursor:pointer;background:var(--card);color:var(--text);font-size:12px;">yd²</button>
-                    </span>
-                </h3>
-                <table>
-                    <tr><th>Item</th><th id="geoUnitHeader">Quantity (ft²)</th></tr>
-                    <tr><td>AquaCell Tank Only</td><td id="geoTankCell"></td></tr>
-                    <tr><td>Stone Backfill Envelope</td><td id="geoStoneCell"></td></tr>
-                    <tr><td><strong>Total</strong></td><td id="geoTotalCell"><strong></strong></td></tr>
-                </table>
-            </div>
-            <script>
-                (function(){
-                    var _gft2 = {{ results.geoTank }};
-                    var _sft2 = {{ results.geoStone }};
-                    var _tft2 = {{ results.geoTotal }};
-                    var _gyd2 = Math.round(_gft2 / 9 * 10) / 10;
-                    var _syd2 = Math.round(_sft2 / 9 * 10) / 10;
-                    var _tyd2 = Math.round(_tft2 / 9 * 10) / 10;
-                    window._geoVals = { ft2: { tank:_gft2, stone:_sft2, total:_tft2 }, yd2: { tank:_gyd2, stone:_syd2, total:_tyd2 } };
-                    window.setGeoUnit = function(unit) {
-                        var v = window._geoVals[unit];
-                        var lbl = unit === 'ft2' ? 'ft²' : 'yd²';
-                        document.getElementById('geoUnitHeader').textContent = 'Quantity (' + lbl + ')';
-                        document.getElementById('geoTankCell').textContent  = v.tank.toLocaleString()  + ' ' + lbl;
-                        document.getElementById('geoStoneCell').textContent = v.stone.toLocaleString() + ' ' + lbl;
-                        document.getElementById('geoTotalCell').innerHTML   = '<strong>' + v.total.toLocaleString() + ' ' + lbl + '</strong>';
-                        document.getElementById('geoUnitFt2').style.background = unit === 'ft2' ? '#1e3a8a' : 'var(--card)';
-                        document.getElementById('geoUnitFt2').style.color      = unit === 'ft2' ? '#fff'    : 'var(--text)';
-                        document.getElementById('geoUnitYd2').style.background = unit === 'yd2' ? '#1e3a8a' : 'var(--card)';
-                        document.getElementById('geoUnitYd2').style.color      = unit === 'yd2' ? '#fff'    : 'var(--text)';
-                        window._currentGeoUnit = unit;
-                    };
-                    window.setGeoUnit('ft2');
-                })();
-            </script>
-
-            <!-- Price Estimation -->
-            <div style="margin-top: 25px; padding: 20px; background: #1e2a44; color: white; border-radius: 8px;">
-                <h3 style="margin-top:0; color:#00b0ff;">Price Estimation</h3>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                    <div>
-                        <label style="display:block; margin-bottom:5px; color:#ccc;">AquaCell Cost per ft³ (USD$)</label>
-                        <input type="number" id="costPerFt3" step="0.01" placeholder="e.g., 2.75" style="width:100%; padding:10px; border:none; border-radius:4px; font-size:16px;">
-                    </div>
-                    <div style="align-self: end;">
-                        <button type="button" onclick="calculateAquaCellPrice()" style="width:100%; padding:12px; background:#00b0ff; color:white; border:none; border-radius:4px; font-size:16px; cursor:pointer;">
-                            Calculate AquaCell Price
-                        </button>
-                    </div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div style="background:#112033; padding:12px; border-radius:4px;">
-                        <div style="font-size:0.9em; color:#ccc;">Net AquaCell Storage Used (ft³)</div>
-                        <div id="priceCrateStorage" style="font-size:1.4em; font-weight:bold; color:#00ffaa;">—</div>
-                    </div>
-                    <div style="background:#112033; padding:12px; border-radius:4px;">
-                        <div style="font-size:0.9em; color:#ccc;">Total AquaCell Cost (USD$)</div>
-                        <div id="priceTotalCost" style="font-size:1.4em; font-weight:bold; color:#00ffaa;">—</div>
-                    </div>
-                </div>
-                <input type="hidden" id="hiddenTotalAquaCellCost" name="totalAquaCellCost" value="">
-            </div>
         </div>
         {% endif %}
 
         <!-- Schematic -->
-        <div class="schematic-card" style="margin-top: {% if results %}30px{% else %}0{% endif %};">
+        <div class="schematic-card" style="margin-top:16px;">
             <h2>Conceptual Plan View + Section Schematic</h2>
             <canvas id="sheet" width="1400" height="1600"></canvas>
             <div class="schematic-btns">
@@ -665,6 +991,18 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         </div>
 
     </div><!-- /right-panel -->
+
+    <!-- ── Floating nav: LEFT panel ── -->
+    <div class="float-nav left" id="floatNavLeft" style="display:none;">
+        <button class="float-btn" onclick="document.getElementById('leftPanel').scrollTo({top:0,behavior:'smooth'})" title="Top of inputs">▲</button>
+        <button class="float-btn" onclick="document.getElementById('leftPanel').scrollTo({top:99999,behavior:'smooth'})" title="Bottom of inputs">▼</button>
+    </div>
+
+    <!-- ── Floating nav: RIGHT panel ── -->
+    <div class="float-nav right" id="floatNavRight" style="display:none;">
+        <button class="float-btn" onclick="document.getElementById('rightPanel').scrollTo({top:0,behavior:'smooth'})" title="Top of results">▲</button>
+        <button class="float-btn" onclick="document.getElementById('rightPanel').scrollTo({top:99999,behavior:'smooth'})" title="Bottom of results">▼</button>
+    </div>
 
 </div><!-- /split-layout -->
 
@@ -705,6 +1043,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const canvas = document.getElementById('sheet');
         if (canvas) { const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height); }
         document.querySelectorAll('.suggested').forEach(el => el.textContent = '');
+        setShapeMode('rectangle');
         document.getElementById('leftPanel').scrollTop = 0;
     }
 
@@ -741,15 +1080,28 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             alert('Please enter a valid cost per cubic foot.');
             return;
         }
-        const match = document.body.innerText.match(/AquaCell Tank Storage:\s*([\d,]+\.?\d*)/i);
-        if (!match) {
+
+        // Read tank storage from the rendered stat tile (id set on the value div)
+        // or fall back to searching the results panel text
+        let storage = null;
+        const statEl = document.getElementById('tankStorageStat');
+        if (statEl) {
+            storage = parseFloat(statEl.textContent.replace(/[^0-9.]/g, ''));
+        }
+        if (!storage) {
+            const resultsDiv = document.querySelector('.results');
+            if (!resultsDiv) { alert('Run Calculate System first.'); return; }
+            const m = resultsDiv.innerText.match(/AquaCell Tank Storage[\s\S]{0,10}?([\d,]+\.?\d*)\s*ft/i);
+            if (m) storage = parseFloat(m[1].replace(/,/g, ''));
+        }
+        if (!storage || !isFinite(storage)) {
             alert('Run Calculate System first.');
             return;
         }
-        const storage = parseFloat(match[1].replace(/,/g, ''));
+
         const total = cost * storage;
-        document.getElementById('priceCrateStorage').textContent = storage.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
-        document.getElementById('priceTotalCost').textContent = total.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+        document.getElementById('priceCrateStorage').textContent = storage.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1}) + ' ft³';
+        document.getElementById('priceTotalCost').textContent = '$' + total.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
         document.getElementById('hiddenTotalAquaCellCost').value = total.toFixed(2);
     }
 
@@ -1007,7 +1359,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
 
     document.getElementById('knownLength').addEventListener('input', renderSheet);
 
-    // ── COLLAPSIBLE SECTION CARDS ──
+    // ── COLLAPSIBLE INPUT SECTION CARDS ──
     function toggleCard(header) {
         const body = header.nextElementSibling;
         const isCollapsed = header.classList.contains('collapsed');
@@ -1019,6 +1371,76 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             body.classList.add('hidden');
         }
     }
+
+    // ── COLLAPSIBLE RESULT CARDS ──
+    function toggleResultCard(header) {
+        // Find the next sibling that is a result-card-body (skip script tags etc)
+        let body = header.nextElementSibling;
+        while (body && !body.classList.contains('result-card-body')) {
+            body = body.nextElementSibling;
+        }
+        if (!body) return;
+        const isCollapsed = header.classList.contains('collapsed');
+        if (isCollapsed) {
+            header.classList.remove('collapsed');
+            body.classList.remove('hidden');
+        } else {
+            header.classList.add('collapsed');
+            body.classList.add('hidden');
+        }
+    }
+
+    // ── FLOATING NAV: show when panel has scrollable content ──
+    function initFloatNav() {
+        const leftPanel  = document.getElementById('leftPanel');
+        const rightPanel = document.getElementById('rightPanel');
+        const navLeft    = document.getElementById('floatNavLeft');
+        const navRight   = document.getElementById('floatNavRight');
+
+        function checkLeft()  { if (navLeft)  navLeft.style.display  = leftPanel.scrollHeight  > leftPanel.clientHeight  + 20 ? 'flex' : 'none'; }
+        function checkRight() { if (navRight) navRight.style.display = rightPanel.scrollHeight > rightPanel.clientHeight + 20 ? 'flex' : 'none'; }
+
+        checkLeft();
+        checkRight();
+        leftPanel.addEventListener('scroll',  checkLeft,  { passive: true });
+        rightPanel.addEventListener('scroll', checkRight, { passive: true });
+        new MutationObserver(checkLeft).observe(leftPanel,   { childList: true, subtree: true });
+        new MutationObserver(checkRight).observe(rightPanel, { childList: true, subtree: true });
+    }
+    initFloatNav();
+
+    // ── SHAPE MODE TOGGLE ──
+    function setShapeMode(mode) {
+        document.getElementById('shapeModeInput').value = mode;
+        const rectInputs    = document.getElementById('rectInputs');
+        const complexInputs = document.getElementById('complexInputs');
+        const btnRect    = document.getElementById('shapeBtn_rect');
+        const btnComplex = document.getElementById('shapeBtn_complex');
+
+        if (mode === 'complex') {
+            rectInputs.style.display    = 'none';
+            complexInputs.style.display = 'block';
+            btnComplex.style.background = '#1e3a8a';
+            btnComplex.style.color      = '#fff';
+            btnRect.style.background    = 'var(--card)';
+            btnRect.style.color         = 'var(--text)';
+        } else {
+            rectInputs.style.display    = 'block';
+            complexInputs.style.display = 'none';
+            btnRect.style.background    = '#1e3a8a';
+            btnRect.style.color         = '#fff';
+            btnComplex.style.background = 'var(--card)';
+            btnComplex.style.color      = 'var(--text)';
+        }
+    }
+
+    // Restore shape mode on page load (after Flask re-render)
+    (function() {
+        const savedMode = document.getElementById('shapeModeInput')
+            ? document.getElementById('shapeModeInput').value
+            : 'rectangle';
+        setShapeMode(savedMode || 'rectangle');
+    })();
     document.getElementById('knownWidth').addEventListener('input', renderSheet);
     document.getElementById('layers').addEventListener('change', renderSheet);
     document.getElementById('modelType').addEventListener('change', renderSheet);
@@ -1062,10 +1484,21 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const trafficMap = { H10: 'H-10', HS20: 'HS-20', HS25: 'HS-25' };
         const trafficLoad = trafficMap[trafficRaw] || trafficRaw;
 
-        // Tank geometry for area/perimeter from results text
-        const snappedMatch = bodyText.match(/Snapped Tank Dimensions:\s*([\d.]+)\s*ft\s*×\s*([\d.]+)\s*ft/i);
-        const areaFt2   = snappedMatch ? (parseFloat(snappedMatch[1]) * parseFloat(snappedMatch[2])).toFixed(1) : '—';
-        const perimFt   = extract(/Used Perimeter:\s*([\d.]+)/i);
+        // Detect shape mode
+        const shapeMode = document.getElementById('shapeModeInput')?.value || 'rectangle';
+        const isComplex = shapeMode === 'complex';
+
+        // Area — works for both rectangle and complex shape modes
+        let areaFt2 = '—';
+        if (isComplex) {
+            // Complex mode: read snapped area from the results panel bold line
+            const complexAreaMatch = bodyText.match(/=\s*([\d,]+\.?\d*)\s*ft²/);
+            if (complexAreaMatch) areaFt2 = parseFloat(complexAreaMatch[1].replace(/,/g,'')).toFixed(1);
+        } else {
+            const snappedMatch = bodyText.match(/Snapped Tank Dimensions:\s*([\d.]+)\s*ft\s*×\s*([\d.]+)\s*ft/i);
+            if (snappedMatch) areaFt2 = (parseFloat(snappedMatch[1]) * parseFloat(snappedMatch[2])).toFixed(1);
+        }
+        const perimFt = extract(/Used Perimeter:\s*([\d.]+)/i);
 
         // BOM — parse from table rows in the results div
         function bomQty(label) {
@@ -1085,12 +1518,21 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const topAdapters12  = bomQty('3085857');
         const topAdapters16  = bomQty('2476842000');
 
-        // Depths
-        const tankHeight   = extract(/Snapped Tank Dimensions:[\s\d.×ft]+×\s*([\d.]+)\s*ft/i);
-        const baseStoneVal = document.querySelector('[name="base_stone"]')?.value || '—';
-        const coverStoneVal= document.querySelector('[name="cover_stone"]')?.value || '—';
-        const systemDepth  = (tankHeight !== '—' && baseStoneVal !== '—' && coverStoneVal !== '—')
-            ? (parseFloat(tankHeight) + parseFloat(baseStoneVal) + parseFloat(coverStoneVal)).toFixed(2)
+        // Tank depth — works for both modes
+        let tankHeight = '—';
+        if (isComplex) {
+            // Complex mode: "Tank Height: X.XX ft" in results
+            tankHeight = extract(/Tank Height:\s*([\d.]+)\s*ft/i);
+        } else {
+            // Rectangle mode: third dimension in snapped dimensions line
+            tankHeight = extract(/Snapped Tank Dimensions:[\s\d.×ft]+×\s*([\d.]+)\s*ft/i);
+        }
+
+        // System depth = tank height + base stone + cover stone
+        const baseStoneVal  = document.querySelector('[name="base_stone"]')?.value  || '0.333';
+        const coverStoneVal = document.querySelector('[name="cover_stone"]')?.value || '1.0';
+        const systemDepth   = (tankHeight !== '—')
+            ? (parseFloat(tankHeight) + parseFloat(baseStoneVal || 0.333) + parseFloat(coverStoneVal || 1.0)).toFixed(2)
             : '—';
 
         // Geotextile — read directly from the geo table by row label
