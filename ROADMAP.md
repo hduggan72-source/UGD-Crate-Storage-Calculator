@@ -66,6 +66,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] Add LIVE LOAD & DEAD LOAD calculations to Results UX (NOT ON PDF SUMMARY)
  
  ## Next Up (High Priority – Do These Next)
+- Updated "scaled tank footprint area" in COMPLEX SHAPE to thousandths
 - Add Storage volume vs. Elevation graphic chart (x/y axis)- volume curve chart
 - Look at moving the Storage results card
 - Remove Dead Load cover weight FOS
