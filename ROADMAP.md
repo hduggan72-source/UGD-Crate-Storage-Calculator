@@ -66,22 +66,22 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] Add LIVE LOAD & DEAD LOAD calculations to Results UX (NOT ON PDF SUMMARY)
 -  [X] Updated "scaled tank footprint area" in COMPLEX SHAPE to thousandths
 -  [X] FIX COPY EMAIL FUNCTION TO ENSURE ALL FIELDS ARE BEING COPIED
+-  [X] add a section in Stone Backfill card that shows stone calculated by LAYER (Top, Perimeter, Base) Gross/Net
  
  ## Next Up (High Priority – Do These Next)
-- add a section in Stone Backfill card that shows stone calculated by LAYER (Top, Perimeter, Base) Gross/Net
+
 - add freight calculator to take a percentage of the total cost (no results needed) just a built in calculator
 - add a pallet count estimator, weight estimator, and contingency calculator
 - Add Storage volume vs. Elevation graphic chart (x/y axis)- volume curve chart
 - Look at moving the Storage results card
 - Remove Dead Load cover weight FOS
 - ask Claude about arriving at live load FOS calculations to be sure it aligns correctly with excel load calculator
-- pass/fail GREEN highlight entire "Total System Storage" if > than minimum required storage / RED if < than
 - add Project # to PDF Summary page
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 
 - Separate Quote Sheet & BOM Command buttons to generate individual pages with different disclaimers as needed
-- qr codes or hyperlinks to wavin.us or specific installation details
+- QR codes or hyperlinks to wavin.us or specific installation details
 - Stage storage table with CSV export
 - STREAMLINE PDF SUMMARY TO JUST ESSENTIALS
 - USE CANVAS TO BUILD A TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
