@@ -206,6 +206,23 @@ def index():
         stone_backfill_bulk_yd3  = round(stone_backfill_bulk_ft3 / 27, 2)
         stone_backfill_bulk_tons = round(stone_backfill_bulk_ft3 * 100 / 2000, 2)
 
+        # ── Stone Backfill by Layer (Gross / Net) ──
+        if shape_mode == 'complex':
+            excav_area_for_layers = complex_excav_area
+            tank_footprint        = complex_tank_area
+        else:
+            excav_area_for_layers = outer_width * outer_length
+            tank_footprint        = tank_width * tank_length
+
+        stone_top_gross      = round(excav_area_for_layers * cover_stone, 1)
+        stone_top_net        = round(stone_top_gross * stone_void, 1)
+        stone_perim_gross    = round((excav_area_for_layers - tank_footprint) * tank_height, 1)
+        stone_perim_net      = round(stone_perim_gross * stone_void, 1)
+        stone_base_gross     = round(excav_area_for_layers * base_stone, 1)
+        stone_base_net       = round(stone_base_gross * stone_void, 1)
+        stone_layer_total_gross = round(stone_top_gross + stone_perim_gross + stone_base_gross, 1)
+        stone_layer_total_net   = round(stone_top_net  + stone_perim_net  + stone_base_net,  1)
+
         stage_storage = None
         if include_stage_storage:
             stage_storage = []
@@ -298,6 +315,14 @@ def index():
             'stone_backfill_bulk_ft3': stone_backfill_bulk_ft3,
             'stone_backfill_bulk_yd3': stone_backfill_bulk_yd3,
             'stone_backfill_bulk_tons': stone_backfill_bulk_tons,
+            'stone_top_gross': stone_top_gross,
+            'stone_top_net': stone_top_net,
+            'stone_perim_gross': stone_perim_gross,
+            'stone_perim_net': stone_perim_net,
+            'stone_base_gross': stone_base_gross,
+            'stone_base_net': stone_base_net,
+            'stone_layer_total_gross': stone_layer_total_gross,
+            'stone_layer_total_net': stone_layer_total_net,
             'geoTank': geoTank,
             'geoStone': geoStone,
             'geoTotal': geoTotal,
@@ -437,6 +462,23 @@ def download_pdf():
     stone_backfill_bulk_yd3  = round(stone_backfill_bulk_ft3 / 27, 2)
     stone_backfill_bulk_tons = round(stone_backfill_bulk_ft3 * 100 / 2000, 2)
 
+    # ── Stone Backfill by Layer (Gross / Net) ──
+    if shape_mode == 'complex':
+        excav_area_for_layers = complex_excav_area
+        tank_footprint        = complex_tank_area
+    else:
+        excav_area_for_layers = outer_width * outer_length
+        tank_footprint        = tank_width * tank_length
+
+    stone_top_gross         = round(excav_area_for_layers * cover_stone, 1)
+    stone_top_net           = round(stone_top_gross * stone_void, 1)
+    stone_perim_gross       = round((excav_area_for_layers - tank_footprint) * tank_height, 1)
+    stone_perim_net         = round(stone_perim_gross * stone_void, 1)
+    stone_base_gross        = round(excav_area_for_layers * base_stone, 1)
+    stone_base_net          = round(stone_base_gross * stone_void, 1)
+    stone_layer_total_gross = round(stone_top_gross + stone_perim_gross + stone_base_gross, 1)
+    stone_layer_total_net   = round(stone_top_net  + stone_perim_net  + stone_base_net,  1)
+
     storage_status = 'PASS' if min_storage <= total_storage else 'FAIL' if min_storage > 0 else None
 
     stage_storage_lines = []
@@ -539,6 +581,11 @@ def download_pdf():
         f"Minimum Required Storage Volume: {min_storage} ft³ → {storage_status}" if min_storage > 0 else "",
         "",
         f"Estimated Stone Backfill Volume (with 10% added): {stone_backfill_bulk_ft3} ft³ / {stone_backfill_bulk_yd3} yd³ / {stone_backfill_bulk_tons} US tons",
+        "  Stone Backfill by Layer (Gross Volume / Net Storage @ void ratio):",
+        f"    Top Layer:       {stone_top_gross} ft³ gross  /  {stone_top_net} ft³ net",
+        f"    Perimeter:       {stone_perim_gross} ft³ gross  /  {stone_perim_net} ft³ net",
+        f"    Base Layer:      {stone_base_gross} ft³ gross  /  {stone_base_net} ft³ net",
+        f"    TOTAL:           {stone_layer_total_gross} ft³ gross  /  {stone_layer_total_net} ft³ net",
         "  * Stone backfill provided by others. Quantity is an estimate for coordination purposes only.",
         "",
         "Bill of Materials",
