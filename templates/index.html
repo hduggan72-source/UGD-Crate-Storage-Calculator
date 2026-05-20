@@ -636,11 +636,11 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 <div class="result-card-body">
                     <div class="result-row">
                         <span class="result-label">Configuration / Layers</span>
-                        <span class="result-value">{{ results.config }} — {{ results.layers }} Layer(s)</span>
+                        <span class="result-value" id="rv_config_layers">{{ results.config }} — {{ results.layers }} Layer(s)</span>
                     </div>
                     <div class="result-row">
                         <span class="result-label">Traffic Load</span>
-                        <span class="result-value">{{ results.traffic_load }}</span>
+                        <span class="result-value" id="rv_traffic_load">{{ results.traffic_load }}</span>
                     </div>
 
                     {% if results.shape_mode == 'complex' %}
@@ -671,26 +671,26 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     </div>
                     <div class="result-row">
                         <span class="result-label">Tank Height</span>
-                        <span class="result-value">{{ results.tank_height }} ft</span>
+                        <span class="result-value" id="rv_tank_height_complex">{{ results.tank_height }} ft</span>
                     </div>
                     {% else %}
                     <div class="result-row">
                         <span class="result-label">Snapped Tank Dimensions</span>
-                        <span class="result-value">{{ results.tank_width }} ft × {{ results.tank_length }} ft × {{ results.tank_height }} ft</span>
+                        <span class="result-value" id="rv_snapped_dims">{{ results.tank_width }} ft × {{ results.tank_length }} ft × {{ results.tank_height }} ft</span>
                     </div>
                     {% endif %}
 
                     <div class="result-row">
                         <span class="result-label">Tank Perimeter</span>
-                        <span class="result-value">{{ results.used_perimeter }} ft</span>
+                        <span class="result-value" id="rv_tank_perimeter">{{ results.used_perimeter }} ft</span>
                     </div>
                     <div class="result-row">
                         <span class="result-label">AquaCell Tank Depth</span>
-                        <span class="result-value">{{ results.tank_height }} ft</span>
+                        <span class="result-value" id="rv_tank_depth">{{ results.tank_height }} ft</span>
                     </div>
                     <div class="result-row">
                         <span class="result-label">Total System Depth (tank + stone)</span>
-                        <span class="result-value">{{ (results.tank_height + (form_data.get('base_stone', 0.333)|float) + (form_data.get('cover_stone', 1.0)|float))|round(2) }} ft</span>
+                        <span class="result-value" id="rv_system_depth">{{ (results.tank_height + (form_data.get('base_stone', 0.333)|float) + (form_data.get('cover_stone', 1.0)|float))|round(2) }} ft</span>
                     </div>
                 </div>
             </div>
@@ -784,7 +784,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     {% if results.min_storage is not none %}
                     <div class="result-row">
                         <span class="result-label">Minimum Required Storage</span>
-                        <span class="result-value {{ 'pass' if results.storage_status == 'PASS' else 'fail' }}">
+                        <span class="result-value {{ 'pass' if results.storage_status == 'PASS' else 'fail' }}" id="rv_min_storage">
                             {{ results.min_storage }} ft³ → {{ results.storage_status }}
                         </span>
                     </div>
@@ -796,12 +796,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         </div>
                         <div class="result-stat">
                             <div class="result-stat-label">Stone Backfill Storage</div>
-                            <div class="result-stat-value">{{ results.stone_storage }} ft³</div>
+                            <div class="result-stat-value" id="rv_stone_storage">{{ results.stone_storage }} ft³</div>
                         </div>
                     </div>
                     <div style="margin-top:10px;padding:12px;background:var(--bg);border-radius:6px;border-left:4px solid var(--accent);">
                         <div style="font-size:11px;opacity:0.7;margin-bottom:4px;">Total System Storage</div>
-                        <div style="font-size:22px;font-weight:bold;color:var(--accent);">{{ results.total_storage }} ft³</div>
+                        <div style="font-size:22px;font-weight:bold;color:var(--accent);" id="rv_total_storage">{{ results.total_storage }} ft³</div>
                     </div>
                 </div>
             </div>
@@ -849,12 +849,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 <div class="result-card-body" style="padding:0;">
                     <table style="margin-top:0;">
                         <tr><th>Item</th><th style="text-align:right;">Quantity</th></tr>
-                        <tr><td>Base Unit (3091506)</td><td style="text-align:right;font-weight:bold;">{{ results.base_units }}</td></tr>
-                        <tr><td>Side Plate (2476600003)</td><td style="text-align:right;font-weight:bold;">{{ results.side_plates }}</td></tr>
-                        <tr><td>Bottom Plate (2476600001)</td><td style="text-align:right;font-weight:bold;">{{ results.bottom_plates }}</td></tr>
-                        <tr><td>8-12" Pipe Connectors (2476631200)</td><td style="text-align:right;font-weight:bold;">{{ results.pipe_connectors }}</td></tr>
-                        <tr><td>12" Top Adapters (3085857)</td><td style="text-align:right;font-weight:bold;">{{ results.top_adapters_12 }}</td></tr>
-                        <tr><td>16" Top Adapters (2476842000)</td><td style="text-align:right;font-weight:bold;">{{ results.top_adapters_16 }}</td></tr>
+                        <tr><td>Base Unit (3091506)</td><td style="text-align:right;font-weight:bold;" id="bom_base_units">{{ results.base_units }}</td></tr>
+                        <tr><td>Side Plate (2476600003)</td><td style="text-align:right;font-weight:bold;" id="bom_side_plates">{{ results.side_plates }}</td></tr>
+                        <tr><td>Bottom Plate (2476600001)</td><td style="text-align:right;font-weight:bold;" id="bom_bottom_plates">{{ results.bottom_plates }}</td></tr>
+                        <tr><td>8-12" Pipe Connectors (2476631200)</td><td style="text-align:right;font-weight:bold;" id="bom_pipe_connectors">{{ results.pipe_connectors }}</td></tr>
+                        <tr><td>12" Top Adapters (3085857)</td><td style="text-align:right;font-weight:bold;" id="bom_top_adapters_12">{{ results.top_adapters_12 }}</td></tr>
+                        <tr><td>16" Top Adapters (2476842000)</td><td style="text-align:right;font-weight:bold;" id="bom_top_adapters_16">{{ results.top_adapters_16 }}</td></tr>
                     </table>
                 </div>
             </div>
@@ -1449,132 +1449,144 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
 
     // ====================== COPY TO EMAIL ======================
     function copyToEmail() {
-        const resultsDiv = document.querySelector('.results');
-        if (!resultsDiv) {
+        // Check results exist
+        if (!document.getElementById('rv_config_layers') && !document.getElementById('tankStorageStat')) {
             alert('Please run "Calculate System" first to generate results.');
             return;
         }
 
-        // Helper: extract a value by regex from results text
-        const bodyText = resultsDiv.innerText;
-
-        function extract(pattern, fallback='—') {
-            const m = bodyText.match(pattern);
-            return m ? m[1].trim() : fallback;
+        // Helper: read textContent of an element by ID, strip units/extra text, return cleaned value or fallback
+        function txt(id, fallback='—') {
+            const el = document.getElementById(id);
+            if (!el) return fallback;
+            return el.textContent.trim() || fallback;
         }
 
-        // Pull values from rendered result elements
-        const config  = extract(/Results\s*[–-]\s*(\S+)\s*Configuration/i);
-        const layers  = extract(/Results\s*[–-]\s*\S+\s*Configuration\s*\((\d+)\s*Layer/i);
-        const configLabel = (config && layers) ? `${config}/${layers}` : '—';
+        // Helper: extract just the numeric portion (strip units like ft³, ft, etc.)
+        function num(id, fallback='—') {
+            const el = document.getElementById(id);
+            if (!el) return fallback;
+            const m = el.textContent.match(/([\d,]+\.?\d*)/);
+            return m ? m[1] : fallback;
+        }
 
-        // Storage
-        const minStorage    = extract(/Minimum Required Storage:\s*([\d,]+\.?\d*)/i);
-        const tankStorage   = extract(/AquaCell Tank Storage:\s*([\d,]+\.?\d*)/i);
-        const stoneStorage  = extract(/Stone Backfill Storage:\s*([\d,]+\.?\d*)/i);
-        const totalStorage  = extract(/Total System Storage:\s*([\d,]+\.?\d*)/i);
+        // --- Config / Layers ---
+        const configSelect  = document.getElementById('modelType')?.value || 'SC';
+        const layersSelect  = document.getElementById('layers')?.value || '—';
 
-        // Tank config / layers from select values
-        const configSelect = document.getElementById('modelType')?.value || config;
-        const layersSelect = document.getElementById('layers')?.value || layers;
-        const tankConfig   = `${configSelect}/${configSelect === 'EX' ? 'EX+' : 'SC'} ${layersSelect} Layer(s)`;
+        // --- Traffic Load ---
+        const trafficRaw  = document.querySelector('[name="traffic_load"]')?.value || '';
+        const trafficMap  = { H10: 'H-10', HS20: 'HS-20', HS25: 'HS-25' };
+        const trafficLoad = trafficMap[trafficRaw] || trafficRaw || txt('rv_traffic_load');
 
-        // Traffic load
-        const trafficRaw = document.querySelector('[name="traffic_load"]')?.value || '';
-        const trafficMap = { H10: 'H-10', HS20: 'HS-20', HS25: 'HS-25' };
-        const trafficLoad = trafficMap[trafficRaw] || trafficRaw;
+        // --- Storage ---
+        const minStorageRaw = txt('rv_min_storage');          // "XXXX ft³ → PASS"
+        const minStorage    = minStorageRaw !== '—' ? (minStorageRaw.match(/([\d,]+\.?\d*)/) || ['','—'])[1] : '—';
+        const tankStorage   = num('tankStorageStat');
+        const stoneStorage  = num('rv_stone_storage');
+        const totalStorage  = num('rv_total_storage');
 
-        // Detect shape mode
+        // --- Area ---
         const shapeMode = document.getElementById('shapeModeInput')?.value || 'rectangle';
         const isComplex = shapeMode === 'complex';
-
-        // Area — works for both rectangle and complex shape modes
         let areaFt2 = '—';
-        if (isComplex) {
-            // Complex mode: read snapped area from the results panel bold line
-            const complexAreaMatch = bodyText.match(/=\s*([\d,]+\.?\d*)\s*ft²/);
-            if (complexAreaMatch) areaFt2 = parseFloat(complexAreaMatch[1].replace(/,/g,'')).toFixed(1);
-        } else {
-            const snappedMatch = bodyText.match(/Snapped Tank Dimensions:\s*([\d.]+)\s*ft\s*×\s*([\d.]+)\s*ft/i);
-            if (snappedMatch) areaFt2 = (parseFloat(snappedMatch[1]) * parseFloat(snappedMatch[2])).toFixed(1);
-        }
-        const perimFt = extract(/Used Perimeter:\s*([\d.]+)/i);
+        let perimFt = '—';
 
-        // BOM — parse from table rows in the results div
-        function bomQty(label) {
-            const rows = resultsDiv.querySelectorAll('table tr');
-            for (const row of rows) {
-                if (row.innerText.includes(label)) {
-                    const cells = row.querySelectorAll('td');
-                    if (cells.length >= 2) return cells[1].innerText.trim();
-                }
+        if (isComplex) {
+            // Complex mode: read from complex shape block
+            const perimEl = document.getElementById('rv_tank_perimeter');
+            if (perimEl) perimFt = (perimEl.textContent.match(/([\d.]+)/) || ['','—'])[1];
+            // Area from complex_tank_area which is baked into the complex shape block text
+            // Fall back to scanning the config card body (it's always rendered, just maybe hidden)
+            const configBody = document.querySelector('.result-card-body');
+            if (configBody) {
+                const m = configBody.textContent.match(/=\s*([\d,]+\.?\d*)\s*ft²/);
+                if (m) areaFt2 = parseFloat(m[1].replace(/,/g,'')).toFixed(1);
             }
-            return '—';
-        }
-        const baseUnits      = bomQty('3091506');
-        const sidePlates     = bomQty('2476600003');
-        const bottomPlates   = bomQty('2476600001');
-        const pipeConnectors = bomQty('2476631200');
-        const topAdapters12  = bomQty('3085857');
-        const topAdapters16  = bomQty('2476842000');
-
-        // Tank depth — works for both modes
-        let tankHeight = '—';
-        if (isComplex) {
-            // Complex mode: "Tank Height: X.XX ft" in results
-            tankHeight = extract(/Tank Height:\s*([\d.]+)\s*ft/i);
         } else {
-            // Rectangle mode: third dimension in snapped dimensions line
-            tankHeight = extract(/Snapped Tank Dimensions:[\s\d.×ft]+×\s*([\d.]+)\s*ft/i);
+            const dimsEl = document.getElementById('rv_snapped_dims');
+            if (dimsEl) {
+                const m = dimsEl.textContent.match(/([\d.]+)\s*ft\s*×\s*([\d.]+)\s*ft/);
+                if (m) areaFt2 = (parseFloat(m[1]) * parseFloat(m[2])).toFixed(1);
+            }
+            const perimEl = document.getElementById('rv_tank_perimeter');
+            if (perimEl) perimFt = (perimEl.textContent.match(/([\d.]+)/) || ['','—'])[1];
         }
 
-        // System depth = tank height + base stone + cover stone
-        const baseStoneVal  = document.querySelector('[name="base_stone"]')?.value  || '0.333';
-        const coverStoneVal = document.querySelector('[name="cover_stone"]')?.value || '1.0';
-        const systemDepth   = (tankHeight !== '—')
-            ? (parseFloat(tankHeight) + parseFloat(baseStoneVal || 0.333) + parseFloat(coverStoneVal || 1.0)).toFixed(2)
-            : '—';
+        // --- Tank Depth & System Depth ---
+        let tankHeight = '—';
+        const tankDepthEl = document.getElementById('rv_tank_depth');
+        if (tankDepthEl) {
+            const m = tankDepthEl.textContent.match(/([\d.]+)/);
+            if (m) tankHeight = m[1];
+        }
+        // Also try the complex-mode tank height element
+        if (tankHeight === '—') {
+            const complexEl = document.getElementById('rv_tank_height_complex');
+            if (complexEl) {
+                const m = complexEl.textContent.match(/([\d.]+)/);
+                if (m) tankHeight = m[1];
+            }
+        }
 
-        // Geotextile — read directly from the geo table by row label
-        // Geotextile — read from live cells which already reflect selected unit
+        // System depth from rendered element (already calculated by Jinja)
+        let systemDepth = '—';
+        const sysDpEl = document.getElementById('rv_system_depth');
+        if (sysDpEl) {
+            const m = sysDpEl.textContent.match(/([\d.]+)/);
+            if (m) systemDepth = m[1];
+        } else if (tankHeight !== '—') {
+            // Fallback: calculate from inputs
+            const baseStoneVal  = parseFloat(document.querySelector('[name="base_stone"]')?.value  || '0.333') || 0.333;
+            const coverStoneVal = parseFloat(document.querySelector('[name="cover_stone"]')?.value || '1.0')   || 1.0;
+            systemDepth = (parseFloat(tankHeight) + baseStoneVal + coverStoneVal).toFixed(2);
+        }
+
+        // --- BOM (read directly from IDs — works even when card is collapsed) ---
+        const baseUnits      = txt('bom_base_units');
+        const sidePlates     = txt('bom_side_plates');
+        const bottomPlates   = txt('bom_bottom_plates');
+        const pipeConnectors = txt('bom_pipe_connectors');
+        const topAdapters12  = txt('bom_top_adapters_12');
+        const topAdapters16  = txt('bom_top_adapters_16');
+
+        // --- Geotextile (read from live cells) ---
         const geoUnit  = (window._currentGeoUnit === 'yd2') ? 'yd²' : 'ft²';
-        const geoTank  = document.getElementById('geoTankCell')  ? document.getElementById('geoTankCell').textContent.trim()  : bomQty('AquaCell Tank Only');
-        const geoStone = document.getElementById('geoStoneCell') ? document.getElementById('geoStoneCell').textContent.trim() : bomQty('Stone Backfill Envelope');
-        const geoTotalRaw = document.getElementById('geoTotalCell') ? document.getElementById('geoTotalCell').textContent.trim() : bomQty('Total');
-        const geoTotal = geoTotalRaw;
+        const geoTank  = txt('geoTankCell');
+        const geoStone = txt('geoStoneCell');
+        const geoTotal = txt('geoTotalCell');
 
-        // Stone backfill bulk volume
-        const stoneBulk = extract(/Estimated Stone Backfill Volume[^:]*:\s*([\d,]+\.?\d*)\s*ft³/i);
+        // --- Stone Backfill Bulk ---
+        const stoneBulkDisplay = txt('stoneBulkDisplay');
 
         const emailText = [
             'AquaCell',
             '',
-            `Minimum Required Storage (ft³):          ${minStorage}`,
-            `AquaCell Tank Storage (ft³):             ${tankStorage}`,
-            `Stone Backfill Storage (ft³):            ${stoneStorage}`,
-            `Total System Storage (ft³):              ${totalStorage}`,
-            `Tank Configuration/Layers:               ${configSelect}/${layersSelect} Layer(s)`,
-            `Traffic Load Required:                   ${trafficLoad}`,
-            `Area (ft²):                              ${areaFt2}`,
-            `Perimeter (ft.):                         ${perimFt}`,
-            `Base Unit (3091506) ea.:                 ${baseUnits}`,
-            `Side Plates (2476600003) ea.:            ${sidePlates}`,
-            `Bottom Plate (2476600001) ea.:           ${bottomPlates}`,
-            `8-12" Pipe Connectors (2476631200) ea.: ${pipeConnectors}`,
-            `12" Top Adapters (3085857) ea.:          ${topAdapters12}`,
-            `16" Top Adapters (2476842000) ea.:       ${topAdapters16}`,
-            `AquaCell Tank Depth (ft.):               ${tankHeight}`,
-            `System Depth (ft.):                      ${systemDepth}`,
-            `AquaCell Tank Wrap Geotextile (${geoUnit}):     ${geoTank}`,
-            `Stone Backfill Envelope Geotextile (${geoUnit}):${geoStone}`,
-            `Total Geotextile (${geoUnit}):                  ${geoTotal}`,
-            `Total Estimated Stone Backfill Volume (with 10%): ${document.getElementById('stoneBulkDisplay') ? document.getElementById('stoneBulkDisplay').textContent.trim() : stoneBulk}`,
+            `Minimum Required Storage (ft³):           ${minStorage}`,
+            `AquaCell Tank Storage (ft³):              ${tankStorage}`,
+            `Stone Backfill Storage (ft³):             ${stoneStorage}`,
+            `Total System Storage (ft³):               ${totalStorage}`,
+            `Tank Configuration/Layers:                ${configSelect}/${layersSelect} Layer(s)`,
+            `Traffic Load Required:                    ${trafficLoad}`,
+            `Area (ft²):                               ${areaFt2}`,
+            `Perimeter (ft.):                          ${perimFt}`,
+            `Base Unit (3091506) ea.:                  ${baseUnits}`,
+            `Side Plates (2476600003) ea.:             ${sidePlates}`,
+            `Bottom Plate (2476600001) ea.:            ${bottomPlates}`,
+            `8-12" Pipe Connectors (2476631200) ea.:  ${pipeConnectors}`,
+            `12" Top Adapters (3085857) ea.:           ${topAdapters12}`,
+            `16" Top Adapters (2476842000) ea.:        ${topAdapters16}`,
+            `AquaCell Tank Depth (ft.):                ${tankHeight}`,
+            `System Depth (ft.):                       ${systemDepth}`,
+            `AquaCell Tank Wrap Geotextile (${geoUnit}):      ${geoTank}`,
+            `Stone Backfill Envelope Geotextile (${geoUnit}): ${geoStone}`,
+            `Total Geotextile (${geoUnit}):                   ${geoTotal}`,
+            `Total Estimated Stone Backfill Volume (with 10%): ${stoneBulkDisplay}`,
         ].join('\n');
 
         navigator.clipboard.writeText(emailText).then(() => {
             alert('✅ Results copied to clipboard! Paste directly into your email.');
         }).catch(() => {
-            // Fallback for browsers that block clipboard API
             const ta = document.createElement('textarea');
             ta.value = emailText;
             ta.style.position = 'fixed';
