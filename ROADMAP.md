@@ -68,6 +68,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] FIX COPY EMAIL FUNCTION TO ENSURE ALL FIELDS ARE BEING COPIED
  
  ## Next Up (High Priority – Do These Next)
+- add a section in Stone Backfill card that shows stone calculated by LAYER (Top, Perimeter, Base) Gross/Net
 - add freight calculator to take a percentage of the total cost (no results needed) just a built in calculator
 - add a pallet count estimator, weight estimator, and contingency calculator
 - Add Storage volume vs. Elevation graphic chart (x/y axis)- volume curve chart
