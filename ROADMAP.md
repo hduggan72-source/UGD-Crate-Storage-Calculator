@@ -64,10 +64,12 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] add command to convert stone backfill & geotextile totals to desired dimensions (tons, cubic yards, cubic ft, square yards or ft)
 -  [X] Add page up/down scroll button to get to the top or bottom of page faster (by sections or card groups)
 -  [X] Add LIVE LOAD & DEAD LOAD calculations to Results UX (NOT ON PDF SUMMARY)
+-  [X] Updated "scaled tank footprint area" in COMPLEX SHAPE to thousandths
  
  ## Next Up (High Priority – Do These Next)
 - CHECK COPY EMAIL FUNCTION TO ENSURE ALL FIELDS ARE BEING COPIED
-- Updated "scaled tank footprint area" in COMPLEX SHAPE to thousandths
+- add freight calculator to take a percentage of the total cost (no results needed) just a built in calculator
+- add a pallet count estimator, weight estimator, and contingency calculator
 - Add Storage volume vs. Elevation graphic chart (x/y axis)- volume curve chart
 - Look at moving the Storage results card
 - Remove Dead Load cover weight FOS
