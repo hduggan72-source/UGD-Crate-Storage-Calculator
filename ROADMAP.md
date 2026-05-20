@@ -79,6 +79,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Remove Dead Load cover weight FOS
 - ask Claude about arriving at live load FOS calculations to be sure it aligns correctly with excel load calculator
 - add Project # to PDF Summary page
+- bouyancy calculator
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 
@@ -87,7 +88,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Stage storage table with CSV export with new command button at header
 - STREAMLINE PDF SUMMARY TO JUST ESSENTIALS (remove BOM and qquantities for estimation); summary only has the technical and could be included on the conceptual schematick page
 - USE CANVAS TO BUILD A TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
-- Excavation slope calculator integration (with variable H:V ratios) - FRONT END CALCULATIONS ONLY
+- Excavation slope calculator integration (with variable H:V ratios) - FRONT END CALCULATIONS ONLY/ summary PDF report
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
 - Optional 3D isometric view of the crate layout
 - Integration of Wavin installation details (access ports, geogrid, compaction notes)
