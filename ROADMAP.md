@@ -70,6 +70,8 @@ Professional web-based calculator for designing and quoting underground stormwat
  
  ## Next Up (High Priority – Do These Next)
 
+- dedicated quote sheet and command button
+- metric toggle
 - add freight calculator to take a percentage of the total cost (no results needed) just a built in calculator
 - add a pallet count estimator, weight estimator, and contingency calculator
 - Add Storage volume vs. Elevation graphic chart (x/y axis)- volume curve chart
@@ -82,8 +84,8 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 - Separate Quote Sheet & BOM Command buttons to generate individual pages with different disclaimers as needed
 - QR codes or hyperlinks to wavin.us or specific installation details
-- Stage storage table with CSV export
-- STREAMLINE PDF SUMMARY TO JUST ESSENTIALS
+- Stage storage table with CSV export with new command button at header
+- STREAMLINE PDF SUMMARY TO JUST ESSENTIALS (remove BOM and qquantities for estimation); summary only has the technical and could be included on the conceptual schematick page
 - USE CANVAS TO BUILD A TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
 - Excavation slope calculator integration (with variable H:V ratios) - FRONT END CALCULATIONS ONLY
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
