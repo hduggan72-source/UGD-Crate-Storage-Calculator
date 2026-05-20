@@ -492,27 +492,27 @@
                         <label>Scaled Tank Footprint Area (ft²)
                             <span class="help-icon" data-tooltip="The total area from your scaled plan inside the complex tank boundary. The tool will fit the crate grid inside this area to get the real snapped area.">?</span>
                         </label>
-                        <input type="number" step="0.1" name="complex_scaled_area" id="complexScaledArea" min="0" value="{{ form_data.get('complex_scaled_area', '') }}">
+                        <input type="number" step="0.001" name="complex_scaled_area" id="complexScaledArea" min="0" value="{{ form_data.get('complex_scaled_area', '') }}">
 
                         <label>Known Width or Length (ft) — from plans
                             <span class="help-icon" data-tooltip="Enter ONE dimension you know from the plans (the longer or controlling dimension works best). The tool calculates the other dimension from the scaled area, then snaps both to crate modules.">?</span>
                         </label>
-                        <input type="number" step="0.01" name="complex_known_dim" id="complexKnownDim" min="0" value="{{ form_data.get('complex_known_dim', '') }}">
+                        <input type="number" step="0.001" name="complex_known_dim" id="complexKnownDim" min="0" value="{{ form_data.get('complex_known_dim', '') }}">
 
                         <label>Scaled Tank Perimeter (ft)
                             <span class="help-icon" data-tooltip="Outer perimeter of the complex tank shape from your scaled plan. Used directly for side plate count and geotextile — not snapped.">?</span>
                         </label>
-                        <input type="number" step="0.01" name="complex_tank_perim" id="complexTankPerim" min="0" value="{{ form_data.get('complex_tank_perim', '') }}">
+                        <input type="number" step="0.001" name="complex_tank_perim" id="complexTankPerim" min="0" value="{{ form_data.get('complex_tank_perim', '') }}">
 
                         <label>Excavation Envelope Area (ft²) — optional
                             <span class="help-icon" data-tooltip="Total excavation footprint including perimeter stone border. Leave blank to auto-estimate from snapped tank area + perimeter × stone width.">?</span>
                         </label>
-                        <input type="number" step="0.1" name="complex_excav_area" id="complexExcavArea" min="0" placeholder="Leave blank to auto-estimate" value="{{ form_data.get('complex_excav_area', '') }}">
+                        <input type="number" step="0.001" name="complex_excav_area" id="complexExcavArea" min="0" placeholder="Leave blank to auto-estimate" value="{{ form_data.get('complex_excav_area', '') }}">
 
                         <label>Excavation Envelope Perimeter (ft) — optional
                             <span class="help-icon" data-tooltip="Outer perimeter of the full excavation. Leave blank to auto-estimate.">?</span>
                         </label>
-                        <input type="number" step="0.01" name="complex_excav_perim" id="complexExcavPerim" min="0" placeholder="Leave blank to auto-estimate" value="{{ form_data.get('complex_excav_perim', '') }}">
+                        <input type="number" step="0.001" name="complex_excav_perim" id="complexExcavPerim" min="0" placeholder="Leave blank to auto-estimate" value="{{ form_data.get('complex_excav_perim', '') }}">
                     </div>
 
                 </div>
