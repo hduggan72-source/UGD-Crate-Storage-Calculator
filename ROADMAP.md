@@ -76,6 +76,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 
 - metric toggle
+- Fix DATE field on QUOTE PDF - "plans"
 - Multiple Basin Entry and Reports
 - add a pallet count estimator, weight estimator, and contingency calculator
 - Add Storage volume vs. Elevation graphic chart (x/y axis)- volume curve chart
