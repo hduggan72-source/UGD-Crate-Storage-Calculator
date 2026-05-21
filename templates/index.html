@@ -400,7 +400,8 @@
         </div>
     </div>
     <div class="topbar-actions">
-        <button class="topbar-btn" onclick="downloadPDF()" style="background:#28a745;color:white;">⬇ PDF</button>
+        <button class="topbar-btn" onclick="downloadPDF()" style="background:#28a745;color:white;">⬇ Report</button>
+        <button class="topbar-btn" onclick="downloadQuote()" style="background:#e67e22;color:white;">📄 Quote</button>
         <button class="topbar-btn" onclick="copyToEmail()" style="background:#6f42c1;color:white;">📋 Copy</button>
         <button class="topbar-btn" onclick="exportProject()" style="background:#17a2b8;color:white;">Export</button>
         <button class="topbar-btn" onclick="document.getElementById('importFile').click()" style="background:#ffc107;color:#212529;">Import</button>
@@ -953,10 +954,15 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             <div class="result-card">
                 <div class="result-card-header" onclick="toggleResultCard(this)"><span>💲 AquaCell Price Estimation</span><span class="rc-arrow">▼</span></div>
                 <div class="result-card-body">
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
                         <div>
                             <label style="display:block;font-size:12px;opacity:0.7;margin-bottom:4px;">AquaCell Cost per ft³ (USD$)</label>
-                            <input type="number" id="costPerFt3" step="0.01" placeholder="e.g., 2.75"
+                            <input type="number" id="costPerFt3" step="0.01" placeholder="e.g., 5.19"
+                                style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:12px;opacity:0.7;margin-bottom:4px;">Freight % of AquaCell Cost</label>
+                            <input type="number" id="freightPct" step="0.1" placeholder="e.g., 10" value="10"
                                 style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
                         </div>
                         <div style="align-self:end;">
@@ -966,17 +972,29 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             </button>
                         </div>
                     </div>
-                    <div class="result-grid2">
+                    <div class="result-grid2" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
                         <div class="result-stat">
                             <div class="result-stat-label">Net AquaCell Storage (ft³)</div>
                             <div id="priceCrateStorage" class="result-stat-value" style="color:#00b0ff;">—</div>
                         </div>
                         <div class="result-stat">
-                            <div class="result-stat-label">Total AquaCell Cost (USD$)</div>
-                            <div id="priceTotalCost" class="result-stat-value" style="color:#00b0ff;">—</div>
+                            <div class="result-stat-label">AquaCell Subtotal</div>
+                            <div id="priceSubtotal" class="result-stat-value" style="color:#00b0ff;">—</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Est. Freight</div>
+                            <div id="priceFreight" class="result-stat-value" style="color:#f39c12;">—</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Est. Total</div>
+                            <div id="priceTotalCost" class="result-stat-value" style="color:#2ecc71;">—</div>
                         </div>
                     </div>
                     <input type="hidden" id="hiddenTotalAquaCellCost" name="totalAquaCellCost" value="">
+                    <input type="hidden" id="hiddenFreightCost" name="freightCost" value="">
+                    <input type="hidden" id="hiddenTotalWithFreight" name="totalWithFreight" value="">
+                    <input type="hidden" id="hiddenFreightPct" name="freightPct" value="">
+                    <input type="hidden" id="hiddenCostPerFt3" name="costPerFt3Hidden" value="">
                 </div>
             </div>
 
@@ -1117,9 +1135,9 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             alert('Please enter a valid cost per cubic foot.');
             return;
         }
+        const freightPct = parseFloat(document.getElementById('freightPct').value) || 0;
 
-        // Read tank storage from the rendered stat tile (id set on the value div)
-        // or fall back to searching the results panel text
+        // Read tank storage from the rendered stat tile or fall back to results text
         let storage = null;
         const statEl = document.getElementById('tankStorageStat');
         if (statEl) {
@@ -1136,10 +1154,52 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             return;
         }
 
-        const total = cost * storage;
+        const subtotal = cost * storage;
+        const freight  = subtotal * (freightPct / 100);
+        const total    = subtotal + freight;
+
+        const fmt = (v) => '$' + v.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+
         document.getElementById('priceCrateStorage').textContent = storage.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1}) + ' ft³';
-        document.getElementById('priceTotalCost').textContent = '$' + total.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
-        document.getElementById('hiddenTotalAquaCellCost').value = total.toFixed(2);
+        document.getElementById('priceSubtotal').textContent     = fmt(subtotal);
+        document.getElementById('priceFreight').textContent      = fmt(freight) + (freightPct > 0 ? '  (' + freightPct + '%)' : '');
+        document.getElementById('priceTotalCost').textContent    = fmt(total);
+
+        // Store for quote export
+        document.getElementById('hiddenTotalAquaCellCost').value = subtotal.toFixed(2);
+        document.getElementById('hiddenFreightCost').value       = freight.toFixed(2);
+        document.getElementById('hiddenTotalWithFreight').value  = total.toFixed(2);
+        document.getElementById('hiddenFreightPct').value        = freightPct.toFixed(1);
+        document.getElementById('hiddenCostPerFt3').value        = cost.toFixed(4);
+    }
+
+    function downloadQuote() {
+        const form = document.getElementById('mainForm');
+        const formData = new FormData(form);
+
+        // Carry over pricing fields
+        formData.append('totalAquaCellCost',  document.getElementById('hiddenTotalAquaCellCost').value  || '0');
+        formData.append('freightCost',        document.getElementById('hiddenFreightCost').value        || '0');
+        formData.append('totalWithFreight',   document.getElementById('hiddenTotalWithFreight').value   || '0');
+        formData.append('freightPct',         document.getElementById('hiddenFreightPct').value         || '10');
+        formData.append('costPerFt3Hidden',   document.getElementById('hiddenCostPerFt3').value         || '0');
+
+        const projectName = (document.getElementById('project_name').value || 'Project').trim()
+                            .replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
+        fetch('/download_quote', { method: 'POST', body: formData })
+        .then(r => {
+            if (!r.ok) throw new Error('Quote generation failed');
+            return r.blob();
+        })
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `AquaCell_Quote_${projectName}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+        })
+        .catch(() => alert('Quote download failed. Run Calculate System and Calculate Price first.'));
     }
 
     function exportProject() {
