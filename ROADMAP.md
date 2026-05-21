@@ -79,6 +79,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Look at moving the Storage results card to top and have it being static 
 - ask Claude about arriving at live load FOS calculations to be sure it aligns correctly with excel load calculator
 - add Project # to PDF Summary page
+- add place for notes about > 18" connectors and geotextile boots to be installed
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 
