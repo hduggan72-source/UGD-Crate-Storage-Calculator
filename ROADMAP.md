@@ -73,8 +73,9 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] STREAMLINE PDF SUMMARY TO JUST ESSENTIALS (remove BOM and qquantities for estimation); summary only has the technical and could be included on the conceptual schematick page
  
  ## Next Up (High Priority – Do These Next)
-
-
+- ADD CREATED BY FIELD (DON'T NECESSARILY NEED "ATTN:" TO PORT THAT TO THE PDF QUOTE SHEET
+- ADD USER INITIALS APPENDED TO A SELF-GENERATED QUOTE # (EX. AQ-1615-00-HD)
+- ADD A TOGGLE BOX UP IN THE PROJECT INFORMATION CARD FOR "REVISION" (REVISION WOULD BE ADDED TO THE QUOTE # "-01,-02, ETC.)
 - metric toggle
 - Fix DATE field on QUOTE PDF - "plans"
 - Multiple Basin Entry and Reports
