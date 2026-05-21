@@ -76,14 +76,13 @@ Professional web-based calculator for designing and quoting underground stormwat
 - add freight calculator to take a percentage of the total cost (no results needed) just a built in calculator
 - add a pallet count estimator, weight estimator, and contingency calculator
 - Add Storage volume vs. Elevation graphic chart (x/y axis)- volume curve chart
-- Look at moving the Storage results card
-- Remove Dead Load cover weight FOS
+- Look at moving the Storage results card to top and have it being static 
 - ask Claude about arriving at live load FOS calculations to be sure it aligns correctly with excel load calculator
 - add Project # to PDF Summary page
-- bouyancy calculator
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 
+- bouyancy calculator
 - Separate Quote Sheet & BOM Command buttons to generate individual pages with different disclaimers as needed
 - QR codes or hyperlinks to wavin.us or specific installation details
 - Stage storage table with CSV export with new command button at header
