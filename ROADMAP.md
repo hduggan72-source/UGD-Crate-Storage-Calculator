@@ -67,6 +67,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] Updated "scaled tank footprint area" in COMPLEX SHAPE to thousandths
 -  [X] FIX COPY EMAIL FUNCTION TO ENSURE ALL FIELDS ARE BEING COPIED
 -  [X] add a section in Stone Backfill card that shows stone calculated by LAYER (Top, Perimeter, Base) Gross/Net
+-  [X] "This calculator provides <em>preliminary, conceptual estimates only</em> and is <em>not a stamped engineering design</em>. Wavin’s assistance in sizing or product selection is advisory and does not constitute             design responsibility or guarantee system performance. The Engineer of Record (EoR) is solely responsible for verifying all design parameters and site conditions, including hydrology, structural requirements,              soils, environmental factors, and integration with the overall stormwater system. AquaCell dimensions and assumptions (including usable storage and unit base areas) follow published product data. <strong>Final             layouts, capacities, and installation depths must be confirmed by a licensed Professional Engineer</strong> using project‑specific plans (grading, pipe sizes and materials, invert elevations, loading conditions,           and applicable codes/standards)." - ADDED TO BOTTOM OF CONCEPTUAL SCHEMATIC
  
  ## Next Up (High Priority – Do These Next)
 
@@ -84,6 +85,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 
+- optional geogrid totals
 - bouyancy calculator
 - Separate Quote Sheet & BOM Command buttons to generate individual pages with different disclaimers as needed
 - QR codes or hyperlinks to wavin.us or specific installation details
@@ -95,8 +97,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Optional 3D isometric view of the crate layout
 - Integration of Wavin installation details (access ports, geogrid, compaction notes)
 - hidden pages that prepends/appends when PDF is created (cover sheet, standard detail, specs, etc.)
-- <div class="disclaimer">
-        <strong>Disclaimer:</strong> This calculator provides <em>preliminary, conceptual estimates only</em> and is <em>not a stamped engineering design</em>. Wavin’s assistance in sizing or product selection is advisory and does not constitute design responsibility or guarantee system performance. The Engineer of Record (EoR) is solely responsible for verifying all design parameters and site conditions, including hydrology, structural requirements, soils, environmental factors, and integration with the overall stormwater system. AquaCell dimensions and assumptions (including usable storage and unit base areas) follow published product data. <strong>Final layouts, capacities, and installation depths must be confirmed by a licensed Professional Engineer</strong> using project‑specific plans (grading, pipe sizes and materials, invert elevations, loading conditions, and applicable codes/standards).
+
       </div>
 
 **How to use this file:**
