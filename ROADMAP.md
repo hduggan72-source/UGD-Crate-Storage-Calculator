@@ -68,31 +68,28 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] FIX COPY EMAIL FUNCTION TO ENSURE ALL FIELDS ARE BEING COPIED
 -  [X] add a section in Stone Backfill card that shows stone calculated by LAYER (Top, Perimeter, Base) Gross/Net
 -  [X] "This calculator provides <em>preliminary, conceptual estimates only</em> and is <em>not a stamped engineering design</em>. Wavin’s assistance in sizing or product selection is advisory and does not constitute             design responsibility or guarantee system performance. The Engineer of Record (EoR) is solely responsible for verifying all design parameters and site conditions, including hydrology, structural requirements,              soils, environmental factors, and integration with the overall stormwater system. AquaCell dimensions and assumptions (including usable storage and unit base areas) follow published product data. <strong>Final             layouts, capacities, and installation depths must be confirmed by a licensed Professional Engineer</strong> using project‑specific plans (grading, pipe sizes and materials, invert elevations, loading conditions,           and applicable codes/standards)." - ADDED TO BOTTOM OF CONCEPTUAL SCHEMATIC
+-  [X] dedicated quote sheet and command button
+-  [X] Add freight calculator to take a percentage of the total cost (no results needed) just a built in calculator
+-  [X] STREAMLINE PDF SUMMARY TO JUST ESSENTIALS (remove BOM and qquantities for estimation); summary only has the technical and could be included on the conceptual schematick page
  
  ## Next Up (High Priority – Do These Next)
 
-- add the wxl # of crates on the tech report and in the system configuration below the snapped tank dimensions
-- MOVE CONCEPTUAL SCHEMATIC TO SECOND PAGE BEHIND THE TECH REPORT SUMMARY PAGE, THEN APPEND WITH STAGE STORAGE TABLE
-- dedicated quote sheet and command button
+
 - metric toggle
 - Multiple Basin Entry and Reports
-- add freight calculator to take a percentage of the total cost (no results needed) just a built in calculator
 - add a pallet count estimator, weight estimator, and contingency calculator
 - Add Storage volume vs. Elevation graphic chart (x/y axis)- volume curve chart
-- Look at moving the Storage results card to top and have it being static 
+- Look at moving the Storage results card to top OF DASHBOARD TO MATCH REPORT and have it being static 
 - ask Claude about arriving at live load FOS calculations to be sure it aligns correctly with excel load calculator
-- add Project # to PDF Summary page
 - add place for notes about > 18" connectors and geotextile boots to be installed
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 
 - optional geogrid totals
 - bouyancy calculator
-- Separate Quote Sheet & BOM Command buttons to generate individual pages with different disclaimers as needed
 - QR codes or hyperlinks to wavin.us or specific installation details
 - Stage storage table with CSV export with new command button at header
-- STREAMLINE PDF SUMMARY TO JUST ESSENTIALS (remove BOM and qquantities for estimation); summary only has the technical and could be included on the conceptual schematick page
-- USE CANVAS TO BUILD A TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
+- USE CANVAS TO BUILD A CONCEPTUAL TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
 - Excavation slope calculator integration (with variable H:V ratios) - FRONT END CALCULATIONS ONLY/ summary PDF report
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
 - Optional 3D isometric view of the crate layout
