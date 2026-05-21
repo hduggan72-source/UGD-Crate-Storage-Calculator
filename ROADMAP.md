@@ -5,7 +5,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 **Current Status:** Live on Flask (production-ready core)
 
-## Current Version (v12.1) — Completed
+## Previous Version (v12.1) — Completed
 - [x] Core SC and EX configuration calculations (snapped tank dimensions, storage volumes)
 - [x] Bill of Materials with correct part codes:
   - Base Unit (3091506)
@@ -59,6 +59,10 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] Add page up/down scroll button to get to the top or bottom of page faster (by sections or card groups)
 -  [X] update to v14 from V12
 -  [X] side panel that stays staic with executable command buttons (Calculate, Reset, download, export, etc.)
+
+
+## CURRENT Version (v14) — Completed
+
 -  [X] reformat the UI/UX into "Cards"
 -  [X] added Quick Summary copy/paste for body of emails
 -  [X] add command to convert stone backfill & geotextile totals to desired dimensions (tons, cubic yards, cubic ft, square yards or ft)
@@ -71,37 +75,38 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] dedicated quote sheet and command button
 -  [X] Add freight calculator to take a percentage of the total cost (no results needed) just a built in calculator
 -  [X] STREAMLINE PDF SUMMARY TO JUST ESSENTIALS (remove BOM and qquantities for estimation); summary only has the technical and could be included on the conceptual schematick page
+-  [ ] add excavated totals for area/ perimeter (for design layout tables)
+-  [ ] Fix DATE field on QUOTE PDF - "plans"
+-  [ ] toggle DISTRIBUTOR, MARKET,  BUDGET ESTIMATE PRICING for quote page export
+
+
  
  ## Next Up (High Priority – Do These Next)
-- add excavated totals for area/ perimeter (for design layout tables) 
-- Fix DATE field on QUOTE PDF - "plans"
-- ADD CREATED BY FIELD (DON'T NECESSARILY NEED "ATTN:" TO PORT THAT TO THE PDF QUOTE SHEET
+
+- optional geogrid totals (based on excavation area + overage)
+- bouyancy calculator
 - ADD EXTENSION ON THE NAMING CONVENTION OF THE REPORT AND QUOTE (DATE, VERSION, ETC.)
-- ADD USER INITIALS APPENDED TO A SELF-GENERATED QUOTE # (EX. AQ-1615-00-HD)
+- ADD USER INITIALS APPENDED TO A SELF-GENERATED OR USING THE EXISTING QUOTE # SYSTEM = PRODUCT + PROJECT# + "CREATED BY" INITIALS (EX. AQ1615-00-HD/1615-00-AQ_HD)
 - ADD A TOGGLE BOX UP IN THE PROJECT INFORMATION CARD FOR "REVISION" (REVISION WOULD BE ADDED TO THE QUOTE # "-01,-02, ETC.)
 - metric toggle
-- Multiple Basin Entry and Reports
-- add a pallet count estimator, weight estimator, and contingency calculator
+- add a pallet count estimator, weight estimator, and contingency calculator that can be added to the quote sheet or at least on dashboard when calculated
 - Add Storage volume vs. Elevation graphic chart (x/y axis)- volume curve chart
 - Look at moving the Storage results card to top OF DASHBOARD TO MATCH REPORT and have it being static 
 - ask Claude about arriving at live load FOS calculations to be sure it aligns correctly with excel load calculator
 - add place for notes about > 18" connectors and geotextile boots to be installed
-
-## Backlog / Future Enhancements (Add here when ideas come up)
-- PRICING ENGINE THAT CAN BE EASILY ADJUSTED FOR DIST, MARKET, MSRP ESTIMATES. ALLOW FOR UPLOADING OF COMPONENT PRICING OR MULTIPLIER WHEN PRICE INCREASES OCCUR
-- optional geogrid totals
-- bouyancy calculator
-- QR codes or hyperlinks to wavin.us or specific installation details
-- Stage storage table with CSV export with new command button at header
-- USE CANVAS TO BUILD A CONCEPTUAL TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
 - Excavation slope calculator integration (with variable H:V ratios) - FRONT END CALCULATIONS ONLY/ summary PDF report
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
-- Optional 3D isometric view of the crate layout
-- Integration of Wavin installation details (access ports, geogrid, compaction notes)
-- hidden pages that prepends/appends when PDF is created (cover sheet, standard detail, specs, etc.)
-- UPLOAD PLAN SHEET AND CRATE AN OVERLAY OF TANK
+- QR codes or hyperlinks to wavin.us or specific installation details
+- Stage storage table with CSV export with new command button at header
 
-      </div>
+## Backlog / Future Enhancements (Add here when ideas come up)
+- (v15) Multiple Basin Entry and Reports
+- (v16) PRICING ENGINE THAT CAN BE EASILY ADJUSTED FOR DIST, MARKET, MSRP ESTIMATES. ALLOW FOR UPLOADING OF COMPONENT PRICING OR MULTIPLIER WHEN PRICE INCREASES OCCUR
+- (v17) USE CANVAS TO BUILD A CONCEPTUAL TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
+- (v18) Optional 3D isometric view of the crate layout
+- Integration of Wavin installation details (access ports, geogrid, compaction notes)
+- List of details that can be selected that prepends/appends when PDF is created (cover sheet, standard detail, specs, etc.)
+- UPLOAD PLAN SHEET AND CRATE AN OVERLAY OF TANK
 
 **How to use this file:**
 - Open `ROADMAP.md` every time you work on the project.
