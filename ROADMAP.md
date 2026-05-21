@@ -86,7 +86,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - add place for notes about > 18" connectors and geotextile boots to be installed
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
-
+- PRICING ENGINE THAT CAN BE EASILY ADJUSTED FOR DIST, MARKET, MSRP ESTIMATES. ALLOW FOR UPLOADING OF COMPONENT PRICING OR MULTIPLIER WHEN PRICE INCREASES OCCUR
 - optional geogrid totals
 - bouyancy calculator
 - QR codes or hyperlinks to wavin.us or specific installation details
