@@ -73,7 +73,8 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] STREAMLINE PDF SUMMARY TO JUST ESSENTIALS (remove BOM and qquantities for estimation); summary only has the technical and could be included on the conceptual schematick page
  
  ## Next Up (High Priority – Do These Next)
- - Fix DATE field on QUOTE PDF - "plans"
+- add excavated totals for area/ perimeter (for design layout tables) 
+- Fix DATE field on QUOTE PDF - "plans"
 - ADD CREATED BY FIELD (DON'T NECESSARILY NEED "ATTN:" TO PORT THAT TO THE PDF QUOTE SHEET
 - ADD EXTENSION ON THE NAMING CONVENTION OF THE REPORT AND QUOTE (DATE, VERSION, ETC.)
 - ADD USER INITIALS APPENDED TO A SELF-GENERATED QUOTE # (EX. AQ-1615-00-HD)
