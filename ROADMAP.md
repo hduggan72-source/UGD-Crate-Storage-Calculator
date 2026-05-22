@@ -95,9 +95,8 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Look at moving the Storage results card to top OF DASHBOARD TO MATCH REPORT and have it being static 
 - ask Claude about arriving at live load FOS calculations to be sure it aligns correctly with excel load calculator
 - add place for notes about > 18" connectors and geotextile boots to be installed
-- Excavation slope calculator integration (with variable H:V ratios) - FRONT END CALCULATIONS ONLY/ summary PDF report
+- Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed (added to excavation & dimensional summary card
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
-- QR codes or hyperlinks to wavin.us or specific installation details
 - Stage storage table with CSV export with new command button at header
 - Update font to Nunito
 
@@ -105,10 +104,11 @@ Professional web-based calculator for designing and quoting underground stormwat
 - (v15) Multiple Basin Entry and Reports
 - (v16) PRICING ENGINE THAT CAN BE EASILY ADJUSTED FOR DIST, MARKET, MSRP ESTIMATES. ALLOW FOR UPLOADING OF COMPONENT PRICING OR MULTIPLIER WHEN PRICE INCREASES OCCUR
 - (v17) USE CANVAS TO BUILD A CONCEPTUAL TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
-- (v18) Optional 3D isometric view of the crate layout
+- (v18) UPLOAD PLAN SHEET AND CRATE AN OVERLAY OF TANK
+- (v19) Optional 3D isometric view of the crate layout
 - Integration of Wavin installation details (access ports, geogrid, compaction notes)
 - List of details that can be selected that prepends/appends when PDF is created (cover sheet, standard detail, specs, etc.)
-- UPLOAD PLAN SHEET AND CRATE AN OVERLAY OF TANK
+- QR codes or hyperlinks to wavin.us or specific installation details (probably on the cover or appended page)
 
 **How to use this file:**
 - Open `ROADMAP.md` every time you work on the project.
