@@ -631,154 +631,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         {% if results %}
         <div class="results">
 
-            <!-- ── CARD 1: System Configuration ── -->
-            <div class="result-card">
-                <div class="result-card-header" onclick="toggleResultCard(this)"><span>⚙ System Configuration</span><span class="rc-arrow">▼</span></div>
-                <div class="result-card-body">
-                    <div class="result-row">
-                        <span class="result-label">Configuration / Layers</span>
-                        <span class="result-value" id="rv_config_layers">{{ results.config }} — {{ results.layers }} Layer(s)</span>
-                    </div>
-                    <div class="result-row">
-                        <span class="result-label">Traffic Load</span>
-                        <span class="result-value" id="rv_traffic_load">{{ results.traffic_load }}</span>
-                    </div>
-
-                    {% if results.shape_mode == 'complex' %}
-                    <div style="background:rgba(30,58,138,0.08);border:1px solid rgba(30,58,138,0.25);border-radius:6px;padding:10px 12px;margin:10px 0;font-size:13px;">
-                        <div style="font-weight:bold;margin-bottom:6px;color:#1e3a8a;">⬠ Complex Shape Mode</div>
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;">
-                            <span style="font-size:11px;opacity:0.7;">Scaled Plan Area</span>
-                            <span style="font-size:11px;opacity:0.7;">Scaled Perimeter</span>
-                            <strong>{{ results.complex_scaled_area }} ft²</strong>
-                            <strong>{{ results.complex_tank_perim }} ft</strong>
-                            <span style="font-size:11px;opacity:0.7;">Known Dimension</span>
-                            <span style="font-size:11px;opacity:0.7;">Derived Dimension</span>
-                            <strong>{{ results.complex_known_dim }} ft</strong>
-                            <strong>{{ (results.complex_scaled_area / results.complex_known_dim)|round(2) }} ft</strong>
-                        </div>
-                        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(30,58,138,0.2);font-size:12px;opacity:0.7;">Real-World Snapped Tank (crates fitted inside scaled area)</div>
-                        <strong style="font-size:14px;color:#1e3a8a;">
-                            {{ results.tank_width }} ft × {{ results.tank_length }} ft
-                            &nbsp;({{ results.complex_crates_known }} × {{ results.complex_crates_other }} crates/layer)
-                            &nbsp;= {{ results.complex_tank_area }} ft²
-                        </strong>
-                        <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;">
-                            <span style="font-size:11px;opacity:0.7;">Excav. Envelope Area</span>
-                            <span style="font-size:11px;opacity:0.7;">Excav. Envelope Perimeter</span>
-                            <strong>{{ results.complex_excav_area }} ft²</strong>
-                            <strong>{{ results.complex_excav_perim }} ft</strong>
-                        </div>
-                    </div>
-                    <div class="result-row">
-                        <span class="result-label">Tank Height</span>
-                        <span class="result-value" id="rv_tank_height_complex">{{ results.tank_height }} ft</span>
-                    </div>
-                    {% else %}
-                    <div class="result-row">
-                        <span class="result-label">Snapped Tank Dimensions</span>
-                        <span class="result-value" id="rv_snapped_dims">{{ results.tank_width }} ft × {{ results.tank_length }} ft × {{ results.tank_height }} ft</span>
-                    </div>
-                    {% endif %}
-
-                    <div class="result-row">
-                        <span class="result-label">Tank Perimeter</span>
-                        <span class="result-value" id="rv_tank_perimeter">{{ results.used_perimeter }} ft</span>
-                    </div>
-                    <div class="result-row">
-                        <span class="result-label">AquaCell Tank Depth</span>
-                        <span class="result-value" id="rv_tank_depth">{{ results.tank_height }} ft</span>
-                    </div>
-                    <div class="result-row">
-                        <span class="result-label">Total System Depth (tank + stone)</span>
-                        <span class="result-value" id="rv_system_depth">{{ (results.tank_height + (form_data.get('base_stone', 0.333)|float) + (form_data.get('cover_stone', 1.0)|float))|round(2) }} ft</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── CARD 2: Cover & Load Verification ── -->
-            <div class="result-card">
-                <div class="result-card-header" onclick="toggleResultCard(this)"><span>🛡 Cover &amp; Load Verification</span><span class="rc-arrow">▼</span></div>
-                <div class="result-card-body">
-
-                    <!-- Elevations -->
-                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:4px;">Elevations</div>
-                    <div class="result-row">
-                        <span class="result-label">Surface Elevation</span>
-                        <span class="result-value">{{ results.surface_elev }} ft</span>
-                    </div>
-                    <div class="result-row">
-                        <span class="result-label">Tank Bottom Elevation</span>
-                        <span class="result-value">{{ results.tank_bottom_elev }} ft</span>
-                    </div>
-                    <div class="result-row">
-                        <span class="result-label">Tank Top Elevation</span>
-                        <span class="result-value">{{ results.tank_top_elev }} ft</span>
-                    </div>
-
-                    <!-- Cover checks -->
-                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Cover Depth Checks</div>
-                    <div class="result-row">
-                        <span class="result-label">Actual Cover Depth</span>
-                        <span class="result-value {{ 'pass' if results.cover_status == 'PASS' else 'fail' }}">
-                            {{ results.cover_depth }} ft → {{ results.cover_status }}
-                        </span>
-                    </div>
-                    <div class="result-row">
-                        <span class="result-label">Maximum Allowable Cover</span>
-                        <span class="result-value {{ 'pass' if results.max_cover_status == 'PASS' else 'fail' }}">
-                            {{ results.max_cover_req }} ft → {{ results.max_cover_status }}
-                        </span>
-                    </div>
-
-                    <!-- Dead load -->
-                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Dead Load (Cover Weight)</div>
-                    <div class="result-row">
-                        <span class="result-label">Dead Load Pressure</span>
-                        <span class="result-value">{{ results.dead_load_psi }} psi</span>
-                    </div>
-                    <div class="result-row">
-                        <span class="result-label">Factor of Safety — Dead Load</span>
-                        <span class="result-value {{ 'pass' if results.fos_dead and results.fos_dead >= 1.95 else 'fail' }}">
-                            {{ results.fos_dead if results.fos_dead else '—' }}
-                        </span>
-                    </div>
-
-                    <!-- Live load -->
-                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Live Load ({{ results.traffic_load }} Traffic — ASTM F2787)</div>
-                    <div class="result-row">
-                        <span class="result-label">Factored Live Load Pressure</span>
-                        <span class="result-value">{{ results.ll_psi if results.ll_psi else '—' }} psi</span>
-                    </div>
-                    <div class="result-row">
-                        <span class="result-label">Total Pressure (LL + DL)</span>
-                        <span class="result-value">
-                            {% if results.ll_psi and results.dead_load_psi %}
-                                {{ (results.ll_psi + results.dead_load_psi)|round(3) }} psi
-                            {% else %}—{% endif %}
-                        </span>
-                    </div>
-                    <div class="result-row">
-                        <span class="result-label">Max Compressive Strength</span>
-                        <span class="result-value">{{ '70' if results.config == 'SC' else '100' }} psi ({{ results.config }})</span>
-                    </div>
-                    <div class="result-row">
-                        <span class="result-label">Factor of Safety — Live Load</span>
-                        <span class="result-value {{ 'pass' if results.fos_live_load and results.fos_live_load >= 1.75 else 'fail' }}">
-                            {{ results.fos_live_load if results.fos_live_load else '—' }}
-                        </span>
-                    </div>
-
-                    <div class="footnote" style="margin-top:10px;margin-bottom:0;font-size:11px;line-height:1.5;">
-                        <strong>Dead Load:</strong> Cover Depth × 120 pcf ÷ 144 &nbsp;|&nbsp;
-                        <strong>FoS DL</strong> = Max Strength ÷ DL Pressure &nbsp;|&nbsp; Min recommended: 1.95<br>
-                        <strong>Live Load:</strong> ASTM F2787 2V:1H distribution, m=1.2, IM=24.75%, LLDF=1.15 &nbsp;|&nbsp;
-                        <strong>FoS LL</strong> = Max Strength ÷ (LL + DL) &nbsp;|&nbsp; Min recommended: 1.75
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── CARD 3: Storage Summary ── -->
+            <!-- ══ CARD 1: Storage Summary (TOP — estimator's primary check) ══ -->
             <div class="result-card">
                 <div class="result-card-header" onclick="toggleResultCard(this)"><span>💧 Storage Summary</span><span class="rc-arrow">▼</span></div>
                 <div class="result-card-body">
@@ -807,7 +660,71 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 </div>
             </div>
 
-            <!-- ── CARD 4: Stone Backfill ── -->
+            <!-- ══ CARD 2: Bill of Materials ══ -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>📦 Bill of Materials</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body" style="padding:0;">
+                    <table style="margin-top:0;">
+                        <tr><th>Item</th><th style="text-align:right;">Quantity</th></tr>
+                        <tr><td>Base Unit (3091506)</td><td style="text-align:right;font-weight:bold;" id="bom_base_units">{{ results.base_units }}</td></tr>
+                        <tr><td>Side Plate (2476600003)</td><td style="text-align:right;font-weight:bold;" id="bom_side_plates">{{ results.side_plates }}</td></tr>
+                        <tr><td>Bottom Plate (2476600001)</td><td style="text-align:right;font-weight:bold;" id="bom_bottom_plates">{{ results.bottom_plates }}</td></tr>
+                        <tr><td>8-12" Pipe Connectors (2476631200)</td><td style="text-align:right;font-weight:bold;" id="bom_pipe_connectors">{{ results.pipe_connectors }}</td></tr>
+                        <tr><td>12" Top Adapters (3085857)</td><td style="text-align:right;font-weight:bold;" id="bom_top_adapters_12">{{ results.top_adapters_12 }}</td></tr>
+                        <tr><td>16" Top Adapters (2476842000)</td><td style="text-align:right;font-weight:bold;" id="bom_top_adapters_16">{{ results.top_adapters_16 }}</td></tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ══ CARD 3: Price Estimation ══ -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>💲 AquaCell Price Estimation</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body">
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+                        <div>
+                            <label style="display:block;font-size:12px;opacity:0.7;margin-bottom:4px;">AquaCell Cost per ft³ (USD$)</label>
+                            <input type="number" id="costPerFt3" step="0.01" placeholder="e.g., 5.19"
+                                style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:12px;opacity:0.7;margin-bottom:4px;">Freight % of AquaCell Cost</label>
+                            <input type="number" id="freightPct" step="0.1" placeholder="e.g., 10" value="10"
+                                style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
+                        </div>
+                        <div style="align-self:end;">
+                            <button type="button" onclick="calculateAquaCellPrice()"
+                                style="width:100%;padding:10px;background:#00b0ff;color:white;border:none;border-radius:4px;font-size:14px;font-weight:bold;cursor:pointer;">
+                                Calculate Price
+                            </button>
+                        </div>
+                    </div>
+                    <div class="result-grid2" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
+                        <div class="result-stat">
+                            <div class="result-stat-label">Net AquaCell Storage (ft³)</div>
+                            <div id="priceCrateStorage" class="result-stat-value" style="color:#00b0ff;">—</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">AquaCell Subtotal</div>
+                            <div id="priceSubtotal" class="result-stat-value" style="color:#00b0ff;">—</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Est. Freight</div>
+                            <div id="priceFreight" class="result-stat-value" style="color:#f39c12;">—</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Est. Total</div>
+                            <div id="priceTotalCost" class="result-stat-value" style="color:#2ecc71;">—</div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="hiddenTotalAquaCellCost" name="totalAquaCellCost" value="">
+                    <input type="hidden" id="hiddenFreightCost" name="freightCost" value="">
+                    <input type="hidden" id="hiddenTotalWithFreight" name="totalWithFreight" value="">
+                    <input type="hidden" id="hiddenFreightPct" name="freightPct" value="">
+                    <input type="hidden" id="hiddenCostPerFt3" name="costPerFt3Hidden" value="">
+                </div>
+            </div>
+
+            <!-- ══ CARD 4: Stone Backfill ══ -->
             <div class="result-card">
                 <div class="result-card-header" onclick="toggleResultCard(this)"><span>🪨 Stone Backfill <span style="font-size:11px;font-weight:normal;opacity:0.75;">(provided by others)</span></span><span class="rc-arrow">▼</span></div>
                 <div class="result-card-body">
@@ -841,8 +758,6 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             window.updateStoneUnit();
                         })();
                     </script>
-
-                    <!-- Stone Volume by Layer breakdown -->
                     <div style="margin-top:14px;">
                         <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:6px;">Stone Volume by Layer</div>
                         <table style="margin-top:0;font-size:13px;">
@@ -881,23 +796,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 </div>
             </div>
 
-            <!-- ── CARD 5: Bill of Materials ── -->
-            <div class="result-card">
-                <div class="result-card-header" onclick="toggleResultCard(this)"><span>📦 Bill of Materials</span><span class="rc-arrow">▼</span></div>
-                <div class="result-card-body" style="padding:0;">
-                    <table style="margin-top:0;">
-                        <tr><th>Item</th><th style="text-align:right;">Quantity</th></tr>
-                        <tr><td>Base Unit (3091506)</td><td style="text-align:right;font-weight:bold;" id="bom_base_units">{{ results.base_units }}</td></tr>
-                        <tr><td>Side Plate (2476600003)</td><td style="text-align:right;font-weight:bold;" id="bom_side_plates">{{ results.side_plates }}</td></tr>
-                        <tr><td>Bottom Plate (2476600001)</td><td style="text-align:right;font-weight:bold;" id="bom_bottom_plates">{{ results.bottom_plates }}</td></tr>
-                        <tr><td>8-12" Pipe Connectors (2476631200)</td><td style="text-align:right;font-weight:bold;" id="bom_pipe_connectors">{{ results.pipe_connectors }}</td></tr>
-                        <tr><td>12" Top Adapters (3085857)</td><td style="text-align:right;font-weight:bold;" id="bom_top_adapters_12">{{ results.top_adapters_12 }}</td></tr>
-                        <tr><td>16" Top Adapters (2476842000)</td><td style="text-align:right;font-weight:bold;" id="bom_top_adapters_16">{{ results.top_adapters_16 }}</td></tr>
-                    </table>
-                </div>
-            </div>
-
-            <!-- ── CARD 6: Geotextile Fabric ── -->
+            <!-- ══ CARD 5: Geotextile Fabric ══ -->
             <div class="result-card">
                 <div class="result-card-header" onclick="toggleResultCard(this)">
                     <span>🧵 Geotextile Fabric
@@ -950,51 +849,219 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 </script>
             </div>
 
-            <!-- ── CARD 7: Price Estimation ── -->
+            <!-- ══ CARD 6: Cover & Load Verification ══ -->
             <div class="result-card">
-                <div class="result-card-header" onclick="toggleResultCard(this)"><span>💲 AquaCell Price Estimation</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>🛡 Cover &amp; Load Verification</span><span class="rc-arrow">▼</span></div>
                 <div class="result-card-body">
-                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
-                        <div>
-                            <label style="display:block;font-size:12px;opacity:0.7;margin-bottom:4px;">AquaCell Cost per ft³ (USD$)</label>
-                            <input type="number" id="costPerFt3" step="0.01" placeholder="e.g., 5.19"
-                                style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:4px;">Elevations</div>
+                    <div class="result-row">
+                        <span class="result-label">Surface Elevation</span>
+                        <span class="result-value">{{ results.surface_elev }} ft</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Tank Bottom Elevation</span>
+                        <span class="result-value">{{ results.tank_bottom_elev }} ft</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Tank Top Elevation</span>
+                        <span class="result-value">{{ results.tank_top_elev }} ft</span>
+                    </div>
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Cover Depth Checks</div>
+                    <div class="result-row">
+                        <span class="result-label">Actual Cover Depth</span>
+                        <span class="result-value {{ 'pass' if results.cover_status == 'PASS' else 'fail' }}">
+                            {{ results.cover_depth }} ft → {{ results.cover_status }}
+                        </span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Maximum Allowable Cover</span>
+                        <span class="result-value {{ 'pass' if results.max_cover_status == 'PASS' else 'fail' }}">
+                            {{ results.max_cover_req }} ft → {{ results.max_cover_status }}
+                        </span>
+                    </div>
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Dead Load (Cover Weight)</div>
+                    <div class="result-row">
+                        <span class="result-label">Dead Load Pressure</span>
+                        <span class="result-value">{{ results.dead_load_psi }} psi</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Factor of Safety — Dead Load</span>
+                        <span class="result-value {{ 'pass' if results.fos_dead and results.fos_dead >= 1.95 else 'fail' }}">
+                            {{ results.fos_dead if results.fos_dead else '—' }}
+                        </span>
+                    </div>
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Live Load ({{ results.traffic_load }} Traffic — ASTM F2787)</div>
+                    <div class="result-row">
+                        <span class="result-label">Factored Live Load Pressure</span>
+                        <span class="result-value">{{ results.ll_psi if results.ll_psi else '—' }} psi</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Total Pressure (LL + DL)</span>
+                        <span class="result-value">
+                            {% if results.ll_psi and results.dead_load_psi %}
+                                {{ (results.ll_psi + results.dead_load_psi)|round(3) }} psi
+                            {% else %}—{% endif %}
+                        </span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Max Compressive Strength</span>
+                        <span class="result-value">{{ '70' if results.config == 'SC' else '100' }} psi ({{ results.config }})</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Factor of Safety — Live Load</span>
+                        <span class="result-value {{ 'pass' if results.fos_live_load and results.fos_live_load >= 1.75 else 'fail' }}">
+                            {{ results.fos_live_load if results.fos_live_load else '—' }}
+                        </span>
+                    </div>
+                    <div class="footnote" style="margin-top:10px;margin-bottom:0;font-size:11px;line-height:1.5;">
+                        <strong>Dead Load:</strong> Cover Depth × 120 pcf ÷ 144 &nbsp;|&nbsp;
+                        <strong>FoS DL</strong> = Max Strength ÷ DL Pressure &nbsp;|&nbsp; Min recommended: 1.95<br>
+                        <strong>Live Load:</strong> ASTM F2787 2V:1H distribution, m=1.2, IM=24.75%, LLDF=1.15 &nbsp;|&nbsp;
+                        <strong>FoS LL</strong> = Max Strength ÷ (LL + DL) &nbsp;|&nbsp; Min recommended: 1.75
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ CARD 7: Excavation & Dimensional Summary (replaces System Config) ══ -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>📐 Excavation &amp; Dimensional Summary</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body">
+
+                    <!-- System ID -->
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:4px;">System</div>
+                    <div class="result-row">
+                        <span class="result-label">Configuration / Layers</span>
+                        <span class="result-value" id="rv_config_layers">{{ results.config }} — {{ results.layers }} Layer(s)</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Traffic Load</span>
+                        <span class="result-value" id="rv_traffic_load">{{ results.traffic_load }}</span>
+                    </div>
+
+                    <!-- Tank dimensions -->
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Tank Dimensions</div>
+                    {% if results.shape_mode == 'complex' %}
+                    <div style="background:rgba(30,58,138,0.08);border:1px solid rgba(30,58,138,0.25);border-radius:6px;padding:10px 12px;margin:6px 0 8px;font-size:13px;">
+                        <div style="font-weight:bold;margin-bottom:6px;color:#1e3a8a;">⬠ Complex Shape Mode</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;">
+                            <span style="font-size:11px;opacity:0.7;">Scaled Plan Area</span>
+                            <span style="font-size:11px;opacity:0.7;">Scaled Perimeter</span>
+                            <strong>{{ results.complex_scaled_area }} ft²</strong>
+                            <strong>{{ results.complex_tank_perim }} ft</strong>
+                            <span style="font-size:11px;opacity:0.7;">Known Dimension</span>
+                            <span style="font-size:11px;opacity:0.7;">Derived Dimension</span>
+                            <strong>{{ results.complex_known_dim }} ft</strong>
+                            <strong>{{ (results.complex_scaled_area / results.complex_known_dim)|round(2) }} ft</strong>
                         </div>
-                        <div>
-                            <label style="display:block;font-size:12px;opacity:0.7;margin-bottom:4px;">Freight % of AquaCell Cost</label>
-                            <input type="number" id="freightPct" step="0.1" placeholder="e.g., 10" value="10"
-                                style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
+                        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(30,58,138,0.2);font-size:12px;opacity:0.7;">Real-World Snapped Tank</div>
+                        <strong style="font-size:14px;color:#1e3a8a;">
+                            {{ results.tank_width }} ft × {{ results.tank_length }} ft
+                            &nbsp;({{ results.complex_crates_known }} × {{ results.complex_crates_other }} crates/layer)
+                            &nbsp;= {{ results.complex_tank_area }} ft²
+                        </strong>
+                    </div>
+                    {% else %}
+                    <div class="result-row">
+                        <span class="result-label">Snapped Tank (W × L × H)</span>
+                        <span class="result-value" id="rv_snapped_dims">{{ results.tank_width }} ft × {{ results.tank_length }} ft × {{ results.tank_height }} ft</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Tank Footprint Area</span>
+                        <span class="result-value">{{ (results.tank_width * results.tank_length)|round(1) }} ft²</span>
+                    </div>
+                    {% endif %}
+                    <div class="result-row">
+                        <span class="result-label">Tank Perimeter</span>
+                        <span class="result-value" id="rv_tank_perimeter">{{ results.used_perimeter }} ft</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Tank Height</span>
+                        <span class="result-value" id="rv_tank_depth">{{ results.tank_height }} ft &nbsp;({{ (results.tank_height * 12)|round(2) }} in)</span>
+                    </div>
+
+                    <!-- Excavation envelope -->
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Excavation Envelope</div>
+                    {% if results.shape_mode == 'complex' %}
+                    <div class="result-row">
+                        <span class="result-label">Excavation Area</span>
+                        <span class="result-value">{{ results.complex_excav_area }} ft²</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Excavation Perimeter</span>
+                        <span class="result-value">{{ results.complex_excav_perim }} ft</span>
+                    </div>
+                    {% else %}
+                    <div class="result-row">
+                        <span class="result-label">Excavation Width × Length</span>
+                        <span class="result-value">
+                            {{ (results.tank_width + 2*(form_data.get('perimeter_stone_width',1.0)|float))|round(2) }} ft ×
+                            {{ (results.tank_length + 2*(form_data.get('perimeter_stone_width',1.0)|float))|round(2) }} ft
+                        </span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Excavation Footprint Area</span>
+                        <span class="result-value">
+                            {{ ((results.tank_width + 2*(form_data.get('perimeter_stone_width',1.0)|float)) * (results.tank_length + 2*(form_data.get('perimeter_stone_width',1.0)|float)))|round(1) }} ft²
+                        </span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Excavation Perimeter</span>
+                        <span class="result-value">
+                            {{ (2 * (results.tank_width + results.tank_length + 4*(form_data.get('perimeter_stone_width',1.0)|float)))|round(2) }} ft
+                        </span>
+                    </div>
+                    {% endif %}
+                    <div class="result-row">
+                        <span class="result-label">Total System Depth (base + tank + cover)</span>
+                        <span class="result-value" id="rv_system_depth">
+                            {{ (results.tank_height + (form_data.get('base_stone',0.333)|float) + (form_data.get('cover_stone',1.0)|float))|round(3) }} ft
+                            &nbsp;({{ ((results.tank_height + (form_data.get('base_stone',0.333)|float) + (form_data.get('cover_stone',1.0)|float)) * 12)|round(1) }} in)
+                        </span>
+                    </div>
+
+                    <!-- Elevations -->
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Elevation Reference</div>
+                    <div class="result-grid2" style="grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;">
+                        <div class="result-stat">
+                            <div class="result-stat-label">Surface Elevation</div>
+                            <div class="result-stat-value" style="font-size:16px;">{{ results.surface_elev }} ft</div>
                         </div>
-                        <div style="align-self:end;">
-                            <button type="button" onclick="calculateAquaCellPrice()"
-                                style="width:100%;padding:10px;background:#00b0ff;color:white;border:none;border-radius:4px;font-size:14px;font-weight:bold;cursor:pointer;">
-                                Calculate Price
-                            </button>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Top of Cover Stone</div>
+                            <div class="result-stat-value" style="font-size:16px;">{{ (results.tank_top_elev + (form_data.get('cover_stone', 1.0)|float))|round(3) }} ft</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Top of Tank</div>
+                            <div class="result-stat-value" style="font-size:16px;">{{ results.tank_top_elev }} ft</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Bottom of Tank</div>
+                            <div class="result-stat-value" style="font-size:16px;">{{ results.tank_bottom_elev }} ft</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Bottom of Base Stone</div>
+                            <div class="result-stat-value" style="font-size:16px;">{{ (results.tank_bottom_elev - (form_data.get('base_stone',0.333)|float))|round(3) }} ft</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Cover Depth</div>
+                            <div class="result-stat-value {{ 'pass' if results.cover_status == 'PASS' else 'fail' }}" style="font-size:16px;">{{ results.cover_depth }} ft</div>
                         </div>
                     </div>
-                    <div class="result-grid2" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
-                        <div class="result-stat">
-                            <div class="result-stat-label">Net AquaCell Storage (ft³)</div>
-                            <div id="priceCrateStorage" class="result-stat-value" style="color:#00b0ff;">—</div>
-                        </div>
-                        <div class="result-stat">
-                            <div class="result-stat-label">AquaCell Subtotal</div>
-                            <div id="priceSubtotal" class="result-stat-value" style="color:#00b0ff;">—</div>
-                        </div>
-                        <div class="result-stat">
-                            <div class="result-stat-label">Est. Freight</div>
-                            <div id="priceFreight" class="result-stat-value" style="color:#f39c12;">—</div>
-                        </div>
-                        <div class="result-stat">
-                            <div class="result-stat-label">Est. Total</div>
-                            <div id="priceTotalCost" class="result-stat-value" style="color:#2ecc71;">—</div>
-                        </div>
+
+                    <!-- Stone depths -->
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Stone Layer Depths</div>
+                    <div class="result-row">
+                        <span class="result-label">Cover Stone</span>
+                        <span class="result-value">{{ form_data.get('cover_stone', 1.0) }} ft</span>
                     </div>
-                    <input type="hidden" id="hiddenTotalAquaCellCost" name="totalAquaCellCost" value="">
-                    <input type="hidden" id="hiddenFreightCost" name="freightCost" value="">
-                    <input type="hidden" id="hiddenTotalWithFreight" name="totalWithFreight" value="">
-                    <input type="hidden" id="hiddenFreightPct" name="freightPct" value="">
-                    <input type="hidden" id="hiddenCostPerFt3" name="costPerFt3Hidden" value="">
+                    <div class="result-row">
+                        <span class="result-label">Perimeter Stone Width</span>
+                        <span class="result-value">{{ form_data.get('perimeter_stone_width', 1.0) }} ft</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Base Stone</span>
+                        <span class="result-value">{{ form_data.get('base_stone', 0.333) }} ft</span>
+                    </div>
                 </div>
             </div>
 
@@ -1657,27 +1724,22 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const stoneBulkDisplay = txt('stoneBulkDisplay');
 
         const emailText = [
-            'AquaCell',
+            'AquaCell Proposed System',
             '',
-            `Minimum Required Storage (ft³):           ${minStorage}`,
-            `AquaCell Tank Storage (ft³):              ${tankStorage}`,
-            `Stone Backfill Storage (ft³):             ${stoneStorage}`,
-            `Total System Storage (ft³):               ${totalStorage}`,
-            `Tank Configuration/Layers:                ${configSelect}/${layersSelect} Layer(s)`,
-            `Traffic Load Required:                    ${trafficLoad}`,
-            `Area (ft²):                               ${areaFt2}`,
-            `Perimeter (ft.):                          ${perimFt}`,
-            `Base Unit (3091506) ea.:                  ${baseUnits}`,
-            `Side Plates (2476600003) ea.:             ${sidePlates}`,
-            `Bottom Plate (2476600001) ea.:            ${bottomPlates}`,
-            `8-12" Pipe Connectors (2476631200) ea.:  ${pipeConnectors}`,
-            `12" Top Adapters (3085857) ea.:           ${topAdapters12}`,
-            `16" Top Adapters (2476842000) ea.:        ${topAdapters16}`,
-            `AquaCell Tank Depth (ft.):                ${tankHeight}`,
-            `System Depth (ft.):                       ${systemDepth}`,
-            `AquaCell Tank Wrap Geotextile (${geoUnit}):      ${geoTank}`,
-            `Stone Backfill Envelope Geotextile (${geoUnit}): ${geoStone}`,
-            `Total Geotextile (${geoUnit}):                   ${geoTotal}`,
+            `Tank Configuration/Layers:                        ${configSelect}/${layersSelect} Layer(s)`,
+            `Minimum Required Storage (ft³):                   ${minStorage}`,
+            `AquaCell Tank Storage (ft³):                      ${tankStorage}`,
+            `Stone Backfill Storage (ft³):                     ${stoneStorage}`,
+            `Total System Storage (ft³):                       ${totalStorage}`,
+            `Base Unit (3091506) ea.:                          ${baseUnits}`,
+            `Side Plates (2476600003) ea.:                     ${sidePlates}`,
+            `Bottom Plate (2476600001) ea.:                    ${bottomPlates}`,
+            `8-12" Pipe Connectors (2476631200) ea.:           ${pipeConnectors}`,
+            `12" Top Adapters (3085857) ea.:                   ${topAdapters12}`,
+            `16" Top Adapters (2476842000) ea.:                ${topAdapters16}`,
+            `AquaCell Tank Wrap Geotextile (ft²):              ${geoTank}`,
+            `Stone Backfill Envelope Geotextile (ft²):         ${geoStone}`,
+            `Total Geotextile (ft²):                           ${geoTotal}`,
             `Total Estimated Stone Backfill Volume (with 10%): ${stoneBulkDisplay}`,
         ].join('\n');
 
