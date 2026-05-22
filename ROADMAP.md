@@ -81,6 +81,8 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] Add "Top of Stone" to Cover & Load Verification Card under "Elevation Reference"
 -  [X] Look at moving the Storage results card to top OF DASHBOARD TO MATCH REPORT
 -  [X] REVISED EMAIL COPY/PASTE ACTION TO RELEVANT ESTIMATING VALUES
+-  [X] Add Storage volume vs. Elevation graphic chart (x/y axis)- volume curve chart
+-  [X] Stage storage table with CSV export with new command button at header
  
  ## Next Up (High Priority – Do These Next)
 
@@ -95,7 +97,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - add place for notes about > 18" connectors and geotextile boots to be installed
 - Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed (added to excavation & dimensional summary card
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
-- Stage storage table with CSV export with new command button at header
+
 - Update font to Nunito
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
@@ -103,7 +105,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - (v16) PRICING ENGINE THAT CAN BE EASILY ADJUSTED FOR DIST, MARKET, MSRP ESTIMATES. ALLOW FOR UPLOADING OF COMPONENT PRICING OR MULTIPLIER WHEN PRICE INCREASES OCCUR
 - (v17) USE CANVAS TO BUILD A CONCEPTUAL TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
 - (v18) UPLOAD PLAN SHEET AND CRATE AN OVERLAY OF TANK
-- (v19) Optional 3D isometric view of the crate layout (Add Storage volume vs. Elevation graphic chart (x/y axis)- volume curve chart)
+- (v19) Optional 3D isometric view of the crate layout 
 - Integration of Wavin installation details (access ports, geogrid, compaction notes)
 - List of details that can be selected that prepends/appends when PDF is created (cover sheet, standard detail, specs, etc.)
 - QR codes or hyperlinks to wavin.us or specific installation details (probably on the cover or appended page)
