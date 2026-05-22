@@ -402,6 +402,7 @@
     <div class="topbar-actions">
         <button class="topbar-btn" onclick="downloadPDF()" style="background:#28a745;color:white;">⬇ Report</button>
         <button class="topbar-btn" onclick="downloadQuote()" style="background:#e67e22;color:white;">📄 Quote</button>
+        <button class="topbar-btn" onclick="downloadStageCSV()" style="background:#0891b2;color:white;">📊 Stage CSV</button>
         <button class="topbar-btn" onclick="copyToEmail()" style="background:#6f42c1;color:white;">📋 Copy</button>
         <button class="topbar-btn" onclick="exportProject()" style="background:#17a2b8;color:white;">Export</button>
         <button class="topbar-btn" onclick="document.getElementById('importFile').click()" style="background:#ffc107;color:#212529;">Import</button>
@@ -1066,7 +1067,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             </div>
 
             {% if results.stage_storage %}
-            <!-- ── CARD 8: Stage Storage Table ── -->
+            <!-- ── CARD 8: Stage Storage Table + Volume Curve ── -->
             <div class="result-card">
                 <div class="result-card-header" onclick="toggleResultCard(this)"><span>📈 Stage Storage Table ({{ results.stage_increment_in }}-inch increments)</span><span class="rc-arrow">▼</span></div>
                 <div class="result-card-body" style="padding:0;">
@@ -1082,12 +1083,132 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             <td>{{ row.elevation_ft }}</td>
                             <td style="text-align:right;">{{ row.tank_storage }}</td>
                             <td style="text-align:right;">{{ row.stone_storage }}</td>
-                            <td style="text-align:right;font-weight:bold;">{{ row.total_storage }}</td>
+                            <td style="text-align:right;font-weight:bold;color:var(--accent);">{{ row.total_storage }}</td>
                         </tr>
                         {% endfor %}
                     </table>
+
+                    <!-- Volume Curve Chart -->
+                    <div style="padding:16px 12px 8px;">
+                        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:10px;">Stage-Storage Volume Curve</div>
+                        <div style="position:relative;height:320px;">
+                            <canvas id="stageCurveChart"></canvas>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            <script>
+            (function() {
+                var stageData = [{% for row in results.stage_storage %}{ elev: {{ row.elevation_ft }}, tank: {{ row.tank_storage }}, stone: {{ row.stone_storage }}, total: {{ row.total_storage }} },{% endfor %}];
+                var tankBottomElev  = {{ results.tank_bottom_elev }};
+                var tankTopElev     = {{ results.tank_top_elev }};
+                var baseStoneDepth  = {{ form_data.get('base_stone', 0.333)|float }};
+                var coverStoneDepth = {{ form_data.get('cover_stone', 1.0)|float }};
+                var baseBottomElev  = tankBottomElev - baseStoneDepth;
+                var coverTopElev    = tankTopElev + coverStoneDepth;
+
+                var labels    = stageData.map(function(d){ return d.elev; });
+                var tankVals  = stageData.map(function(d){ return d.tank; });
+                var stoneVals = stageData.map(function(d){ return d.stone; });
+                var totalVals = stageData.map(function(d){ return d.total; });
+                var maxVol    = Math.max.apply(null, totalVals) * 1.08;
+
+                function renderChart() {
+                    var isDark   = document.documentElement.getAttribute('data-theme') === 'dark';
+                    var gridClr  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+                    var lblClr   = isDark ? '#94a3b8' : '#64748b';
+                    var ctx = document.getElementById('stageCurveChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'AquaCell Tank (ft³)',
+                                    data: tankVals,
+                                    borderColor: '#3b82f6',
+                                    backgroundColor: 'transparent',
+                                    borderWidth: 2,
+                                    pointRadius: 0,
+                                    tension: 0.25,
+                                    order: 2
+                                },
+                                {
+                                    label: 'Stone Backfill (ft³)',
+                                    data: stoneVals,
+                                    borderColor: '#94a3b8',
+                                    backgroundColor: 'transparent',
+                                    borderWidth: 1.5,
+                                    borderDash: [4,3],
+                                    pointRadius: 0,
+                                    tension: 0.25,
+                                    order: 3
+                                },
+                                {
+                                    label: 'Total Storage (ft³)',
+                                    data: totalVals,
+                                    borderColor: '#10b981',
+                                    backgroundColor: 'rgba(16,185,129,0.07)',
+                                    borderWidth: 2.5,
+                                    fill: false,
+                                    pointRadius: 0,
+                                    tension: 0.25,
+                                    order: 1
+                                }
+                            ]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: { mode: 'index', intersect: false },
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'bottom',
+                                    labels: { color: lblClr, font: { size: 10 }, boxWidth: 20, padding: 10 }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        title: function(items){ return 'Elevation: ' + items[0].label + ' ft'; },
+                                        label: function(item){ return item.dataset.label + ': ' + Number(item.raw).toLocaleString() + ' ft³'; }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    title: { display: true, text: 'Storage Volume (ft³)', color: lblClr, font: { size: 11 } },
+                                    min: 0,
+                                    max: maxVol,
+                                    grid: { color: gridClr },
+                                    ticks: {
+                                        color: lblClr,
+                                        font: { size: 10 },
+                                        callback: function(v){ return v >= 1000 ? (v/1000).toFixed(0)+'k' : v; }
+                                    }
+                                },
+                                y: {
+                                    title: { display: true, text: 'Elevation (ft)', color: lblClr, font: { size: 11 } },
+                                    reverse: true,
+                                    grid: { color: gridClr },
+                                    ticks: { color: lblClr, font: { size: 10 } }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                if (typeof Chart !== 'undefined') {
+                    renderChart();
+                } else {
+                    var s = document.createElement('script');
+                    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+                    s.onload = renderChart;
+                    document.head.appendChild(s);
+                }
+            })();
+            </script>
             {% endif %}
 
             {% if results.project_notes %}
@@ -1612,6 +1733,27 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     document.getElementById('base_stone').addEventListener('input', renderSheet);
 
     // ====================== COPY TO EMAIL ======================
+    function downloadStageCSV() {
+        const form = document.getElementById('mainForm');
+        if (!form) { alert('Please run Calculate System first.'); return; }
+        const formData = new FormData(form);
+        const projectName = (document.getElementById('project_name')?.value || 'Project').trim().replace(/[^a-zA-Z0-9\-_ ]/g,'_').replace(/\s+/g,'_');
+        fetch('/download_stage_csv', { method: 'POST', body: formData })
+        .then(r => {
+            if (!r.ok) throw new Error('CSV generation failed');
+            return r.blob();
+        })
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'AquaCell_StageStorage_' + projectName + '.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        })
+        .catch(() => alert('Stage CSV failed. Run Calculate System with Stage Storage enabled first.'));
+    }
+
     function copyToEmail() {
         // Check results exist
         if (!document.getElementById('rv_config_layers') && !document.getElementById('tankStorageStat')) {
