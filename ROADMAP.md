@@ -78,8 +78,9 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [ ] add excavated totals for area/ perimeter (for design layout tables)
 -  [ ] Fix DATE field on QUOTE PDF - "plans"
 -  [ ] toggle DISTRIBUTOR, MARKET,  BUDGET ESTIMATE PRICING for quote page export
-
-
+-  [X] Add "Top of Stone" to Cover & Load Verification Card under "Elevation Reference"
+-  [ ] Move "Traffic Load" in Excavation & Dimensional Summary to the Cover & Load Verification card [after Cover Depth Checks and before Dead Load]
+-  [ ] 
  
  ## Next Up (High Priority – Do These Next)
 
