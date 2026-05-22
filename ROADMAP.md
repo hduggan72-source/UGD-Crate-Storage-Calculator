@@ -1,4 +1,4 @@
-# AquaCell V12 Crate Calculator — Development Roadmap
+# AquaCell v14 Crate Calculator — Development Roadmap
 
 **Project Goal:**  
 Professional web-based calculator for designing and quoting underground stormwater retention, detention, and infiltration systems using Wavin AquaCell polypropylene stackable crates. The tool must produce accurate storage volumes, BOM with part codes, geotextile quantities (burrito-style wrap), professional PDF reports, and visual layout drawings for client submittals.
