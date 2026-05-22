@@ -1169,22 +1169,22 @@ def download_quote():
       # ════════════════════════════════════════
       y = H - 28
 
-      # Logo box (top-left)
+      # Logo box (top-left) + "An Orbia business." tagline below
       if logo_path and os.path.exists(logo_path):
           try:
               img = ImageReader(logo_path)
-              c.drawImage(img, LQ, y - 52, width=130, height=52,
+              c.drawImage(img, LQ, y - 44, width=130, height=44,
                           preserveAspectRatio=True, mask='auto')
           except Exception:
               pass
+      q_text(LQ + 4, y - 52, 'An Orbia business.', 'Helvetica-Oblique', 7, GRAY)
 
       # "MATERIALS QUOTE" title (center)
       q_text(W/2, y - 14, 'MATERIALS QUOTE', 'Helvetica-Bold', 20, QNY, 'center')
 
-      # Orbia logo area / quote number (top-right)
+      # Project number box (top-right) — no "An Orbia business." here
       q_rect(W - RQ - 140, y - 52, 140, 52, QLGY)
-      q_text(W - RQ - 70, y - 18, 'An Orbia business.', 'Helvetica', 7, GRAY, 'center')
-      q_text(W - RQ - 70, y - 36, project_num if project_num else '—', 'Helvetica-Bold', 18, QNY, 'center')
+      q_text(W - RQ - 70, y - 20, project_num if project_num else '—', 'Helvetica-Bold', 18, QNY, 'center')
 
       y -= 62
 
@@ -1201,41 +1201,38 @@ def download_quote():
       # Row 2
       q_text(LQ, y - 20, 'PROJECT NAME:', 'Helvetica-Bold', 8, QNY)
       q_text(LQ + 78, y - 20, project_name or '—', 'Helvetica', 8, BLACK)
-      q_text(W/2, y - 20, 'ATTN:', 'Helvetica-Bold', 8, QNY)
+      q_text(W/2, y - 20, 'PREPARED BY:', 'Helvetica-Bold', 8, QNY)
 
       # Row 3
       q_text(LQ, y - 32, 'CITY:', 'Helvetica-Bold', 8, QNY)
       city_str = location.split(',')[0].strip() if location else '—'
       q_text(LQ + 48, y - 32, city_str, 'Helvetica', 8, BLACK)
-      q_text(W/2, y - 32, 'PREPARED BY:', 'Helvetica-Bold', 8, QNY)
+      q_text(W/2, y - 32, 'EMAIL:', 'Helvetica-Bold', 8, QNY)
 
       # Row 4
       q_text(LQ, y - 44, 'STATE:', 'Helvetica-Bold', 8, QNY)
       state_str = location.split(',')[1].strip() if location and ',' in location else '—'
       q_text(LQ + 48, y - 44, state_str, 'Helvetica', 8, BLACK)
-      q_text(W/2, y - 44, 'EMAIL:', 'Helvetica-Bold', 8, QNY)
 
-      y -= 58
+      y -= 54
       q_rule(y)
       y -= 4
 
-      # ── Warning banner if notes present ─────────────────────────
+      # ── Notes banner (royal blue / white) ───────────────────────
       if project_notes.strip():
-          q_rect(LQ, y - 14, QW, 14, QYLW)
-          q_text(W/2, y - 10, project_notes[:120], 'Helvetica-Bold', 7, QRED, 'center')
+          q_rect(LQ, y - 14, QW, 14, QNY)
+          q_text(W/2, y - 10, project_notes[:120], 'Helvetica-Bold', 7, WHITE, 'center')
           y -= 18
 
-      # ── Spec summary row ─────────────────────────────────────────
+      # ── Spec summary row (Plans Dated removed) ───────────────────
       q_rect(LQ, y - 28, QW, 28, QLGY)
-      col_w = QW / 6
+      col_w = QW / 4
 
       specs = [
-          ('AREA', f'{tank_area:,.0f} ft²'),
-          ('PERIMETER', f'{round(used_perimeter,1)} ft'),
-          ('Plans Dated:', generated_str),
+          ('AREA',        f'{tank_area:,.0f} ft²'),
+          ('PERIMETER',   f'{round(used_perimeter,1)} ft'),
           ('TANK HEIGHT', f'{round(tank_height,1)} ft'),
-          ('MODEL TYPE', config_label),
-          ('', ''),
+          ('MODEL TYPE',  config_label),
       ]
       for i, (lbl, val) in enumerate(specs):
           x = LQ + i * col_w
