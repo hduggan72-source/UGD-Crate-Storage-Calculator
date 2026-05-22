@@ -986,10 +986,109 @@ def download_pdf():
     buffer.seek(0)
     safe_name = (project_name or 'Project').strip().replace(' ', '_')
     return send_file(buffer, as_attachment=True,
-                     download_name=f'AquaCell_Summary_{safe_name}.pdf',
+                     download_name=f'AquaCell_Summary_{safe_name}_{datetime.datetime.now().strftime("%m%d%Y")}.pdf',
                      mimetype='application/pdf')
 
 
+
+
+# ══════════════════════════════════════════════════════════════════
+#  DOWNLOAD STAGE STORAGE CSV
+# ══════════════════════════════════════════════════════════════════
+
+@app.route('/download_stage_csv', methods=['POST'])
+def download_stage_csv():
+    import csv
+    import io as _io
+
+    project_name       = request.form.get('project_name', 'Project')
+    config             = request.form.get('config', 'SC')
+    layers             = int(request.form.get('layers', 3))
+    surface_elev       = float(request.form.get('surface_elev', 0) or 0)
+    tank_bottom_elev   = float(request.form.get('tank_bottom_elev', 0) or 0)
+    known_width        = float(request.form.get('known_width', 0) or 0)
+    known_length       = float(request.form.get('known_length', 0) or 0)
+    perimeter_stone_width = float(request.form.get('perimeter_stone_width', 1.0) or 1.0)
+    cover_stone        = float(request.form.get('cover_stone', 1.0) or 1.0)
+    base_stone         = float(request.form.get('base_stone', 0.333) or 0.333)
+    stone_void         = float(request.form.get('stone_void', 0.40) or 0.40)
+    stage_increment_in = int(request.form.get('stage_increment_in', 12) or 12)
+    shape_mode         = request.form.get('shape_mode', 'rectangle')
+
+    MODULE_WID = 1.9685
+    MODULE_LEN = 3.937
+
+    if config == 'SC':
+        layer_heights = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]
+        void_ratio    = 0.95486
+    else:
+        layer_heights = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
+        void_ratio    = 0.92633
+
+    tank_height        = layer_heights[layers-1] if layers <= len(layer_heights) else layer_heights[-1]
+    total_system_depth = base_stone + tank_height + cover_stone
+
+    if shape_mode == 'complex':
+        complex_scaled_area = float(request.form.get('complex_scaled_area', 0) or 0)
+        complex_known_dim   = float(request.form.get('complex_known_dim', 0) or 0)
+        complex_excav_area  = float(request.form.get('complex_excav_area', 0) or 0)
+        other_dim     = complex_scaled_area / complex_known_dim if complex_known_dim > 0 else 0
+        crates_known  = math.floor(complex_known_dim / MODULE_WID) if complex_known_dim > 0 else 0
+        crates_other  = math.floor(other_dim / MODULE_LEN) if other_dim > 0 else 0
+        snapped_known = crates_known * MODULE_WID
+        snapped_other = crates_other * MODULE_LEN
+        gross_vol     = snapped_known * snapped_other * tank_height
+        tank_storage  = gross_vol * void_ratio
+        if complex_excav_area <= 0:
+            complex_excav_area = (snapped_known + 2*perimeter_stone_width) * (snapped_other + 2*perimeter_stone_width)
+        stone_envelope_volume = complex_excav_area * total_system_depth - gross_vol
+    else:
+        crates_wide   = math.floor(known_width / MODULE_WID)
+        crates_long   = math.floor(known_length / MODULE_LEN)
+        tank_width    = crates_wide * MODULE_WID
+        tank_length   = crates_long * MODULE_LEN
+        gross_vol     = tank_width * tank_length * tank_height
+        tank_storage  = gross_vol * void_ratio
+        outer_width   = tank_width + 2*perimeter_stone_width
+        outer_length  = tank_length + 2*perimeter_stone_width
+        stone_envelope_volume = outer_width * outer_length * total_system_depth - gross_vol
+
+    total_stone_storage = stone_envelope_volume * stone_void
+
+    # Build rows
+    increment_ft  = stage_increment_in / 12.0
+    top_of_stone  = tank_bottom_elev + tank_height + cover_stone
+    current_elev  = tank_bottom_elev - base_stone
+    rows = []
+    while current_elev <= top_of_stone + 0.01:
+        depth_tank  = max(0, min(tank_height, current_elev - tank_bottom_elev))
+        tank_vol    = (depth_tank / tank_height) * tank_storage if tank_height > 0 else 0
+        depth_stone = max(0, min(total_system_depth, current_elev - (tank_bottom_elev - base_stone)))
+        stone_vol   = (depth_stone / total_system_depth) * total_stone_storage if total_system_depth > 0 else 0
+        rows.append((round(current_elev, 4), round(tank_vol, 2), round(stone_vol, 2), round(tank_vol + stone_vol, 2)))
+        current_elev += increment_ft
+
+    # Write CSV with metadata header
+    output = _io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['# AquaCell Stage-Storage Table'])
+    writer.writerow([f'# Project: {project_name}'])
+    writer.writerow([f'# Configuration: {config}-{layers}  |  Stage Increment: {stage_increment_in} in'])
+    writer.writerow([f'# Tank Bottom Elev: {tank_bottom_elev} ft  |  Surface Elev: {surface_elev} ft'])
+    writer.writerow([f'# Generated: {datetime.datetime.now().strftime("%m/%d/%Y %H:%M")}'])
+    writer.writerow([])
+    writer.writerow(['Elevation (ft)', 'Tank Storage (ft3)', 'Stone Storage (ft3)', 'Total Storage (ft3)'])
+    for row in rows:
+        writer.writerow(row)
+
+    output.seek(0)
+    safe_name = (project_name or 'Project').strip().replace(' ', '_')
+    return send_file(
+        _io.BytesIO(output.getvalue().encode('utf-8')),
+        as_attachment=True,
+        download_name=f'AquaCell_StageStorage_{safe_name}_{datetime.datetime.now().strftime("%m%d%Y")}.csv',
+        mimetype='text/csv'
+    )
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -1438,7 +1537,7 @@ def download_quote():
       buffer.seek(0)
       safe_name = (project_name or 'Quote').strip().replace(' ', '_')
       return send_file(buffer, as_attachment=True,
-                       download_name=f'AquaCell_Quote_{safe_name}.pdf',
+                       download_name=f'AquaCell_Quote_{safe_name}_{datetime.datetime.now().strftime("%m%d%Y")}.pdf',
                        mimetype='application/pdf')
 
   except Exception as e:
