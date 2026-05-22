@@ -99,6 +99,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
 - QR codes or hyperlinks to wavin.us or specific installation details
 - Stage storage table with CSV export with new command button at header
+- Update font to Nunito
 
 ## Backlog / Future Enhancements (Add here when ideas come up)
 - (v15) Multiple Basin Entry and Reports
