@@ -72,15 +72,15 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] FIX COPY EMAIL FUNCTION TO ENSURE ALL FIELDS ARE BEING COPIED
 -  [X] add a section in Stone Backfill card that shows stone calculated by LAYER (Top, Perimeter, Base) Gross/Net
 -  [X] "This calculator provides <em>preliminary, conceptual estimates only</em> and is <em>not a stamped engineering design</em>. Wavin’s assistance in sizing or product selection is advisory and does not constitute             design responsibility or guarantee system performance. The Engineer of Record (EoR) is solely responsible for verifying all design parameters and site conditions, including hydrology, structural requirements,              soils, environmental factors, and integration with the overall stormwater system. AquaCell dimensions and assumptions (including usable storage and unit base areas) follow published product data. <strong>Final             layouts, capacities, and installation depths must be confirmed by a licensed Professional Engineer</strong> using project‑specific plans (grading, pipe sizes and materials, invert elevations, loading conditions,           and applicable codes/standards)." - ADDED TO BOTTOM OF CONCEPTUAL SCHEMATIC
--  [X] dedicated quote sheet and command button
+-  [X] dedicated quote sheet and command export button
 -  [X] Add freight calculator to take a percentage of the total cost (no results needed) just a built in calculator
 -  [X] STREAMLINE PDF SUMMARY TO JUST ESSENTIALS (remove BOM and qquantities for estimation); summary only has the technical and could be included on the conceptual schematick page
--  [ ] add excavated totals for area/ perimeter (for design layout tables)
--  [ ] Fix DATE field on QUOTE PDF - "plans"
--  [ ] toggle DISTRIBUTOR, MARKET,  BUDGET ESTIMATE PRICING for quote page export
+-  [X] add excavated totals for area/ perimeter (for design layout tables)
+-  [X] Fix DATE field on QUOTE PDF - "plans"
+-  [X] toggle DISTRIBUTOR, MARKET,  BUDGET ESTIMATE PRICING for quote page export
 -  [X] Add "Top of Stone" to Cover & Load Verification Card under "Elevation Reference"
--  [ ] Move "Traffic Load" in Excavation & Dimensional Summary to the Cover & Load Verification card [after Cover Depth Checks and before Dead Load]
--  [ ] 
+-  [X] Look at moving the Storage results card to top OF DASHBOARD TO MATCH REPORT
+-  [X] REVISED EMAIL COPY/PASTE ACTION TO RELEVANT ESTIMATING VALUES
  
  ## Next Up (High Priority – Do These Next)
 
@@ -91,8 +91,6 @@ Professional web-based calculator for designing and quoting underground stormwat
 - ADD A TOGGLE BOX UP IN THE PROJECT INFORMATION CARD FOR "REVISION" (REVISION WOULD BE ADDED TO THE QUOTE # "-01,-02, ETC.)
 - metric toggle
 - add a pallet count estimator, weight estimator, and contingency calculator that can be added to the quote sheet or at least on dashboard when calculated
-- Add Storage volume vs. Elevation graphic chart (x/y axis)- volume curve chart
-- Look at moving the Storage results card to top OF DASHBOARD TO MATCH REPORT and have it being static 
 - ask Claude about arriving at live load FOS calculations to be sure it aligns correctly with excel load calculator
 - add place for notes about > 18" connectors and geotextile boots to be installed
 - Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed (added to excavation & dimensional summary card
@@ -105,7 +103,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - (v16) PRICING ENGINE THAT CAN BE EASILY ADJUSTED FOR DIST, MARKET, MSRP ESTIMATES. ALLOW FOR UPLOADING OF COMPONENT PRICING OR MULTIPLIER WHEN PRICE INCREASES OCCUR
 - (v17) USE CANVAS TO BUILD A CONCEPTUAL TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
 - (v18) UPLOAD PLAN SHEET AND CRATE AN OVERLAY OF TANK
-- (v19) Optional 3D isometric view of the crate layout
+- (v19) Optional 3D isometric view of the crate layout (Add Storage volume vs. Elevation graphic chart (x/y axis)- volume curve chart)
 - Integration of Wavin installation details (access ports, geogrid, compaction notes)
 - List of details that can be selected that prepends/appends when PDF is created (cover sheet, standard detail, specs, etc.)
 - QR codes or hyperlinks to wavin.us or specific installation details (probably on the cover or appended page)
