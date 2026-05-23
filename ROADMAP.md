@@ -85,6 +85,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] Stage storage table with CSV export with new command button at header
  
  ## Next Up (High Priority – Do These Next)
+- sign-in/ log-in information (name, company, email)
 - add storage curve to bottom of stage storage on pdf export
 - optional geogrid totals (based on excavation area + overage)
 - bouyancy calculator
