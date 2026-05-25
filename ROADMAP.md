@@ -5,7 +5,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 **Current Status:** Live on Flask (production-ready core)
 
-## Previous Version (v12.1) — Completed
+**## Previous Version (v12.1) — Completed**
 - [x] Core SC and EX configuration calculations (snapped tank dimensions, storage volumes)
 - [x] Bill of Materials with correct part codes:
   - Base Unit (3091506)
@@ -61,7 +61,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] side panel that stays staic with executable command buttons (Calculate, Reset, download, export, etc.)
 
 
-## CURRENT Version (v14) — Completed
+**## CURRENT Version (v14) — Completed**
 
 -  [X] reformat the UI/UX into "Cards"
 -  [X] added Quick Summary copy/paste for body of emails
@@ -85,24 +85,23 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] Stage storage table with CSV export with new command button at header
 -  [X] add storage curve to bottom of stage storage on pdf export
 -  [X] ADD EXTENSION ON THE NAMING CONVENTION OF THE REPORT AND QUOTE (DATE, VERSION, ETC.)
+-  [X] Separate CLIENT & ESTIMATOR as idividual fields (customer/Wavin rep)
 
  
- ## Next Up (High Priority – Do These Next)
-- separate CLIENT & ESTIMATOR as idividual fields (customer/Wavin rep)
+** ## Next Up (High Priority – Do These Next)**
+
 - optional geogrid totals (based on excavation area + overage)
-- bouyancy calculator
-- ADD USER INITIALS APPENDED TO A SELF-GENERATED OR USING THE EXISTING QUOTE # SYSTEM = PRODUCT + PROJECT# + "CREATED BY" INITIALS (EX. AQ1615-00-HD/1615-00-AQ_HD)
-- ADD A TOGGLE BOX UP IN THE PROJECT INFORMATION CARD FOR "REVISION" (REVISION WOULD BE ADDED TO THE QUOTE # "-01,-02, ETC.)
-- metric toggle
-- add a pallet count estimator, weight estimator, and contingency calculator that can be added to the quote sheet or at least on dashboard when calculated
-- ask Claude about arriving at live load FOS calculations to be sure it aligns correctly with excel load calculator
 - add place for notes about > 18" connectors and geotextile boots to be installed
 - Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed (added to excavation & dimensional summary card
+- bouyancy calculator
+- add a pallet count estimator, weight estimator, and contingency calculator that can be added to the quote sheet or at least on dashboard when calculated
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
 
-- Update font to Nunito
+**##SYSTEM CHECKS TO VERIFY / CONFIRM**
+- ask Claude about arriving at live load FOS calculations to be sure it aligns correctly with excel load calculator
 
-## Backlog / Future Enhancements (Add here when ideas come up)
+
+**## Backlog / Future Enhancements (Add here when ideas come up)**
 - (v15) Multiple Basin Entry and Reports
 - (v16) PRICING ENGINE THAT CAN BE EASILY ADJUSTED FOR DIST, MARKET, MSRP ESTIMATES. ALLOW FOR UPLOADING OF COMPONENT PRICING OR MULTIPLIER WHEN PRICE INCREASES OCCUR
 - (v17) USE CANVAS TO BUILD A CONCEPTUAL TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
@@ -111,6 +110,10 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Integration of Wavin installation details (access ports, geogrid, compaction notes)
 - List of details that can be selected that prepends/appends when PDF is created (cover sheet, standard detail, specs, etc.)
 - QR codes or hyperlinks to wavin.us or specific installation details (probably on the cover or appended page)
+- ADD USER INITIALS APPENDED TO A SELF-GENERATED OR USING THE EXISTING QUOTE # SYSTEM = PRODUCT + PROJECT# + "CREATED BY" INITIALS (EX. AQ1615-00-HD/1615-00-AQ_HD)
+- Metric toggle
+- Update font to Nunito (Wavin speciifc calculator ONLY)
+- ADD A TOGGLE BOX UP IN THE PROJECT INFORMATION CARD FOR "REVISION" (REVISION WOULD BE ADDED TO THE QUOTE # "-01,-02, ETC.)
 
 **How to use this file:**
 - Open `ROADMAP.md` every time you work on the project.
