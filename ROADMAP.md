@@ -86,16 +86,16 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] add storage curve to bottom of stage storage on pdf export
 -  [X] ADD EXTENSION ON THE NAMING CONVENTION OF THE REPORT AND QUOTE (DATE, VERSION, ETC.)
 -  [X] Separate CLIENT & ESTIMATOR as idividual fields (customer/Wavin rep)
+-  [X] add field for contingency units in BOM CARD and add line on quote sheet
+-  [X] Add a pallet count estimator, weight estimator, and contingency calculator that can be added to the quote sheet or at least on dashboard when calculated
 
  
 ** ## Next Up (High Priority – Do These Next)**
 
-- add field for contingency units in BOM CARD and add line on quote sheet
 - optional geogrid totals (based on excavation area + overage)
 - add place for notes about > 18" connectors and geotextile boots to be installed
 - Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed (added to excavation & dimensional summary card
 - bouyancy calculator
-- add a pallet count estimator, weight estimator, and contingency calculator that can be added to the quote sheet or at least on dashboard when calculated
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
 
 **##SYSTEM CHECKS TO VERIFY / CONFIRM**
