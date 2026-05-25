@@ -782,10 +782,9 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 var baseUnits = getQty('bom_base_units');
                 var autoContingency = baseUnits > 0 ? Math.ceil(baseUnits / PALLETS.base) * PALLETS.base - baseUnits : 0;
                 setEl('bom_contingency', autoContingency);
+                // Always update input to match current calculation — user can override after
                 var inputEl = document.getElementById('contingency_units');
-                if (inputEl && (inputEl.value === '' || inputEl.value === '0')) {
-                    inputEl.value = autoContingency;
-                }
+                if (inputEl) inputEl.value = autoContingency;
 
                 // ── Quantities ──
                 var qty = {
