@@ -83,13 +83,14 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] REVISED EMAIL COPY/PASTE ACTION TO RELEVANT ESTIMATING VALUES
 -  [X] Add Storage volume vs. Elevation graphic chart (x/y axis)- volume curve chart
 -  [X] Stage storage table with CSV export with new command button at header
+-  [X] add storage curve to bottom of stage storage on pdf export
+-  [X] ADD EXTENSION ON THE NAMING CONVENTION OF THE REPORT AND QUOTE (DATE, VERSION, ETC.)
+
  
  ## Next Up (High Priority – Do These Next)
-- sign-in/ log-in information (name, company, email)
-- add storage curve to bottom of stage storage on pdf export
+- separate CLIENT & ESTIMATOR as idividual fields (customer/Wavin rep)
 - optional geogrid totals (based on excavation area + overage)
 - bouyancy calculator
-- ADD EXTENSION ON THE NAMING CONVENTION OF THE REPORT AND QUOTE (DATE, VERSION, ETC.)
 - ADD USER INITIALS APPENDED TO A SELF-GENERATED OR USING THE EXISTING QUOTE # SYSTEM = PRODUCT + PROJECT# + "CREATED BY" INITIALS (EX. AQ1615-00-HD/1615-00-AQ_HD)
 - ADD A TOGGLE BOX UP IN THE PROJECT INFORMATION CARD FOR "REVISION" (REVISION WOULD BE ADDED TO THE QUOTE # "-01,-02, ETC.)
 - metric toggle
