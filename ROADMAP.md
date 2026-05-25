@@ -90,6 +90,7 @@ Professional web-based calculator for designing and quoting underground stormwat
  
 ** ## Next Up (High Priority – Do These Next)**
 
+- add field for contingency units in BOM CARD and add line on quote sheet
 - optional geogrid totals (based on excavation area + overage)
 - add place for notes about > 18" connectors and geotextile boots to be installed
 - Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed (added to excavation & dimensional summary card
