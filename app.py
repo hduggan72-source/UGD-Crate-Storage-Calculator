@@ -44,6 +44,8 @@ def index():
         project_num  = request.form.get('project_num', '')
         location     = request.form.get('location', '')
         client       = request.form.get('client', '')
+        estimator    = request.form.get('estimator', '')
+        estimator_email = request.form.get('estimator_email', '')
         config       = request.form.get('config', 'SC')
         layers       = int(request.form.get('layers', 3))
         surface_elev      = float(request.form.get('surface_elev', 0) or 0)
@@ -406,7 +408,7 @@ def _draw_footer(c, page_num, total_pages, project_name, generated_str):
     c.drawRightString(PW - RM, 10, f'Page {page_num} of {total_pages}')
 
 
-def _draw_page1_header(c, logo_path, project_name, project_num, location, client, generated_str):
+def _draw_page1_header(c, logo_path, project_name, project_num, location, client, estimator, generated_str):
     """Branded navy header band + project info box. Returns y below."""
     band_h = 64
     c.setFillColor(NAVY)
@@ -430,8 +432,8 @@ def _draw_page1_header(c, logo_path, project_name, project_num, location, client
 
     y = PH - band_h - 6
 
-    # Project info box — 2-column grid
-    info_h = 48
+    # Project info box — 2-column grid (3 rows)
+    info_h = 58
     c.setFillColor(LGRAY)
     c.setStrokeColor(MGRAY)
     c.setLineWidth(0.5)
@@ -448,10 +450,11 @@ def _draw_page1_header(c, logo_path, project_name, project_num, location, client
         c.setFont('Helvetica-Bold', 8.5)
         c.drawString(x, top_y - 13, val if val else '—')
 
-    _pf('Project Name',       project_name, col1_x, y - 4)
-    _pf('Project Number',     project_num,  col2_x, y - 4)
-    _pf('Location',           location,     col1_x, y - 26)
-    _pf('Client / Estimator', client,       col2_x, y - 26)
+    _pf('Project Name',    project_name, col1_x, y - 4)
+    _pf('Project Number',  project_num,  col2_x, y - 4)
+    _pf('Location',        location,     col1_x, y - 24)
+    _pf('Client',          client,       col2_x, y - 24)
+    _pf('Estimator',       estimator,    col1_x, y - 44)
 
     return y - info_h - 8
 
@@ -564,6 +567,8 @@ def download_pdf():
     project_num       = request.form.get('project_num', '')
     location          = request.form.get('location', '')
     client            = request.form.get('client', '')
+    estimator         = request.form.get('estimator', '')
+    estimator_email   = request.form.get('estimator_email', '')
     config            = request.form.get('config', 'SC')
     layers            = int(request.form.get('layers', 3))
     surface_elev      = float(request.form.get('surface_elev', 0) or 0)
@@ -736,7 +741,7 @@ def download_pdf():
     # ─────────────────────────────────────────────────────────
     #  PAGE 1 — Technical Summary (NO disclaimer here)
     # ─────────────────────────────────────────────────────────
-    y = _draw_page1_header(c, logo_path, project_name, project_num, location, client, generated_str)
+    y = _draw_page1_header(c, logo_path, project_name, project_num, location, client, estimator, generated_str)
 
     # shared column anchors used by backfill table below
     C_LAYER   = LM + 5
@@ -1104,6 +1109,8 @@ def download_quote():
       project_num      = request.form.get('project_num', '')
       location         = request.form.get('location', '')
       client           = request.form.get('client', '')
+      estimator        = request.form.get('estimator', '')
+      estimator_email  = request.form.get('estimator_email', '')
       config           = request.form.get('config', 'SC')
       layers           = int(request.form.get('layers', 3))
       traffic_load     = request.form.get('traffic_load', 'HS20')
@@ -1301,12 +1308,14 @@ def download_quote():
       q_text(LQ, y - 20, 'PROJECT NAME:', 'Helvetica-Bold', 8, QNY)
       q_text(LQ + 78, y - 20, project_name or '—', 'Helvetica', 8, BLACK)
       q_text(W/2, y - 20, 'PREPARED BY:', 'Helvetica-Bold', 8, QNY)
+      q_text(W/2 + 90, y - 20, estimator or '—', 'Helvetica', 8, BLACK)
 
       # Row 3
       q_text(LQ, y - 32, 'CITY:', 'Helvetica-Bold', 8, QNY)
       city_str = location.split(',')[0].strip() if location else '—'
       q_text(LQ + 48, y - 32, city_str, 'Helvetica', 8, BLACK)
       q_text(W/2, y - 32, 'EMAIL:', 'Helvetica-Bold', 8, QNY)
+      q_text(W/2 + 50, y - 32, estimator_email or '—', 'Helvetica', 8, BLACK)
 
       # Row 4
       q_text(LQ, y - 44, 'STATE:', 'Helvetica-Bold', 8, QNY)
@@ -1535,9 +1544,11 @@ def download_quote():
 
       c.save()
       buffer.seek(0)
-      safe_name = (project_name or 'Quote').strip().replace(' ', '_')
+      safe_name    = (project_name or 'Quote').strip().replace(' ', '_')
+      safe_num     = (project_num or '').strip().replace(' ', '_')
+      name_parts   = '_'.join(filter(None, [safe_num, safe_name]))
       return send_file(buffer, as_attachment=True,
-                       download_name=f'AquaCell_Quote_{safe_name}_{datetime.datetime.now().strftime("%m%d%Y")}.pdf',
+                       download_name=f'AquaCell_Quote_{name_parts}_{datetime.datetime.now().strftime("%m%d%Y")}.pdf',
                        mimetype='application/pdf')
 
   except Exception as e:
