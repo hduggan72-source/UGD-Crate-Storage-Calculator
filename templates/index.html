@@ -425,11 +425,15 @@
                     <label>Project Name</label>
                     <input type="text" name="project_name" id="project_name" placeholder="Enter here" value="{{ form_data.get('project_name', '') }}">
                     <label>Project Number</label>
-                    <input type="text" name="project_num" placeholder="Enter here" value="{{ form_data.get('project_num', '') }}">
+                    <input type="text" name="project_num" id="project_num" placeholder="Enter here" value="{{ form_data.get('project_num', '') }}">
                     <label>Location (City, State)</label>
                     <input type="text" name="location" placeholder="Enter here" value="{{ form_data.get('location', '') }}">
-                    <label>Client / Estimator</label>
-                    <input type="text" name="client" placeholder="Enter here" value="{{ form_data.get('client', '') }}">
+                    <label>Client (Company / Contact)</label>
+                    <input type="text" name="client" id="client" placeholder="Enter here" value="{{ form_data.get('client', '') }}">
+                    <label>Estimator (Wavin Rep)</label>
+                    <input type="text" name="estimator" id="estimator" placeholder="Enter here" value="{{ form_data.get('estimator', '') }}">
+                    <label>Estimator Email</label>
+                    <input type="text" name="estimator_email" id="estimator_email" placeholder="Enter here" value="{{ form_data.get('estimator_email', '') }}">
                 </div>
             </div>
 
@@ -1310,7 +1314,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `AquaCell_${projectName}.pdf`;
+            const pdfDate1 = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'');
+            a.download = `AquaCell_Summary_${projectName}_${pdfDate1}.pdf`;
             a.click();
             URL.revokeObjectURL(url);
         })
@@ -1371,6 +1376,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         formData.append('totalWithFreight',   document.getElementById('hiddenTotalWithFreight').value   || '0');
         formData.append('freightPct',         document.getElementById('hiddenFreightPct').value         || '10');
         formData.append('costPerFt3Hidden',   document.getElementById('hiddenCostPerFt3').value         || '0');
+        // Explicitly pass project number to guarantee filename
+        formData.set('project_num', document.getElementById('project_num')?.value || '');
 
         const projectName = (document.getElementById('project_name').value || 'Project').trim()
                             .replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
@@ -1383,7 +1390,10 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `AquaCell_Quote_${projectName}.pdf`;
+            const projNum = (document.getElementById('project_num')?.value || '').trim().replace(/[^a-zA-Z0-9\-_]/g,'_');
+            const qDate = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'');
+            const qParts = [projNum, projectName].filter(Boolean).join('_');
+            a.download = `AquaCell_Quote_${qParts}_${qDate}.pdf`;
             a.click();
             URL.revokeObjectURL(url);
         })
@@ -1747,7 +1757,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'AquaCell_StageStorage_' + projectName + '.csv';
+            const csvDate = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'');
+        a.download = 'AquaCell_StageStorage_' + projectName + '_' + csvDate + '.csv';
             a.click();
             URL.revokeObjectURL(url);
         })
