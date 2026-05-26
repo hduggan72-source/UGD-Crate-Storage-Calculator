@@ -740,9 +740,13 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     <label>16" Top Adapter (2476842000)</label>
                     <input type="number" name="top_adapters_16" id="top_adapters_16" min="0" value="{{ form_data.get('top_adapters_16', '') }}">
                     <label style="margin-top:10px;">Contingency Base Units (3091506)
-                        <span style="font-size:11px;opacity:0.65;font-weight:normal;"> — extra crates for jobsite breakage</span>
+                        <span style="font-size:11px;opacity:0.65;font-weight:normal;"> — extra crates for jobsite breakage (optional)</span>
                     </label>
-                    <input type="number" name="contingency_units" id="contingency_units" min="0" value="{{ form_data.get('contingency_units', 0) }}">
+                    <input type="number" name="contingency_units" id="contingency_units" min="0"
+                           value="{{ form_data.get('contingency_units', 0) }}"
+                           onchange="document.getElementById('contingency_overridden').value='1';">
+                    <input type="hidden" name="contingency_overridden" id="contingency_overridden"
+                           value="{{ form_data.get('contingency_overridden', '0') }}">
                 </div>
             </div>
 
@@ -874,13 +878,14 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                                 <td style="text-align:right;" id="w_top_adapters_16">—</td>
                                 <td style="text-align:right;" id="p_top_adapters_16">—</td>
                             </tr>
-                            <tr style="border-top:2px solid var(--border);">
-                                <td style="font-size:12px;opacity:0.8;">Contingency Base Units (3091506)
-                                    <span style="font-size:10px;opacity:0.6;"> — full pallet rounding</span>
+                            <tr style="border-top:2px dashed var(--border);background:rgba(251,191,36,0.06);">
+                                <td style="font-size:12px;color:#f59e0b;font-style:italic;">
+                                    ⚐ Contingency Base Units (3091506)
+                                    <span style="font-size:10px;opacity:0.7;"> — OPTIONAL · not included in pricing</span>
                                 </td>
-                                <td style="text-align:right;font-weight:bold;color:var(--accent);" id="bom_contingency">—</td>
-                                <td style="text-align:right;" id="w_contingency">—</td>
-                                <td style="text-align:right;" id="p_contingency">—</td>
+                                <td style="text-align:right;font-weight:bold;color:#f59e0b;font-style:italic;" id="bom_contingency">—</td>
+                                <td style="text-align:right;color:#f59e0b;font-style:italic;" id="w_contingency">—</td>
+                                <td style="text-align:right;color:#f59e0b;font-style:italic;" id="p_contingency">—</td>
                             </tr>
                         </tbody>
                         <tfoot>
@@ -936,12 +941,23 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 // ── Auto-calc contingency ──
                 var baseUnits = getQty('bom_base_units');
                 var autoContingency = baseUnits > 0 ? Math.ceil(baseUnits / PALLETS.base) * PALLETS.base - baseUnits : 0;
-                setEl('bom_contingency', autoContingency);
-                // Always update input to match current calculation — user can override after
-                var inputEl = document.getElementById('contingency_units');
-                if (inputEl) inputEl.value = autoContingency;
 
-                // ── Quantities ──
+                // Respect user override: only auto-set input if user has NOT manually changed it
+                var inputEl     = document.getElementById('contingency_units');
+                var overrideEl  = document.getElementById('contingency_overridden');
+                var userOverride = overrideEl && overrideEl.value === '1';
+                var contingencyQty;
+                if (userOverride) {
+                    // User has manually set a value — keep it
+                    contingencyQty = inputEl ? (parseInt(inputEl.value) || 0) : 0;
+                } else {
+                    // No override — use auto value and update input
+                    contingencyQty = autoContingency;
+                    if (inputEl) inputEl.value = autoContingency;
+                }
+                setEl('bom_contingency', contingencyQty);
+
+                // ── Quantities (contingency excluded from totals — it is OPTIONAL) ──
                 var qty = {
                     base:        baseUnits,
                     side:        getQty('bom_side_plates'),
@@ -949,22 +965,24 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     pipe:        getQty('bom_pipe_connectors'),
                     adapter12:   getQty('bom_top_adapters_12'),
                     adapter16:   getQty('bom_top_adapters_16'),
-                    contingency: autoContingency
+                    contingency: contingencyQty
                 };
 
                 // ── Calculate and populate weights & pallets ──
-                var rows = [
-                    ['base',        'w_base_units',       'p_base_units'],
-                    ['side',        'w_side_plates',      'p_side_plates'],
-                    ['bottom',      'w_bottom_plates',    'p_bottom_plates'],
-                    ['pipe',        'w_pipe_connectors',  'p_pipe_connectors'],
-                    ['adapter12',   'w_top_adapters_12',  'p_top_adapters_12'],
-                    ['adapter16',   'w_top_adapters_16',  'p_top_adapters_16'],
-                    ['contingency', 'w_contingency',      'p_contingency'],
+                // Main rows (priced items)
+                var mainRows = [
+                    ['base',      'w_base_units',       'p_base_units'],
+                    ['side',      'w_side_plates',      'p_side_plates'],
+                    ['bottom',    'w_bottom_plates',    'p_bottom_plates'],
+                    ['pipe',      'w_pipe_connectors',  'p_pipe_connectors'],
+                    ['adapter12', 'w_top_adapters_12',  'p_top_adapters_12'],
+                    ['adapter16', 'w_top_adapters_16',  'p_top_adapters_16'],
                 ];
+                // Contingency row (shown separately, NOT in totals)
+                var contRow = ['contingency', 'w_contingency', 'p_contingency'];
 
                 var totalQty = 0, totalWeight = 0, totalPallets = 0;
-                rows.forEach(function(r) {
+                mainRows.forEach(function(r) {
                     var key = r[0], wId = r[1], pId = r[2];
                     var q   = qty[key];
                     var w   = q * WEIGHTS[key];
@@ -976,7 +994,14 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     totalPallets += p;
                 });
 
-                // ── Totals row ──
+                // Contingency — show weight/pallets for reference but exclude from totals
+                (function() {
+                    var q = qty.contingency;
+                    setEl(contRow[1], q > 0 ? fmtLbs(q * WEIGHTS.contingency) : '—');
+                    setEl(contRow[2], q > 0 ? fmtPal(pallets(q, PALLETS.contingency)) : '—');
+                })();
+
+                // ── Totals row (priced items only) ──
                 setEl('bom_total_qty',     totalQty.toLocaleString());
                 setEl('bom_total_weight',  fmtLbs(totalWeight));
                 setEl('bom_total_pallets', totalPallets.toLocaleString() + ' pallets');
