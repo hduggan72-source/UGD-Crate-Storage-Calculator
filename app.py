@@ -80,7 +80,8 @@ def index():
         pipe_connectors   = int(request.form.get('pipe_connectors', 0) or 0)
         top_adapters_12   = int(request.form.get('top_adapters_12', 0) or 0)
         top_adapters_16   = int(request.form.get('top_adapters_16', 0) or 0)
-        contingency_units = int(request.form.get('contingency_units', 0) or 0)
+        contingency_units    = int(request.form.get('contingency_units', 0) or 0)
+        contingency_overridden = request.form.get('contingency_overridden', '0')
         project_notes     = request.form.get('project_notes', '')
         include_stage_storage = request.form.get('include_stage_storage') == 'yes'
         include_schematic     = request.form.get('include_schematic') == 'yes'
@@ -256,7 +257,8 @@ def index():
             'base_units': base_units, 'side_plates': side_plates,
             'bottom_plates': bottom_plates, 'pipe_connectors': pipe_connectors,
             'top_adapters_12': top_adapters_12, 'top_adapters_16': top_adapters_16,
-            'contingency_units': contingency_units,
+            'contingency_units':    contingency_units,
+                'contingency_overridden': contingency_overridden,
             'project_notes': project_notes,
             'stage_storage': stage_storage, 'stage_increment_in': stage_increment_in,
             'min_storage': min_storage if min_storage > 0 else None,
@@ -1144,7 +1146,8 @@ def download_quote():
       pipe_connectors  = int(request.form.get('pipe_connectors', 0) or 0)
       top_adapters_12  = int(request.form.get('top_adapters_12', 0) or 0)
       top_adapters_16  = int(request.form.get('top_adapters_16', 0) or 0)
-      contingency_units = int(request.form.get('contingency_units', 0) or 0)
+      contingency_units    = int(request.form.get('contingency_units', 0) or 0)
+      contingency_overridden = request.form.get('contingency_overridden', '0')
       project_notes    = request.form.get('project_notes', '')
       shape_mode       = request.form.get('shape_mode', 'rectangle')
 
@@ -1409,7 +1412,7 @@ def download_quote():
           ('4', '2476631200', 'AQUACELL 8\u201312\u2033 PIPE CONNECTOR', pipe_connectors, 'EACH', ''),
           ('5', '3085857',    'AQUACELL TOP CONNECTOR (12\u2033)', top_adapters_12, 'EACH', ''),
           ('5', '2476842000', 'AQUACELL TOP CONNECTOR (16\u2033)', top_adapters_16, 'EACH', ''),
-          ('6', '3091506',    '**AQUACELL BASE UNITS ADDED AS CONTINGENCY (FULL PALLET)**', contingency_units, 'EACH', ''),
+          ('6', '3091506',    'AQUACELL BASE UNITS — CONTINGENCY (OPTIONAL / NOT PRICED)', contingency_units, 'EACH', 'OPTIONAL'),
       ]
 
       for i, (ln, pc, ds, qt, un, nt) in enumerate(bom_rows):
