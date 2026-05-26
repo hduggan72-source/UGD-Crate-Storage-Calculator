@@ -22,6 +22,12 @@ GITHUB_OWNER  = "hduggan72-source"
 GITHUB_REPO   = "UGD-Crate-Storage-Calculator"
 GITHUB_BRANCH = "Quote_Report_Summary_Exports"
 GITHUB_FOLDER = "Details"
+GITHUB_PAT    = os.environ.get("GITHUB_PAT", "")   # set in Render environment
+
+# ── File list cache (avoids repeated GitHub API calls) ──
+_details_cache      = []          # cached list of filenames
+_details_cache_time = 0.0         # epoch timestamp of last fetch
+_CACHE_TTL_SECONDS  = 600         # refresh every 10 minutes
 
 # ── ASTM F2787 Live Load Model constants ──
 _LL_m    = 1.2
@@ -1576,31 +1582,47 @@ if __name__ == '__main__':
 
 
 # ══════════════════════════════════════════════════════════════════
-#  DETAIL SHEET EXPORTER — GitHub file listing
+#  DETAIL SHEET EXPORTER — GitHub file listing (cached + authenticated)
 # ══════════════════════════════════════════════════════════════════
+
+def _github_headers():
+    """Build request headers, injecting PAT when available."""
+    h = {
+        "Accept":     "application/vnd.github.v3+json",
+        "User-Agent": "AquaCell-Calculator"
+    }
+    if GITHUB_PAT:
+        h["Authorization"] = f"Bearer {GITHUB_PAT}"
+    return h
 
 @app.route('/api/details')
 def api_details():
-    """Return a sorted list of PDF filenames from the GitHub Details folder."""
+    """Return a cached, sorted list of PDF filenames from the GitHub Details folder."""
+    import time
+    global _details_cache, _details_cache_time
+
+    # Serve from cache if still fresh
+    if _details_cache and (time.time() - _details_cache_time) < _CACHE_TTL_SECONDS:
+        return jsonify({"files": _details_cache, "cached": True})
+
     url = (
         f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
         f"/contents/{GITHUB_FOLDER}?ref={GITHUB_BRANCH}"
     )
     try:
-        resp = requests.get(
-            url, timeout=12,
-            headers={
-                "Accept":     "application/vnd.github.v3+json",
-                "User-Agent": "AquaCell-Calculator"
-            }
-        )
+        resp = requests.get(url, timeout=12, headers=_github_headers())
         resp.raise_for_status()
         files = sorted(
             f["name"] for f in resp.json()
             if isinstance(f, dict) and f.get("name", "").lower().endswith(".pdf")
         )
-        return jsonify({"files": files})
+        _details_cache      = files
+        _details_cache_time = time.time()
+        return jsonify({"files": files, "cached": False})
     except Exception as exc:
+        # Return stale cache rather than an error if we have one
+        if _details_cache:
+            return jsonify({"files": _details_cache, "cached": True, "warning": str(exc)})
         return jsonify({"error": str(exc), "files": []}), 500
 
 
@@ -1627,7 +1649,7 @@ def download_details_pdf():
             raw_url = base_raw + filename
             r = requests.get(
                 raw_url, timeout=30,
-                headers={"User-Agent": "AquaCell-Calculator"}
+                headers=_github_headers()
             )
             r.raise_for_status()
             reader = PyPdfReader(BytesIO(r.content))
