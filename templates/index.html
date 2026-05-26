@@ -2212,6 +2212,184 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             alert('✅ Results copied to clipboard! Paste directly into your email.');
         });
     }
+
+    // ══════════════════════════════════════════════════
+    //  DETAIL SHEET EXPORTER
+    // ══════════════════════════════════════════════════
+
+    const DETAIL_GROUPS = [
+        { label: 'Installation Details',
+          test: n => /^AQ1000[1-9]_|^AQ10010_|^AQ1001[9-9]_|^AQ1002[0-6]_/.test(n) },
+        { label: 'Cross Sections',
+          test: n => /^AQ1001[1-8]_|^AquaCell_SC/.test(n) },
+        { label: 'Component Details',
+          test: n => /^AQ30/.test(n) },
+        { label: 'Volume & Connections',
+          test: n => /^AQ20/.test(n) },
+        { label: 'Technical Bulletins',
+          test: n => /^TB|^Report_on|^TRI_|^WAVIN/.test(n) },
+        { label: 'Guides & Marketing',
+          test: n => /^WA_/.test(n) },
+        { label: 'Other', test: () => true }
+    ];
+
+    function categorizeFiles(files) {
+        const groups = DETAIL_GROUPS.map(g => ({ label: g.label, files: [] }));
+        files.forEach(f => {
+            for (let i = 0; i < DETAIL_GROUPS.length; i++) {
+                if (DETAIL_GROUPS[i].test(f)) {
+                    groups[i].files.push(f);
+                    break;
+                }
+            }
+        });
+        return groups.filter(g => g.files.length > 0);
+    }
+
+    function friendlyName(filename) {
+        return filename
+            .replace(/\.pdf$/i, '')
+            .replace(/_/g, ' ')
+            .replace(/Layout\d*/gi, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+    }
+
+    function renderDetailsGroups(groups) {
+        const container = document.getElementById('detailsGroups');
+        container.innerHTML = '';
+        if (groups.length === 0) {
+            container.innerHTML = '<p style="color:#94a3b8;font-size:13px;">No PDF files found in repository.</p>';
+            return;
+        }
+        const selAll = document.createElement('button');
+        selAll.className = 'details-select-all';
+        selAll.textContent = 'Select All Files';
+        selAll.onclick = () => {
+            document.querySelectorAll('#detailsGroups input[type=checkbox]').forEach(cb => cb.checked = true);
+            updateDetailsCount();
+        };
+        container.appendChild(selAll);
+        groups.forEach((group, gi) => {
+            const div = document.createElement('div');
+            div.className = 'details-group';
+            const header = document.createElement('div');
+            header.className = 'details-group-header';
+            header.innerHTML = `
+                <span class="details-group-label">${group.label} <span style="color:#64748b;font-weight:normal;">(${group.files.length})</span></span>
+                <button class="details-group-toggle" data-gi="${gi}">Select all</button>
+            `;
+            header.querySelector('.details-group-toggle').addEventListener('click', (e) => {
+                const gIndex = e.target.dataset.gi;
+                const cbs = document.querySelectorAll('[data-group="' + gIndex + '"]');
+                const allChecked = [...cbs].every(cb => cb.checked);
+                cbs.forEach(cb => cb.checked = !allChecked);
+                e.target.textContent = allChecked ? 'Select all' : 'Deselect all';
+                updateDetailsCount();
+            });
+            div.appendChild(header);
+            const list = document.createElement('div');
+            list.className = 'details-file-list';
+            group.files.forEach(f => {
+                const item = document.createElement('label');
+                item.className = 'details-file-item';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = f;
+                cb.dataset.group = gi;
+                cb.addEventListener('change', updateDetailsCount);
+                const span = document.createElement('span');
+                span.textContent = friendlyName(f);
+                span.title = f;
+                item.appendChild(cb);
+                item.appendChild(span);
+                list.appendChild(item);
+            });
+            div.appendChild(list);
+            container.appendChild(div);
+        });
+        updateDetailsCount();
+    }
+
+    function updateDetailsCount() {
+        const checked = document.querySelectorAll('#detailsGroups input[type=checkbox]:checked').length;
+        document.getElementById('detailsCount').textContent = checked + ' file' + (checked !== 1 ? 's' : '') + ' selected';
+        document.getElementById('detailsGenBtn').disabled = checked === 0;
+    }
+
+    var _detailsLoaded = false;
+
+    function openDetailsModal() {
+        document.getElementById('detailsOverlay').classList.add('open');
+        if (_detailsLoaded) return;
+        var spinner = document.getElementById('detailsSpinner');
+        var errDiv  = document.getElementById('detailsError');
+        spinner.classList.add('active');
+        errDiv.classList.remove('visible');
+        fetch('/api/details')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                spinner.classList.remove('active');
+                if (data.error) {
+                    errDiv.textContent = '⚠ ' + data.error;
+                    errDiv.classList.add('visible');
+                    return;
+                }
+                _detailsLoaded = true;
+                renderDetailsGroups(categorizeFiles(data.files));
+            })
+            .catch(function(err) {
+                spinner.classList.remove('active');
+                errDiv.textContent = '⚠ Could not reach server: ' + err.message;
+                errDiv.classList.add('visible');
+            });
+    }
+
+    function closeDetailsModal() {
+        document.getElementById('detailsOverlay').classList.remove('open');
+    }
+
+    function closeDetailsIfBg(e) {
+        if (e.target === document.getElementById('detailsOverlay')) closeDetailsModal();
+    }
+
+    function generateDetailsPDF() {
+        var selected = Array.from(document.querySelectorAll('#detailsGroups input[type=checkbox]:checked'))
+                           .map(function(cb) { return cb.value; });
+        if (selected.length === 0) return;
+        var btn = document.getElementById('detailsGenBtn');
+        btn.disabled = true;
+        btn.textContent = '⏳ Generating…';
+        fetch('/download_details_pdf', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ files: selected })
+        })
+        .then(function(r) {
+            if (!r.ok) return r.json().then(function(d) { return Promise.reject(d.error || 'Server error'); });
+            return r.blob();
+        })
+        .then(function(blob) {
+            var url = URL.createObjectURL(blob);
+            var a   = document.createElement('a');
+            a.href  = url;
+            var d   = new Date();
+            var dt  = (d.getMonth()+1).toString().padStart(2,'0') +
+                      d.getDate().toString().padStart(2,'0') +
+                      d.getFullYear();
+            a.download = 'AquaCell_Details_' + dt + '.pdf';
+            a.click();
+            URL.revokeObjectURL(url);
+        })
+        .catch(function(err) {
+            alert('PDF generation failed: ' + err);
+        })
+        .finally(function() {
+            btn.disabled = false;
+            btn.textContent = '⬇ Generate PDF';
+        });
+    }
+
 </script>
 
 <!-- ══ DETAIL SHEET EXPORTER MODAL ══ -->
