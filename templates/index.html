@@ -58,6 +58,160 @@
             cursor: pointer; font-size: 13px; font-weight: bold;
         }
 
+
+        /* ══ DETAIL SHEET EXPORTER MODAL ══ */
+        .details-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.65);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        .details-overlay.open { display: flex; }
+        .details-modal {
+            background: #0f1e3c;
+            color: #e2e8f0;
+            border-radius: 10px;
+            width: 680px;
+            max-width: 95vw;
+            max-height: 88vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+            border: 1px solid #1e3a8a;
+        }
+        .details-modal-header {
+            background: #1e3a8a;
+            padding: 14px 20px;
+            border-radius: 10px 10px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .details-modal-header h3 {
+            margin: 0; font-size: 15px; color: #fff;
+        }
+        .details-modal-header .details-close {
+            background: none; border: none; color: #fff;
+            font-size: 22px; cursor: pointer; line-height: 1; padding: 0 4px;
+        }
+        .details-modal-body {
+            padding: 16px 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .details-group {
+            margin-bottom: 14px;
+        }
+        .details-group-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #1a2f5e;
+            border-radius: 5px;
+            padding: 7px 12px;
+            margin-bottom: 6px;
+        }
+        .details-group-label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #93c5fd;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .details-group-toggle {
+            font-size: 11px;
+            color: #60a5fa;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            text-decoration: underline;
+        }
+        .details-file-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px 12px;
+            padding: 0 4px;
+        }
+        .details-file-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            font-size: 11.5px;
+            color: #cbd5e1;
+            padding: 3px 0;
+            cursor: pointer;
+            line-height: 1.4;
+        }
+        .details-file-item:hover { color: #fff; }
+        .details-file-item input[type=checkbox] {
+            margin-top: 2px;
+            flex-shrink: 0;
+            accent-color: #3b82f6;
+            width: 14px; height: 14px;
+        }
+        .details-modal-footer {
+            padding: 12px 20px;
+            border-top: 1px solid #1e3a8a;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .details-count {
+            flex: 1;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        .details-btn {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .details-btn-primary { background: #2563eb; color: #fff; }
+        .details-btn-primary:hover { background: #1d4ed8; }
+        .details-btn-primary:disabled { background: #475569; cursor: not-allowed; }
+        .details-btn-secondary { background: #334155; color: #e2e8f0; }
+        .details-btn-secondary:hover { background: #475569; }
+        .details-spinner {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #60a5fa;
+        }
+        .details-spinner.active { display: flex; }
+        .details-spinner-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #3b82f6;
+            animation: detailPulse 1s infinite;
+        }
+        @keyframes detailPulse {
+            0%,100% { opacity: 0.3; transform: scale(0.8); }
+            50%      { opacity: 1;   transform: scale(1.2); }
+        }
+        .details-error {
+            background: #450a0a;
+            color: #fca5a5;
+            border-radius: 5px;
+            padding: 10px 14px;
+            font-size: 12px;
+            display: none;
+        }
+        .details-error.visible { display: block; }
+        .details-select-all {
+            font-size: 11px; color: #60a5fa;
+            cursor: pointer; background: none;
+            border: none; padding: 0 0 8px 0;
+            text-decoration: underline;
+            display: block;
+        }
         /* ── SPLIT LAYOUT ── */
         .split-layout {
             display: flex;
@@ -403,6 +557,7 @@
         <button class="topbar-btn" onclick="downloadPDF()" style="background:#28a745;color:white;">⬇ Report</button>
         <button class="topbar-btn" onclick="downloadQuote()" style="background:#e67e22;color:white;">📄 Quote</button>
         <button class="topbar-btn" onclick="downloadStageCSV()" style="background:#0891b2;color:white;">📊 Stage CSV</button>
+        <button class="topbar-btn" onclick="openDetailsModal()" style="background:#0f4c81;color:white;border:1px solid #3b82f6;">📋 Details</button>
         <button class="topbar-btn" onclick="copyToEmail()" style="background:#6f42c1;color:white;">📋 Copy</button>
         <button class="topbar-btn" onclick="exportProject()" style="background:#17a2b8;color:white;">Export</button>
         <button class="topbar-btn" onclick="document.getElementById('importFile').click()" style="background:#ffc107;color:#212529;">Import</button>
@@ -2058,5 +2213,29 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         });
     }
 </script>
+
+<!-- ══ DETAIL SHEET EXPORTER MODAL ══ -->
+<div class="details-overlay" id="detailsOverlay" onclick="closeDetailsIfBg(event)">
+  <div class="details-modal">
+    <div class="details-modal-header">
+      <h3>📋 AquaCell Detail Sheet Exporter</h3>
+      <button class="details-close" onclick="closeDetailsModal()" title="Close">✕</button>
+    </div>
+    <div class="details-modal-body" id="detailsBody">
+      <div class="details-spinner active" id="detailsSpinner">
+        <div class="details-spinner-dot"></div>
+        Loading detail sheets from GitHub…
+      </div>
+      <div class="details-error" id="detailsError"></div>
+      <div id="detailsGroups"></div>
+    </div>
+    <div class="details-modal-footer">
+      <span class="details-count" id="detailsCount">0 files selected</span>
+      <button class="details-btn details-btn-secondary" onclick="closeDetailsModal()">Cancel</button>
+      <button class="details-btn details-btn-primary" id="detailsGenBtn"
+              onclick="generateDetailsPDF()" disabled>⬇ Generate PDF</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
