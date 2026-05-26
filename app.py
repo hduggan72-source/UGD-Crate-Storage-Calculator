@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, jsonify
 import io
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -9,8 +9,19 @@ import math
 import os
 import base64
 from io import BytesIO
+import requests
+from pypdf import PdfWriter, PdfReader as PyPdfReader
 
 app = Flask(__name__)
+
+# ══════════════════════════════════════════════════════════════════
+#  GITHUB DETAIL SHEET CONFIG  — update GITHUB_BRANCH when you
+#  cut a new branch; everything else stays the same.
+# ══════════════════════════════════════════════════════════════════
+GITHUB_OWNER  = "hduggan72-source"
+GITHUB_REPO   = "UGD-Crate-Storage-Calculator"
+GITHUB_BRANCH = "Quote_Report_Summary_Exports"
+GITHUB_FOLDER = "Details"
 
 # ── ASTM F2787 Live Load Model constants ──
 _LL_m    = 1.2
@@ -1562,3 +1573,78 @@ def download_quote():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+
+# ══════════════════════════════════════════════════════════════════
+#  DETAIL SHEET EXPORTER — GitHub file listing
+# ══════════════════════════════════════════════════════════════════
+
+@app.route('/api/details')
+def api_details():
+    """Return a sorted list of PDF filenames from the GitHub Details folder."""
+    url = (
+        f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
+        f"/contents/{GITHUB_FOLDER}?ref={GITHUB_BRANCH}"
+    )
+    try:
+        resp = requests.get(
+            url, timeout=12,
+            headers={
+                "Accept":     "application/vnd.github.v3+json",
+                "User-Agent": "AquaCell-Calculator"
+            }
+        )
+        resp.raise_for_status()
+        files = sorted(
+            f["name"] for f in resp.json()
+            if isinstance(f, dict) and f.get("name", "").lower().endswith(".pdf")
+        )
+        return jsonify({"files": files})
+    except Exception as exc:
+        return jsonify({"error": str(exc), "files": []}), 500
+
+
+# ══════════════════════════════════════════════════════════════════
+#  DETAIL SHEET EXPORTER — merge selected PDFs into one download
+# ══════════════════════════════════════════════════════════════════
+
+@app.route('/download_details_pdf', methods=['POST'])
+def download_details_pdf():
+    """Fetch selected PDFs from GitHub raw and merge into a single PDF."""
+    try:
+        data     = request.get_json(force=True)
+        selected = data.get('files', [])
+        if not selected:
+            return jsonify({"error": "No files selected"}), 400
+
+        base_raw = (
+            f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}"
+            f"/{GITHUB_BRANCH}/{GITHUB_FOLDER}/"
+        )
+
+        writer = PdfWriter()
+        for filename in selected:
+            raw_url = base_raw + filename
+            r = requests.get(
+                raw_url, timeout=30,
+                headers={"User-Agent": "AquaCell-Calculator"}
+            )
+            r.raise_for_status()
+            reader = PyPdfReader(BytesIO(r.content))
+            for page in reader.pages:
+                writer.add_page(page)
+
+        output = BytesIO()
+        writer.write(output)
+        output.seek(0)
+
+        date_str = datetime.datetime.now().strftime("%m%d%Y")
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name=f"AquaCell_Details_{date_str}.pdf",
+            mimetype="application/pdf"
+        )
+    except Exception as exc:
+        import traceback
+        return jsonify({"error": str(exc), "trace": traceback.format_exc()}), 500
