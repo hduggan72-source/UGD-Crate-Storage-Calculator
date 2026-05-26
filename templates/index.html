@@ -2219,15 +2219,15 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
 
     const DETAIL_GROUPS = [
         { label: 'Installation Details',
-          test: n => /^AQ1000[1-9]_|^AQ10010_|^AQ1001[9-9]_|^AQ1002[0-6]_/.test(n) },
+          test: n => /^AQ-100-0[1-9]|^AQ-100-10[ .]|^AQ-100-19|^AQ-100-2[0-6]/.test(n) },
         { label: 'Cross Sections',
-          test: n => /^AQ1001[1-8]_|^AquaCell_SC/.test(n) },
+          test: n => /^AQ-100-1[1-8]/.test(n) },
         { label: 'Component Details',
-          test: n => /^AQ30/.test(n) },
+          test: n => /^AQ-300/.test(n) },
         { label: 'Volume & Connections',
-          test: n => /^AQ20/.test(n) },
+          test: n => /^AQ-200/.test(n) },
         { label: 'Technical Bulletins',
-          test: n => /^TB|^Report_on|^TRI_|^WAVIN/.test(n) },
+          test: n => /^TB|^Report on|^TRI |^WAVIN/.test(n) },
         { label: 'Guides & Marketing',
           test: n => /^WA_/.test(n) },
         { label: 'Other', test: () => true }
@@ -2249,8 +2249,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     function friendlyName(filename) {
         return filename
             .replace(/\.pdf$/i, '')
-            .replace(/_/g, ' ')
-            .replace(/Layout\d*/gi, '')
+            .replace(/-Layout\d*(\s*\(\d+\))?$/i, '')
+            .replace(/Layout\d*(\s*\(\d+\))?$/i, '')
             .replace(/\s{2,}/g, ' ')
             .trim();
     }
