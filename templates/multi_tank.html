@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AquaCell Multi-Tank Calculator</title>
+    <style>
+        :root {
+            --bg: #f1f5f9;
+            --card: #ffffff;
+            --text: #1e293b;
+            --border: #cbd5e1;
+            --accent: #1e40af;
+            --accent2: #0891b2;
+            --navy: #0f1e3c;
+            --green: #15803d;
+            --red: #b91c1c;
+            --amber: #92400e;
+            --ltblue: #dbeafe;
+            --ltgrn: #dcfce7;
+            --sidebar-w: 340px;
+        }
+        [data-theme="dark"] {
+            --bg: #0f172a;
+            --card: #1e2937;
+            --text: #e2e8f0;
+            --border: #334155;
+            --ltblue: #1e3a8a;
+            --ltgrn: #14532d;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ══ TOP BAR ══ */
+        .topbar {
+            background: var(--navy);
+            color: #fff;
+            padding: 0 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 56px;
+            flex-shrink: 0;
+            border-bottom: 2px solid #1a3260;
+            z-index: 100;
+        }
+        .topbar-left { display: flex; align-items: center; gap: 14px; }
+        .topbar-left img { height: 34px; }
+        .topbar-title { font-size: 15px; font-weight: bold; color: #60a5fa; }
+        .topbar-sub { font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+        .topbar-badge {
+            font-size: 10px; font-weight: bold; background: #e67e22;
+            color: #fff; padding: 2px 8px; border-radius: 10px; margin-left: 8px;
+        }
+        .topbar-actions { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+        .topbar-btn {
+            padding: 6px 13px; border: none; border-radius: 4px;
+            cursor: pointer; font-size: 12px; font-weight: bold;
+            transition: opacity 0.15s;
+        }
+        .topbar-btn:hover { opacity: 0.85; }
+
+        /* ══ MAIN SPLIT ══ */
+        .main-split {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* ══ LEFT: TANK LIST SIDEBAR ══ */
+        .sidebar {
+            width: var(--sidebar-w);
+            min-width: 280px;
+            flex-shrink: 0;
+            background: var(--navy);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .sidebar-header {
+            padding: 12px 14px 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .sidebar-header-title {
+            font-size: 12px; font-weight: bold; color: #93c5fd;
+            text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px;
+        }
+        .btn-add-tank {
+            width: 100%; padding: 9px; background: #1e40af; color: #fff;
+            border: none; border-radius: 5px; font-size: 13px; font-weight: bold;
+            cursor: pointer; transition: background 0.15s;
+        }
+        .btn-add-tank:hover { background: #1d4ed8; }
+
+        .tank-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .tank-card {
+            background: #1a2f5e;
+            border-radius: 6px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+            overflow: hidden;
+        }
+        .tank-card.active {
+            border-color: #60a5fa;
+            background: #1e3a8a;
+        }
+        .tank-card:hover:not(.active) { border-color: #334d7a; }
+        .tank-card-header {
+            padding: 9px 11px 7px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .tank-card-num {
+            width: 22px; height: 22px; border-radius: 50%;
+            background: #1e40af; color: #fff; font-size: 11px; font-weight: bold;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .tank-card.active .tank-card-num { background: #60a5fa; color: #0f1e3c; }
+        .tank-card-name {
+            flex: 1; font-size: 13px; font-weight: bold; color: #e2e8f0;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .tank-card-del {
+            background: none; border: none; color: #f87171; cursor: pointer;
+            font-size: 16px; line-height: 1; padding: 0 2px;
+            opacity: 0.6; transition: opacity 0.15s;
+        }
+        .tank-card-del:hover { opacity: 1; }
+        .tank-card-meta {
+            padding: 0 11px 8px;
+            font-size: 11px; color: #94a3b8;
+            display: flex; gap: 8px; flex-wrap: wrap;
+        }
+        .tank-meta-badge {
+            background: rgba(255,255,255,0.08);
+            border-radius: 3px; padding: 1px 6px;
+            font-size: 10.5px;
+        }
+        .tank-storage-badge {
+            color: #60a5fa; font-weight: bold; font-size: 11px;
+        }
+        .tank-status-pass { color: #4ade80; }
+        .tank-status-fail { color: #f87171; }
+
+        .sidebar-footer {
+            padding: 10px 12px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            font-size: 11px;
+            color: #94a3b8;
+        }
+        .sidebar-footer .cum-total {
+            font-size: 13px; font-weight: bold; color: #60a5fa;
+        }
+
+        /* ══ CENTER: INPUTS + RESULTS ══ */
+        .center-panel {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg);
+        }
+
+        /* Empty state */
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text);
+            opacity: 0.5;
+            gap: 12px;
+            padding: 40px;
+            text-align: center;
+        }
+        .empty-state .big-icon { font-size: 52px; }
+        .empty-state p { font-size: 14px; line-height: 1.5; max-width: 340px; }
+
+        /* Tank editor */
+        .tank-editor {
+            padding: 16px 18px;
+            display: none;
+        }
+        .tank-editor.visible { display: block; }
+
+        .editor-title {
+            font-size: 15px; font-weight: bold; color: var(--accent);
+            margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+        }
+
+        .input-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 14px;
+            margin-bottom: 12px;
+        }
+        .input-group { display: flex; flex-direction: column; gap: 4px; }
+        .input-group.full { grid-column: 1 / -1; }
+        .input-group label {
+            font-size: 11px; font-weight: bold; color: var(--text); opacity: 0.7;
+            text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .input-group input, .input-group select {
+            padding: 7px 9px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--card);
+            color: var(--text);
+            font-size: 13px;
+            width: 100%;
+        }
+        .input-group input:focus, .input-group select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(30,64,175,0.12);
+        }
+
+        .section-label {
+            font-size: 11px; font-weight: bold; text-transform: uppercase;
+            letter-spacing: 0.05em; color: var(--accent); opacity: 0.8;
+            margin: 14px 0 7px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .calc-btn {
+            width: 100%; padding: 11px; background: #007bff; color: #fff;
+            border: none; border-radius: 5px; font-size: 14px; font-weight: bold;
+            cursor: pointer; margin-top: 12px; transition: background 0.15s;
+        }
+        .calc-btn:hover { background: #0056b3; }
+
+        /* ══ RESULTS PANEL ══ */
+        .results-section {
+            padding: 0 18px 20px;
+        }
+
+        .result-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+        .result-card-hdr {
+            background: var(--accent);
+            color: #fff; padding: 8px 14px;
+            font-size: 12px; font-weight: bold;
+            letter-spacing: 0.02em;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: space-between;
+            user-select: none;
+        }
+        .result-card-hdr:hover { opacity: 0.9; }
+        .result-card-hdr .rcarrow {
+            font-size: 10px; opacity: 0.7; transition: transform 0.2s;
+        }
+        .result-card-hdr.collapsed .rcarrow { transform: rotate(-90deg); }
+        .result-card-body { padding: 12px 14px; }
+        .result-card-body.hidden { display: none; }
+
+        .result-row {
+            display: flex; justify-content: space-between; align-items: baseline;
+            padding: 4px 0; border-bottom: 1px solid var(--border);
+            font-size: 12.5px; gap: 10px;
+        }
+        .result-row:last-child { border-bottom: none; }
+        .rl { color: var(--text); opacity: 0.7; flex-shrink: 0; }
+        .rv { font-weight: 600; color: var(--text); text-align: right; }
+        .rv.pass { color: var(--green); }
+        .rv.fail { color: var(--red); }
+        .rv.accent { color: var(--accent); font-size: 14px; }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin: 6px 0;
+        }
+        .stat-box {
+            background: var(--bg);
+            border-radius: 5px;
+            padding: 9px 11px;
+        }
+        .stat-lbl { font-size: 10px; opacity: 0.65; margin-bottom: 2px; }
+        .stat-val { font-size: 15px; font-weight: bold; }
+        .stat-val.blue { color: var(--accent); }
+        .stat-val.green { color: var(--green); }
+        .stat-val.red { color: var(--red); }
+
+        /* BOM table */
+        .bom-table {
+            width: 100%; border-collapse: collapse; font-size: 12px;
+        }
+        .bom-table th {
+            background: rgba(30,64,175,0.08);
+            padding: 5px 8px; text-align: left; font-size: 11px;
+        }
+        .bom-table td { padding: 4px 8px; border-bottom: 1px solid var(--border); }
+        .bom-table tr:last-child td { border-bottom: none; }
+        .bom-table .bom-num { text-align: right; font-weight: bold; }
+        .bom-table .bom-total { background: rgba(30,64,175,0.08); font-weight: bold; }
+
+        /* ══ RIGHT: CUMULATIVE BOM PANEL ══ */
+        .cum-panel {
+            width: 310px;
+            min-width: 260px;
+            flex-shrink: 0;
+            background: var(--card);
+            border-left: 2px solid var(--border);
+            overflow-y: auto;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+        .cum-title {
+            font-size: 12px; font-weight: bold; color: var(--accent);
+            text-transform: uppercase; letter-spacing: 0.05em;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid var(--accent);
+        }
+        .cum-bom-row {
+            display: flex; justify-content: space-between;
+            padding: 5px 0; border-bottom: 1px solid var(--border);
+            font-size: 12px; gap: 8px;
+        }
+        .cum-bom-row:last-child { border-bottom: none; }
+        .cum-bom-label { color: var(--text); opacity: 0.75; }
+        .cum-bom-val { font-weight: bold; color: var(--accent); }
+        .cum-highlight {
+            background: var(--ltblue);
+            border-radius: 6px;
+            padding: 10px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        .cum-highlight-label { font-size: 10px; opacity: 0.7; margin-bottom: 3px; }
+        .cum-highlight-val { font-size: 18px; font-weight: bold; color: var(--accent); }
+
+        /* Pricing */
+        .price-box {
+            background: var(--bg);
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        .price-box label {
+            font-size: 10px; font-weight: bold; text-transform: uppercase;
+            letter-spacing: 0.04em; opacity: 0.7; margin-bottom: 4px; display: block;
+        }
+        .price-box input {
+            width: 100%; padding: 6px 8px;
+            border: 1px solid var(--border); border-radius: 4px;
+            background: var(--card); color: var(--text); font-size: 13px;
+            margin-bottom: 6px;
+        }
+        .price-row {
+            display: flex; justify-content: space-between;
+            font-size: 12px; padding: 3px 0;
+        }
+        .price-total {
+            background: #0f1e3c; color: #fff; border-radius: 5px;
+            padding: 8px 10px; margin-top: 6px;
+            display: flex; justify-content: space-between;
+            font-weight: bold; font-size: 13px;
+        }
+
+        .btn-quote {
+            width: 100%; padding: 10px; background: #e67e22; color: #fff;
+            border: none; border-radius: 5px; font-size: 13px; font-weight: bold;
+            cursor: pointer; margin-top: 8px; transition: background 0.15s;
+        }
+        .btn-quote:hover { background: #d35400; }
+        .btn-json {
+            width: 100%; padding: 8px; background: #0891b2; color: #fff;
+            border: none; border-radius: 5px; font-size: 12px; font-weight: bold;
+            cursor: pointer; margin-top: 6px;
+        }
+        .btn-json:hover { background: #0e7490; }
+
+        /* Summary table in cumulative panel */
+        .summary-table {
+            width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px;
+        }
+        .summary-table th {
+            padding: 4px 6px; background: rgba(30,64,175,0.1);
+            font-size: 10px; text-align: left;
+        }
+        .summary-table td { padding: 3px 6px; border-bottom: 1px solid var(--border); }
+        .summary-table tr:last-child td { border-bottom: none; }
+
+        /* Toast */
+        .toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #1e3a8a; color: #fff; padding: 10px 20px;
+            border-radius: 6px; font-size: 13px; font-weight: bold;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+            z-index: 9999;
+        }
+        .toast.show { opacity: 1; }
+
+        /* Loading spinner */
+        .spinner {
+            display: none; align-items: center; justify-content: center;
+            gap: 8px; padding: 8px 0; font-size: 12px; color: var(--accent);
+        }
+        .spinner.active { display: flex; }
+        .spinner-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: var(--accent);
+            animation: spin 0.8s infinite ease-in-out;
+        }
+        .spinner-dot:nth-child(2) { animation-delay: 0.15s; }
+        .spinner-dot:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes spin { 0%,100% { transform: scale(0.7); opacity: 0.4; } 50% { transform: scale(1.1); opacity: 1; } }
+
+        /* Nav back button */
+        .back-link {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-size: 12px; color: #93c5fd; text-decoration: none;
+            padding: 5px 10px; border-radius: 4px;
+            border: 1px solid rgba(147,197,253,0.3);
+            transition: background 0.15s;
+        }
+        .back-link:hover { background: rgba(147,197,253,0.1); }
+    </style>
+</head>
+<body>
+
+<!-- ══ TOP BAR ══ -->
+<div class="topbar">
+    <div class="topbar-left">
+        <img src="/static/aquacell-logo.png" alt="AquaCell" onerror="this.style.display='none'">
+        <div>
+            <div class="topbar-title">
+                AquaCell Multi-Tank Calculator
+                <span class="topbar-badge" id="tankCountBadge">0 Tanks</span>
+            </div>
+            <div class="topbar-sub">Aggregate multi-tank BOMs into one cumulative order</div>
+        </div>
+    </div>
+    <div class="topbar-actions">
+        <a href="/" class="back-link">← Single Tank</a>
+        <button class="topbar-btn" onclick="exportJSON()" style="background:#0891b2;color:#fff;">⬇ Export JSON</button>
+        <button class="topbar-btn" onclick="importJSON()" style="background:#ffc107;color:#212529;">Import JSON</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImport(event)">
+        <button id="themeToggle" class="topbar-btn" style="background:transparent;color:#fff;font-size:18px;padding:4px 9px;">☀️</button>
+    </div>
+</div>
+
+<div class="main-split">
+
+    <!-- ══ SIDEBAR: Tank List ══ -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-header-title">Tanks in Project</div>
+            <button class="btn-add-tank" onclick="addTank()">+ Add Tank</button>
+        </div>
+        <div class="tank-list" id="tankList">
+            <!-- Tank cards injected by JS -->
+        </div>
+        <div class="sidebar-footer" id="sidebarFooter" style="display:none;">
+            <div style="margin-bottom:4px;">Combined Tank Storage</div>
+            <div class="cum-total" id="sfTankStorage">— ft³</div>
+            <div style="margin-top:6px;opacity:0.7;">Total System Storage (+ stone)</div>
+            <div class="cum-total" style="color:#4ade80;" id="sfTotalStorage">— ft³</div>
+        </div>
+    </div>
+
+    <!-- ══ CENTER: Tank Editor + Results ══ -->
+    <div class="center-panel" id="centerPanel">
+
+        <!-- Empty state -->
+        <div class="empty-state" id="emptyState">
+            <div class="big-icon">🏗️</div>
+            <div style="font-size:18px;font-weight:bold;">No Tanks Yet</div>
+            <p>Click <strong>+ Add Tank</strong> in the sidebar to start configuring your first underground stormwater tank. Each tank is calculated independently, and all BOMs are aggregated into one cumulative order below.</p>
+        </div>
+
+        <!-- Tank Editor (shown when a tank is selected) -->
+        <div class="tank-editor" id="tankEditor">
+            <div class="editor-title">
+                <span id="editorTankIcon">🏊</span>
+                <span id="editorTankTitle">Tank 1</span>
+                <div class="spinner" id="calcSpinner">
+                    <div class="spinner-dot"></div>
+                    <div class="spinner-dot"></div>
+                    <div class="spinner-dot"></div>
+                    Calculating…
+                </div>
+            </div>
+
+            <!-- TANK IDENTITY -->
+            <div class="section-label">Tank Identity</div>
+            <div class="input-grid">
+                <div class="input-group full">
+                    <label>Tank Label / Name</label>
+                    <input type="text" id="f_tank_label" placeholder="e.g. Basin A, Detention 1" oninput="saveDraft()">
+                </div>
+                <div class="input-group">
+                    <label>Configuration</label>
+                    <select id="f_config" onchange="saveDraft()">
+                        <option value="SC">SC — Standard</option>
+                        <option value="EX">EX — Extra Strong</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Number of Layers</label>
+                    <select id="f_layers" onchange="saveDraft()">
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3" selected>3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Traffic Load</label>
+                    <select id="f_traffic_load" onchange="saveDraft()">
+                        <option value="H10">H-10</option>
+                        <option value="HS20" selected>HS-20</option>
+                        <option value="HS25">HS-25</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Min Required Storage (ft³)</label>
+                    <input type="number" id="f_min_storage" placeholder="0" min="0" oninput="saveDraft()">
+                </div>
+            </div>
+
+            <!-- DIMENSIONS -->
+            <div class="section-label">Tank Dimensions</div>
+            <div class="input-grid">
+                <div class="input-group">
+                    <label>Known Width (ft)</label>
+                    <input type="number" id="f_known_width" step="0.01" min="0" placeholder="e.g. 20" oninput="saveDraft()">
+                </div>
+                <div class="input-group">
+                    <label>Known Length (ft)</label>
+                    <input type="number" id="f_known_length" step="0.01" min="0" placeholder="e.g. 40" oninput="saveDraft()">
+                </div>
+            </div>
+
+            <!-- ELEVATIONS -->
+            <div class="section-label">Elevations</div>
+            <div class="input-grid">
+                <div class="input-group">
+                    <label>Surface Elevation (ft)</label>
+                    <input type="number" id="f_surface_elev" step="0.01" placeholder="e.g. 850" oninput="saveDraft()">
+                </div>
+                <div class="input-group">
+                    <label>Tank Bottom Elevation (ft)</label>
+                    <input type="number" id="f_tank_bottom_elev" step="0.01" placeholder="e.g. 840" oninput="saveDraft()">
+                </div>
+            </div>
+
+            <!-- STONE & GEO -->
+            <div class="section-label">Stone &amp; Backfill</div>
+            <div class="input-grid">
+                <div class="input-group">
+                    <label>Cover Stone Depth (ft)</label>
+                    <input type="number" id="f_cover_stone" step="any" value="1.0" min="0" oninput="saveDraft()">
+                </div>
+                <div class="input-group">
+                    <label>Base Stone Depth (ft)</label>
+                    <input type="number" id="f_base_stone" step="any" value="0.333" min="0" oninput="saveDraft()">
+                </div>
+                <div class="input-group">
+                    <label>Perimeter Stone Width (ft)</label>
+                    <input type="number" id="f_perimeter_stone_width" step="any" value="1.0" min="0" oninput="saveDraft()">
+                </div>
+                <div class="input-group">
+                    <label>Stone Void Ratio</label>
+                    <input type="number" id="f_stone_void" step="0.01" value="0.40" min="0" max="1" oninput="saveDraft()">
+                </div>
+                <div class="input-group">
+                    <label>Geotextile Waste %</label>
+                    <input type="number" id="f_geoWaste" value="10" min="0" oninput="saveDraft()">
+                </div>
+            </div>
+
+            <!-- ACCESSORIES -->
+            <div class="section-label">Accessories</div>
+            <div class="input-grid">
+                <div class="input-group">
+                    <label>8-12" Pipe Connectors (2476631200)</label>
+                    <input type="number" id="f_pipe_connectors" value="0" min="0" oninput="saveDraft()">
+                </div>
+                <div class="input-group">
+                    <label>12" Top Adapters (3085857)</label>
+                    <input type="number" id="f_top_adapters_12" value="0" min="0" oninput="saveDraft()">
+                </div>
+                <div class="input-group">
+                    <label>16" Top Adapters (2476842000)</label>
+                    <input type="number" id="f_top_adapters_16" value="0" min="0" oninput="saveDraft()">
+                </div>
+            </div>
+
+            <button class="calc-btn" onclick="calculateCurrentTank()">▶ Calculate This Tank</button>
+        </div>
+
+        <!-- ══ RESULTS for selected tank ══ -->
+        <div class="results-section" id="resultsSection" style="display:none;">
+
+            <!-- Storage Summary -->
+            <div class="result-card">
+                <div class="result-card-hdr" onclick="toggleRC(this)">💧 Storage Summary <span class="rcarrow">▼</span></div>
+                <div class="result-card-body">
+                    <div class="stat-grid">
+                        <div class="stat-box">
+                            <div class="stat-lbl">AquaCell Tank Storage</div>
+                            <div class="stat-val blue" id="r_tank_storage">—</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-lbl">Stone Backfill Storage</div>
+                            <div class="stat-val" id="r_stone_storage">—</div>
+                        </div>
+                        <div class="stat-box" style="background:var(--ltblue);">
+                            <div class="stat-lbl">Total System Storage</div>
+                            <div class="stat-val blue" id="r_total_storage">—</div>
+                        </div>
+                    </div>
+                    <div id="r_storage_check" style="font-size:12px;margin-top:6px;"></div>
+                </div>
+            </div>
+
+            <!-- BOM -->
+            <div class="result-card">
+                <div class="result-card-hdr" onclick="toggleRC(this)">📦 Bill of Materials — This Tank <span class="rcarrow">▼</span></div>
+                <div class="result-card-body" style="padding:0;">
+                    <table class="bom-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th style="text-align:right;">Qty</th>
+                                <th style="text-align:right;">Weight (lbs)</th>
+                                <th style="text-align:right;">Pallets</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bomTableBody">
+                            <tr><td colspan="4" style="text-align:center;opacity:0.5;padding:12px;">Calculate to see results</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Cover & Load -->
+            <div class="result-card">
+                <div class="result-card-hdr" onclick="toggleRC(this)" style="background:#1e40af;">🛡️ Cover &amp; Load Verification <span class="rcarrow">▼</span></div>
+                <div class="result-card-body">
+                    <div class="result-row">
+                        <span class="rl">Actual Cover Depth</span>
+                        <span class="rv" id="r_cover_depth">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">Cover Status</span>
+                        <span class="rv" id="r_cover_status">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">Dead Load Pressure</span>
+                        <span class="rv" id="r_dl_psi">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">FoS — Dead Load (min 1.95)</span>
+                        <span class="rv" id="r_fos_dead">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">Factored Live Load Pressure</span>
+                        <span class="rv" id="r_ll_psi">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">FoS — Live Load (min 1.75)</span>
+                        <span class="rv" id="r_fos_ll">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dimensions -->
+            <div class="result-card">
+                <div class="result-card-hdr" onclick="toggleRC(this)" style="background:#1e40af;">📐 Dimensions <span class="rcarrow">▼</span></div>
+                <div class="result-card-body">
+                    <div class="result-row">
+                        <span class="rl">Snapped Tank (W × L)</span>
+                        <span class="rv" id="r_dims">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">Crates per Layer</span>
+                        <span class="rv" id="r_crates">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">Tank Height</span>
+                        <span class="rv" id="r_ht">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">Total System Depth</span>
+                        <span class="rv" id="r_sys_depth">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">Tank Perimeter</span>
+                        <span class="rv" id="r_perim">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">Excavation Envelope (W × L)</span>
+                        <span class="rv" id="r_excav">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Geotextile -->
+            <div class="result-card">
+                <div class="result-card-hdr" onclick="toggleRC(this)" style="background:#1e40af;">🧵 Geotextile (by others) <span class="rcarrow">▼</span></div>
+                <div class="result-card-body">
+                    <div class="result-row">
+                        <span class="rl">Tank Wrap (ft²)</span>
+                        <span class="rv" id="r_geoTank">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">Backfill Envelope (ft²)</span>
+                        <span class="rv" id="r_geoStone">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">Total Geotextile (ft²)</span>
+                        <span class="rv accent" id="r_geoTotal">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stone Backfill -->
+            <div class="result-card">
+                <div class="result-card-hdr" onclick="toggleRC(this)" style="background:#1e40af;">🪨 Stone Backfill (by others) <span class="rcarrow">▼</span></div>
+                <div class="result-card-body">
+                    <div class="result-row">
+                        <span class="rl">Purchase Volume (10% overage)</span>
+                        <span class="rv" id="r_stone_yd3">—</span>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /results-section -->
+    </div><!-- /center-panel -->
+
+    <!-- ══ RIGHT: Cumulative BOM Panel ══ -->
+    <div class="cum-panel" id="cumPanel">
+        <div class="cum-title">📋 Cumulative BOM</div>
+        <div style="font-size:11px;opacity:0.6;margin-bottom:10px;">Aggregated across all calculated tanks</div>
+
+        <div class="cum-highlight">
+            <div class="cum-highlight-label">Combined AquaCell Tank Storage</div>
+            <div class="cum-highlight-val" id="cum_tank_storage">— ft³</div>
+        </div>
+        <div class="cum-highlight" style="background:var(--ltgrn);">
+            <div class="cum-highlight-label">Combined Total System Storage</div>
+            <div class="cum-highlight-val" style="color:var(--green);" id="cum_total_storage">— ft³</div>
+        </div>
+
+        <!-- Tank summary table -->
+        <div style="font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;opacity:0.65;margin:12px 0 6px;">Tank Breakdown</div>
+        <div id="cum_tank_summary" style="font-size:11px;opacity:0.5;">Add and calculate tanks to see summary.</div>
+
+        <!-- BOM rows -->
+        <div style="font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;opacity:0.65;margin:14px 0 6px;">AquaCell Components</div>
+        <div class="cum-bom-row">
+            <span class="cum-bom-label">Base Units (3091506)</span>
+            <span class="cum-bom-val" id="cum_base_units">—</span>
+        </div>
+        <div class="cum-bom-row">
+            <span class="cum-bom-label">Side Plates (2476600003)</span>
+            <span class="cum-bom-val" id="cum_side_plates">—</span>
+        </div>
+        <div class="cum-bom-row">
+            <span class="cum-bom-label">Bottom Plates (2476600001)</span>
+            <span class="cum-bom-val" id="cum_bottom_plates">—</span>
+        </div>
+        <div class="cum-bom-row">
+            <span class="cum-bom-label">8-12" Pipe Conn. (2476631200)</span>
+            <span class="cum-bom-val" id="cum_pipe_connectors">—</span>
+        </div>
+        <div class="cum-bom-row">
+            <span class="cum-bom-label">12" Top Adapters (3085857)</span>
+            <span class="cum-bom-val" id="cum_top_adapters_12">—</span>
+        </div>
+        <div class="cum-bom-row">
+            <span class="cum-bom-label">16" Top Adapters (2476842000)</span>
+            <span class="cum-bom-val" id="cum_top_adapters_16">—</span>
+        </div>
+        <div class="cum-bom-row">
+            <span class="cum-bom-label">Contingency Units (pallet fill)</span>
+            <span class="cum-bom-val" id="cum_contingency">—</span>
+        </div>
+        <div class="cum-bom-row" style="border-top:2px solid var(--accent);margin-top:4px;padding-top:6px;">
+            <span class="cum-bom-label" style="font-weight:bold;">Est. Total Weight</span>
+            <span class="cum-bom-val" id="cum_weight" style="color:var(--green);">—</span>
+        </div>
+        <div class="cum-bom-row">
+            <span class="cum-bom-label" style="font-weight:bold;">Est. Total Pallets</span>
+            <span class="cum-bom-val" id="cum_pallets" style="color:var(--green);">—</span>
+        </div>
+
+        <!-- Geotextile & Stone cumulative -->
+        <div style="font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;opacity:0.65;margin:14px 0 6px;">By Others (Reference)</div>
+        <div class="cum-bom-row">
+            <span class="cum-bom-label">Total Geotextile (ft²)</span>
+            <span class="cum-bom-val" id="cum_geo">—</span>
+        </div>
+        <div class="cum-bom-row">
+            <span class="cum-bom-label">Total Stone (yd³ w/overage)</span>
+            <span class="cum-bom-val" id="cum_stone_yd3">—</span>
+        </div>
+
+        <!-- ── Pricing ── -->
+        <div style="font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;opacity:0.65;margin:14px 0 6px;">💲 Price Estimation</div>
+        <div class="price-box">
+            <label>Cost per ft³ (USD $)</label>
+            <input type="number" id="costPerFt3" step="0.01" placeholder="e.g. 5.19" oninput="calcPrice()">
+            <label>Freight % of AquaCell Cost</label>
+            <input type="number" id="freightPct" step="0.1" value="10" oninput="calcPrice()">
+            <div class="price-row"><span>AquaCell Subtotal</span><strong id="priceSubtotal">—</strong></div>
+            <div class="price-row"><span>Est. Freight</span><strong id="priceFreight" style="color:#e67e22;">—</strong></div>
+            <div class="price-total">
+                <span>Est. Total</span>
+                <span id="priceTotal">—</span>
+            </div>
+        </div>
+
+        <!-- ── Project Info for Quote ── -->
+        <div style="font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;opacity:0.65;margin:14px 0 6px;">Project Info (for Quote)</div>
+        <div class="price-box">
+            <label>Project Name</label>
+            <input type="text" id="q_project_name" placeholder="My Project">
+            <label>Project Number</label>
+            <input type="text" id="q_project_num" placeholder="2025-001">
+            <label>Client</label>
+            <input type="text" id="q_client" placeholder="Client Name">
+            <label>Location</label>
+            <input type="text" id="q_location" placeholder="City, State">
+            <label>Estimator (Wavin Rep)</label>
+            <input type="text" id="q_estimator" placeholder="Your Name">
+            <label>Estimator Email</label>
+            <input type="text" id="q_estimator_email" placeholder="you@wavin.com">
+            <label>Project Notes</label>
+            <input type="text" id="q_notes" placeholder="Optional notes for header">
+        </div>
+
+        <button class="btn-quote" onclick="downloadQuote()">📄 Download Multi-Tank Quote PDF</button>
+        <button class="btn-json" onclick="exportJSON()">⬇ Export Project JSON</button>
+    </div>
+
+</div><!-- /main-split -->
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════════════
+let tanks     = [];   // Array of tank input dicts
+let results   = [];   // Array of calc result dicts (parallel to tanks, null if not calculated)
+let activeIdx = null; // Currently selected tank index
+let cumBOM    = null; // Latest cumulative BOM from server
+
+const PALLETS = { base:56, side:120, bottom:120, pipe:60, adapter12:20, adapter16:12 };
+const WEIGHTS = { base:25.18, side:4.91, bottom:7.86, pipe:2.70, adapter12:11.02, adapter16:22.00 };
+
+// ══════════════════════════════════════════════════════════════════
+//  TANK LIFECYCLE
+// ══════════════════════════════════════════════════════════════════
+function addTank() {
+    const idx = tanks.length;
+    const label = `Tank ${idx + 1}`;
+    tanks.push({
+        tank_label: label,
+        config: 'SC', layers: '3', traffic_load: 'HS20',
+        known_width: '', known_length: '',
+        surface_elev: '', tank_bottom_elev: '',
+        cover_stone: '1.0', base_stone: '0.333',
+        perimeter_stone_width: '1.0', stone_void: '0.40',
+        geoWaste: '10', min_storage: '0',
+        pipe_connectors: '0', top_adapters_12: '0', top_adapters_16: '0',
+    });
+    results.push(null);
+    renderSidebar();
+    selectTank(idx);
+    showToast(`✓ ${label} added`);
+}
+
+function deleteTank(idx, ev) {
+    ev.stopPropagation();
+    if (!confirm(`Delete "${tanks[idx].tank_label}"?`)) return;
+    tanks.splice(idx, 1);
+    results.splice(idx, 1);
+    if (activeIdx === idx) {
+        activeIdx = tanks.length > 0 ? Math.max(0, idx - 1) : null;
+    } else if (activeIdx > idx) {
+        activeIdx--;
+    }
+    renderSidebar();
+    if (activeIdx !== null) selectTank(activeIdx);
+    else showEmpty();
+    rebuildCumulative();
+    showToast('Tank removed');
+}
+
+function selectTank(idx) {
+    activeIdx = idx;
+    renderSidebar();
+    loadEditor(idx);
+    if (results[idx]) showResults(results[idx]);
+    else clearResults();
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SIDEBAR
+// ══════════════════════════════════════════════════════════════════
+function renderSidebar() {
+    const list = document.getElementById('tankList');
+    list.innerHTML = '';
+
+    tanks.forEach((t, i) => {
+        const r = results[i];
+        const div = document.createElement('div');
+        div.className = 'tank-card' + (i === activeIdx ? ' active' : '');
+        div.onclick = () => selectTank(i);
+
+        let metaHtml = `
+            <span class="tank-meta-badge">${t.config}-${t.layers}</span>
+            <span class="tank-meta-badge">${t.traffic_load || 'HS20'}</span>
+        `;
+        let storageHtml = '';
+        if (r) {
+            const covCls = r.cover_ok ? 'tank-status-pass' : 'tank-status-fail';
+            storageHtml = `<span class="tank-storage-badge">${r.tank_storage.toLocaleString()} ft³</span>
+                           <span class="${covCls}" style="font-size:10px;">${r.cover_ok ? '✓ Cover OK' : '✗ Cover FAIL'}</span>`;
+        } else {
+            storageHtml = `<span style="font-size:10px;opacity:0.5;font-style:italic;">Not calculated</span>`;
+        }
+
+        div.innerHTML = `
+            <div class="tank-card-header">
+                <div class="tank-card-num">${i + 1}</div>
+                <div class="tank-card-name">${t.tank_label || 'Tank ' + (i+1)}</div>
+                <button class="tank-card-del" onclick="deleteTank(${i}, event)" title="Delete">×</button>
+            </div>
+            <div class="tank-card-meta">
+                ${metaHtml}
+                ${storageHtml}
+            </div>
+        `;
+        list.appendChild(div);
+    });
+
+    document.getElementById('tankCountBadge').textContent = tanks.length + ' Tank' + (tanks.length !== 1 ? 's' : '');
+
+    // Sidebar footer storage totals
+    const calcedTanks = results.filter(Boolean);
+    if (calcedTanks.length > 0) {
+        const totTank  = calcedTanks.reduce((s, r) => s + r.tank_storage,  0);
+        const totTotal = calcedTanks.reduce((s, r) => s + r.total_storage, 0);
+        document.getElementById('sfTankStorage').textContent  = totTank.toFixed(1)  + ' ft³';
+        document.getElementById('sfTotalStorage').textContent = totTotal.toFixed(1) + ' ft³';
+        document.getElementById('sidebarFooter').style.display = '';
+    } else {
+        document.getElementById('sidebarFooter').style.display = 'none';
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  EDITOR LOAD / SAVE
+// ══════════════════════════════════════════════════════════════════
+const FIELDS = [
+    'tank_label','config','layers','traffic_load','known_width','known_length',
+    'surface_elev','tank_bottom_elev','cover_stone','base_stone',
+    'perimeter_stone_width','stone_void','geoWaste','min_storage',
+    'pipe_connectors','top_adapters_12','top_adapters_16',
+];
+
+function loadEditor(idx) {
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('tankEditor').classList.add('visible');
+    document.getElementById('editorTankTitle').textContent = tanks[idx].tank_label || `Tank ${idx + 1}`;
+    document.getElementById('editorTankIcon').textContent = ['🏊','🌊','🏗️','🔵','🟦','💧','⬛','🟣'][idx % 8];
+
+    FIELDS.forEach(f => {
+        const el = document.getElementById('f_' + f);
+        if (el) el.value = tanks[idx][f] !== undefined ? tanks[idx][f] : '';
+    });
+}
+
+function saveDraft() {
+    if (activeIdx === null) return;
+    FIELDS.forEach(f => {
+        const el = document.getElementById('f_' + f);
+        if (el) tanks[activeIdx][f] = el.value;
+    });
+    document.getElementById('editorTankTitle').textContent = tanks[activeIdx].tank_label || `Tank ${activeIdx + 1}`;
+    renderSidebar();
+}
+
+function showEmpty() {
+    document.getElementById('emptyState').style.display = '';
+    document.getElementById('tankEditor').classList.remove('visible');
+    document.getElementById('resultsSection').style.display = 'none';
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  CALCULATION
+// ══════════════════════════════════════════════════════════════════
+async function calculateCurrentTank() {
+    if (activeIdx === null) return;
+    saveDraft();
+
+    const spinner = document.getElementById('calcSpinner');
+    spinner.classList.add('active');
+
+    try {
+        const resp = await fetch('/multi/calculate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tanks: [tanks[activeIdx]] })
+        });
+        const data = await resp.json();
+        if (data.error) { alert('Calculation error: ' + data.error); return; }
+
+        results[activeIdx] = data.tank_results[0];
+        showResults(results[activeIdx]);
+        renderSidebar();
+        rebuildCumulative();
+        showToast('✓ Calculated');
+    } catch (err) {
+        alert('Network error: ' + err.message);
+    } finally {
+        spinner.classList.remove('active');
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SHOW RESULTS
+// ══════════════════════════════════════════════════════════════════
+const UNIT_WEIGHTS = { base_units:25.18, side_plates:4.91, bottom_plates:7.86,
+                        pipe_connectors:2.70, top_adapters_12:11.02, top_adapters_16:22.00, contingency:25.18 };
+const PALLET_COUNTS = { base_units:56, side_plates:120, bottom_plates:120,
+                         pipe_connectors:60, top_adapters_12:20, top_adapters_16:12, contingency:56 };
+
+function fmtNum(v, dec=1) { return typeof v === 'number' ? v.toLocaleString(undefined,{minimumFractionDigits:dec,maximumFractionDigits:dec}) : '—'; }
+function setEl(id, v) { const e = document.getElementById(id); if (e) e.textContent = v; }
+function setClass(id, cls) { const e = document.getElementById(id); if (e) e.className = 'rv ' + cls; }
+
+function showResults(r) {
+    document.getElementById('resultsSection').style.display = '';
+
+    // Storage
+    setEl('r_tank_storage',  fmtNum(r.tank_storage) + ' ft³');
+    setEl('r_stone_storage', fmtNum(r.stone_storage) + ' ft³');
+    setEl('r_total_storage', fmtNum(r.total_storage) + ' ft³');
+    if (r.min_storage > 0) {
+        const ok = r.storage_ok;
+        document.getElementById('r_storage_check').innerHTML =
+            `<span style="color:${ok?'var(--green)':'var(--red)'};">` +
+            `Required: ${r.min_storage.toLocaleString()} ft³ — ${ok ? '✓ PASS' : '✗ FAIL'}` +
+            `</span>`;
+    } else {
+        document.getElementById('r_storage_check').innerHTML = '';
+    }
+
+    // BOM
+    const contQty = Math.max(0, Math.ceil(r.base_units / 56) * 56 - r.base_units);
+    const bomData = [
+        { label: 'Base Unit (3091506)',           key: 'base_units',      qty: r.base_units },
+        { label: 'Side Plate (2476600003)',        key: 'side_plates',     qty: r.side_plates },
+        { label: 'Bottom Plate (2476600001)',      key: 'bottom_plates',   qty: r.bottom_plates },
+        { label: '8-12" Pipe Conn (2476631200)',  key: 'pipe_connectors', qty: r.pipe_connectors },
+        { label: '12" Top Adapter (3085857)',      key: 'top_adapters_12', qty: r.top_adapters_12 },
+        { label: '16" Top Adapter (2476842000)',   key: 'top_adapters_16', qty: r.top_adapters_16 },
+        { label: 'Contingency (pallet fill)',      key: 'contingency',     qty: contQty },
+    ];
+
+    let totalW = 0, totalP = 0, totalQ = 0;
+    const tbody = document.getElementById('bomTableBody');
+    tbody.innerHTML = '';
+    bomData.forEach(b => {
+        const w = b.qty * (UNIT_WEIGHTS[b.key] || 0);
+        const p = b.qty > 0 ? Math.ceil(b.qty / (PALLET_COUNTS[b.key] || 1)) : 0;
+        totalW += w; totalQ += b.qty; totalP += p;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${b.label}</td>
+            <td class="bom-num">${b.qty.toLocaleString()}</td>
+            <td class="bom-num">${w > 0 ? w.toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1}) + ' lbs' : '—'}</td>
+            <td class="bom-num">${p > 0 ? p : '—'}</td>`;
+        tbody.appendChild(tr);
+    });
+    const tfoot = document.createElement('tr');
+    tfoot.className = 'bom-total';
+    tfoot.innerHTML = `<td><strong>TOTAL</strong></td>
+        <td class="bom-num"><strong>${totalQ.toLocaleString()}</strong></td>
+        <td class="bom-num" style="color:var(--accent);"><strong>${totalW.toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1})} lbs</strong></td>
+        <td class="bom-num" style="color:var(--accent);"><strong>${totalP} pallets</strong></td>`;
+    tbody.appendChild(tfoot);
+
+    // Cover & load
+    setEl('r_cover_depth', fmtNum(r.cover_depth, 2) + ' ft');
+    const covEl = document.getElementById('r_cover_status');
+    covEl.textContent = r.cover_ok ? `✓ PASS (min ${r.min_cover} ft)` : `✗ FAIL (min ${r.min_cover} ft required)`;
+    covEl.className = 'rv ' + (r.cover_ok ? 'pass' : 'fail');
+    setEl('r_dl_psi', (r.dead_load_psi || '—') + ' psi');
+
+    const fosDeadEl = document.getElementById('r_fos_dead');
+    fosDeadEl.textContent = r.fos_dead ? r.fos_dead : '—';
+    fosDeadEl.className = 'rv ' + (r.fos_dead && r.fos_dead >= 1.95 ? 'pass' : 'fail');
+
+    setEl('r_ll_psi', r.ll_psi ? r.ll_psi + ' psi' : '—');
+    const fosLLEl = document.getElementById('r_fos_ll');
+    fosLLEl.textContent = r.fos_ll ? r.fos_ll : '—';
+    fosLLEl.className = 'rv ' + (r.fos_ll && r.fos_ll >= 1.75 ? 'pass' : 'fail');
+
+    // Dimensions
+    setEl('r_dims',      `${r.tank_width} ft × ${r.tank_length} ft`);
+    setEl('r_crates',    `${r.crates_wide} × ${r.crates_long} = ${r.crates_layer}/layer`);
+    setEl('r_ht',        `${r.tank_height} ft`);
+    setEl('r_sys_depth', `${r.total_system_depth} ft`);
+    setEl('r_perim',     `${r.used_perimeter} ft`);
+    setEl('r_excav',     `${r.outer_width} ft × ${r.outer_length} ft`);
+
+    // Geotextile
+    setEl('r_geoTank',  fmtNum(r.geoTank, 1) + ' ft²');
+    setEl('r_geoStone', fmtNum(r.geoStone, 1) + ' ft²');
+    setEl('r_geoTotal', fmtNum(r.geoTotal, 1) + ' ft²');
+
+    // Stone
+    setEl('r_stone_yd3', fmtNum(r.stone_yd3, 1) + ' yd³');
+}
+
+function clearResults() {
+    document.getElementById('resultsSection').style.display = 'none';
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  CUMULATIVE BOM
+// ══════════════════════════════════════════════════════════════════
+async function rebuildCumulative() {
+    const calcedTanks = tanks.filter((_, i) => results[i] !== null);
+    if (calcedTanks.length === 0) {
+        clearCumulative();
+        return;
+    }
+
+    try {
+        const resp = await fetch('/multi/calculate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tanks: calcedTanks })
+        });
+        const data = await resp.json();
+        if (data.error) return;
+        cumBOM = data;
+        renderCumulative(data);
+    } catch (err) {
+        console.warn('Cumulative rebuild failed:', err);
+    }
+}
+
+function renderCumulative(data) {
+    const cum = data.cumulative;
+    const det = data.bom_detail;
+
+    setEl('cum_tank_storage',   fmtNum(cum.tank_storage, 1) + ' ft³');
+    setEl('cum_total_storage',  fmtNum(cum.total_storage, 1) + ' ft³');
+    setEl('cum_base_units',     cum.base_units.toLocaleString());
+    setEl('cum_side_plates',    cum.side_plates.toLocaleString());
+    setEl('cum_bottom_plates',  cum.bottom_plates.toLocaleString());
+    setEl('cum_pipe_connectors',cum.pipe_connectors.toLocaleString());
+    setEl('cum_top_adapters_12',cum.top_adapters_12.toLocaleString());
+    setEl('cum_top_adapters_16',cum.top_adapters_16.toLocaleString());
+    setEl('cum_contingency',    cum.contingency.toLocaleString());
+    setEl('cum_weight',         data.total_weight.toLocaleString(undefined,{minimumFractionDigits:1}) + ' lbs');
+    setEl('cum_pallets',        data.total_pallets.toLocaleString() + ' pallets');
+    setEl('cum_geo',            fmtNum(cum.geoTotal, 1) + ' ft²');
+    setEl('cum_stone_yd3',      fmtNum(cum.stone_yd3, 1) + ' yd³');
+
+    // Tank summary table
+    const calcedResults = results.filter(Boolean);
+    let tableHtml = `<table class="summary-table">
+        <thead><tr><th>Tank</th><th style="text-align:right;">Config</th><th style="text-align:right;">Tank ft³</th><th style="text-align:right;">Cover</th></tr></thead>
+        <tbody>`;
+    calcedResults.forEach((r, i) => {
+        tableHtml += `<tr>
+            <td>${r.tank_label}</td>
+            <td style="text-align:right;">${r.config}-${r.layers}</td>
+            <td style="text-align:right;font-weight:bold;color:var(--accent);">${r.tank_storage.toLocaleString()}</td>
+            <td style="text-align:right;color:${r.cover_ok ? 'var(--green)' : 'var(--red)'};">${r.cover_ok ? '✓' : '✗'}</td>
+        </tr>`;
+    });
+    tableHtml += '</tbody></table>';
+    document.getElementById('cum_tank_summary').innerHTML = tableHtml;
+
+    calcPrice();
+}
+
+function clearCumulative() {
+    ['cum_tank_storage','cum_total_storage','cum_base_units','cum_side_plates',
+     'cum_bottom_plates','cum_pipe_connectors','cum_top_adapters_12','cum_top_adapters_16',
+     'cum_contingency','cum_weight','cum_pallets','cum_geo','cum_stone_yd3'].forEach(id => setEl(id, '—'));
+    document.getElementById('cum_tank_summary').innerHTML = '<span style="font-size:11px;opacity:0.5;">No tanks calculated yet.</span>';
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  PRICE CALCULATION
+// ══════════════════════════════════════════════════════════════════
+function calcPrice() {
+    if (!cumBOM) return;
+    const cpp = parseFloat(document.getElementById('costPerFt3').value) || 0;
+    const fPct = parseFloat(document.getElementById('freightPct').value) || 0;
+    if (cpp <= 0) {
+        setEl('priceSubtotal', '—');
+        setEl('priceFreight', '—');
+        setEl('priceTotal', '—');
+        return;
+    }
+    const storage  = cumBOM.cumulative.tank_storage;
+    const subtotal = cpp * storage;
+    const freight  = subtotal * fPct / 100;
+    const total    = subtotal + freight;
+    const fmt = v => '$' + v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+    setEl('priceSubtotal', fmt(subtotal));
+    setEl('priceFreight',  fmt(freight));
+    setEl('priceTotal',    fmt(total));
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  QUOTE PDF DOWNLOAD
+// ══════════════════════════════════════════════════════════════════
+async function downloadQuote() {
+    const calcedIdxs = results.reduce((acc, r, i) => { if (r) acc.push(i); return acc; }, []);
+    if (calcedIdxs.length === 0) {
+        alert('Please calculate at least one tank first.');
+        return;
+    }
+
+    const payload = {
+        project_name:    document.getElementById('q_project_name').value,
+        project_num:     document.getElementById('q_project_num').value,
+        client:          document.getElementById('q_client').value,
+        location:        document.getElementById('q_location').value,
+        estimator:       document.getElementById('q_estimator').value,
+        estimator_email: document.getElementById('q_estimator_email').value,
+        project_notes:   document.getElementById('q_notes').value,
+        cost_per_ft3:    parseFloat(document.getElementById('costPerFt3').value) || 0,
+        freight_pct:     parseFloat(document.getElementById('freightPct').value) || 10,
+        tanks:           calcedIdxs.map(i => tanks[i]),
+    };
+
+    try {
+        const resp = await fetch('/multi/download_quote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            alert('Quote error: ' + (err.error || 'Unknown'));
+            return;
+        }
+        const blob = await resp.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url;
+        const proj = (payload.project_name || 'Project').replace(/[^a-zA-Z0-9\-_ ]/g,'_').replace(/\s+/g,'_');
+        const dt   = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'');
+        a.download = `AquaCell_MultiTank_Quote_${proj}_${dt}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('✓ Quote downloaded');
+    } catch (err) {
+        alert('Download failed: ' + err.message);
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  JSON EXPORT / IMPORT
+// ══════════════════════════════════════════════════════════════════
+function exportJSON() {
+    const payload = {
+        version: 1,
+        exported: new Date().toISOString(),
+        project: {
+            name:           document.getElementById('q_project_name').value,
+            num:            document.getElementById('q_project_num').value,
+            client:         document.getElementById('q_client').value,
+            location:       document.getElementById('q_location').value,
+            estimator:      document.getElementById('q_estimator').value,
+            estimator_email:document.getElementById('q_estimator_email').value,
+            notes:          document.getElementById('q_notes').value,
+        },
+        pricing: {
+            cost_per_ft3: parseFloat(document.getElementById('costPerFt3').value) || 0,
+            freight_pct:  parseFloat(document.getElementById('freightPct').value) || 10,
+        },
+        tanks: tanks,
+        results: results,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    const proj = (payload.project.name || 'Project').replace(/\s+/g,'_');
+    a.download = `AquaCell_MultiTank_${proj}_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('✓ JSON exported');
+}
+
+function importJSON() {
+    document.getElementById('importFile').click();
+}
+
+function handleImport(ev) {
+    const file = ev.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (data.tanks) tanks = data.tanks;
+            if (data.results) results = data.results;
+            if (data.project) {
+                document.getElementById('q_project_name').value    = data.project.name || '';
+                document.getElementById('q_project_num').value     = data.project.num || '';
+                document.getElementById('q_client').value          = data.project.client || '';
+                document.getElementById('q_location').value        = data.project.location || '';
+                document.getElementById('q_estimator').value       = data.project.estimator || '';
+                document.getElementById('q_estimator_email').value = data.project.estimator_email || '';
+                document.getElementById('q_notes').value           = data.project.notes || '';
+            }
+            if (data.pricing) {
+                document.getElementById('costPerFt3').value = data.pricing.cost_per_ft3 || '';
+                document.getElementById('freightPct').value = data.pricing.freight_pct  || 10;
+            }
+            renderSidebar();
+            if (tanks.length > 0) selectTank(0);
+            else showEmpty();
+            rebuildCumulative();
+            showToast('✓ Project imported');
+        } catch (err) {
+            alert('Failed to import JSON: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+    ev.target.value = '';
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  UI HELPERS
+// ══════════════════════════════════════════════════════════════════
+function toggleRC(hdr) {
+    let body = hdr.nextElementSibling;
+    while (body && !body.classList.contains('result-card-body')) body = body.nextElementSibling;
+    if (!body) return;
+    const collapsed = hdr.classList.toggle('collapsed');
+    body.classList.toggle('hidden', collapsed);
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  THEME
+// ══════════════════════════════════════════════════════════════════
+const toggleBtn = document.getElementById('themeToggle');
+const savedTheme = localStorage.getItem('ac_theme') || 'light';
+if (savedTheme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    toggleBtn.textContent = '🌙';
+}
+toggleBtn.addEventListener('click', () => {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    if (isDark) {
+        document.documentElement.removeAttribute('data-theme');
+        toggleBtn.textContent = '☀️';
+        localStorage.setItem('ac_theme', 'light');
+    } else {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        toggleBtn.textContent = '🌙';
+        localStorage.setItem('ac_theme', 'dark');
+    }
+});
+
+// Init
+renderSidebar();
+</script>
+</body>
+</html>
