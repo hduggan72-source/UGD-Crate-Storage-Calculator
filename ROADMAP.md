@@ -89,7 +89,9 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] add field for contingency units in BOM CARD and add line on quote sheet
 -  [X] Add a pallet count estimator, weight estimator, and contingency calculator that can be added to the quote sheet or at least on dashboard when calculated
 
+-  [X] (v15) Multiple Basin Entry and Reports
  
+
 ** ## Next Up (High Priority – Do These Next)**
 
 - command button to collapse all cards
@@ -104,7 +106,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 
 **## Backlog / Future Enhancements (Add here when ideas come up)**
-- (v15) Multiple Basin Entry and Reports
+
 - (v16) PRICING ENGINE THAT CAN BE EASILY ADJUSTED FOR DIST, MARKET, MSRP ESTIMATES. ALLOW FOR UPLOADING OF COMPONENT PRICING OR MULTIPLIER WHEN PRICE INCREASES OCCUR
 - (v17) USE CANVAS TO BUILD A CONCEPTUAL TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
 - (v18) UPLOAD PLAN SHEET AND CRATE AN OVERLAY OF TANK
