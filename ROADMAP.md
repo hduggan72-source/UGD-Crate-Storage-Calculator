@@ -92,8 +92,9 @@ Professional web-based calculator for designing and quoting underground stormwat
  
 ** ## Next Up (High Priority – Do These Next)**
 
+- command button to collapse all cards
 - optional geogrid totals (based on excavation area + overage)
-- add place for notes about > 18" connectors and geotextile boots to be installed
+- add place for "additional accessories" in BOM?
 - Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed (added to excavation & dimensional summary card
 - bouyancy calculator
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
