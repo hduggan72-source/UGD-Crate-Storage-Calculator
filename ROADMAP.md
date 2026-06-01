@@ -92,7 +92,7 @@ Professional web-based calculator for designing and quoting underground stormwat
  
 
 ** ## Next Up (High Priority – Do These Next)**
-
+- add fabric and stone totals for both tanks to reports and quote
 - command button to collapse all cards
 - optional geogrid totals (based on excavation area + overage)
 - add place for "additional accessories" in BOM?
