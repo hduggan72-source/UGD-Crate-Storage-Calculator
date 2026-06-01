@@ -1,3 +1,4 @@
 flask
 reportlab
-gunicorn
+pypdf
+requests
