@@ -2,3 +2,4 @@ flask
 reportlab
 pypdf
 requests
+gunicorn
