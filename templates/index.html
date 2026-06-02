@@ -1000,6 +1000,11 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             <input type="number" id="freightPct" step="0.1" placeholder="e.g., 10" value="10"
                                 style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
                         </div>
+                        <div>
+                            <label style="display:block;font-size:12px;opacity:0.7;margin-bottom:4px;">Market Price % Above Total <span style="font-size:10px;color:#f39c12;">(optional)</span></label>
+                            <input type="number" id="marketPricePct" step="0.1" placeholder="e.g., 10" value="10"
+                                style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
+                        </div>
                         <div style="align-self:end;">
                             <button type="button" onclick="calculateAquaCellPrice()"
                                 style="width:100%;padding:10px;background:#00b0ff;color:white;border:none;border-radius:4px;font-size:14px;font-weight:bold;cursor:pointer;">
@@ -1007,7 +1012,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             </button>
                         </div>
                     </div>
-                    <div class="result-grid2" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
+                    <div class="result-grid2" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;">
                         <div class="result-stat">
                             <div class="result-stat-label">Net AquaCell Storage (ft³)</div>
                             <div id="priceCrateStorage" class="result-stat-value" style="color:#00b0ff;">—</div>
@@ -1024,12 +1029,18 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             <div class="result-stat-label">Est. Total</div>
                             <div id="priceTotalCost" class="result-stat-value" style="color:#2ecc71;">—</div>
                         </div>
+                        <div class="result-stat" style="border:1px solid #f39c12;border-radius:6px;">
+                            <div class="result-stat-label" style="color:#f39c12;">📢 Suggested Market Price</div>
+                            <div id="priceMarket" class="result-stat-value" style="color:#f39c12;">—</div>
+                        </div>
                     </div>
                     <input type="hidden" id="hiddenTotalAquaCellCost" name="totalAquaCellCost" value="">
                     <input type="hidden" id="hiddenFreightCost" name="freightCost" value="">
                     <input type="hidden" id="hiddenTotalWithFreight" name="totalWithFreight" value="">
                     <input type="hidden" id="hiddenFreightPct" name="freightPct" value="">
                     <input type="hidden" id="hiddenCostPerFt3" name="costPerFt3Hidden" value="">
+                    <input type="hidden" id="hiddenMarketPrice" name="marketPrice" value="">
+                    <input type="hidden" id="hiddenMarketPricePct" name="marketPricePct" value="">
                 </div>
             </div>
 
@@ -1668,6 +1679,18 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         document.getElementById('hiddenTotalWithFreight').value  = total.toFixed(2);
         document.getElementById('hiddenFreightPct').value        = freightPct.toFixed(1);
         document.getElementById('hiddenCostPerFt3').value        = cost.toFixed(4);
+
+        // Market price
+        const marketPct = parseFloat(document.getElementById('marketPricePct').value) || 0;
+        const marketPrice = total * (1 + marketPct / 100);
+        const marketEl = document.getElementById('priceMarket');
+        if (marketEl) {
+            marketEl.textContent = marketPct > 0
+                ? fmt(marketPrice) + '  (+' + marketPct + '%)'
+                : '—';
+        }
+        document.getElementById('hiddenMarketPrice').value    = marketPrice.toFixed(2);
+        document.getElementById('hiddenMarketPricePct').value = marketPct.toFixed(1);
     }
 
     function downloadQuote() {
@@ -1680,6 +1703,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         formData.append('totalWithFreight',   document.getElementById('hiddenTotalWithFreight').value   || '0');
         formData.append('freightPct',         document.getElementById('hiddenFreightPct').value         || '10');
         formData.append('costPerFt3Hidden',   document.getElementById('hiddenCostPerFt3').value         || '0');
+        formData.append('marketPrice',        document.getElementById('hiddenMarketPrice').value          || '0');
+        formData.append('marketPricePct',     document.getElementById('hiddenMarketPricePct').value        || '0');
         // Explicitly pass project number to guarantee filename
         formData.set('project_num', document.getElementById('project_num')?.value || '');
 
