@@ -568,6 +568,7 @@
     </div>
 </div>
 
+ 
 <!-- ══════════════ SPLIT LAYOUT ══════════════ -->
 <div class="split-layout">
 
@@ -1005,6 +1006,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             <input type="number" id="marketPricePct" step="0.1" placeholder="e.g., 10" value="10"
                                 style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
                         </div>
+                        <div>
+                            <label style="display:block;font-size:12px;opacity:0.7;margin-bottom:4px;">Unit Price ($/Base Unit) <span style="font-size:10px;color:#64748b;">auto-calculated</span></label>
+                            <input type="number" id="unitPricePerCrate" step="0.01" placeholder="Auto after Calculate"
+                                style="width:100%;padding:8px;border:1px solid #00b0ff;border-radius:4px;background:var(--card);color:#00b0ff;font-size:14px;font-weight:bold;"
+                                title="Auto-calculated as AquaCell Subtotal ÷ Base Units. Editable if needed.">
+                        </div>
                         <div style="align-self:end;">
                             <button type="button" onclick="calculateAquaCellPrice()"
                                 style="width:100%;padding:10px;background:#00b0ff;color:white;border:none;border-radius:4px;font-size:14px;font-weight:bold;cursor:pointer;">
@@ -1041,6 +1048,9 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     <input type="hidden" id="hiddenCostPerFt3" name="costPerFt3Hidden" value="">
                     <input type="hidden" id="hiddenMarketPrice" name="marketPrice" value="">
                     <input type="hidden" id="hiddenMarketPricePct" name="marketPricePct" value="">
+                    <input type="hidden" id="hiddenContingencyQty" name="contingencyQtyPriced" value="">
+                    <input type="hidden" id="hiddenUnitPrice" name="unitPricePerCrate" value="">
+                    <input type="hidden" id="hiddenContingencyStorage" name="contingencyStorage" value="">
                 </div>
             </div>
 
@@ -1662,35 +1672,60 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             return;
         }
 
-        const subtotal = cost * storage;
+        // Base AquaCell subtotal (ft³ × $/ft³)
+        const baseSubtotal   = cost * storage;
+        const baseUnitsQty   = parseInt((document.getElementById('bom_base_units')?.textContent || '0').replace(/,/g,'')) || 0;
+
+        // Auto-calculate $/unit = baseSubtotal / baseUnits, but allow user override
+        let unitPrice = parseFloat(document.getElementById('unitPricePerCrate')?.value) || 0;
+        const autoUnitPrice = baseUnitsQty > 0 ? baseSubtotal / baseUnitsQty : 0;
+        if (unitPrice <= 0) {
+            unitPrice = autoUnitPrice;
+            const upEl = document.getElementById('unitPricePerCrate');
+            if (upEl) upEl.value = autoUnitPrice.toFixed(4);
+        }
+
+        // Contingency priced at explicit $/unit
+        const contingencyQty      = parseInt((document.getElementById('contingency_units')?.value || '0')) || 0;
+        const contingencyUnitCost = contingencyQty * unitPrice;
+
+        const subtotal = baseSubtotal + contingencyUnitCost;
         const freight  = subtotal * (freightPct / 100);
         const total    = subtotal + freight;
 
         const fmt = (v) => '$' + v.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+        const fmtU = (v) => '$' + v.toLocaleString(undefined, {minimumFractionDigits:4, maximumFractionDigits:4});
 
-        document.getElementById('priceCrateStorage').textContent = storage.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1}) + ' ft³';
+        document.getElementById('priceCrateStorage').textContent =
+            storage.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1}) + ' ft³'
+            + (contingencyQty > 0 ? '  +' + contingencyQty + ' contingency @ ' + fmtU(unitPrice) + '/unit' : '');
         document.getElementById('priceSubtotal').textContent     = fmt(subtotal);
         document.getElementById('priceFreight').textContent      = fmt(freight) + (freightPct > 0 ? '  (' + freightPct + '%)' : '');
         document.getElementById('priceTotalCost').textContent    = fmt(total);
 
         // Store for quote export
-        document.getElementById('hiddenTotalAquaCellCost').value = subtotal.toFixed(2);
-        document.getElementById('hiddenFreightCost').value       = freight.toFixed(2);
-        document.getElementById('hiddenTotalWithFreight').value  = total.toFixed(2);
-        document.getElementById('hiddenFreightPct').value        = freightPct.toFixed(1);
-        document.getElementById('hiddenCostPerFt3').value        = cost.toFixed(4);
+        document.getElementById('hiddenTotalAquaCellCost').value  = subtotal.toFixed(2);
+        document.getElementById('hiddenFreightCost').value        = freight.toFixed(2);
+        document.getElementById('hiddenTotalWithFreight').value   = total.toFixed(2);
+        document.getElementById('hiddenFreightPct').value         = freightPct.toFixed(1);
+        document.getElementById('hiddenCostPerFt3').value         = cost.toFixed(4);
+        document.getElementById('hiddenContingencyQty').value     = contingencyQty;
+        document.getElementById('hiddenContingencyStorage').value = contingencyUnitCost.toFixed(2);
+        document.getElementById('hiddenUnitPrice').value          = unitPrice.toFixed(4);
 
         // Market price
-        const marketPct = parseFloat(document.getElementById('marketPricePct').value) || 0;
+        const marketPct   = parseFloat(document.getElementById('marketPricePct')?.value) || 0;
         const marketPrice = total * (1 + marketPct / 100);
-        const marketEl = document.getElementById('priceMarket');
+        const marketEl    = document.getElementById('priceMarket');
         if (marketEl) {
             marketEl.textContent = marketPct > 0
                 ? fmt(marketPrice) + '  (+' + marketPct + '%)'
                 : '—';
         }
-        document.getElementById('hiddenMarketPrice').value    = marketPrice.toFixed(2);
-        document.getElementById('hiddenMarketPricePct').value = marketPct.toFixed(1);
+        const hMP = document.getElementById('hiddenMarketPrice');
+        const hMPP = document.getElementById('hiddenMarketPricePct');
+        if (hMP)  hMP.value  = marketPrice.toFixed(2);
+        if (hMPP) hMPP.value = marketPct.toFixed(1);
     }
 
     function downloadQuote() {
@@ -1702,9 +1737,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         formData.append('freightCost',        document.getElementById('hiddenFreightCost').value        || '0');
         formData.append('totalWithFreight',   document.getElementById('hiddenTotalWithFreight').value   || '0');
         formData.append('freightPct',         document.getElementById('hiddenFreightPct').value         || '10');
-        formData.append('costPerFt3Hidden',   document.getElementById('hiddenCostPerFt3').value         || '0');
-        formData.append('marketPrice',        document.getElementById('hiddenMarketPrice').value          || '0');
-        formData.append('marketPricePct',     document.getElementById('hiddenMarketPricePct').value        || '0');
+        formData.append('costPerFt3Hidden',      document.getElementById('hiddenCostPerFt3').value         || '0');
+        formData.append('marketPrice',           document.getElementById('hiddenMarketPrice')?.value         || '0');
+        formData.append('marketPricePct',        document.getElementById('hiddenMarketPricePct')?.value       || '0');
+        formData.append('contingencyQtyPriced',  document.getElementById('hiddenContingencyQty')?.value      || '0');
+        formData.append('contingencyStorage',    document.getElementById('hiddenContingencyStorage')?.value   || '0');
+        formData.append('unitPricePerCrate',     document.getElementById('hiddenUnitPrice')?.value            || '0');
         // Explicitly pass project number to guarantee filename
         formData.set('project_num', document.getElementById('project_num')?.value || '');
 
