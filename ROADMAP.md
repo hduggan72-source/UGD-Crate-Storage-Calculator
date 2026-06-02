@@ -93,6 +93,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 ** ## Next Up (High Priority – Do These Next)**
 
+- Add pricing to the CONTINGENCY BASINS as well. We should be encouraging those on every job.
 - command button to collapse all cards
 - optional geogrid totals (based on excavation area + overage)
 - add place for "additional accessories" in BOM?
