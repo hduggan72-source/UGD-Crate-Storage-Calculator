@@ -461,6 +461,7 @@
     </div>
     <div class="topbar-actions">
         <a href="/" class="back-link">← Single Tank</a>
+        <button class="topbar-btn" onclick="copyToClipboard()" style="background:#6f42c1;color:#fff;">📋 Copy</button>
         <button class="topbar-btn" onclick="exportJSON()" style="background:#0891b2;color:#fff;">⬇ Export JSON</button>
         <button class="topbar-btn" onclick="importJSON()" style="background:#ffc107;color:#212529;">Import JSON</button>
         <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -1409,6 +1410,95 @@ toggleBtn.addEventListener('click', () => {
         localStorage.setItem('ac_theme', 'dark');
     }
 });
+
+
+// ══════════════════════════════════════════════════════════════════
+//  COPY TO CLIPBOARD  —  Multi-Tank Summary
+// ══════════════════════════════════════════════════════════════════
+function copyToClipboard() {
+    const calcedResults = results.filter(Boolean);
+    if (calcedResults.length === 0) {
+        alert('Please calculate at least one tank first.');
+        return;
+    }
+
+    const pad = (str, len) => String(str).padEnd(len, ' ');
+    const rpad = (str, len) => String(str).padStart(len, ' ');
+
+    // Cumulative totals
+    const totTankStorage  = calcedResults.reduce((s, r) => s + r.tank_storage,  0);
+    const totStoneStorage = calcedResults.reduce((s, r) => s + r.stone_storage, 0);
+    const totTotalStorage = calcedResults.reduce((s, r) => s + r.total_storage, 0);
+    const totMinStorage   = calcedResults.reduce((s, r) => s + (r.min_storage || 0), 0);
+    const totBase         = calcedResults.reduce((s, r) => s + r.base_units,      0);
+    const totSide         = calcedResults.reduce((s, r) => s + r.side_plates,     0);
+    const totBot          = calcedResults.reduce((s, r) => s + r.bottom_plates,   0);
+    const totPipe         = calcedResults.reduce((s, r) => s + r.pipe_connectors, 0);
+    const totTop12        = calcedResults.reduce((s, r) => s + r.top_adapters_12, 0);
+    const totTop16        = calcedResults.reduce((s, r) => s + r.top_adapters_16, 0);
+    const totGeoTank      = calcedResults.reduce((s, r) => s + r.geoTank,  0);
+    const totGeoStone     = calcedResults.reduce((s, r) => s + r.geoStone, 0);
+    const totGeoTotal     = calcedResults.reduce((s, r) => s + r.geoTotal, 0);
+    const totStoneYd3     = calcedResults.reduce((s, r) => s + r.stone_yd3, 0);
+    const contingency     = Math.max(0, Math.ceil(totBase / 56) * 56 - totBase);
+
+    const fmt = v => parseFloat(v).toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1});
+    const fmtI = v => Math.round(v).toLocaleString();
+
+    // Per-tank breakdown lines
+    const divider = '-'.repeat(70);
+    const tankLines = [];
+    calcedResults.forEach((r, i) => {
+        tankLines.push(`  Tank ${i+1}: ${r.tank_label}  |  ${r.config}-${r.layers}  |  ${r.tank_width}ft × ${r.tank_length}ft  |  ${r.tank_height}ft ht`);
+        tankLines.push(`           Storage: ${fmt(r.tank_storage)} ft³ (tank)  |  Cover: ${r.cover_depth}ft — ${r.cover_ok ? 'PASS' : 'FAIL'}`);
+        tankLines.push(`           Base: ${r.base_units}  Side: ${r.side_plates}  Bot: ${r.bottom_plates}`);
+    });
+
+    const lines = [
+        'AquaCell Proposed Multi-Tank System',
+        '',
+        `Total AquaCell Tanks:                              ${calcedResults.length}`,
+        `Minimum Required Project Storage (ft³):            ${totMinStorage > 0 ? fmt(totMinStorage) : '—'}`,
+        `AquaCell Total All Tanks Storage (ft³):            ${fmt(totTankStorage)}`,
+        `Stone Backfill All Project Storage (ft³):          ${fmt(totStoneStorage)}`,
+        `System Total Project Storage (ft³):                ${fmt(totTotalStorage)}`,
+        '',
+        divider,
+        'PER-TANK BREAKDOWN',
+        divider,
+        ...tankLines,
+        divider,
+        '',
+        `Base Units (3091506) ea.:                          ${fmtI(totBase)}`,
+        `Side Plates (2476600003) ea.:                      ${fmtI(totSide)}`,
+        `Bottom Plates (2476600001) ea.:                    ${fmtI(totBot)}`,
+        `8-12" Pipe Connectors (2476631200) ea.:            ${fmtI(totPipe)}`,
+        `12" Top Adapters (3085857) ea.:                    ${fmtI(totTop12)}`,
+        `16" Top Adapters (2476842000) ea.:                 ${fmtI(totTop16)}`,
+        `Contingency Base Units (pallet fill) ea.:          ${fmtI(contingency)}`,
+        '',
+        `AquaCell Tank Wrap Geotextile (ft²):               ${fmt(totGeoTank)}  (with 20% overage)`,
+        `Stone Backfill Envelope Geotextile (ft²):          ${fmt(totGeoStone)}  (with 20% overage)`,
+        `Total Non-Woven Geotextile (ft²):                  ${fmt(totGeoTotal)}  (with 20% overage)`,
+        `Total Estimated Stone Backfill Volume (with 10%):  ${fmt(totStoneYd3)} CU YD`,
+    ];
+
+    const text = lines.join('\n');
+
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('✅ Copied to clipboard — paste into your email!');
+    }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('✅ Copied to clipboard — paste into your email!');
+    });
+}
 
 // Init
 renderSidebar();
