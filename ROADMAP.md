@@ -87,12 +87,12 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] Separate CLIENT & ESTIMATOR as idividual fields (customer/Wavin rep)
 -  [X] add field for contingency units in BOM CARD and add line on quote sheet
 -  [X] Add a pallet count estimator, weight estimator, and contingency calculator that can be added to the quote sheet or at least on dashboard when calculated
-
--  [X] (v15) Multiple Basin Entry and Reports
+-  [X] Multiple Basin Entry and Reports branch created
+-  [X] Add fabric and stone totals for both tanks to MULTI-TANK quote
  
 
 ** ## Next Up (High Priority – Do These Next)**
-- add fabric and stone totals for both tanks to reports and quote
+
 - command button to collapse all cards
 - optional geogrid totals (based on excavation area + overage)
 - add place for "additional accessories" in BOM?
@@ -107,10 +107,10 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 **## Backlog / Future Enhancements (Add here when ideas come up)**
 
-- (v16) PRICING ENGINE THAT CAN BE EASILY ADJUSTED FOR DIST, MARKET, MSRP ESTIMATES. ALLOW FOR UPLOADING OF COMPONENT PRICING OR MULTIPLIER WHEN PRICE INCREASES OCCUR
-- (v17) UPLOAD PLAN SHEET AND CREATE AN OVERLAY OF TANK (RECTANGLE/SQUARE ONLY); OR CRATE BUILDER FOR COMPLEX (ENTER ROW BY ROW, THEN DESIGNATE HOW MANY CRATES IN THE ROW)
-- (v18) USE CANVAS TO BUILD A CONCEPTUAL TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
-- (v19) Optional 3D isometric view of the crate layout 
+- (v15) PRICING ENGINE THAT CAN BE EASILY ADJUSTED FOR DIST, MARKET, MSRP ESTIMATES. ALLOW FOR UPLOADING OF COMPONENT PRICING OR MULTIPLIER WHEN PRICE INCREASES OCCUR
+- (v16) UPLOAD PLAN SHEET AND CREATE AN OVERLAY OF TANK (RECTANGLE/SQUARE ONLY); OR CRATE BUILDER FOR COMPLEX (ENTER ROW BY ROW, THEN DESIGNATE HOW MANY CRATES IN THE ROW)
+- (v17) USE CANVAS TO BUILD A CONCEPTUAL TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
+- (v18) Optional 3D isometric view of the crate layout 
 - Integration of Wavin installation details (access ports, geogrid, compaction notes)
 - List of details that can be selected that prepends/appends when PDF is created (cover sheet, standard detail, specs, etc.)
 - QR codes or hyperlinks to wavin.us or specific installation details (probably on the cover or appended page)
