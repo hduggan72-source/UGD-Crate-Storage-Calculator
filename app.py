@@ -25,7 +25,7 @@ MODULE_LEN = 3.937    # ft
 # ══════════════════════════════════════════════════════════════════
 GITHUB_OWNER  = "hduggan72-source"
 GITHUB_REPO   = "UGD-Crate-Storage-Calculator"
-GITHUB_BRANCH = "Multiple_Tank_Calculator"
+GITHUB_BRANCH = "Multi_Tank_Calculator"
 GITHUB_FOLDER = "Details"
 GITHUB_PAT    = os.environ.get("GITHUB_PAT", "")   # set in Render environment
 
@@ -623,7 +623,7 @@ def calc_tank(t):
     cover_stone      = float(t.get('cover_stone', 1.0) or 1.0)
     base_stone       = float(t.get('base_stone', 0.333) or 0.333)
     stone_void       = float(t.get('stone_void', 0.40) or 0.40)
-    geoWaste         = int(t.get('geoWaste', 10) or 10)
+    geoWaste         = int(t.get('geoWaste', 20) or 20)
     pipe_connectors  = int(t.get('pipe_connectors', 0) or 0)
     top_adapters_12  = int(t.get('top_adapters_12', 0) or 0)
     top_adapters_16  = int(t.get('top_adapters_16', 0) or 0)
@@ -1106,6 +1106,69 @@ def multi_download_quote():
         q_text(bom_col_ds, y - 9, 'COMBINED SYSTEM WEIGHT', 'Helvetica-Bold', 7.5, WHITE)
         q_text(bom_col_wt, y - 9, f'{total_weight_all:,.1f} lbs', 'Helvetica-Bold', 8, QYLW, 'right')
         y -= 18
+
+        # ════════════════════════════════════════
+        #  PROVIDED BY OTHERS SECTION
+        # ════════════════════════════════════════
+        QRED_MT2 = colors.HexColor('#c0392b')
+        q_rect(LQ, y - 13, QW, 13, QRED_MT2)
+        q_text(W / 2, y - 9,
+               'RECOMMENDED BY WAVIN — PROVIDED BY OTHERS  (ESTIMATES FOR REFERENCE ONLY — SUBJECT TO VERIFICATION)',
+               'Helvetica-Bold', 7, WHITE, 'center')
+        y -= 13
+
+        # Others table header — LINE, DESCRIPTION, QUANTITY, UNITS
+        oth_col_ln  = LQ + 4
+        oth_col_ds  = LQ + 28
+        oth_col_qt  = LQ + QW - 80
+        oth_col_un  = LQ + QW - 4
+
+        q_rect(LQ, y - 13, QW, 13, colors.HexColor('#922b21'))
+        q_text(oth_col_ln, y - 9, 'LINE',        'Helvetica-Bold', 6.5, WHITE)
+        q_text(oth_col_ds, y - 9, 'DESCRIPTION', 'Helvetica-Bold', 6.5, WHITE)
+        q_text(oth_col_qt, y - 9, 'QUANTITY',    'Helvetica-Bold', 6.5, WHITE, 'right')
+        q_text(oth_col_un, y - 9, 'UNITS',       'Helvetica-Bold', 6.5, WHITE, 'right')
+        y -= 13
+
+        # Cumulative geo conversion ft² → yd²
+        cum_geoTank_yd2  = int(round(cum['geoTank']  / 9, 0))
+        cum_geoStone_yd2 = int(round(cum['geoStone'] / 9, 0))
+        cum_stone_yd3    = int(cum['stone_yd3'])
+        cum_adapters     = cum['top_adapters_12'] + cum['top_adapters_16']
+        geoWaste_pct     = 20  # standard waste assumption for multi-tank
+
+        others_rows_mt = [
+            ('A', f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD²) + {geoWaste_pct}% WASTE (TANK ONLY)',
+             cum_geoTank_yd2, 'SQ YD'),
+            ('B', f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD²) + {geoWaste_pct}% WASTE (BACKFILL ONLY)',
+             cum_geoStone_yd2, 'SQ YD'),
+            ('C', 'WOVEN GEOTEXTILE + 20% WASTE (TANK ONLY)', 0, 'SQ YD'),
+            ('D', 'BIAXIAL GEOGRID (INTEGRALLY FORMED POLYPROPYLENE) + 20% WASTE', 0, 'SQ YD'),
+            ('E', 'CASTINGS FOR VENTING / INSPECTION PORTS / INLETS', int(cum_adapters), 'EACH'),
+            ('F', 'LARGE CUSTOM PIPE ADAPTERS (18″–36″) FOR FIELD INSTALL', 0, 'EACH'),
+            ('G', 'STONE BACKFILL OR SELECT BACKFILL ESTIMATED FOR UG SYSTEM', cum_stone_yd3, 'CU YD'),
+        ]
+
+        max_ds_chars = 90
+        for i, (ln, ds, qt, un) in enumerate(others_rows_mt):
+            shade = QLGY if i % 2 == 0 else WHITE
+            rh = 20 if len(ds) > max_ds_chars else 13
+            q_rect(LQ, y - rh, QW, rh, shade)
+            q_text(oth_col_ln, y - (rh // 2) - 2, ln, 'Helvetica-Bold', 7, colors.HexColor('#922b21'))
+            if len(ds) <= max_ds_chars:
+                q_text(oth_col_ds, y - (rh // 2) - 2, ds, 'Helvetica', 7, BLACK)
+            else:
+                split = ds.rfind(' ', 0, max_ds_chars)
+                if split == -1:
+                    split = max_ds_chars
+                q_text(oth_col_ds, y - 5,  ds[:split],      'Helvetica', 6.5, BLACK)
+                q_text(oth_col_ds, y - 13, ds[split+1:],    'Helvetica', 6.5, BLACK)
+            q_text(oth_col_qt, y - (rh // 2) - 2, str(qt) if qt else '0',
+                   'Helvetica-Bold', 7.5, colors.HexColor('#922b21'), 'right')
+            q_text(oth_col_un, y - (rh // 2) - 2, un, 'Helvetica', 7, BLACK, 'right')
+            y -= rh
+
+        y -= 8
 
         # Pricing block
         if cost_per_ft3 > 0:
