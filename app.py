@@ -1899,13 +1899,16 @@ def download_quote():
       shape_mode       = request.form.get('shape_mode', 'rectangle')
 
       # Pricing
-      subtotal           = float(request.form.get('totalAquaCellCost', 0) or 0)
-      freight_cost       = float(request.form.get('freightCost', 0) or 0)
-      total_with_freight = float(request.form.get('totalWithFreight', 0) or subtotal)
-      freight_pct        = float(request.form.get('freightPct', 10) or 10)
-      cost_per_ft3       = float(request.form.get('costPerFt3Hidden', 0) or 0)
-      market_price       = float(request.form.get('marketPrice', 0) or 0)
-      market_price_pct   = float(request.form.get('marketPricePct', 0) or 0)
+      subtotal              = float(request.form.get('totalAquaCellCost', 0) or 0)
+      freight_cost          = float(request.form.get('freightCost', 0) or 0)
+      total_with_freight    = float(request.form.get('totalWithFreight', 0) or subtotal)
+      freight_pct           = float(request.form.get('freightPct', 10) or 10)
+      cost_per_ft3          = float(request.form.get('costPerFt3Hidden', 0) or 0)
+      market_price          = float(request.form.get('marketPrice', 0) or 0)
+      market_price_pct      = float(request.form.get('marketPricePct', 0) or 0)
+      contingency_qty_priced = int(float(request.form.get('contingencyQtyPriced', 0) or 0))
+      contingency_unit_cost  = float(request.form.get('contingencyStorage', 0) or 0)   # total $ for contingency units
+      unit_price_per_crate   = float(request.form.get('unitPricePerCrate', 0) or 0)
 
       MODULE_WID = 1.9685
       MODULE_LEN = 3.937
@@ -2161,7 +2164,7 @@ def download_quote():
           ('4', '2476631200', 'AQUACELL 8\u201312\u2033 PIPE CONNECTOR', pipe_connectors, 'EACH', ''),
           ('5', '3085857',    'AQUACELL TOP CONNECTOR (12\u2033)', top_adapters_12, 'EACH', ''),
           ('5', '2476842000', 'AQUACELL TOP CONNECTOR (16\u2033)', top_adapters_16, 'EACH', ''),
-          ('6', '3091506',    'AQUACELL BASE UNITS — CONTINGENCY (OPTIONAL / NOT PRICED)', contingency_units, 'EACH', 'OPTIONAL'),
+          ('6', '3091506',    'AQUACELL BASE UNITS — CONTINGENCY (RECOMMENDED)', contingency_units, 'EACH', 'INCL.'),
       ]
 
       for i, (ln, pc, ds, qt, un, nt) in enumerate(bom_rows):
@@ -2178,9 +2181,14 @@ def download_quote():
       # Pricing: cost per ft³ note + subtotal
       y -= 4
       q_rect(LQ, y - 13, QW - 120, 13, QLGY)
-      q_text(LQ + 4, y - 9,
-             f'Pricing based on ${cost_per_ft3:.4f}/ft\u00b3 \u00d7 {tank_storage:,.1f} ft\u00b3 net AquaCell storage',
-             'Helvetica-Oblique', 7, GRAY)
+      # Pricing note — show contingency unit price breakdown if present
+      if contingency_qty_priced > 0 and unit_price_per_crate > 0:
+          pricing_note = (f'Pricing: ${cost_per_ft3:.4f}/ft\u00b3 \u00d7 {tank_storage:,.1f} ft\u00b3'
+                          f'  +  {contingency_qty_priced} contingency units \u00d7 ${unit_price_per_crate:.4f}/unit'
+                          f'  =  {money(subtotal)} subtotal')
+      else:
+          pricing_note = f'Pricing based on ${cost_per_ft3:.4f}/ft\u00b3 \u00d7 {tank_storage:,.1f} ft\u00b3 net AquaCell storage'
+      q_text(LQ + 4, y - 9, pricing_note, 'Helvetica-Oblique', 7, GRAY)
 
       q_rect(LQ + QW - 120, y - 13, 120, 13, QNY)
       q_text(LQ + QW - 4, y - 9, 'SUB-TOTAL', 'Helvetica-Bold', 7.5, WHITE, 'right')
@@ -2248,8 +2256,9 @@ def download_quote():
       # ════════════════════════════════════════
       QAMB  = colors.HexColor('#92400e')
       LTAMB = colors.HexColor('#fef3c7')
+      subtotal_label = f'AQUACELL SUB-TOTAL (BASE + {contingency_qty_priced} CONTINGENCY UNITS)' if contingency_qty_priced > 0 else 'AQUACELL SUB-TOTAL'
       totals = [
-          ('AQUACELL SUB-TOTAL',  money(subtotal),           QNY,   QLGY),
+          (subtotal_label,        money(subtotal),            QNY,   QLGY),
           ('ESTIMATED TAXES*',    '$0.00  (TBD at purchase)', GRAY,  WHITE),
           (f'ESTIMATED FREIGHT* ({freight_pct:.1f}%)', money(freight_cost), colors.HexColor('#784212'), colors.HexColor('#fef9e7')),
           ('ESTIMATED TOTAL',     money(total_with_freight),  QGRN,  colors.HexColor('#eafaf1')),
@@ -2284,6 +2293,8 @@ def download_quote():
           '*ESTIMATED TAXES & FREIGHT TO BE DETERMINED AT TIME OF PURCHASE',
           '*THIS QUOTE IS VALID FOR 30 DAYS FROM THE DATE OF ISSUANCE. SUBJECT TO CHANGE AFTER THIS DATE',
       ]
+      if market_price > 0:
+          notes.append('*SUGGESTED MARKET PRICE IS FOR REFERENCE ONLY — REPRESENTS RECOMMENDED DISTRIBUTOR RESALE PRICE')
       if market_price > 0:
           notes.append('*SUGGESTED MARKET PRICE IS FOR REFERENCE ONLY — REPRESENTS RECOMMENDED DISTRIBUTOR RESALE PRICE')
       for n in notes:
