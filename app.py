@@ -1899,11 +1899,13 @@ def download_quote():
       shape_mode       = request.form.get('shape_mode', 'rectangle')
 
       # Pricing
-      subtotal         = float(request.form.get('totalAquaCellCost', 0) or 0)
-      freight_cost     = float(request.form.get('freightCost', 0) or 0)
+      subtotal           = float(request.form.get('totalAquaCellCost', 0) or 0)
+      freight_cost       = float(request.form.get('freightCost', 0) or 0)
       total_with_freight = float(request.form.get('totalWithFreight', 0) or subtotal)
-      freight_pct      = float(request.form.get('freightPct', 10) or 10)
-      cost_per_ft3     = float(request.form.get('costPerFt3Hidden', 0) or 0)
+      freight_pct        = float(request.form.get('freightPct', 10) or 10)
+      cost_per_ft3       = float(request.form.get('costPerFt3Hidden', 0) or 0)
+      market_price       = float(request.form.get('marketPrice', 0) or 0)
+      market_price_pct   = float(request.form.get('marketPricePct', 0) or 0)
 
       MODULE_WID = 1.9685
       MODULE_LEN = 3.937
@@ -2244,12 +2246,21 @@ def download_quote():
       # ════════════════════════════════════════
       #  TOTALS BLOCK
       # ════════════════════════════════════════
+      QAMB  = colors.HexColor('#92400e')
+      LTAMB = colors.HexColor('#fef3c7')
       totals = [
           ('AQUACELL SUB-TOTAL',  money(subtotal),           QNY,   QLGY),
           ('ESTIMATED TAXES*',    '$0.00  (TBD at purchase)', GRAY,  WHITE),
           (f'ESTIMATED FREIGHT* ({freight_pct:.1f}%)', money(freight_cost), colors.HexColor('#784212'), colors.HexColor('#fef9e7')),
           ('ESTIMATED TOTAL',     money(total_with_freight),  QGRN,  colors.HexColor('#eafaf1')),
       ]
+      if market_price > 0:
+          totals.append((
+              f'SUGGESTED MARKET PRICE* (+{market_price_pct:.1f}%)',
+              money(market_price),
+              QAMB,
+              LTAMB,
+          ))
 
       tot_label_w = 160
       tot_val_w   = 110
@@ -2273,6 +2284,8 @@ def download_quote():
           '*ESTIMATED TAXES & FREIGHT TO BE DETERMINED AT TIME OF PURCHASE',
           '*THIS QUOTE IS VALID FOR 30 DAYS FROM THE DATE OF ISSUANCE. SUBJECT TO CHANGE AFTER THIS DATE',
       ]
+      if market_price > 0:
+          notes.append('*SUGGESTED MARKET PRICE IS FOR REFERENCE ONLY — REPRESENTS RECOMMENDED DISTRIBUTOR RESALE PRICE')
       for n in notes:
           q_text(W/2, y, n, 'Helvetica-Bold', 7, QRED, 'center')
           y -= 11
