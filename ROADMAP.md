@@ -89,11 +89,10 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] Add a pallet count estimator, weight estimator, and contingency calculator that can be added to the quote sheet or at least on dashboard when calculated
 -  [X] Multiple Basin Entry and Reports branch created
 -  [X] Add fabric and stone totals for both tanks to MULTI-TANK quote
+-  [X] Add pricing to the CONTINGENCY BASINS as well. We should be encouraging those on every job.
  
-
 ** ## Next Up (High Priority – Do These Next)**
 
-- Add pricing to the CONTINGENCY BASINS as well. We should be encouraging those on every job.
 - command button to collapse all cards
 - optional geogrid totals (based on excavation area + overage)
 - add place for "additional accessories" in BOM?
