@@ -38,6 +38,7 @@ Professional web-based calculator for designing and quoting underground stormwat
  
 ** ## Next Up (High Priority – Do These Next)**
 
+- fix contingency basin override
 - command button to collapse all cards
 - EXPORT STAGE STORAGE CURVE FROM UI
 - optional geogrid totals (based on excavation area + overage)
