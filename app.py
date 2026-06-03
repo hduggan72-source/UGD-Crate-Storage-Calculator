@@ -1900,7 +1900,7 @@ def download_quote():
 
       # ── Hardcoded floor unit prices — update here on price change ──
       FLOOR_PRICES = {
-          'base':      40.51,
+          'base':      42.47,
           'side':      21.31,
           'bottom':    18.71,
           'pipe':      28.53,
