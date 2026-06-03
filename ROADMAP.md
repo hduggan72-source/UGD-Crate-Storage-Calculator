@@ -39,11 +39,14 @@ Professional web-based calculator for designing and quoting underground stormwat
 ** ## Next Up (High Priority – Do These Next)**
 
 - command button to collapse all cards
+- EXPORT STAGE STORAGE CURVE FROM UI
 - optional geogrid totals (based on excavation area + overage)
 - add place for "additional accessories" in BOM?
-
+- TAKE PRICING OUT OF SEPARATE CALCULATIONS TOOL FOR CLIENT USE
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
 - toggle DISTRIBUTOR, MARKET,  BUDGET ESTIMATE PRICING for quote page export (HEADER TITLE)
+- ADD DISTANCE FROM BUILDING CALCULATOR (THAT AND BUOYANCY SHOULD BE SEPARATE BRANCHES SIMILAR TO MULTI-TANK)
+- ONE BUTTON THAT TAKES YOU TO "TOOLS" WHERE MULTIPLE CALCULATORS LIVE AND EXPORT TO THEIR OWN PAGE WITH GRAPHICS
 
 **##SYSTEM CHECKS TO VERIFY / CONFIRM**
 
@@ -62,7 +65,8 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 - (v16) UPLOAD PLAN SHEET AND CREATE AN OVERLAY OF TANK (RECTANGLE/SQUARE ONLY); OR CRATE BUILDER FOR COMPLEX (ENTER ROW BY ROW, THEN DESIGNATE HOW MANY CRATES IN THE ROW)
 - (v17) USE CANVAS TO BUILD A CONCEPTUAL TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
-- (v18) Optional 3D isometric view of the crate layout 
+- (v18) Optional 3D isometric view of the crate layout
+- (v19) SEPARATE CALCULATOR TOOL WITH NO PRICING; 
 
 **How to use this file:**
 - Open `ROADMAP.md` every time you work on the project.
