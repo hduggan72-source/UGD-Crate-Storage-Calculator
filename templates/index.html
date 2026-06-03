@@ -1,0 +1,2448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AquaCell V12 Crate Calculator</title>
+    <style>
+        :root {
+            --bg: #f8f9fa;
+            --card: white;
+            --text: #212529;
+            --accent: #007bff;
+            --border: #dee2e6;
+            --highlight: #e7f3ff;
+        }
+        [data-theme="dark"] {
+            --bg: #0f172a;
+            --card: #1e2937;
+            --text: #e2e8f0;
+            --accent: #60a5fa;
+            --border: #334155;
+            --highlight: #1e3a8a;
+        }
+
+        * { box-sizing: border-box; }
+
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0;
+            background: var(--bg); 
+            color: var(--text); 
+            transition: all 0.3s;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── TOP BAR ── */
+        .topbar {
+            background: #0f1e3c;
+            color: #fff;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 60px;
+            flex-shrink: 0;
+            border-bottom: 2px solid #1a3260;
+            z-index: 100;
+        }
+        .topbar-left { display: flex; align-items: center; gap: 14px; }
+        .topbar-left img { height: 38px; }
+        .topbar-title { font-size: 17px; font-weight: bold; color: #60a5fa; }
+        .topbar-sub { font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 2px; }
+        .topbar-actions { display: flex; gap: 8px; align-items: center; }
+        .topbar-btn {
+            padding: 7px 14px; border: none; border-radius: 4px;
+            cursor: pointer; font-size: 13px; font-weight: bold;
+        }
+       
+        /* ══ DETAIL SHEET EXPORTER MODAL ══ */
+        .details-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.65);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        .details-overlay.open { display: flex; }
+        .details-modal {
+            background: #0f1e3c;
+            color: #e2e8f0;
+            border-radius: 10px;
+            width: 680px;
+            max-width: 95vw;
+            max-height: 88vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+            border: 1px solid #1e3a8a;
+        }
+        .details-modal-header {
+            background: #1e3a8a;
+            padding: 14px 20px;
+            border-radius: 10px 10px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .details-modal-header h3 {
+            margin: 0; font-size: 15px; color: #fff;
+        }
+        .details-modal-header .details-close {
+            background: none; border: none; color: #fff;
+            font-size: 22px; cursor: pointer; line-height: 1; padding: 0 4px;
+        }
+        .details-modal-body {
+            padding: 16px 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .details-group {
+            margin-bottom: 14px;
+        }
+        .details-group-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #1a2f5e;
+            border-radius: 5px;
+            padding: 7px 12px;
+            margin-bottom: 6px;
+        }
+        .details-group-label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #93c5fd;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .details-group-toggle {
+            font-size: 11px;
+            color: #60a5fa;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            text-decoration: underline;
+        }
+        .details-file-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px 12px;
+            padding: 0 4px;
+        }
+        .details-file-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            font-size: 11.5px;
+            color: #cbd5e1;
+            padding: 3px 0;
+            cursor: pointer;
+            line-height: 1.4;
+        }
+        .details-file-item:hover { color: #fff; }
+        .details-file-item input[type=checkbox] {
+            margin-top: 2px;
+            flex-shrink: 0;
+            accent-color: #3b82f6;
+            width: 14px; height: 14px;
+        }
+        .details-modal-footer {
+            padding: 12px 20px;
+            border-top: 1px solid #1e3a8a;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .details-count {
+            flex: 1;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        .details-btn {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .details-btn-primary { background: #2563eb; color: #fff; }
+        .details-btn-primary:hover { background: #1d4ed8; }
+        .details-btn-primary:disabled { background: #475569; cursor: not-allowed; }
+        .details-btn-secondary { background: #334155; color: #e2e8f0; }
+        .details-btn-secondary:hover { background: #475569; }
+        .details-spinner {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #60a5fa;
+        }
+        .details-spinner.active { display: flex; }
+        .details-spinner-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #3b82f6;
+            animation: detailPulse 1s infinite;
+        }
+        @keyframes detailPulse {
+            0%,100% { opacity: 0.3; transform: scale(0.8); }
+            50%      { opacity: 1;   transform: scale(1.2); }
+        }
+        .details-error {
+            background: #450a0a;
+            color: #fca5a5;
+            border-radius: 5px;
+            padding: 10px 14px;
+            font-size: 12px;
+            display: none;
+        }
+        .details-error.visible { display: block; }
+        .details-select-all {
+            font-size: 11px; color: #60a5fa;
+            cursor: pointer; background: none;
+            border: none; padding: 0 0 8px 0;
+            text-decoration: underline;
+            display: block;
+        }
+        /* ── SPLIT LAYOUT ── */
+        .split-layout {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* ── LEFT PANEL (inputs) ── */
+        .left-panel {
+            width: 380px;
+            min-width: 320px;
+            flex-shrink: 0;
+            background: var(--card);
+            border-right: 2px solid var(--border);
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        /* ── RIGHT PANEL (results + schematic) ── */
+        .right-panel {
+            flex: 1;
+            overflow-y: auto;
+            background: var(--bg);
+            padding: 20px;
+        }
+
+        /* ── SECTION CARDS ── */
+        .section-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 14px;
+            overflow: hidden;
+        }
+        .section-card-header {
+            background: #1e3a8a;
+            color: #fff;
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 0.02em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
+        }
+        .section-card-header:hover { background: #1e4aa8; }
+        [data-theme="dark"] .section-card-header { background: #1e3a5f; }
+        [data-theme="dark"] .section-card-header:hover { background: #1e4a7a; }
+        .section-card-header .collapse-arrow {
+            font-size: 11px;
+            transition: transform 0.2s ease;
+            opacity: 0.8;
+            flex-shrink: 0;
+        }
+        .section-card-header.collapsed .collapse-arrow { transform: rotate(-90deg); }
+        .section-card-body {
+            padding: 12px 14px;
+            transition: none;
+        }
+        .section-card-body.hidden { display: none; }
+
+        .container { 
+            max-width: 1250px; 
+            margin: auto; 
+            background: var(--card); 
+            padding: 30px; 
+            border-radius: 8px; 
+            box-shadow: 0 0 15px rgba(0,0,0,0.1); 
+            border: 1px solid var(--border);
+            position: relative;
+            display: none; /* hidden — replaced by split layout */
+        }
+        .header { 
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+            margin-bottom: 20px; 
+        }
+        .header img { 
+            height: 70px; 
+        }
+        h1 { 
+            color: var(--accent); 
+            margin: 0; 
+        }
+        .form-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 20px; 
+        }
+        label { 
+            display: block; 
+            margin: 8px 0 4px; 
+            font-weight: bold;
+            font-size: 13px;
+        }
+        input, select, textarea { 
+            width: 100%; 
+            padding: 7px 8px; 
+            border: 1px solid var(--border); 
+            border-radius: 4px; 
+            background: var(--card); 
+            color: var(--text);
+            font-size: 13px;
+        }
+        textarea { 
+            min-height: 120px; 
+            resize: vertical; 
+        }
+        button { 
+            padding: 12px 24px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 16px; 
+        }
+        .results {
+            margin-top: 0;
+        }
+        .result-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 14px;
+            overflow: hidden;
+        }
+        .result-card-header {
+            background: #1e3a8a;
+            color: #fff;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 0.02em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .result-card-header:hover { background: #1e4aa8; }
+        [data-theme="dark"] .result-card-header { background: #1e3a5f; }
+        [data-theme="dark"] .result-card-header:hover { background: #1e4a7a; }
+        .result-card-header .rc-arrow {
+            margin-left: auto;
+            font-size: 11px;
+            opacity: 0.7;
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+        }
+        .result-card-header.collapsed .rc-arrow { transform: rotate(-90deg); }
+        .result-card-body {
+            padding: 14px 16px;
+        }
+        .result-card-body.hidden { display: none; }
+
+        /* ── Floating scroll buttons ── */
+        .float-nav {
+            position: fixed;
+            bottom: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 200;
+        }
+        .float-nav.left  { left:  16px; }
+        .float-nav.right { right: 16px; }
+        .float-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1e3a8a;
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+            opacity: 0.85;
+            transition: opacity 0.15s, transform 0.15s;
+        }
+        .float-btn:hover { opacity: 1; transform: scale(1.1); }
+        [data-theme="dark"] .float-btn { background: #1e4aa8; }
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 5px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            gap: 12px;
+        }
+        .result-row:last-child { border-bottom: none; }
+        .result-label { color: var(--text); opacity: 0.75; flex-shrink: 0; }
+        .result-value { font-weight: 600; color: var(--text); text-align: right; }
+        .result-value.pass { color: #2ecc71; }
+        .result-value.fail { color: #e74c3c; }
+        .result-value.accent { color: var(--accent); font-size: 15px; }
+        .result-grid2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            padding: 4px 0;
+        }
+        .result-stat {
+            background: var(--bg);
+            border-radius: 6px;
+            padding: 10px 12px;
+        }
+        .result-stat-label { font-size: 11px; color: var(--text); opacity: 0.65; margin-bottom: 3px; }
+        .result-stat-value { font-size: 16px; font-weight: bold; color: var(--text); }
+        .result-stat-value.accent { color: var(--accent); }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 15px; 
+        }
+        th, td { 
+            border: 1px solid var(--border); 
+            padding: 8px; 
+            text-align: left; 
+        }
+        .highlight { 
+            font-weight: bold; 
+            color: var(--accent); 
+        }
+        .geo-section { 
+            background: #f0f8ff; 
+            padding: 15px; 
+            border-radius: 6px; 
+            margin: 20px 0; 
+        }
+        [data-theme="dark"] .geo-section { 
+            background: #1e3a8a; 
+        }
+        .status-pass { 
+            color: #2ecc71; 
+            font-weight: bold; 
+        }
+        .status-fail { 
+            color: #e74c3c; 
+            font-weight: bold; 
+        }
+        .footnote {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 15px;
+            line-height: 1.4;
+            border-top: 1px solid var(--border);
+            padding-top: 10px;
+        }
+        [data-theme="dark"] .footnote {
+            color: #94a3b8;
+        }
+        .suggested { 
+            font-size: 0.85em; 
+            color: #28a745; 
+            font-style: italic; 
+        }
+        .help-icon {
+            cursor: help;
+            color: var(--accent);
+            font-size: 1.2em;
+            margin-left: 6px;
+            display: inline-block;
+            position: relative;
+        }
+        .help-icon:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--card);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 10px 14px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            width: max-content;
+            max-width: 280px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 100;
+            font-size: 0.9em;
+            line-height: 1.3;
+            text-align: left;
+        }
+        .theme-toggle { 
+            font-size: 20px; 
+            cursor: pointer; 
+            background: none; 
+            border: none; 
+            z-index: 10;
+            color: white;
+        }
+
+        /* Schematic Styles */
+        .schematic-card { margin-top: 30px; padding: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+        canvas#sheet { background: #ffffff; border: 1px solid #ccc; border-radius: 8px; width: 100%; max-width: 1400px; height: auto; display: block; margin: 0 auto; }
+        .schematic-btns { margin-top: 12px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+        /* DARK MODE FIX */
+        .options-container {
+            margin-top:25px; 
+            padding:15px; 
+            background:#f0f8ff; 
+            border-radius:6px;
+        }
+        [data-theme="dark"] .options-container {
+            background-color: #1e2937 !important;
+            border: 1px solid #475569 !important;
+            color: #f1f5f9 !important;
+        }
+        [data-theme="dark"] .options-container label,
+        [data-theme="dark"] .options-container span {
+            color: #f1f5f9 !important;
+        }
+        [data-theme="dark"] .options-container select {
+            background-color: #334155 !important;
+            color: #f1f5f9 !important;
+            border: 1px solid #64748b !important;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ══════════════ TOP BAR ══════════════ -->
+<div class="topbar">
+    <div class="topbar-left">
+        <img src="/static/aquacell-logo.png" alt="AquaCell Logo" onerror="this.style.display='none';">
+        <div>
+            <div class="topbar-title">AquaCell V14 — Underground Stormwater System Calculator</div>
+            <div class="topbar-sub">This calculator provides preliminary estimates only. The Engineer of Record is responsible for final design and verification.</div>
+        </div>
+    </div>
+    <div class="topbar-actions">
+        <a href="/multi" class="topbar-btn" style="background:#0891b2;color:white;text-decoration:none;">
+            🏗️ Multi-Tank
+        </a>
+        <button class="topbar-btn" onclick="downloadPDF()" style="background:#28a745;color:white;">⬇ Report</button>
+        <button class="topbar-btn" onclick="downloadQuote()" style="background:#e67e22;color:white;">📄 Quote</button>
+        <button class="topbar-btn" onclick="downloadStageCSV()" style="background:#0891b2;color:white;">📊 Stage CSV</button>
+        <button class="topbar-btn" onclick="openDetailsModal()" style="background:#0f4c81;color:white;border:1px solid #3b82f6;">📋 Details</button>
+        <button class="topbar-btn" onclick="copyToEmail()" style="background:#6f42c1;color:white;">📋 Copy</button>
+        <button class="topbar-btn" onclick="exportProject()" style="background:#17a2b8;color:white;">Export</button>
+        <button class="topbar-btn" onclick="document.getElementById('importFile').click()" style="background:#ffc107;color:#212529;">Import</button>
+        <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importProject(event)">
+        <button id="themeToggle" class="topbar-btn" title="Toggle Theme" style="background:transparent;color:white;font-size:20px;padding:4px 10px;">☀️</button>
+    </div>
+</div>
+
+ 
+<!-- ══════════════ SPLIT LAYOUT ══════════════ -->
+<div class="split-layout">
+
+    <!-- ── LEFT PANEL: all inputs ── -->
+    <div class="left-panel" id="leftPanel">
+        <form id="mainForm" method="post" action="/">
+
+            <!-- Project Info -->
+            <div class="section-card">
+                <div class="section-card-header" onclick="toggleCard(this)"><span>Project Information</span><span class="collapse-arrow">▼</span></div>
+                <div class="section-card-body">
+                    <label>Project Name</label>
+                    <input type="text" name="project_name" id="project_name" placeholder="Enter here" value="{{ form_data.get('project_name', '') }}">
+                    <label>Project Number</label>
+                    <input type="text" name="project_num" id="project_num" placeholder="Enter here" value="{{ form_data.get('project_num', '') }}">
+                    <label>Location (City, State)</label>
+                    <input type="text" name="location" placeholder="Enter here" value="{{ form_data.get('location', '') }}">
+                    <label>Client (Company / Contact)</label>
+                    <input type="text" name="client" id="client" placeholder="Enter here" value="{{ form_data.get('client', '') }}">
+                    <label>Estimator (Wavin Rep)</label>
+                    <input type="text" name="estimator" id="estimator" placeholder="Enter here" value="{{ form_data.get('estimator', '') }}">
+                    <label>Estimator Email</label>
+                    <input type="text" name="estimator_email" id="estimator_email" placeholder="Enter here" value="{{ form_data.get('estimator_email', '') }}">
+                </div>
+            </div>
+
+            <!-- Installation Parameters -->
+            <div class="section-card">
+                <div class="section-card-header" onclick="toggleCard(this)"><span>Installation Parameters</span><span class="collapse-arrow">▼</span></div>
+                <div class="section-card-body">
+                    <label>Configuration</label>
+                    <select name="config" id="modelType">
+                        <option value="SC" {{ 'selected' if form_data.get('config') == 'SC' else '' }}>Standard Configuration (SC)</option>
+                        <option value="EX" {{ 'selected' if form_data.get('config') == 'EX' else '' }}>Extra Strong (EX)</option>
+                    </select>
+                    <label>Number of Layers</label>
+                    <select name="layers" id="layers">
+                        {% for n in range(1,9) %}
+                        <option value="{{ n }}" {{ 'selected' if form_data.get('layers') == n|string else '' }}>{{ n }}</option>
+                        {% endfor %}
+                    </select>
+                    <label>Minimum Required Storage Volume (ft³)
+                        <span class="help-icon" data-tooltip="Minimum storage volume required for the project.">?</span>
+                    </label>
+                    <input type="number" step="0.1" name="min_storage" min="0" value="{{ form_data.get('min_storage', '') }}">
+
+                    <!-- ── Shape Mode Toggle ── -->
+                    <div style="margin:14px 0 10px;">
+                        <div style="font-size:12px;font-weight:bold;color:var(--text);margin-bottom:6px;">Tank Shape Mode</div>
+                        <div style="display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;">
+                            <button type="button" id="shapeBtn_rect" onclick="setShapeMode('rectangle')"
+                                style="flex:1;padding:7px 4px;border:none;cursor:pointer;font-size:12px;font-weight:bold;background:#1e3a8a;color:#fff;">
+                                ▭ Rectangle
+                            </button>
+                            <button type="button" id="shapeBtn_complex" onclick="setShapeMode('complex')"
+                                style="flex:1;padding:7px 4px;border:none;cursor:pointer;font-size:12px;font-weight:bold;background:var(--card);color:var(--text);">
+                                ⬠ Complex Shape
+                            </button>
+                        </div>
+                    </div>
+                    <input type="hidden" name="shape_mode" id="shapeModeInput" value="{{ form_data.get('shape_mode', 'rectangle') }}">
+
+                    <!-- ── Rectangle inputs ── -->
+                    <div id="rectInputs">
+                        <label>Known Width (ft) — from plans
+                            <span class="help-icon" data-tooltip="Enter the width from the site plans. The calculator will snap to the nearest whole crate module.">?</span>
+                        </label>
+                        <input type="number" step="0.01" name="known_width" id="knownWidth" min="0" value="{{ form_data.get('known_width', '') }}">
+                        <label>Known Length (ft) — from plans
+                            <span class="help-icon" data-tooltip="Enter the length from the site plans. The calculator will snap to the nearest whole crate module.">?</span>
+                        </label>
+                        <input type="number" step="0.01" name="known_length" id="knownLength" min="0" value="{{ form_data.get('known_length', '') }}">
+                    </div>
+
+                    <!-- ── Complex Shape inputs ── -->
+                    <div id="complexInputs" style="display:none;">
+                        <div style="background:rgba(30,58,138,0.08);border:1px solid rgba(30,58,138,0.25);border-radius:6px;padding:9px 10px;margin-bottom:10px;font-size:11px;line-height:1.5;color:var(--text);">
+                            <strong>Complex Shape Mode</strong> — Enter your scaled plan values.
+                            The tool derives the second dimension, then snaps both to real crate
+                            module sizes (47.2" × 23.6") to get the true fitted area.
+                            Side plates use your scaled perimeter directly.
+                            Leave excavation fields blank to auto-estimate.
+                        </div>
+
+                        <label>Scaled Tank Footprint Area (ft²)
+                            <span class="help-icon" data-tooltip="The total area from your scaled plan inside the complex tank boundary. The tool will fit the crate grid inside this area to get the real snapped area.">?</span>
+                        </label>
+                        <input type="number" step="0.001" name="complex_scaled_area" id="complexScaledArea" min="0" value="{{ form_data.get('complex_scaled_area', '') }}">
+
+                        <label>Known Width or Length (ft) — from plans
+                            <span class="help-icon" data-tooltip="Enter ONE dimension you know from the plans (the longer or controlling dimension works best). The tool calculates the other dimension from the scaled area, then snaps both to crate modules.">?</span>
+                        </label>
+                        <input type="number" step="0.001" name="complex_known_dim" id="complexKnownDim" min="0" value="{{ form_data.get('complex_known_dim', '') }}">
+
+                        <label>Scaled Tank Perimeter (ft)
+                            <span class="help-icon" data-tooltip="Outer perimeter of the complex tank shape from your scaled plan. Used directly for side plate count and geotextile — not snapped.">?</span>
+                        </label>
+                        <input type="number" step="0.001" name="complex_tank_perim" id="complexTankPerim" min="0" value="{{ form_data.get('complex_tank_perim', '') }}">
+
+                        <label>Excavation Envelope Area (ft²) — optional
+                            <span class="help-icon" data-tooltip="Total excavation footprint including perimeter stone border. Leave blank to auto-estimate from snapped tank area + perimeter × stone width.">?</span>
+                        </label>
+                        <input type="number" step="0.001" name="complex_excav_area" id="complexExcavArea" min="0" placeholder="Leave blank to auto-estimate" value="{{ form_data.get('complex_excav_area', '') }}">
+
+                        <label>Excavation Envelope Perimeter (ft) — optional
+                            <span class="help-icon" data-tooltip="Outer perimeter of the full excavation. Leave blank to auto-estimate.">?</span>
+                        </label>
+                        <input type="number" step="0.001" name="complex_excav_perim" id="complexExcavPerim" min="0" placeholder="Leave blank to auto-estimate" value="{{ form_data.get('complex_excav_perim', '') }}">
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Elevations & Traffic -->
+            <div class="section-card">
+                <div class="section-card-header" onclick="toggleCard(this)"><span>Elevations &amp; Traffic</span><span class="collapse-arrow">▼</span></div>
+                <div class="section-card-body">
+                    <label>Estimated Surface Elevation (ft)</label>
+                    <input type="number" step="0.01" name="surface_elev" id="surface_elev" placeholder="e.g., 850.50" value="{{ form_data.get('surface_elev', '') }}">
+                    <label>AquaCell Tank Bottom Elevation (ft)</label>
+                    <input type="number" step="0.01" name="tank_bottom_elev" id="tank_bottom_elev" placeholder="e.g., 840.00" value="{{ form_data.get('tank_bottom_elev', '') }}">
+                    <label>Traffic Load Required
+                        <span class="help-icon" data-tooltip="HS-20 is most common for roads/parking lots.
+H-10: min cover SC/EX = 1.0 ft
+HS-20: min cover SC = 1.5 ft | EX = 1.33 ft
+HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
+                    </label>
+                    <select name="traffic_load">
+                        <option value="H10" {{ 'selected' if form_data.get('traffic_load') == 'H10' else '' }}>H-10 Traffic</option>
+                        <option value="HS20" {{ 'selected' if form_data.get('traffic_load') == 'HS20' else '' }}>HS-20 Traffic</option>
+                        <option value="HS25" {{ 'selected' if form_data.get('traffic_load') == 'HS25' else '' }}>HS-25 Traffic</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Installation / Backfill Requirements -->
+            <div class="section-card">
+                <div class="section-card-header" onclick="toggleCard(this)"><span>Installation / Backfill Requirements</span><span class="collapse-arrow">▼</span></div>
+                <div class="section-card-body">
+                    <label>Perimeter Stone Width (ft)
+                        <span class="help-icon" data-tooltip="Thickness of the stone envelope surrounding the tank (typically 1.0 ft).">?</span>
+                    </label>
+                    <input type="number" step="any" name="perimeter_stone_width" min="0" value="{{ form_data.get('perimeter_stone_width', '') }}">
+                    <label>Cover Stone Depth (ft)
+                        <span class="help-icon" data-tooltip="Depth of the stone above the top of the tank.">?</span>
+                    </label>
+                    <input type="number" step="any" name="cover_stone" min="0" value="{{ form_data.get('cover_stone', '') }}">
+                    <label>Base Stone Depth (ft)
+                        <span class="help-icon" data-tooltip="Depth of the stone below the bottom of the tank (typically 0.333 ft / 4 inches).">?</span>
+                    </label>
+                    <input type="number" step="any" name="base_stone" id="base_stone" min="0" value="{{ form_data.get('base_stone', '') }}">
+                    <label>Stone Void Ratio
+                        <span class="help-icon" data-tooltip="Void space in the crushed stone backfill (typically 0.40 or 40%). Used for storage volume calculation.">?</span>
+                    </label>
+                    <input type="number" step="0.01" name="stone_void" min="0" max="1" value="{{ form_data.get('stone_void', '') }}">
+                    <label>Geotextile Waste/Overlap (%)
+                        <span class="help-icon" data-tooltip="Additional percentage for overlap, seams, and waste when installing the geotextile wrap (typically 10%).">?</span>
+                    </label>
+                    <input type="number" step="1" name="geoWaste" min="0" value="{{ form_data.get('geoWaste', '0') }}">
+                </div>
+            </div>
+
+            <!-- Accessories -->
+            <div class="section-card">
+                <div class="section-card-header" onclick="toggleCard(this)"><span>Accessories</span><span class="collapse-arrow">▼</span></div>
+                <div class="section-card-body">
+                    <label>8-12" Pipe Connector (2476631200)</label>
+                    <input type="number" name="pipe_connectors" min="0" value="{{ form_data.get('pipe_connectors', '') }}">
+                    <label>12" Top Adapter (3085857)</label>
+                    <input type="number" name="top_adapters_12" id="top_adapters_12" min="0" value="{{ form_data.get('top_adapters_12', '') }}">
+                    <div id="topAdapterSuggestion" class="suggested"></div>
+                    <label>16" Top Adapter (2476842000)</label>
+                    <input type="number" name="top_adapters_16" id="top_adapters_16" min="0" value="{{ form_data.get('top_adapters_16', '') }}">
+                    <label style="margin-top:10px;">Contingency Base Units (3091506)
+                        <span style="font-size:11px;opacity:0.65;font-weight:normal;"> — extra crates for jobsite breakage</span>
+                    </label>
+                    <input type="number" name="contingency_units" id="contingency_units" min="0" value="{{ form_data.get('contingency_units', 0) }}">
+                </div>
+            </div>
+
+            <!-- Options -->
+            <div class="section-card">
+                <div class="section-card-header" onclick="toggleCard(this)"><span>Report Options</span><span class="collapse-arrow">▼</span></div>
+                <div class="section-card-body options-container" style="margin:0;padding:12px 14px;border-radius:0;">
+                    <label style="display:block;">
+                        <input type="checkbox" name="include_schematic" id="include_schematic" value="yes" checked>
+                        Include Schematic Layout in PDF Report
+                    </label>
+                    <label style="margin-top:12px;">
+                        <input type="checkbox" name="include_stage_storage" value="yes" {{ 'checked' if form_data.get('include_stage_storage') == 'yes' else '' }}>
+                        Include Stage Storage Table (for detention routing)
+                    </label>
+                    <div style="margin-top:12px; display:flex; align-items:center; gap:10px;">
+                        <label style="margin:0; white-space:nowrap;">Stage Storage Increment</label>
+                        <select name="stage_increment_in" style="width:auto;">
+                            <option value="1" {{ 'selected' if form_data.get('stage_increment_in') == '1' else '' }}>1 inch</option>
+                            <option value="3" {{ 'selected' if form_data.get('stage_increment_in') == '3' else '' }}>3 inch</option>
+                            <option value="6" {{ 'selected' if form_data.get('stage_increment_in') == '6' else '' }}>6 inch</option>
+                            <option value="12" {{ 'selected' if form_data.get('stage_increment_in') == '12' else '' }}>12 inch (1 ft)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Project Notes -->
+            <div class="section-card">
+                <div class="section-card-header" onclick="toggleCard(this)"><span>Project Notes / Special Instructions / Assumptions</span><span class="collapse-arrow">▼</span></div>
+                <div class="section-card-body">
+                    <textarea name="project_notes" placeholder="Enter any additional notes, assumptions, special requirements, or comments here..." style="min-height:90px;resize:vertical;">{{ form_data.get('project_notes', '') }}</textarea>
+                </div>
+            </div>
+
+            <!-- Calculate button -->
+            <button type="submit" style="width:100%;padding:14px;background:#007bff;color:white;border:none;border-radius:6px;font-size:16px;font-weight:bold;cursor:pointer;margin-bottom:10px;">
+                ▶ Calculate System
+            </button>
+            <button type="button" onclick="resetForm()" style="width:100%;padding:10px;background:#6c757d;color:white;border:none;border-radius:6px;font-size:14px;cursor:pointer;margin-bottom:20px;">
+                Reset Form
+            </button>
+
+        </form>
+    </div><!-- /left-panel -->
+
+    <!-- ── RIGHT PANEL: results + schematic ── -->
+    <div class="right-panel" id="rightPanel">
+
+        {% if results %}
+        <div class="results">
+
+            <!-- ══ CARD 1: Storage Summary (TOP — estimator's primary check) ══ -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>💧 Storage Summary</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body">
+                    {% if results.min_storage is not none %}
+                    <div class="result-row">
+                        <span class="result-label">Minimum Required Storage</span>
+                        <span class="result-value {{ 'pass' if results.storage_status == 'PASS' else 'fail' }}" id="rv_min_storage">
+                            {{ results.min_storage }} ft³ → {{ results.storage_status }}
+                        </span>
+                    </div>
+                    {% endif %}
+                    <div class="result-grid2" style="margin-top:8px;">
+                        <div class="result-stat">
+                            <div class="result-stat-label">AquaCell Tank Storage</div>
+                            <div class="result-stat-value" id="tankStorageStat">{{ results.tank_storage }} ft³</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Stone Backfill Storage</div>
+                            <div class="result-stat-value" id="rv_stone_storage">{{ results.stone_storage }} ft³</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:10px;padding:12px;background:var(--bg);border-radius:6px;border-left:4px solid var(--accent);">
+                        <div style="font-size:11px;opacity:0.7;margin-bottom:4px;">Total System Storage</div>
+                        <div style="font-size:22px;font-weight:bold;color:var(--accent);" id="rv_total_storage">{{ results.total_storage }} ft³</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ CARD 2: Bill of Materials ══ -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>📦 Bill of Materials</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body" style="padding:0;">
+                    <table style="margin-top:0;font-size:12.5px;">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;">Item</th>
+                                <th style="text-align:right;">Qty</th>
+                                <th style="text-align:right;">Weight (lbs)</th>
+                                <th style="text-align:right;"># Pallets</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Base Unit (3091506)</td>
+                                <td style="text-align:right;font-weight:bold;" id="bom_base_units">{{ results.base_units }}</td>
+                                <td style="text-align:right;" id="w_base_units">—</td>
+                                <td style="text-align:right;" id="p_base_units">—</td>
+                            </tr>
+                            <tr>
+                                <td>Side Plate (2476600003)</td>
+                                <td style="text-align:right;font-weight:bold;" id="bom_side_plates">{{ results.side_plates }}</td>
+                                <td style="text-align:right;" id="w_side_plates">—</td>
+                                <td style="text-align:right;" id="p_side_plates">—</td>
+                            </tr>
+                            <tr>
+                                <td>Bottom Plate (2476600001)</td>
+                                <td style="text-align:right;font-weight:bold;" id="bom_bottom_plates">{{ results.bottom_plates }}</td>
+                                <td style="text-align:right;" id="w_bottom_plates">—</td>
+                                <td style="text-align:right;" id="p_bottom_plates">—</td>
+                            </tr>
+                            <tr>
+                                <td>8-12" Pipe Connectors (2476631200)</td>
+                                <td style="text-align:right;font-weight:bold;" id="bom_pipe_connectors">{{ results.pipe_connectors }}</td>
+                                <td style="text-align:right;" id="w_pipe_connectors">—</td>
+                                <td style="text-align:right;" id="p_pipe_connectors">—</td>
+                            </tr>
+                            <tr>
+                                <td>12" Top Adapters (3085857)</td>
+                                <td style="text-align:right;font-weight:bold;" id="bom_top_adapters_12">{{ results.top_adapters_12 }}</td>
+                                <td style="text-align:right;" id="w_top_adapters_12">—</td>
+                                <td style="text-align:right;" id="p_top_adapters_12">—</td>
+                            </tr>
+                            <tr>
+                                <td>16" Top Adapters (2476842000)</td>
+                                <td style="text-align:right;font-weight:bold;" id="bom_top_adapters_16">{{ results.top_adapters_16 }}</td>
+                                <td style="text-align:right;" id="w_top_adapters_16">—</td>
+                                <td style="text-align:right;" id="p_top_adapters_16">—</td>
+                            </tr>
+                            <tr style="border-top:2px solid var(--border);">
+                                <td style="font-size:12px;opacity:0.8;">Contingency Base Units (3091506)
+                                    <span style="font-size:10px;opacity:0.6;"> — full pallet rounding</span>
+                                </td>
+                                <td style="text-align:right;font-weight:bold;color:var(--accent);" id="bom_contingency">—</td>
+                                <td style="text-align:right;" id="w_contingency">—</td>
+                                <td style="text-align:right;" id="p_contingency">—</td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr style="background:rgba(30,58,138,0.10);font-weight:bold;">
+                                <td style="padding:7px 10px;">TOTALS</td>
+                                <td style="text-align:right;padding:7px 10px;" id="bom_total_qty">—</td>
+                                <td style="text-align:right;padding:7px 10px;color:#1e3a8a;" id="bom_total_weight">—</td>
+                                <td style="text-align:right;padding:7px 10px;color:#1e3a8a;" id="bom_total_pallets">—</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <div style="font-size:10px;opacity:0.55;padding:6px 10px 8px;">
+                        Weight per unit: Base/Contingency 25.18 lb · Side Plate 4.91 lb · Bottom Plate 7.86 lb · Pipe Conn. 2.70 lb · 12" Adapter 11.02 lb · 16" Adapter 22.00 lb
+                    </div>
+                </div>
+            </div>
+
+            <script>
+            (function() {
+                // ── Unit weights (lbs) ──
+                var WEIGHTS = {
+                    base:        25.180,
+                    side:         4.910,
+                    bottom:       7.860,
+                    pipe:         2.703,
+                    adapter12:   11.023,
+                    adapter16:   22.000,
+                    contingency: 25.180
+                };
+                // ── Units per pallet ──
+                var PALLETS = {
+                    base:        56,
+                    side:       120,
+                    bottom:     120,
+                    pipe:        60,
+                    adapter12:   20,
+                    adapter16:   12,
+                    contingency: 56
+                };
+
+                function getQty(id) {
+                    var el = document.getElementById(id);
+                    return el ? (parseInt(el.textContent.replace(/,/g,'')) || 0) : 0;
+                }
+                function setEl(id, val) {
+                    var el = document.getElementById(id);
+                    if (el) el.textContent = val;
+                }
+                function fmtLbs(v) { return v > 0 ? v.toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1}) + ' lbs' : '—'; }
+                function fmtPal(v) { return v > 0 ? v.toLocaleString() : '—'; }
+                function pallets(qty, perPallet) { return qty > 0 ? Math.ceil(qty / perPallet) : 0; }
+
+                // ── Auto-calc contingency ──
+                var baseUnits = getQty('bom_base_units');
+                var autoContingency = baseUnits > 0 ? Math.ceil(baseUnits / PALLETS.base) * PALLETS.base - baseUnits : 0;
+                setEl('bom_contingency', autoContingency);
+                // Always update input to match current calculation — user can override after
+                var inputEl = document.getElementById('contingency_units');
+                if (inputEl) inputEl.value = autoContingency;
+
+                // ── Quantities ──
+                var qty = {
+                    base:        baseUnits,
+                    side:        getQty('bom_side_plates'),
+                    bottom:      getQty('bom_bottom_plates'),
+                    pipe:        getQty('bom_pipe_connectors'),
+                    adapter12:   getQty('bom_top_adapters_12'),
+                    adapter16:   getQty('bom_top_adapters_16'),
+                    contingency: autoContingency
+                };
+
+                // ── Calculate and populate weights & pallets ──
+                var rows = [
+                    ['base',        'w_base_units',       'p_base_units'],
+                    ['side',        'w_side_plates',      'p_side_plates'],
+                    ['bottom',      'w_bottom_plates',    'p_bottom_plates'],
+                    ['pipe',        'w_pipe_connectors',  'p_pipe_connectors'],
+                    ['adapter12',   'w_top_adapters_12',  'p_top_adapters_12'],
+                    ['adapter16',   'w_top_adapters_16',  'p_top_adapters_16'],
+                    ['contingency', 'w_contingency',      'p_contingency'],
+                ];
+
+                var totalQty = 0, totalWeight = 0, totalPallets = 0;
+                rows.forEach(function(r) {
+                    var key = r[0], wId = r[1], pId = r[2];
+                    var q   = qty[key];
+                    var w   = q * WEIGHTS[key];
+                    var p   = pallets(q, PALLETS[key]);
+                    setEl(wId, fmtLbs(w));
+                    setEl(pId, fmtPal(p));
+                    totalQty     += q;
+                    totalWeight  += w;
+                    totalPallets += p;
+                });
+
+                // ── Totals row ──
+                setEl('bom_total_qty',     totalQty.toLocaleString());
+                setEl('bom_total_weight',  fmtLbs(totalWeight));
+                setEl('bom_total_pallets', totalPallets.toLocaleString() + ' pallets');
+            })();
+            </script>
+
+            <!-- ══ CARD 3: Price Estimation ══ -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>💲 AquaCell Price Estimation</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body">
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+                        <div>
+                            <label style="display:block;font-size:12px;opacity:0.7;margin-bottom:4px;">Markup % <span style="font-size:10px;color:#64748b;">(÷ method: 10% agent · 20% market)</span></label>
+                            <input type="number" id="markupPct" step="0.1" placeholder="e.g., 10 or 20" value="10"
+                                style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:12px;opacity:0.7;margin-bottom:4px;">Freight % of Selling Price</label>
+                            <input type="number" id="freightPct" step="0.1" placeholder="e.g., 10" value="10"
+                                style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
+                        </div>
+                        <div style="align-self:end;">
+                            <button type="button" onclick="calculateAquaCellPrice()"
+                                style="width:100%;padding:10px;background:#00b0ff;color:white;border:none;border-radius:4px;font-size:14px;font-weight:bold;cursor:pointer;">
+                                Calculate Price
+                            </button>
+                        </div>
+                    </div>
+                    <div class="result-grid2" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
+                        <div class="result-stat">
+                            <div class="result-stat-label">Calculated Cost (floor)</div>
+                            <div id="priceFloorCost" class="result-stat-value" style="color:#00b0ff;">—</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Selling Price (w/ markup)</div>
+                            <div id="priceSubtotal" class="result-stat-value" style="color:#2ecc71;">—</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Est. Freight</div>
+                            <div id="priceFreight" class="result-stat-value" style="color:#f39c12;">—</div>
+                        </div>
+                        <div class="result-stat" style="border:1px solid #2ecc71;border-radius:6px;">
+                            <div class="result-stat-label" style="color:#2ecc71;">Total to Customer</div>
+                            <div id="priceTotalCost" class="result-stat-value" style="color:#2ecc71;">—</div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="hiddenFloorCost"        name="floorCost"        value="">
+                    <input type="hidden" id="hiddenTotalAquaCellCost" name="totalAquaCellCost" value="">
+                    <input type="hidden" id="hiddenFreightCost"      name="freightCost"      value="">
+                    <input type="hidden" id="hiddenTotalWithFreight" name="totalWithFreight" value="">
+                    <input type="hidden" id="hiddenFreightPct"       name="freightPct"       value="">
+                    <input type="hidden" id="hiddenMarkupPct"        name="markupPct"        value="">
+                </div>
+            </div>
+
+            <!-- ══ CARD 4: Stone Backfill ══ -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>🪨 Stone Backfill <span style="font-size:11px;font-weight:normal;opacity:0.75;">(provided by others)</span></span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body">
+                    <div style="font-size:12px;opacity:0.7;margin-bottom:8px;">Quantities are estimates for budgeting and coordination purposes only.</div>
+                    <div class="result-row">
+                        <span class="result-label">Purchase Volume (with 10% overage)</span>
+                        <span class="result-value" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                            <span id="stoneBulkDisplay" style="font-weight:700;color:var(--accent);"></span>
+                            <select id="stoneUnitSelect" onchange="updateStoneUnit()"
+                                style="padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:12px;cursor:pointer;">
+                                <option value="ft3">ft³ — Cubic Feet</option>
+                                <option value="yd3">yd³ — Cubic Yards</option>
+                                <option value="tons">US Short Tons</option>
+                            </select>
+                        </span>
+                    </div>
+                    <script>
+                        (function(){
+                            var _ft3  = {{ results.stone_backfill_bulk_ft3 }};
+                            var _yd3  = {{ results.stone_backfill_bulk_yd3 }};
+                            var _tons = {{ results.stone_backfill_bulk_tons }};
+                            window._stoneBulk = { ft3: _ft3, yd3: _yd3, tons: _tons };
+                            window.updateStoneUnit = function() {
+                                var sel  = document.getElementById('stoneUnitSelect');
+                                var disp = document.getElementById('stoneBulkDisplay');
+                                if (!sel || !disp) return;
+                                if (sel.value === 'ft3')  disp.textContent = _ft3.toLocaleString()  + ' ft³';
+                                if (sel.value === 'yd3')  disp.textContent = _yd3.toLocaleString()  + ' yd³';
+                                if (sel.value === 'tons') disp.textContent = _tons.toLocaleString() + ' US short tons';
+                            };
+                            window.updateStoneUnit();
+                        })();
+                    </script>
+                    <div style="margin-top:14px;">
+                        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:6px;">Stone Volume by Layer</div>
+                        <table style="margin-top:0;font-size:13px;">
+                            <thead>
+                                <tr style="background:rgba(30,58,138,0.08);">
+                                    <th style="text-align:left;padding:6px 10px;">Layer</th>
+                                    <th style="text-align:right;padding:6px 10px;">Gross (ft³)</th>
+                                    <th style="text-align:right;padding:6px 10px;">Net (ft³)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="padding:5px 10px;">Top</td>
+                                    <td style="text-align:right;padding:5px 10px;">{{ "{:,.1f}".format(results.stone_top_gross) }}</td>
+                                    <td style="text-align:right;padding:5px 10px;">{{ "{:,.1f}".format(results.stone_top_net) }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:5px 10px;">Perimeter</td>
+                                    <td style="text-align:right;padding:5px 10px;">{{ "{:,.1f}".format(results.stone_perim_gross) }}</td>
+                                    <td style="text-align:right;padding:5px 10px;">{{ "{:,.1f}".format(results.stone_perim_net) }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:5px 10px;">Bottom</td>
+                                    <td style="text-align:right;padding:5px 10px;">{{ "{:,.1f}".format(results.stone_base_gross) }}</td>
+                                    <td style="text-align:right;padding:5px 10px;">{{ "{:,.1f}".format(results.stone_base_net) }}</td>
+                                </tr>
+                                <tr style="background:rgba(16,185,129,0.12);font-weight:bold;">
+                                    <td style="padding:6px 10px;">TOTAL</td>
+                                    <td style="text-align:right;padding:6px 10px;color:#059669;">{{ "{:,.1f}".format(results.stone_layer_total_gross) }}</td>
+                                    <td style="text-align:right;padding:6px 10px;color:#059669;">{{ "{:,.1f}".format(results.stone_layer_total_net) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div style="font-size:11px;opacity:0.6;margin-top:5px;padding:0 4px;">Net = Gross × stone void ratio ({{ (form_data.get('stone_void', 0.40)|float * 100)|round(0)|int }}% void). Gross values used for purchase quantity estimates.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ CARD 5: Geotextile Fabric ══ -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)">
+                    <span>🧵 Geotextile Fabric
+                    <span style="font-size:11px;font-weight:normal;opacity:0.75;">(provided by others)</span></span>
+                    <span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center;">
+                        <span style="display:inline-flex;border:1px solid rgba(255,255,255,0.3);border-radius:5px;overflow:hidden;" onclick="event.stopPropagation()">
+                            <button type="button" id="geoUnitFt2" onclick="setGeoUnit('ft2')"
+                                style="padding:2px 10px;border:none;cursor:pointer;background:rgba(255,255,255,0.25);color:#fff;font-size:11px;font-weight:bold;">ft²</button>
+                            <button type="button" id="geoUnitYd2" onclick="setGeoUnit('yd2')"
+                                style="padding:2px 10px;border:none;cursor:pointer;background:transparent;color:rgba(255,255,255,0.6);font-size:11px;">yd²</button>
+                        </span>
+                        <span class="rc-arrow">▼</span>
+                    </span>
+                </div>
+                <div class="result-card-body" style="padding:0;">
+                    <table style="margin-top:0;">
+                        <tr><th>Item</th><th id="geoUnitHeader" style="text-align:right;">Quantity (ft²)</th></tr>
+                        <tr><td>AquaCell Tank Only</td><td id="geoTankCell" style="text-align:right;font-weight:bold;"></td></tr>
+                        <tr><td>Stone Backfill Envelope</td><td id="geoStoneCell" style="text-align:right;font-weight:bold;"></td></tr>
+                        <tr><td><strong>Total Geotextile</strong></td><td id="geoTotalCell" style="text-align:right;font-weight:bold;"></td></tr>
+                        <tr><td style="font-size:12px;opacity:0.7;">Waste/Overlap</td><td style="text-align:right;font-size:12px;opacity:0.7;">{{ results.geoWaste }}%</td></tr>
+                    </table>
+                </div>
+                <script>
+                    (function(){
+                        var _gft2 = {{ results.geoTank }};
+                        var _sft2 = {{ results.geoStone }};
+                        var _tft2 = {{ results.geoTotal }};
+                        var _gyd2 = Math.round(_gft2 / 9 * 10) / 10;
+                        var _syd2 = Math.round(_sft2 / 9 * 10) / 10;
+                        var _tyd2 = Math.round(_tft2 / 9 * 10) / 10;
+                        window._geoVals = { ft2: { tank:_gft2, stone:_sft2, total:_tft2 }, yd2: { tank:_gyd2, stone:_syd2, total:_tyd2 } };
+                        window.setGeoUnit = function(unit) {
+                            var v = window._geoVals[unit];
+                            var lbl = unit === 'ft2' ? 'ft²' : 'yd²';
+                            document.getElementById('geoUnitHeader').textContent = 'Quantity (' + lbl + ')';
+                            document.getElementById('geoTankCell').textContent  = v.tank.toLocaleString()  + ' ' + lbl;
+                            document.getElementById('geoStoneCell').textContent = v.stone.toLocaleString() + ' ' + lbl;
+                            document.getElementById('geoTotalCell').innerHTML   = '<strong>' + v.total.toLocaleString() + ' ' + lbl + '</strong>';
+                            document.getElementById('geoUnitFt2').style.background = unit === 'ft2' ? 'rgba(255,255,255,0.25)' : 'transparent';
+                            document.getElementById('geoUnitFt2').style.color      = unit === 'ft2' ? '#fff' : 'rgba(255,255,255,0.6)';
+                            document.getElementById('geoUnitFt2').style.fontWeight = unit === 'ft2' ? 'bold' : 'normal';
+                            document.getElementById('geoUnitYd2').style.background = unit === 'yd2' ? 'rgba(255,255,255,0.25)' : 'transparent';
+                            document.getElementById('geoUnitYd2').style.color      = unit === 'yd2' ? '#fff' : 'rgba(255,255,255,0.6)';
+                            document.getElementById('geoUnitYd2').style.fontWeight = unit === 'yd2' ? 'bold' : 'normal';
+                            window._currentGeoUnit = unit;
+                        };
+                        window.setGeoUnit('ft2');
+                    })();
+                </script>
+            </div>
+
+            <!-- ══ CARD 6: Cover & Load Verification ══ -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>🛡 Cover &amp; Load Verification</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body">
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:4px;">Elevations</div>
+                    <div class="result-row">
+                        <span class="result-label">Surface Elevation</span>
+                        <span class="result-value">{{ results.surface_elev }} ft</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Tank Bottom Elevation</span>
+                        <span class="result-value">{{ results.tank_bottom_elev }} ft</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Tank Top Elevation</span>
+                        <span class="result-value">{{ results.tank_top_elev }} ft</span>
+                    </div>
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Cover Depth Checks</div>
+                    <div class="result-row">
+                        <span class="result-label">Actual Cover Depth</span>
+                        <span class="result-value {{ 'pass' if results.cover_status == 'PASS' else 'fail' }}">
+                            {{ results.cover_depth }} ft → {{ results.cover_status }}
+                        </span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Maximum Allowable Cover</span>
+                        <span class="result-value {{ 'pass' if results.max_cover_status == 'PASS' else 'fail' }}">
+                            {{ results.max_cover_req }} ft → {{ results.max_cover_status }}
+                        </span>
+                    </div>
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Dead Load (Cover Weight)</div>
+                    <div class="result-row">
+                        <span class="result-label">Dead Load Pressure</span>
+                        <span class="result-value">{{ results.dead_load_psi }} psi</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Factor of Safety — Dead Load</span>
+                        <span class="result-value {{ 'pass' if results.fos_dead and results.fos_dead >= 1.95 else 'fail' }}">
+                            {{ results.fos_dead if results.fos_dead else '—' }}
+                        </span>
+                    </div>
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Live Load ({{ results.traffic_load }} Traffic — ASTM F2787)</div>
+                    <div class="result-row">
+                        <span class="result-label">Factored Live Load Pressure</span>
+                        <span class="result-value">{{ results.ll_psi if results.ll_psi else '—' }} psi</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Total Pressure (LL + DL)</span>
+                        <span class="result-value">
+                            {% if results.ll_psi and results.dead_load_psi %}
+                                {{ (results.ll_psi + results.dead_load_psi)|round(3) }} psi
+                            {% else %}—{% endif %}
+                        </span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Max Compressive Strength</span>
+                        <span class="result-value">{{ '70' if results.config == 'SC' else '100' }} psi ({{ results.config }})</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Factor of Safety — Live Load</span>
+                        <span class="result-value {{ 'pass' if results.fos_live_load and results.fos_live_load >= 1.75 else 'fail' }}">
+                            {{ results.fos_live_load if results.fos_live_load else '—' }}
+                        </span>
+                    </div>
+                    <div class="footnote" style="margin-top:10px;margin-bottom:0;font-size:11px;line-height:1.5;">
+                        <strong>Dead Load:</strong> Cover Depth × 120 pcf ÷ 144 &nbsp;|&nbsp;
+                        <strong>FoS DL</strong> = Max Strength ÷ DL Pressure &nbsp;|&nbsp; Min recommended: 1.95<br>
+                        <strong>Live Load:</strong> ASTM F2787 2V:1H distribution, m=1.2, IM=24.75%, LLDF=1.15 &nbsp;|&nbsp;
+                        <strong>FoS LL</strong> = Max Strength ÷ (LL + DL) &nbsp;|&nbsp; Min recommended: 1.75
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ CARD 7: Excavation & Dimensional Summary (replaces System Config) ══ -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>📐 Excavation &amp; Dimensional Summary</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body">
+
+                    <!-- System ID -->
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:4px;">System</div>
+                    <div class="result-row">
+                        <span class="result-label">Configuration / Layers</span>
+                        <span class="result-value" id="rv_config_layers">{{ results.config }} — {{ results.layers }} Layer(s)</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Traffic Load</span>
+                        <span class="result-value" id="rv_traffic_load">{{ results.traffic_load }}</span>
+                    </div>
+
+                    <!-- Tank dimensions -->
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Tank Dimensions</div>
+                    {% if results.shape_mode == 'complex' %}
+                    <div style="background:rgba(30,58,138,0.08);border:1px solid rgba(30,58,138,0.25);border-radius:6px;padding:10px 12px;margin:6px 0 8px;font-size:13px;">
+                        <div style="font-weight:bold;margin-bottom:6px;color:#1e3a8a;">⬠ Complex Shape Mode</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;">
+                            <span style="font-size:11px;opacity:0.7;">Scaled Plan Area</span>
+                            <span style="font-size:11px;opacity:0.7;">Scaled Perimeter</span>
+                            <strong>{{ results.complex_scaled_area }} ft²</strong>
+                            <strong>{{ results.complex_tank_perim }} ft</strong>
+                            <span style="font-size:11px;opacity:0.7;">Known Dimension</span>
+                            <span style="font-size:11px;opacity:0.7;">Derived Dimension</span>
+                            <strong>{{ results.complex_known_dim }} ft</strong>
+                            <strong>{{ (results.complex_scaled_area / results.complex_known_dim)|round(2) }} ft</strong>
+                        </div>
+                        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(30,58,138,0.2);font-size:12px;opacity:0.7;">Real-World Snapped Tank</div>
+                        <strong style="font-size:14px;color:#1e3a8a;">
+                            {{ results.tank_width }} ft × {{ results.tank_length }} ft
+                            &nbsp;({{ results.complex_crates_known }} × {{ results.complex_crates_other }} crates/layer)
+                            &nbsp;= {{ results.complex_tank_area }} ft²
+                        </strong>
+                    </div>
+                    {% else %}
+                    <div class="result-row">
+                        <span class="result-label">Snapped Tank (W × L × H)</span>
+                        <span class="result-value" id="rv_snapped_dims">{{ results.tank_width }} ft × {{ results.tank_length }} ft × {{ results.tank_height }} ft</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Tank Footprint Area</span>
+                        <span class="result-value">{{ (results.tank_width * results.tank_length)|round(1) }} ft²</span>
+                    </div>
+                    {% endif %}
+                    <div class="result-row">
+                        <span class="result-label">Tank Perimeter</span>
+                        <span class="result-value" id="rv_tank_perimeter">{{ results.used_perimeter }} ft</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Tank Height</span>
+                        <span class="result-value" id="rv_tank_depth">{{ results.tank_height }} ft &nbsp;({{ (results.tank_height * 12)|round(2) }} in)</span>
+                    </div>
+
+                    <!-- Excavation envelope -->
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Excavation Envelope</div>
+                    {% if results.shape_mode == 'complex' %}
+                    <div class="result-row">
+                        <span class="result-label">Excavation Area</span>
+                        <span class="result-value">{{ results.complex_excav_area }} ft²</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Excavation Perimeter</span>
+                        <span class="result-value">{{ results.complex_excav_perim }} ft</span>
+                    </div>
+                    {% else %}
+                    <div class="result-row">
+                        <span class="result-label">Excavation Width × Length</span>
+                        <span class="result-value">
+                            {{ (results.tank_width + 2*(form_data.get('perimeter_stone_width',1.0)|float))|round(2) }} ft ×
+                            {{ (results.tank_length + 2*(form_data.get('perimeter_stone_width',1.0)|float))|round(2) }} ft
+                        </span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Excavation Footprint Area</span>
+                        <span class="result-value">
+                            {{ ((results.tank_width + 2*(form_data.get('perimeter_stone_width',1.0)|float)) * (results.tank_length + 2*(form_data.get('perimeter_stone_width',1.0)|float)))|round(1) }} ft²
+                        </span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Excavation Perimeter</span>
+                        <span class="result-value">
+                            {{ (2 * (results.tank_width + results.tank_length + 4*(form_data.get('perimeter_stone_width',1.0)|float)))|round(2) }} ft
+                        </span>
+                    </div>
+                    {% endif %}
+                    <div class="result-row">
+                        <span class="result-label">Total System Depth (base + tank + cover)</span>
+                        <span class="result-value" id="rv_system_depth">
+                            {{ (results.tank_height + (form_data.get('base_stone',0.333)|float) + (form_data.get('cover_stone',1.0)|float))|round(3) }} ft
+                            &nbsp;({{ ((results.tank_height + (form_data.get('base_stone',0.333)|float) + (form_data.get('cover_stone',1.0)|float)) * 12)|round(1) }} in)
+                        </span>
+                    </div>
+
+                    <!-- Elevations -->
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Elevation Reference</div>
+                    <div class="result-grid2" style="grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;">
+                        <div class="result-stat">
+                            <div class="result-stat-label">Surface Elevation</div>
+                            <div class="result-stat-value" style="font-size:16px;">{{ results.surface_elev }} ft</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Top of Cover Stone</div>
+                            <div class="result-stat-value" style="font-size:16px;">{{ (results.tank_top_elev + (form_data.get('cover_stone', 1.0)|float))|round(3) }} ft</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Top of Tank</div>
+                            <div class="result-stat-value" style="font-size:16px;">{{ results.tank_top_elev }} ft</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Bottom of Tank</div>
+                            <div class="result-stat-value" style="font-size:16px;">{{ results.tank_bottom_elev }} ft</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Bottom of Base Stone</div>
+                            <div class="result-stat-value" style="font-size:16px;">{{ (results.tank_bottom_elev - (form_data.get('base_stone',0.333)|float))|round(3) }} ft</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Cover Depth</div>
+                            <div class="result-stat-value {{ 'pass' if results.cover_status == 'PASS' else 'fail' }}" style="font-size:16px;">{{ results.cover_depth }} ft</div>
+                        </div>
+                    </div>
+
+                    <!-- Stone depths -->
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Stone Layer Depths</div>
+                    <div class="result-row">
+                        <span class="result-label">Cover Stone</span>
+                        <span class="result-value">{{ form_data.get('cover_stone', 1.0) }} ft</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Perimeter Stone Width</span>
+                        <span class="result-value">{{ form_data.get('perimeter_stone_width', 1.0) }} ft</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="result-label">Base Stone</span>
+                        <span class="result-value">{{ form_data.get('base_stone', 0.333) }} ft</span>
+                    </div>
+                </div>
+            </div>
+
+            {% if results.stage_storage %}
+            <!-- ── CARD 8: Stage Storage Table + Volume Curve ── -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>📈 Stage Storage Table ({{ results.stage_increment_in }}-inch increments)</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body" style="padding:0;">
+                    <table style="margin-top:0;">
+                        <tr>
+                            <th>Elevation (ft)</th>
+                            <th style="text-align:right;">Tank (ft³)</th>
+                            <th style="text-align:right;">Stone (ft³)</th>
+                            <th style="text-align:right;">Total (ft³)</th>
+                        </tr>
+                        {% for row in results.stage_storage %}
+                        <tr>
+                            <td>{{ row.elevation_ft }}</td>
+                            <td style="text-align:right;">{{ row.tank_storage }}</td>
+                            <td style="text-align:right;">{{ row.stone_storage }}</td>
+                            <td style="text-align:right;font-weight:bold;color:var(--accent);">{{ row.total_storage }}</td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+
+                    <!-- Volume Curve Chart -->
+                    <div style="padding:16px 12px 8px;">
+                        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:10px;">Stage-Storage Volume Curve</div>
+                        <div style="position:relative;height:320px;">
+                            <canvas id="stageCurveChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+            (function() {
+                var stageData = [{% for row in results.stage_storage %}{ elev: {{ row.elevation_ft }}, tank: {{ row.tank_storage }}, stone: {{ row.stone_storage }}, total: {{ row.total_storage }} },{% endfor %}];
+                var tankBottomElev  = {{ results.tank_bottom_elev }};
+                var tankTopElev     = {{ results.tank_top_elev }};
+                var baseStoneDepth  = {{ form_data.get('base_stone', 0.333)|float }};
+                var coverStoneDepth = {{ form_data.get('cover_stone', 1.0)|float }};
+                var baseBottomElev  = tankBottomElev - baseStoneDepth;
+                var coverTopElev    = tankTopElev + coverStoneDepth;
+
+                var labels    = stageData.map(function(d){ return d.elev; });
+                var tankVals  = stageData.map(function(d){ return d.tank; });
+                var stoneVals = stageData.map(function(d){ return d.stone; });
+                var totalVals = stageData.map(function(d){ return d.total; });
+                var maxVol    = Math.max.apply(null, totalVals) * 1.08;
+
+                function renderChart() {
+                    var isDark   = document.documentElement.getAttribute('data-theme') === 'dark';
+                    var gridClr  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+                    var lblClr   = isDark ? '#94a3b8' : '#64748b';
+                    var ctx = document.getElementById('stageCurveChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'AquaCell Tank (ft³)',
+                                    data: tankVals,
+                                    borderColor: '#3b82f6',
+                                    backgroundColor: 'transparent',
+                                    borderWidth: 2,
+                                    pointRadius: 0,
+                                    tension: 0.25,
+                                    order: 2
+                                },
+                                {
+                                    label: 'Stone Backfill (ft³)',
+                                    data: stoneVals,
+                                    borderColor: '#94a3b8',
+                                    backgroundColor: 'transparent',
+                                    borderWidth: 1.5,
+                                    borderDash: [4,3],
+                                    pointRadius: 0,
+                                    tension: 0.25,
+                                    order: 3
+                                },
+                                {
+                                    label: 'Total Storage (ft³)',
+                                    data: totalVals,
+                                    borderColor: '#10b981',
+                                    backgroundColor: 'rgba(16,185,129,0.07)',
+                                    borderWidth: 2.5,
+                                    fill: false,
+                                    pointRadius: 0,
+                                    tension: 0.25,
+                                    order: 1
+                                }
+                            ]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: { mode: 'index', intersect: false },
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'bottom',
+                                    labels: { color: lblClr, font: { size: 10 }, boxWidth: 20, padding: 10 }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        title: function(items){ return 'Elevation: ' + items[0].label + ' ft'; },
+                                        label: function(item){ return item.dataset.label + ': ' + Number(item.raw).toLocaleString() + ' ft³'; }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    title: { display: true, text: 'Storage Volume (ft³)', color: lblClr, font: { size: 11 } },
+                                    min: 0,
+                                    max: maxVol,
+                                    grid: { color: gridClr },
+                                    ticks: {
+                                        color: lblClr,
+                                        font: { size: 10 },
+                                        callback: function(v){ return v >= 1000 ? (v/1000).toFixed(0)+'k' : v; }
+                                    }
+                                },
+                                y: {
+                                    title: { display: true, text: 'Elevation (ft)', color: lblClr, font: { size: 11 } },
+                                    reverse: true,
+                                    grid: { color: gridClr },
+                                    ticks: { color: lblClr, font: { size: 10 } }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                if (typeof Chart !== 'undefined') {
+                    renderChart();
+                } else {
+                    var s = document.createElement('script');
+                    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+                    s.onload = renderChart;
+                    document.head.appendChild(s);
+                }
+            })();
+            </script>
+            {% endif %}
+
+            {% if results.project_notes %}
+            <!-- ── CARD 9: Project Notes ── -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>📝 Project Notes</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body" style="font-size:13px;line-height:1.6;white-space:pre-wrap;">{{ results.project_notes }}</div>
+            </div>
+            {% endif %}
+
+        </div>
+        {% endif %}
+
+        <!-- Schematic -->
+        <div class="schematic-card" style="margin-top:16px;">
+            <h2>Conceptual Plan View + Section Schematic</h2>
+            <canvas id="sheet" width="1400" height="1600"></canvas>
+            <div class="schematic-btns">
+                <button onclick="renderSheet()" style="background:#007bff;color:white;">Refresh Visual</button>
+                <button onclick="downloadSheetPNG()" style="background:#28a745;color:white;">Download PNG</button>
+                <button onclick="exportPDFSheet()" style="background:#17a2b8;color:white;">Export PDF (Schematic Only)</button>
+            </div>
+        </div>
+
+    </div><!-- /right-panel -->
+
+    <!-- ── Floating nav: LEFT panel ── -->
+    <div class="float-nav left" id="floatNavLeft" style="display:none;">
+        <button class="float-btn" onclick="document.getElementById('leftPanel').scrollTo({top:0,behavior:'smooth'})" title="Top of inputs">▲</button>
+        <button class="float-btn" onclick="document.getElementById('leftPanel').scrollTo({top:99999,behavior:'smooth'})" title="Bottom of inputs">▼</button>
+    </div>
+
+    <!-- ── Floating nav: RIGHT panel ── -->
+    <div class="float-nav right" id="floatNavRight" style="display:none;">
+        <button class="float-btn" onclick="document.getElementById('rightPanel').scrollTo({top:0,behavior:'smooth'})" title="Top of results">▲</button>
+        <button class="float-btn" onclick="document.getElementById('rightPanel').scrollTo({top:99999,behavior:'smooth'})" title="Bottom of results">▼</button>
+    </div>
+
+</div><!-- /split-layout -->
+
+<script>
+    // Theme Toggle
+    const toggleBtn = document.getElementById('themeToggle');
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    if (savedTheme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        toggleBtn.textContent = '🌙';
+    }
+    toggleBtn.addEventListener('click', () => {
+        if (document.documentElement.getAttribute('data-theme') === 'dark') {
+            document.documentElement.removeAttribute('data-theme');
+            toggleBtn.textContent = '☀️';
+            localStorage.setItem('theme', 'light');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            toggleBtn.textContent = '🌙';
+            localStorage.setItem('theme', 'dark');
+        }
+    });
+
+    function resetForm() {
+        const form = document.getElementById('mainForm');
+        form.querySelectorAll('input[type="text"], input[type="number"]').forEach(el => { el.value = ''; });
+        form.querySelectorAll('select').forEach(el => { el.selectedIndex = 0; });
+        form.querySelectorAll('textarea').forEach(el => { el.value = ''; });
+        form.querySelectorAll('input[type="checkbox"]').forEach(el => { el.checked = true; });
+        const resultsDiv = document.querySelector('.results');
+        if (resultsDiv) resultsDiv.innerHTML = '';
+        ['priceCrateStorage','priceFloorCost','priceSubtotal',
+         'priceFreight','priceTotalCost'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = '—';
+        });
+        const canvas = document.getElementById('sheet');
+        if (canvas) { const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height); }
+        document.querySelectorAll('.suggested').forEach(el => el.textContent = '');
+        setShapeMode('rectangle');
+        document.getElementById('leftPanel').scrollTop = 0;
+    }
+
+    function downloadPDF() {
+        const form = document.getElementById('mainForm');
+        const formData = new FormData(form);
+        formData.append('totalAquaCellCost', document.getElementById('hiddenTotalAquaCellCost').value || '—');
+
+        const canvas = document.getElementById('sheet');
+        const includeSchematic = document.getElementById('include_schematic').checked;
+        if (includeSchematic && canvas) {
+            const base64Image = canvas.toDataURL('image/png');
+            formData.append('schematic_image', base64Image);
+        }
+
+        const projectName = (document.getElementById('project_name').value || 'Project').trim()
+                            .replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
+        fetch('/download_pdf', { method: 'POST', body: formData })
+        .then(r => r.blob())
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const pdfDate1 = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'');
+            a.download = `AquaCell_Summary_${projectName}_${pdfDate1}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+        })
+        .catch(() => alert('PDF download failed. Try Calculate first.'));
+    }
+
+    function calculateAquaCellPrice() {
+        // ── Hardcoded floor unit prices (update here on price increase) ──
+        const UNIT_PRICES = {
+            base:      40.51,
+            side:      21.31,
+            bottom:    18.71,
+            pipe:      28.53,
+            adapter12: 96.54,
+            adapter16: 170.60,
+        };
+
+        const markupPct  = parseFloat(document.getElementById('markupPct').value) || 0;
+        const freightPct = parseFloat(document.getElementById('freightPct').value) || 0;
+
+        // Read BOM quantities from rendered results
+        function getQty(id) {
+            const el = document.getElementById(id);
+            return el ? (parseInt(el.textContent.replace(/,/g,'')) || 0) : 0;
+        }
+        const baseUnits    = getQty('bom_base_units');
+        const sidePlates   = getQty('bom_side_plates');
+        const bottomPlates = getQty('bom_bottom_plates');
+        const pipeConns    = getQty('bom_pipe_connectors');
+        const adapters12   = getQty('bom_top_adapters_12');
+        const adapters16   = getQty('bom_top_adapters_16');
+        const contingency  = parseInt((document.getElementById('contingency_units')?.value || '0')) || 0;
+
+        if (baseUnits === 0) {
+            alert('Run Calculate System first — no BOM quantities found.');
+            return;
+        }
+
+        // Floor cost = sum of all components at unit prices
+        const floorCost = (baseUnits    * UNIT_PRICES.base)
+                        + (sidePlates   * UNIT_PRICES.side)
+                        + (bottomPlates * UNIT_PRICES.bottom)
+                        + (pipeConns    * UNIT_PRICES.pipe)
+                        + (adapters12   * UNIT_PRICES.adapter12)
+                        + (adapters16   * UNIT_PRICES.adapter16)
+                        + (contingency  * UNIT_PRICES.base);
+
+        // Selling price = floor cost ÷ (1 - markup%)
+        const divisor     = markupPct > 0 ? (1 - markupPct / 100) : 1;
+        const sellingPrice = divisor > 0 ? floorCost / divisor : floorCost;
+
+        // Freight applied to selling price
+        const freightCost  = sellingPrice * (freightPct / 100);
+        const totalToCustomer = sellingPrice + freightCost;
+
+        const fmt  = (v) => '$' + v.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+
+        document.getElementById('priceFloorCost').textContent  = fmt(floorCost);
+        document.getElementById('priceSubtotal').textContent   = fmt(sellingPrice)
+            + (markupPct > 0 ? '  (' + markupPct + '% markup)' : '');
+        document.getElementById('priceFreight').textContent    = fmt(freightCost)
+            + (freightPct > 0 ? '  (' + freightPct + '%)' : '');
+        document.getElementById('priceTotalCost').textContent  = fmt(totalToCustomer);
+
+        // Store for quote export
+        document.getElementById('hiddenFloorCost').value        = floorCost.toFixed(2);
+        document.getElementById('hiddenTotalAquaCellCost').value = sellingPrice.toFixed(2);
+        document.getElementById('hiddenFreightCost').value       = freightCost.toFixed(2);
+        document.getElementById('hiddenTotalWithFreight').value  = totalToCustomer.toFixed(2);
+        document.getElementById('hiddenFreightPct').value        = freightPct.toFixed(1);
+        document.getElementById('hiddenMarkupPct').value         = markupPct.toFixed(1);
+    }
+
+
+    function downloadQuote() {
+        const form = document.getElementById('mainForm');
+        const formData = new FormData(form);
+
+        // Carry over pricing fields
+        formData.append('floorCost',          document.getElementById('hiddenFloorCost').value          || '0');
+        formData.append('totalAquaCellCost',  document.getElementById('hiddenTotalAquaCellCost').value  || '0');
+        formData.append('freightCost',        document.getElementById('hiddenFreightCost').value        || '0');
+        formData.append('totalWithFreight',   document.getElementById('hiddenTotalWithFreight').value   || '0');
+        formData.append('freightPct',         document.getElementById('hiddenFreightPct').value         || '10');
+        formData.append('markupPct',          document.getElementById('hiddenMarkupPct').value          || '0');
+        // Explicitly pass project number to guarantee filename
+        formData.set('project_num', document.getElementById('project_num')?.value || '');
+
+        const projectName = (document.getElementById('project_name').value || 'Project').trim()
+                            .replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
+        fetch('/download_quote', { method: 'POST', body: formData })
+        .then(r => {
+            if (!r.ok) throw new Error('Quote generation failed');
+            return r.blob();
+        })
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const projNum = (document.getElementById('project_num')?.value || '').trim().replace(/[^a-zA-Z0-9\-_]/g,'_');
+            const qDate = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'');
+            const qParts = [projNum, projectName].filter(Boolean).join('_');
+            a.download = `AquaCell_Quote_${qParts}_${qDate}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+        })
+        .catch(() => alert('Quote download failed. Run Calculate System and Calculate Price first.'));
+    }
+
+    function exportProject() {
+        const data = {};
+        document.querySelectorAll('#mainForm input, #mainForm select, #mainForm textarea').forEach(el => {
+            if (el.name) data[el.name] = el.value;
+        });
+        const proj = (document.getElementById('project_name').value || 'Project').trim().replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
+        const ts = new Date().toISOString().slice(0,10);
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `AquaCell_${proj}_${ts}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function importProject(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const data = JSON.parse(e.target.result);
+                Object.keys(data).forEach(k => {
+                    const el = document.querySelector(`[name="${k}"]`);
+                    if (el) el.value = data[k];
+                });
+                alert('✅ Project loaded successfully! Click "Calculate System" to refresh results.');
+            } catch (err) {
+                alert('❌ Error reading JSON file.');
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+    }
+
+    function updateSuggestion() {
+        const div = document.getElementById('topAdapterSuggestion');
+        const m = document.body.innerText.match(/AquaCell Tank Storage:\s*([\d,]+)/i);
+        if (m) {
+            const v = parseFloat(m[1].replace(/,/g,''));
+            if (v > 0) div.textContent = `Suggested: ${Math.max(1, Math.floor(v/3500))} (1 per ~3500 ft³)`;
+        }
+    }
+
+    window.addEventListener('load', () => {
+        if (document.querySelector('.results')) updateSuggestion();
+    });
+
+    // ====================== SCHEMATIC ENGINE ======================
+    const CL_IN = 47.2; const CW_IN = 23.6;
+    const CRATE_LEN_FT = 3.94;
+    const CRATE_WID_FT = 1.97;
+
+    const LAYER_HT = {
+        SC: [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581],
+        EX: [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
+    };
+
+    function snapGrid(L, W) {
+        const crates_long = Math.floor(L * 12 / CL_IN);
+        const crates_wide = Math.floor(W * 12 / CW_IN);
+        return {
+            crates_long, crates_wide,
+            used_L: crates_long * CRATE_LEN_FT,
+            used_W: crates_wide * CRATE_WID_FT,
+            margin_L: (L - crates_long * CRATE_LEN_FT)/2,
+            margin_W: (W - crates_wide * CRATE_WID_FT)/2
+        };
+    }
+
+    const COLORS = {frame:'#d0d0d0', text:'#000', muted:'#333', stoneFill:'#e6e6e6', stoneStroke:'#7d7d7d', crateFill:'#d5eaff', crateStroke:'#234c93', red:'#ff3b3b', baseStone:'#7a7f89'};
+
+    function drawPlan(ctx, state, b) {
+        const {L, W, snap} = state;
+        ctx.save();
+        ctx.fillStyle = '#fff'; ctx.fillRect(b.x,b.y,b.w,b.h);
+        ctx.strokeStyle = COLORS.frame; ctx.strokeRect(b.x,b.y,b.w,b.h);
+
+        const pxpf = Math.min((b.w-140)/L, (b.h-180)/W);
+        const ox = b.x+60, oy = b.y+60;
+
+        const ring = 1.0;
+        ctx.fillStyle = COLORS.stoneFill; ctx.strokeStyle = COLORS.stoneStroke;
+        ctx.fillRect(ox+(snap.margin_L-ring)*pxpf, oy+(snap.margin_W-ring)*pxpf, (snap.used_L+2*ring)*pxpf, (snap.used_W+2*ring)*pxpf);
+        ctx.strokeRect(ox+(snap.margin_L-ring)*pxpf, oy+(snap.margin_W-ring)*pxpf, (snap.used_L+2*ring)*pxpf, (snap.used_W+2*ring)*pxpf);
+
+        for(let i=0; i<snap.crates_long; i++) for(let j=0; j<snap.crates_wide; j++) {
+            const cx = ox + (snap.margin_L + i*CRATE_LEN_FT)*pxpf;
+            const cy = oy + (snap.margin_W + j*CRATE_WID_FT)*pxpf;
+            ctx.fillStyle = COLORS.crateFill; ctx.strokeStyle = COLORS.crateStroke;
+            ctx.fillRect(cx,cy,CRATE_LEN_FT*pxpf,CRATE_WID_FT*pxpf);
+            ctx.strokeRect(cx,cy,CRATE_LEN_FT*pxpf,CRATE_WID_FT*pxpf);
+        }
+
+        ctx.strokeStyle = '#000'; ctx.lineWidth=3;
+        ctx.strokeRect(ox+snap.margin_L*pxpf, oy+snap.margin_W*pxpf, snap.used_L*pxpf, snap.used_W*pxpf);
+
+        ctx.setLineDash([8,6]); ctx.strokeStyle=COLORS.red; ctx.lineWidth=2;
+        ctx.strokeRect(ox+(snap.margin_L-1)*pxpf, oy+(snap.margin_W-1)*pxpf, (snap.used_L+2)*pxpf, (snap.used_W+2)*pxpf);
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = COLORS.text; ctx.font = '600 16px Arial';
+        ctx.fillText(`PLAN VIEW — Used footprint: ${snap.used_L.toFixed(2)} ft × ${snap.used_W.toFixed(2)} ft`, b.x+20, b.y+28);
+
+        // Scale Bar
+        const scaleFt = 10;
+        const scalePx = scaleFt * pxpf;
+        const sx = b.x + 60;
+        const sy = b.y + b.h - 70;
+        ctx.fillStyle = '#fff'; ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
+        ctx.fillRect(sx, sy, scalePx, 28);
+        ctx.strokeRect(sx, sy, scalePx, 28);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(sx + 8, sy + 8, scalePx - 16, 12);
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+        for(let i = 0; i <= scaleFt; i += 2) {
+            const tx = sx + 8 + (i / scaleFt) * (scalePx - 16);
+            ctx.beginPath(); ctx.moveTo(tx, sy + 8); ctx.lineTo(tx, sy + 20); ctx.stroke();
+        }
+        ctx.fillStyle = '#000'; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center';
+        ctx.fillText(`${scaleFt} ft`, sx + scalePx/2, sy + 48);
+
+        ctx.font = '12px Arial'; ctx.textAlign = 'right';
+        ctx.fillText(`1 Crate = ${CRATE_LEN_FT.toFixed(2)} ft × ${CRATE_WID_FT.toFixed(2)} ft`, b.x + b.w - 30, b.y + b.h - 25);
+        ctx.restore();
+    }
+
+    function drawSection(ctx, state, b) {
+        const tankBottomElev = parseFloat(document.getElementById('tank_bottom_elev').value) || 0;
+        const baseStoneDepth = parseFloat(document.getElementById('base_stone').value) || 0.333;
+
+        const bottomOfBaseStone = tankBottomElev - baseStoneDepth;
+        const heights = LAYER_HT[state.config] || LAYER_HT.SC;
+        const tankHeight = heights[state.layers-1] || state.layers * 1.33;
+        const totalHeight = baseStoneDepth + tankHeight;
+
+        ctx.save();
+        ctx.fillStyle = '#fff'; ctx.fillRect(b.x, b.y, b.w, b.h);
+        ctx.strokeStyle = '#ddd'; ctx.strokeRect(b.x, b.y, b.w, b.h);
+
+        ctx.fillStyle = '#f0f0f0'; ctx.fillRect(b.x, b.y, b.w, 40);
+        ctx.fillStyle = '#000'; ctx.font = '600 16px Arial';
+        ctx.fillText('SECTION VIEW — Base at Bottom', b.x+20, b.y+28);
+
+        const pxpf = (b.h - 120) / (totalHeight + 1);
+        const ox = b.x + 120;
+        const oy = b.y + 60;
+        const bottomY = oy + totalHeight * pxpf;
+
+        // Compacted Base Stone at BOTTOM
+        ctx.fillStyle = COLORS.baseStone;
+        ctx.strokeStyle = '#333';
+        ctx.fillRect(ox, bottomY - baseStoneDepth * pxpf, b.w - 240, baseStoneDepth * pxpf);
+        ctx.strokeRect(ox, bottomY - baseStoneDepth * pxpf, b.w - 240, baseStoneDepth * pxpf);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center';
+        ctx.fillText('Compacted Base Stone', ox + (b.w - 240)/2, bottomY - (baseStoneDepth * pxpf)/2 + 5);
+
+        // AquaCell Layers stacked upward
+        let currentBottom = bottomY - baseStoneDepth * pxpf;
+        for (let k = 0; k < state.layers; k++) {
+            const layerHt = (heights[k] || (k+1)*1.33) - (heights[k-1] || 0) || (tankHeight / state.layers);
+            const layerTop = currentBottom - layerHt * pxpf;
+
+            ctx.fillStyle = '#9fd7ff';
+            ctx.strokeStyle = '#234c93';
+            ctx.fillRect(ox, layerTop, b.w - 240, layerHt * pxpf);
+            ctx.strokeRect(ox, layerTop, b.w - 240, layerHt * pxpf);
+
+            ctx.fillStyle = '#000';
+            ctx.fillText(`Layer ${k+1}`, ox + (b.w - 240)/2, layerTop + (layerHt * pxpf)/2 + 5);
+
+            currentBottom = layerTop;
+        }
+
+        // Elevation Scale
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(ox - 60, oy); ctx.lineTo(ox - 60, bottomY); ctx.stroke();
+
+        ctx.font = '12px Arial'; ctx.textAlign = 'right'; ctx.fillStyle = '#000';
+
+        ctx.fillText(bottomOfBaseStone.toFixed(2), ox - 70, bottomY + 4);
+        ctx.beginPath(); ctx.moveTo(ox - 60, bottomY); ctx.lineTo(ox - 45, bottomY); ctx.stroke();
+
+        ctx.fillText(tankBottomElev.toFixed(2), ox - 70, bottomY - baseStoneDepth * pxpf + 4);
+        ctx.beginPath(); ctx.moveTo(ox - 60, bottomY - baseStoneDepth * pxpf); ctx.lineTo(ox - 45, bottomY - baseStoneDepth * pxpf); ctx.stroke();
+
+        let elev = tankBottomElev;
+        for (let k = 0; k < state.layers; k++) {
+            const layerHt = (heights[k] || (k+1)*1.33) - (heights[k-1] || 0) || (tankHeight / state.layers);
+            elev += layerHt;
+            const yPos = bottomY - baseStoneDepth * pxpf - (elev - tankBottomElev) * pxpf;
+            ctx.fillText(elev.toFixed(2), ox - 70, yPos + 4);
+            ctx.beginPath(); ctx.moveTo(ox - 60, yPos); ctx.lineTo(ox - 45, yPos); ctx.stroke();
+        }
+
+        ctx.save();
+        ctx.translate(ox - 85, oy + totalHeight * pxpf / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('Elevation (ft)', 0, 0);
+        ctx.restore();
+
+        ctx.restore();
+    }
+
+    function renderSheet() {
+        const L = parseFloat(document.getElementById('knownLength').value) || 0;
+        const W = parseFloat(document.getElementById('knownWidth').value) || 0;
+        const layers = parseInt(document.getElementById('layers').value) || 1;
+        const config = document.getElementById('modelType').value || 'SC';
+
+        if (L <= 0 || W <= 0) return;
+
+        const snap = snapGrid(L, W);
+        const state = {L, W, layers, config, snap};
+
+        const canvas = document.getElementById('sheet');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+
+        ctx.fillStyle = '#f8f8f8'; ctx.fillRect(0,0,canvas.width,55);
+        ctx.fillStyle = '#000'; ctx.font = 'bold 18px Arial';
+        ctx.fillText(`AquaCell ${config}-${layers} | ${L.toFixed(2)} ft × ${W.toFixed(2)} ft | ${snap.crates_long} × ${snap.crates_wide} crates`, 30, 38);
+
+        drawPlan(ctx, state, {x:30, y:80, w:canvas.width-60, h:620});
+        drawSection(ctx, state, {x:30, y:720, w:canvas.width-60, h:780});
+
+        ctx.fillStyle = '#666'; ctx.font = '12px Arial';
+        ctx.fillText('Conceptual schematic — not for construction', 30, canvas.height-15);
+    }
+
+    function downloadSheetPNG() {
+        const a = document.createElement('a');
+        a.href = document.getElementById('sheet').toDataURL('image/png');
+        a.download = 'AquaCell_Schematic.png';
+        a.click();
+    }
+
+    function exportPDFSheet() {
+        const dataURL = document.getElementById('sheet').toDataURL('image/png');
+        const win = window.open('');
+        win.document.write(`<img src="${dataURL}" style="width:100%;">`);
+        win.document.close();
+        setTimeout(() => win.print(), 400);
+    }
+
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            if (document.getElementById('knownLength').value) renderSheet();
+        }, 800);
+    });
+
+    document.getElementById('knownLength').addEventListener('input', renderSheet);
+
+    // ── COLLAPSIBLE INPUT SECTION CARDS ──
+    function toggleCard(header) {
+        const body = header.nextElementSibling;
+        const isCollapsed = header.classList.contains('collapsed');
+        if (isCollapsed) {
+            header.classList.remove('collapsed');
+            body.classList.remove('hidden');
+        } else {
+            header.classList.add('collapsed');
+            body.classList.add('hidden');
+        }
+    }
+
+    // ── COLLAPSIBLE RESULT CARDS ──
+    function toggleResultCard(header) {
+        // Find the next sibling that is a result-card-body (skip script tags etc)
+        let body = header.nextElementSibling;
+        while (body && !body.classList.contains('result-card-body')) {
+            body = body.nextElementSibling;
+        }
+        if (!body) return;
+        const isCollapsed = header.classList.contains('collapsed');
+        if (isCollapsed) {
+            header.classList.remove('collapsed');
+            body.classList.remove('hidden');
+        } else {
+            header.classList.add('collapsed');
+            body.classList.add('hidden');
+        }
+    }
+
+    // ── FLOATING NAV: show when panel has scrollable content ──
+    function initFloatNav() {
+        const leftPanel  = document.getElementById('leftPanel');
+        const rightPanel = document.getElementById('rightPanel');
+        const navLeft    = document.getElementById('floatNavLeft');
+        const navRight   = document.getElementById('floatNavRight');
+
+        function checkLeft()  { if (navLeft)  navLeft.style.display  = leftPanel.scrollHeight  > leftPanel.clientHeight  + 20 ? 'flex' : 'none'; }
+        function checkRight() { if (navRight) navRight.style.display = rightPanel.scrollHeight > rightPanel.clientHeight + 20 ? 'flex' : 'none'; }
+
+        checkLeft();
+        checkRight();
+        leftPanel.addEventListener('scroll',  checkLeft,  { passive: true });
+        rightPanel.addEventListener('scroll', checkRight, { passive: true });
+        new MutationObserver(checkLeft).observe(leftPanel,   { childList: true, subtree: true });
+        new MutationObserver(checkRight).observe(rightPanel, { childList: true, subtree: true });
+    }
+    initFloatNav();
+
+    // ── SHAPE MODE TOGGLE ──
+    function setShapeMode(mode) {
+        document.getElementById('shapeModeInput').value = mode;
+        const rectInputs    = document.getElementById('rectInputs');
+        const complexInputs = document.getElementById('complexInputs');
+        const btnRect    = document.getElementById('shapeBtn_rect');
+        const btnComplex = document.getElementById('shapeBtn_complex');
+
+        if (mode === 'complex') {
+            rectInputs.style.display    = 'none';
+            complexInputs.style.display = 'block';
+            btnComplex.style.background = '#1e3a8a';
+            btnComplex.style.color      = '#fff';
+            btnRect.style.background    = 'var(--card)';
+            btnRect.style.color         = 'var(--text)';
+        } else {
+            rectInputs.style.display    = 'block';
+            complexInputs.style.display = 'none';
+            btnRect.style.background    = '#1e3a8a';
+            btnRect.style.color         = '#fff';
+            btnComplex.style.background = 'var(--card)';
+            btnComplex.style.color      = 'var(--text)';
+        }
+    }
+
+    // Restore shape mode on page load (after Flask re-render)
+    (function() {
+        const savedMode = document.getElementById('shapeModeInput')
+            ? document.getElementById('shapeModeInput').value
+            : 'rectangle';
+        setShapeMode(savedMode || 'rectangle');
+    })();
+    document.getElementById('knownWidth').addEventListener('input', renderSheet);
+    document.getElementById('layers').addEventListener('change', renderSheet);
+    document.getElementById('modelType').addEventListener('change', renderSheet);
+    document.getElementById('tank_bottom_elev').addEventListener('input', renderSheet);
+    document.getElementById('base_stone').addEventListener('input', renderSheet);
+
+    // ====================== COPY TO EMAIL ======================
+    function downloadStageCSV() {
+        const form = document.getElementById('mainForm');
+        if (!form) { alert('Please run Calculate System first.'); return; }
+        const formData = new FormData(form);
+        const projectName = (document.getElementById('project_name')?.value || 'Project').trim().replace(/[^a-zA-Z0-9\-_ ]/g,'_').replace(/\s+/g,'_');
+        fetch('/download_stage_csv', { method: 'POST', body: formData })
+        .then(r => {
+            if (!r.ok) throw new Error('CSV generation failed');
+            return r.blob();
+        })
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const csvDate = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'');
+        a.download = 'AquaCell_StageStorage_' + projectName + '_' + csvDate + '.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        })
+        .catch(() => alert('Stage CSV failed. Run Calculate System with Stage Storage enabled first.'));
+    }
+
+    function copyToEmail() {
+        // Check results exist
+        if (!document.getElementById('rv_config_layers') && !document.getElementById('tankStorageStat')) {
+            alert('Please run "Calculate System" first to generate results.');
+            return;
+        }
+
+        // Helper: read textContent of an element by ID, strip units/extra text, return cleaned value or fallback
+        function txt(id, fallback='—') {
+            const el = document.getElementById(id);
+            if (!el) return fallback;
+            return el.textContent.trim() || fallback;
+        }
+
+        // Helper: extract just the numeric portion (strip units like ft³, ft, etc.)
+        function num(id, fallback='—') {
+            const el = document.getElementById(id);
+            if (!el) return fallback;
+            const m = el.textContent.match(/([\d,]+\.?\d*)/);
+            return m ? m[1] : fallback;
+        }
+
+        // --- Config / Layers ---
+        const configSelect  = document.getElementById('modelType')?.value || 'SC';
+        const layersSelect  = document.getElementById('layers')?.value || '—';
+
+        // --- Traffic Load ---
+        const trafficRaw  = document.querySelector('[name="traffic_load"]')?.value || '';
+        const trafficMap  = { H10: 'H-10', HS20: 'HS-20', HS25: 'HS-25' };
+        const trafficLoad = trafficMap[trafficRaw] || trafficRaw || txt('rv_traffic_load');
+
+        // --- Storage ---
+        const minStorageRaw = txt('rv_min_storage');          // "XXXX ft³ → PASS"
+        const minStorage    = minStorageRaw !== '—' ? (minStorageRaw.match(/([\d,]+\.?\d*)/) || ['','—'])[1] : '—';
+        const tankStorage   = num('tankStorageStat');
+        const stoneStorage  = num('rv_stone_storage');
+        const totalStorage  = num('rv_total_storage');
+
+        // --- Area ---
+        const shapeMode = document.getElementById('shapeModeInput')?.value || 'rectangle';
+        const isComplex = shapeMode === 'complex';
+        let areaFt2 = '—';
+        let perimFt = '—';
+
+        if (isComplex) {
+            // Complex mode: read from complex shape block
+            const perimEl = document.getElementById('rv_tank_perimeter');
+            if (perimEl) perimFt = (perimEl.textContent.match(/([\d.]+)/) || ['','—'])[1];
+            // Area from complex_tank_area which is baked into the complex shape block text
+            // Fall back to scanning the config card body (it's always rendered, just maybe hidden)
+            const configBody = document.querySelector('.result-card-body');
+            if (configBody) {
+                const m = configBody.textContent.match(/=\s*([\d,]+\.?\d*)\s*ft²/);
+                if (m) areaFt2 = parseFloat(m[1].replace(/,/g,'')).toFixed(1);
+            }
+        } else {
+            const dimsEl = document.getElementById('rv_snapped_dims');
+            if (dimsEl) {
+                const m = dimsEl.textContent.match(/([\d.]+)\s*ft\s*×\s*([\d.]+)\s*ft/);
+                if (m) areaFt2 = (parseFloat(m[1]) * parseFloat(m[2])).toFixed(1);
+            }
+            const perimEl = document.getElementById('rv_tank_perimeter');
+            if (perimEl) perimFt = (perimEl.textContent.match(/([\d.]+)/) || ['','—'])[1];
+        }
+
+        // --- Tank Depth & System Depth ---
+        let tankHeight = '—';
+        const tankDepthEl = document.getElementById('rv_tank_depth');
+        if (tankDepthEl) {
+            const m = tankDepthEl.textContent.match(/([\d.]+)/);
+            if (m) tankHeight = m[1];
+        }
+        // Also try the complex-mode tank height element
+        if (tankHeight === '—') {
+            const complexEl = document.getElementById('rv_tank_height_complex');
+            if (complexEl) {
+                const m = complexEl.textContent.match(/([\d.]+)/);
+                if (m) tankHeight = m[1];
+            }
+        }
+
+        // System depth from rendered element (already calculated by Jinja)
+        let systemDepth = '—';
+        const sysDpEl = document.getElementById('rv_system_depth');
+        if (sysDpEl) {
+            const m = sysDpEl.textContent.match(/([\d.]+)/);
+            if (m) systemDepth = m[1];
+        } else if (tankHeight !== '—') {
+            // Fallback: calculate from inputs
+            const baseStoneVal  = parseFloat(document.querySelector('[name="base_stone"]')?.value  || '0.333') || 0.333;
+            const coverStoneVal = parseFloat(document.querySelector('[name="cover_stone"]')?.value || '1.0')   || 1.0;
+            systemDepth = (parseFloat(tankHeight) + baseStoneVal + coverStoneVal).toFixed(2);
+        }
+
+        // --- BOM (read directly from IDs — works even when card is collapsed) ---
+        const baseUnits      = txt('bom_base_units');
+        const sidePlates     = txt('bom_side_plates');
+        const bottomPlates   = txt('bom_bottom_plates');
+        const pipeConnectors = txt('bom_pipe_connectors');
+        const topAdapters12  = txt('bom_top_adapters_12');
+        const topAdapters16  = txt('bom_top_adapters_16');
+
+        // --- Geotextile (read from live cells) ---
+        const geoUnit  = (window._currentGeoUnit === 'yd2') ? 'yd²' : 'ft²';
+        const geoTank  = txt('geoTankCell');
+        const geoStone = txt('geoStoneCell');
+        const geoTotal = txt('geoTotalCell');
+
+        // --- Stone Backfill Bulk ---
+        const stoneBulkDisplay = txt('stoneBulkDisplay');
+
+        const emailText = [
+            'AquaCell Proposed System',
+            '',
+            `Tank Configuration/Layers:                        ${configSelect}/${layersSelect} Layer(s)`,
+            `Minimum Required Storage (ft³):                   ${minStorage}`,
+            `AquaCell Tank Storage (ft³):                      ${tankStorage}`,
+            `Stone Backfill Storage (ft³):                     ${stoneStorage}`,
+            `Total System Storage (ft³):                       ${totalStorage}`,
+            `Base Unit (3091506) ea.:                          ${baseUnits}`,
+            `Side Plates (2476600003) ea.:                     ${sidePlates}`,
+            `Bottom Plate (2476600001) ea.:                    ${bottomPlates}`,
+            `8-12" Pipe Connectors (2476631200) ea.:           ${pipeConnectors}`,
+            `12" Top Adapters (3085857) ea.:                   ${topAdapters12}`,
+            `16" Top Adapters (2476842000) ea.:                ${topAdapters16}`,
+            `AquaCell Tank Wrap Geotextile (ft²):              ${geoTank}`,
+            `Stone Backfill Envelope Geotextile (ft²):         ${geoStone}`,
+            `Total Geotextile (ft²):                           ${geoTotal}`,
+            `Total Estimated Stone Backfill Volume (with 10%): ${stoneBulkDisplay}`,
+        ].join('\n');
+
+        navigator.clipboard.writeText(emailText).then(() => {
+            alert('✅ Results copied to clipboard! Paste directly into your email.');
+        }).catch(() => {
+            const ta = document.createElement('textarea');
+            ta.value = emailText;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            alert('✅ Results copied to clipboard! Paste directly into your email.');
+        });
+    }
+
+    // ══════════════════════════════════════════════════
+    //  DETAIL SHEET EXPORTER
+    // ══════════════════════════════════════════════════
+
+    const DETAIL_GROUPS = [
+        { label: 'Installation Details',
+          test: n => /^AQ-100-0[1-9]|^AQ-100-10[ .]|^AQ-100-19|^AQ-100-2[0-6]/.test(n) },
+        { label: 'Cross Sections',
+          test: n => /^AQ-100-1[1-8]/.test(n) },
+        { label: 'Component Details',
+          test: n => /^AQ-300/.test(n) },
+        { label: 'Volume & Connections',
+          test: n => /^AQ-200/.test(n) },
+        { label: 'Technical Bulletins',
+          test: n => /^TB|^Report on|^TRI |^WAVIN/.test(n) },
+        { label: 'Guides & Marketing',
+          test: n => /^WA_/.test(n) },
+        { label: 'Other', test: () => true }
+    ];
+
+    function categorizeFiles(files) {
+        const groups = DETAIL_GROUPS.map(g => ({ label: g.label, files: [] }));
+        files.forEach(f => {
+            for (let i = 0; i < DETAIL_GROUPS.length; i++) {
+                if (DETAIL_GROUPS[i].test(f)) {
+                    groups[i].files.push(f);
+                    break;
+                }
+            }
+        });
+        return groups.filter(g => g.files.length > 0);
+    }
+
+    function friendlyName(filename) {
+        return filename
+            .replace(/\.pdf$/i, '')
+            .replace(/-Layout\d*(\s*\(\d+\))?$/i, '')
+            .replace(/Layout\d*(\s*\(\d+\))?$/i, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+    }
+
+    function renderDetailsGroups(groups) {
+        const container = document.getElementById('detailsGroups');
+        container.innerHTML = '';
+        if (groups.length === 0) {
+            container.innerHTML = '<p style="color:#94a3b8;font-size:13px;">No PDF files found in repository.</p>';
+            return;
+        }
+        const selAll = document.createElement('button');
+        selAll.className = 'details-select-all';
+        selAll.textContent = 'Select All Files';
+        selAll.onclick = () => {
+            document.querySelectorAll('#detailsGroups input[type=checkbox]').forEach(cb => cb.checked = true);
+            updateDetailsCount();
+        };
+        container.appendChild(selAll);
+        groups.forEach((group, gi) => {
+            const div = document.createElement('div');
+            div.className = 'details-group';
+            const header = document.createElement('div');
+            header.className = 'details-group-header';
+            header.innerHTML = `
+                <span class="details-group-label">${group.label} <span style="color:#64748b;font-weight:normal;">(${group.files.length})</span></span>
+                <button class="details-group-toggle" data-gi="${gi}">Select all</button>
+            `;
+            header.querySelector('.details-group-toggle').addEventListener('click', (e) => {
+                const gIndex = e.target.dataset.gi;
+                const cbs = document.querySelectorAll('[data-group="' + gIndex + '"]');
+                const allChecked = [...cbs].every(cb => cb.checked);
+                cbs.forEach(cb => cb.checked = !allChecked);
+                e.target.textContent = allChecked ? 'Select all' : 'Deselect all';
+                updateDetailsCount();
+            });
+            div.appendChild(header);
+            const list = document.createElement('div');
+            list.className = 'details-file-list';
+            group.files.forEach(f => {
+                const item = document.createElement('label');
+                item.className = 'details-file-item';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = f;
+                cb.dataset.group = gi;
+                cb.addEventListener('change', updateDetailsCount);
+                const span = document.createElement('span');
+                span.textContent = friendlyName(f);
+                span.title = f;
+                item.appendChild(cb);
+                item.appendChild(span);
+                list.appendChild(item);
+            });
+            div.appendChild(list);
+            container.appendChild(div);
+        });
+        updateDetailsCount();
+    }
+
+    function updateDetailsCount() {
+        const checked = document.querySelectorAll('#detailsGroups input[type=checkbox]:checked').length;
+        document.getElementById('detailsCount').textContent = checked + ' file' + (checked !== 1 ? 's' : '') + ' selected';
+        document.getElementById('detailsGenBtn').disabled = checked === 0;
+    }
+
+    var _detailsLoaded = false;
+
+    function openDetailsModal() {
+        document.getElementById('detailsOverlay').classList.add('open');
+        if (_detailsLoaded) return;
+        var spinner = document.getElementById('detailsSpinner');
+        var errDiv  = document.getElementById('detailsError');
+        spinner.classList.add('active');
+        errDiv.classList.remove('visible');
+        fetch('/api/details')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                spinner.classList.remove('active');
+                if (data.error) {
+                    errDiv.textContent = '⚠ ' + data.error;
+                    errDiv.classList.add('visible');
+                    return;
+                }
+                _detailsLoaded = true;
+                renderDetailsGroups(categorizeFiles(data.files));
+            })
+            .catch(function(err) {
+                spinner.classList.remove('active');
+                errDiv.textContent = '⚠ Could not reach server: ' + err.message;
+                errDiv.classList.add('visible');
+            });
+    }
+
+    function closeDetailsModal() {
+        document.getElementById('detailsOverlay').classList.remove('open');
+    }
+
+    function closeDetailsIfBg(e) {
+        if (e.target === document.getElementById('detailsOverlay')) closeDetailsModal();
+    }
+
+    function generateDetailsPDF() {
+        var selected = Array.from(document.querySelectorAll('#detailsGroups input[type=checkbox]:checked'))
+                           .map(function(cb) { return cb.value; });
+        if (selected.length === 0) return;
+        var btn = document.getElementById('detailsGenBtn');
+        btn.disabled = true;
+        btn.textContent = '⏳ Generating…';
+        fetch('/download_details_pdf', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ files: selected })
+        })
+        .then(function(r) {
+            if (!r.ok) return r.json().then(function(d) { return Promise.reject(d.error || 'Server error'); });
+            return r.blob();
+        })
+        .then(function(blob) {
+            var url = URL.createObjectURL(blob);
+            var a   = document.createElement('a');
+            a.href  = url;
+            var d   = new Date();
+            var dt  = (d.getMonth()+1).toString().padStart(2,'0') +
+                      d.getDate().toString().padStart(2,'0') +
+                      d.getFullYear();
+            a.download = 'AquaCell_Details_' + dt + '.pdf';
+            a.click();
+            URL.revokeObjectURL(url);
+        })
+        .catch(function(err) {
+            alert('PDF generation failed: ' + err);
+        })
+        .finally(function() {
+            btn.disabled = false;
+            btn.textContent = '⬇ Generate PDF';
+        });
+    }
+
+</script>
+
+<!-- ══ DETAIL SHEET EXPORTER MODAL ══ -->
+<div class="details-overlay" id="detailsOverlay" onclick="closeDetailsIfBg(event)">
+  <div class="details-modal">
+    <div class="details-modal-header">
+      <h3>📋 AquaCell Detail Sheet Exporter</h3>
+      <button class="details-close" onclick="closeDetailsModal()" title="Close">✕</button>
+    </div>
+    <div class="details-modal-body" id="detailsBody">
+      <div class="details-spinner active" id="detailsSpinner">
+        <div class="details-spinner-dot"></div>
+        Loading detail sheets from GitHub…
+      </div>
+      <div class="details-error" id="detailsError"></div>
+      <div id="detailsGroups"></div>
+    </div>
+    <div class="details-modal-footer">
+      <span class="details-count" id="detailsCount">0 files selected</span>
+      <button class="details-btn details-btn-secondary" onclick="closeDetailsModal()">Cancel</button>
+      <button class="details-btn details-btn-primary" id="detailsGenBtn"
+              onclick="generateDetailsPDF()" disabled>⬇ Generate PDF</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
