@@ -34,17 +34,17 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] Multiple Basin Entry and Reports branch created
 -  [X] Add fabric and stone totals for both tanks to MULTI-TANK quote
 -  [X] Add pricing to the CONTINGENCY BASINS as well. We should be encouraging those on every job.
+-  [X] fix contingency basin override
 -  [X] v15 PRICING ENGINE THAT CAN BE EASILY ADJUSTED FOR DIST, MARKET, MSRP ESTIMATES. COMPONENT PRICING HARDCODED AND EDITABLE WHEN PRICE INCREASES OCCUR
+-  [X] EXPORT STAGE STORAGE CURVE FROM UI
  
 ** ## Next Up (High Priority – Do These Next)**
 
-- fix contingency basin override
-- command button to collapse all cards
-- EXPORT STAGE STORAGE CURVE FROM UI
-- optional geogrid totals (based on excavation area + overage)
-- add place for "additional accessories" in BOM?
-- TAKE PRICING OUT OF SEPARATE CALCULATIONS TOOL FOR CLIENT USE
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
+- add biaxial geogrid total to the quote sheet as a product by others (based on excavation area + overage)
+- command button to collapse all cards
+- add place for "additional accessories" in BOM
+- TAKE PRICING OUT OF SEPARATE CALCULATIONS TOOL FOR CLIENT USE
 - toggle DISTRIBUTOR, MARKET,  BUDGET ESTIMATE PRICING for quote page export (HEADER TITLE)
 - ADD DISTANCE FROM BUILDING CALCULATOR (THAT AND BUOYANCY SHOULD BE SEPARATE BRANCHES SIMILAR TO MULTI-TANK)
 - ONE BUTTON THAT TAKES YOU TO "TOOLS" WHERE MULTIPLE CALCULATORS LIVE AND EXPORT TO THEIR OWN PAGE WITH GRAPHICS
@@ -55,12 +55,8 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 - Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed (added to excavation & dimensional summary card
 - bouyancy calculator
-- List of details that can be selected that prepends/appends when PDF is created (cover sheet, standard detail, specs, etc.)
-- QR codes or hyperlinks to wavin.us or specific installation details (probably on the cover or appended page)
-- ADD USER INITIALS APPENDED TO A SELF-GENERATED OR USING THE EXISTING QUOTE # SYSTEM = PRODUCT + PROJECT# + "CREATED BY" INITIALS (EX. AQ1615-00-HD/1615-00-AQ_HD)
 - Metric toggle
 - Update font to Nunito (Wavin speciifc calculator ONLY)
-- ADD A TOGGLE BOX UP IN THE PROJECT INFORMATION CARD FOR "REVISION" (REVISION WOULD BE ADDED TO THE QUOTE # "-01,-02, ETC.)
 
 **Future Version Releases**
 
