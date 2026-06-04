@@ -40,16 +40,19 @@ Professional web-based calculator for designing and quoting underground stormwat
  
 ** ## Next Up (High Priority – Do These Next)**
 
+- ADD DISTANCE FROM BUILDING CALCULATOR (THAT AND BUOYANCY SHOULD BE SEPARATE BRANCHES SIMILAR TO MULTI-TANK)
+- add biaxial geogrid total to the quote sheet as a product by others (based on excavation area + overage)
 - add feature on UX/UI to toggle on/off layers of backfill included in storage
+- ADD COMPLEX CALCULATOR (SIMPLE) TO MULTI TANK UI/UX
+- ADD FABRIC AND ACCESSORY AMOUNTS TO THE MULTI-TANK QUOTE
 - add project name to details export name extension
 - add a COST PER CUBIC FOOT Field on the quote that is just a calculation of the total sum / AquaCell tank storage
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
-- add biaxial geogrid total to the quote sheet as a product by others (based on excavation area + overage)
 - command button to collapse all cards
 - add place for "additional accessories" in BOM
 - TAKE PRICING OUT OF SEPARATE CALCULATIONS TOOL FOR CLIENT USE
 - toggle DISTRIBUTOR, MARKET,  BUDGET ESTIMATE PRICING for quote page export (HEADER TITLE)
-- ADD DISTANCE FROM BUILDING CALCULATOR (THAT AND BUOYANCY SHOULD BE SEPARATE BRANCHES SIMILAR TO MULTI-TANK)
+
 - ONE BUTTON THAT TAKES YOU TO "TOOLS" WHERE MULTIPLE CALCULATORS LIVE AND EXPORT TO THEIR OWN PAGE WITH GRAPHICS
 
 **##SYSTEM CHECKS TO VERIFY / CONFIRM**
