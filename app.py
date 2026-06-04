@@ -1443,7 +1443,22 @@ def download_pdf():
     stone_perim_net      = round(stone_perim_gross * stone_void, 1)
     stone_base_gross     = round(excav_area_for_layers * base_stone, 1)
     stone_base_net       = round(stone_base_gross * stone_void, 1)
-    stone_layer_total_net = round(stone_top_net + stone_perim_net + stone_base_net, 1)
+
+    # ── Stone layer net-storage inclusion toggles ──────────────────
+    # JS sends '1' (included) or '0' (excluded) for each layer.
+    # Gross volumes are always preserved for purchase/coordination.
+    stone_top_included   = request.form.get('stone_top_included',   '1') == '1'
+    stone_perim_included = request.form.get('stone_perim_included', '1') == '1'
+    stone_base_included  = request.form.get('stone_base_included',  '1') == '1'
+
+    stone_top_net_pdf   = stone_top_net   if stone_top_included   else 0.0
+    stone_perim_net_pdf = stone_perim_net if stone_perim_included else 0.0
+    stone_base_net_pdf  = stone_base_net  if stone_base_included  else 0.0
+    stone_layer_total_net = round(stone_top_net_pdf + stone_perim_net_pdf + stone_base_net_pdf, 1)
+
+    # Adjust total_stone_storage and total_storage to match toggled selection
+    total_stone_storage   = stone_layer_total_net
+    total_storage         = round(tank_storage + total_stone_storage, 1)
 
     # Stage storage
     stage_storage_lines = []
@@ -1523,7 +1538,7 @@ def download_pdf():
         y = _kv_row_colored(c, y, 'Minimum Required Storage Volume',
                             f'{min_storage:,.1f} ft³', storage_status or 'FAIL', shade=False)
     y = _kv_row(c, y, 'AquaCell Tank Storage  (crate void space)', f'{tank_storage:,.1f} ft³', shade=True)
-    y = _kv_row(c, y, 'Stone Backfill Storage  (@ entered stone void ratio)', f'{total_stone_storage:,.1f} ft³', shade=False)
+    y = _kv_row(c, y, 'Stone Backfill Storage  (included layers net storage)', f'{total_stone_storage:,.1f} ft³', shade=False)
     y = _highlight_row(c, y, 'Total System Storage', f'{total_storage:,.1f} ft³',
                        bg=LTBLUE, fg=BLUE)
     y -= 5
@@ -1588,27 +1603,43 @@ def download_pdf():
     # ── SECTION 4: Stone Backfill ─────────────────────────────
     y = _section_header(c, y, '■  STONE BACKFILL  (provided by others — coordination estimates only)')
 
-    y = _sub_label(c, y, f'NET STORAGE BY LAYER  (stone void ratio = {stone_void_pct}%  |  net = gross × void ratio)')
+    y = _sub_label(c, y, f'STORAGE BY LAYER  (stone void ratio = {stone_void_pct}%  |  net = gross × void ratio  |  ✓ = included in Total System Storage)')
+
+    # Column anchors for 4-column stone table
+    C_STN_LAYER = LM + 5
+    C_STN_GROSS_R = LM + CW - 215
+    C_STN_NET_R   = LM + CW - 105
+    C_STN_INC_R   = LM + CW - 5
+    COL_W_NUM = 100
+    COL_W_INC = 90
 
     y = _table_header(c, y, [
-        ('Layer',              C_LAYER, 200, 'left'),
-        ('Net Storage (ft³)',  C_NET_R - COL_NET_W, COL_NET_W, 'right'),
+        ('Layer',             C_STN_LAYER,              160,       'left'),
+        ('Gross (ft³)',       C_STN_GROSS_R - COL_W_NUM, COL_W_NUM, 'right'),
+        ('Net (ft³)',         C_STN_NET_R   - COL_W_NUM, COL_W_NUM, 'right'),
+        ('In Net Total',      C_STN_INC_R   - COL_W_INC, COL_W_INC, 'right'),
     ])
-    y = _table_row(c, y, [
-        ('Cover / Top',             C_LAYER, 200, 'left',  False, None),
-        (f'{stone_top_net:,.1f}',   C_NET_R - COL_NET_W, COL_NET_W, 'right', False, None),
-    ], shade=False)
-    y = _table_row(c, y, [
-        ('Perimeter / Sides',       C_LAYER, 200, 'left',  False, None),
-        (f'{stone_perim_net:,.1f}', C_NET_R - COL_NET_W, COL_NET_W, 'right', False, None),
-    ], shade=True)
-    y = _table_row(c, y, [
-        ('Base / Bottom',           C_LAYER, 200, 'left',  False, None),
-        (f'{stone_base_net:,.1f}',  C_NET_R - COL_NET_W, COL_NET_W, 'right', False, None),
-    ], shade=False)
+
+    def _stone_row(y, label, gross, net, included, shade):
+        inc_text  = '✓  INCLUDED' if included else '—  EXCLUDED'
+        inc_color = GREEN         if included else RED
+        y = _table_row(c, y, [
+            (label,           C_STN_LAYER,              160,       'left',  False, None),
+            (f'{gross:,.1f}', C_STN_GROSS_R - COL_W_NUM, COL_W_NUM, 'right', False, GRAY),
+            (f'{net:,.1f}',   C_STN_NET_R   - COL_W_NUM, COL_W_NUM, 'right', False, None),
+            (inc_text,        C_STN_INC_R   - COL_W_INC, COL_W_INC, 'right', True,  inc_color),
+        ], shade=shade)
+        return y
+
+    y = _stone_row(y, 'Cover / Top',     stone_top_gross,   stone_top_net,   stone_top_included,   shade=False)
+    y = _stone_row(y, 'Perimeter / Sides', stone_perim_gross, stone_perim_net, stone_perim_included, shade=True)
+    y = _stone_row(y, 'Base / Bottom',   stone_base_gross,  stone_base_net,  stone_base_included,  shade=False)
     y = _table_total_row(c, y, [
-        ('TOTAL NET STORAGE',                     C_LAYER, 200, 'left'),
-        (f'{stone_layer_total_net:,.1f} ft³',     C_NET_R - COL_NET_W, COL_NET_W, 'right'),
+        ('TOTAL NET STORAGE (INCLUDED LAYERS)',    C_STN_LAYER,              160,       'left'),
+        (f'{stone_top_gross + stone_perim_gross + stone_base_gross:,.1f}',
+                                                   C_STN_GROSS_R - COL_W_NUM, COL_W_NUM, 'right'),
+        (f'{stone_layer_total_net:,.1f} ft³',      C_STN_NET_R   - COL_W_NUM, COL_W_NUM, 'right'),
+        ('',                                       C_STN_INC_R   - COL_W_INC, COL_W_INC, 'right'),
     ], bg=LTGRN, fg=GREEN)
     y -= 5
 

@@ -806,8 +806,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     {% if results.min_storage is not none %}
                     <div class="result-row">
                         <span class="result-label">Minimum Required Storage</span>
-                        <span class="result-value {{ 'pass' if results.storage_status == 'PASS' else 'fail' }}" id="rv_min_storage">
-                            {{ results.min_storage }} ft³ → {{ results.storage_status }}
+                        <span class="result-value" id="rv_min_storage">
+                            {{ results.min_storage }} ft³ → <span id="rv_storage_status" class="{{ 'pass' if results.storage_status == 'PASS' else 'fail' }}">{{ results.storage_status }}</span>
                         </span>
                     </div>
                     {% endif %}
@@ -817,7 +817,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             <div class="result-stat-value" id="tankStorageStat">{{ results.tank_storage }} ft³</div>
                         </div>
                         <div class="result-stat">
-                            <div class="result-stat-label">Stone Backfill Storage</div>
+                            <div class="result-stat-label">Stone Backfill Storage <span style="font-size:10px;opacity:0.6;">(included layers)</span></div>
                             <div class="result-stat-value" id="rv_stone_storage">{{ results.stone_storage }} ft³</div>
                         </div>
                     </div>
@@ -1090,33 +1090,66 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                                     <th style="text-align:left;padding:6px 10px;">Layer</th>
                                     <th style="text-align:right;padding:6px 10px;">Gross (ft³)</th>
                                     <th style="text-align:right;padding:6px 10px;">Net (ft³)</th>
+                                    <th style="text-align:center;padding:6px 10px;white-space:nowrap;">In Net Total</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td style="padding:5px 10px;">Top</td>
+                                    <td style="padding:5px 10px;">Top / Cover</td>
                                     <td style="text-align:right;padding:5px 10px;">{{ "{:,.1f}".format(results.stone_top_gross) }}</td>
-                                    <td style="text-align:right;padding:5px 10px;">{{ "{:,.1f}".format(results.stone_top_net) }}</td>
+                                    <td style="text-align:right;padding:5px 10px;" id="stoneTopNetCell">{{ "{:,.1f}".format(results.stone_top_net) }}</td>
+                                    <td style="text-align:center;padding:5px 10px;">
+                                        <input type="checkbox" id="inclStoneTop" name="stone_top_included" value="1" checked
+                                            onchange="recalcStoneToggles()"
+                                            style="width:16px;height:16px;cursor:pointer;accent-color:#059669;">
+                                    </td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:5px 10px;">Perimeter</td>
+                                    <td style="padding:5px 10px;">Perimeter / Sides</td>
                                     <td style="text-align:right;padding:5px 10px;">{{ "{:,.1f}".format(results.stone_perim_gross) }}</td>
-                                    <td style="text-align:right;padding:5px 10px;">{{ "{:,.1f}".format(results.stone_perim_net) }}</td>
+                                    <td style="text-align:right;padding:5px 10px;" id="stonePerimNetCell">{{ "{:,.1f}".format(results.stone_perim_net) }}</td>
+                                    <td style="text-align:center;padding:5px 10px;">
+                                        <input type="checkbox" id="inclStonePerim" name="stone_perim_included" value="1" checked
+                                            onchange="recalcStoneToggles()"
+                                            style="width:16px;height:16px;cursor:pointer;accent-color:#059669;">
+                                    </td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:5px 10px;">Bottom</td>
+                                    <td style="padding:5px 10px;">Base / Bottom</td>
                                     <td style="text-align:right;padding:5px 10px;">{{ "{:,.1f}".format(results.stone_base_gross) }}</td>
-                                    <td style="text-align:right;padding:5px 10px;">{{ "{:,.1f}".format(results.stone_base_net) }}</td>
+                                    <td style="text-align:right;padding:5px 10px;" id="stoneBaseNetCell">{{ "{:,.1f}".format(results.stone_base_net) }}</td>
+                                    <td style="text-align:center;padding:5px 10px;">
+                                        <input type="checkbox" id="inclStoneBase" name="stone_base_included" value="1" checked
+                                            onchange="recalcStoneToggles()"
+                                            style="width:16px;height:16px;cursor:pointer;accent-color:#059669;">
+                                    </td>
                                 </tr>
                                 <tr style="background:rgba(16,185,129,0.12);font-weight:bold;">
                                     <td style="padding:6px 10px;">TOTAL</td>
                                     <td style="text-align:right;padding:6px 10px;color:#059669;">{{ "{:,.1f}".format(results.stone_layer_total_gross) }}</td>
-                                    <td style="text-align:right;padding:6px 10px;color:#059669;">{{ "{:,.1f}".format(results.stone_layer_total_net) }}</td>
+                                    <td style="text-align:right;padding:6px 10px;color:#059669;" id="stoneTotalNetCell">{{ "{:,.1f}".format(results.stone_layer_total_net) }}</td>
+                                    <td style="text-align:center;padding:6px 10px;font-size:11px;color:#059669;">included layers</td>
                                 </tr>
                             </tbody>
                         </table>
-                        <div style="font-size:11px;opacity:0.6;margin-top:5px;padding:0 4px;">Net = Gross × stone void ratio ({{ (form_data.get('stone_void', 0.40)|float * 100)|round(0)|int }}% void). Gross values used for purchase quantity estimates.</div>
+                        <div style="font-size:11px;opacity:0.6;margin-top:5px;padding:0 4px;">Net = Gross × stone void ratio ({{ (form_data.get('stone_void', 0.40)|float * 100)|round(0)|int }}% void). Gross values used for purchase quantity estimates. Toggle layers to include/exclude their net storage from Total System Storage.</div>
                     </div>
+                    <!-- Hidden toggle fields — synced by recalcStoneToggles(), passed on every form POST -->
+                    <input type="hidden" id="hiddenStoneTopIncl"   name="stone_top_included"   value="1">
+                    <input type="hidden" id="hiddenStonePerimIncl" name="stone_perim_included" value="1">
+                    <input type="hidden" id="hiddenStoneBaseIncl"  name="stone_base_included"  value="1">
+                    <script>
+                    (function(){
+                        // Raw net values from server — used by recalcStoneToggles()
+                        window._stoneNetRaw = {
+                            top:   {{ results.stone_top_net }},
+                            perim: {{ results.stone_perim_net }},
+                            base:  {{ results.stone_base_net }},
+                            tank:  {{ results.tank_storage }},
+                            minStorage: {{ results.min_storage if results.min_storage else 0 }},
+                        };
+                    })();
+                    </script>
                 </div>
             </div>
 
@@ -1620,6 +1653,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const formData = new FormData(form);
         formData.append('totalAquaCellCost', document.getElementById('hiddenTotalAquaCellCost').value || '—');
 
+        // Stone layer inclusion toggles — always pass explicitly so Flask gets them
+        // even if the Stone Backfill card is collapsed (collapsed inputs can be skipped by FormData)
+        formData.set('stone_top_included',   document.getElementById('hiddenStoneTopIncl')?.value   ?? '1');
+        formData.set('stone_perim_included', document.getElementById('hiddenStonePerimIncl')?.value ?? '1');
+        formData.set('stone_base_included',  document.getElementById('hiddenStoneBaseIncl')?.value  ?? '1');
+
         const canvas = document.getElementById('sheet');
         const includeSchematic = document.getElementById('include_schematic').checked;
         if (includeSchematic && canvas) {
@@ -1641,6 +1680,60 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             URL.revokeObjectURL(url);
         })
         .catch(() => alert('PDF download failed. Try Calculate first.'));
+    }
+
+    // ====================== STONE TOGGLE RECALC ======================
+    function recalcStoneToggles() {
+        var raw = window._stoneNetRaw;
+        if (!raw) return;  // no results yet
+
+        var inclTop   = document.getElementById('inclStoneTop')?.checked   ?? true;
+        var inclPerim = document.getElementById('inclStonePerim')?.checked ?? true;
+        var inclBase  = document.getElementById('inclStoneBase')?.checked  ?? true;
+
+        var netTop   = inclTop   ? raw.top   : 0;
+        var netPerim = inclPerim ? raw.perim : 0;
+        var netBase  = inclBase  ? raw.base  : 0;
+        var stoneNet = netTop + netPerim + netBase;
+        var totalSys = raw.tank + stoneNet;
+
+        var fmt = function(v) {
+            return v.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1});
+        };
+
+        // Update Storage Summary card
+        var stoneEl = document.getElementById('rv_stone_storage');
+        if (stoneEl) stoneEl.textContent = fmt(stoneNet) + ' ft³';
+        var totalEl = document.getElementById('rv_total_storage');
+        if (totalEl) totalEl.textContent = fmt(totalSys) + ' ft³';
+
+        // Live-update PASS/FAIL if min required storage is present
+        var statusEl = document.getElementById('rv_storage_status');
+        if (statusEl && raw.minStorage !== undefined && raw.minStorage > 0) {
+            var passes = totalSys >= raw.minStorage;
+            statusEl.textContent = passes ? 'PASS' : 'FAIL';
+            statusEl.className   = passes ? 'pass' : 'fail';
+        }
+
+        // Update stone backfill table total net cell
+        var tnetEl = document.getElementById('stoneTotalNetCell');
+        if (tnetEl) tnetEl.textContent = fmt(stoneNet);
+
+        // Dim/highlight individual net cells based on inclusion
+        var topNetEl   = document.getElementById('stoneTopNetCell');
+        var perimNetEl = document.getElementById('stonePerimNetCell');
+        var baseNetEl  = document.getElementById('stoneBaseNetCell');
+        if (topNetEl)   topNetEl.style.opacity   = inclTop   ? '1' : '0.35';
+        if (perimNetEl) perimNetEl.style.opacity = inclPerim ? '1' : '0.35';
+        if (baseNetEl)  baseNetEl.style.opacity  = inclBase  ? '1' : '0.35';
+
+        // Sync hidden fields (passed to Flask on every form POST / fetch)
+        var h_top   = document.getElementById('hiddenStoneTopIncl');
+        var h_perim = document.getElementById('hiddenStonePerimIncl');
+        var h_base  = document.getElementById('hiddenStoneBaseIncl');
+        if (h_top)   h_top.value   = inclTop   ? '1' : '0';
+        if (h_perim) h_perim.value = inclPerim ? '1' : '0';
+        if (h_base)  h_base.value  = inclBase  ? '1' : '0';
     }
 
     function calculateAquaCellPrice() {
