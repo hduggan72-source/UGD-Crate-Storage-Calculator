@@ -940,10 +940,21 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 // ── Auto-calc contingency ──
                 var baseUnits = getQty('bom_base_units');
                 var autoContingency = baseUnits > 0 ? Math.ceil(baseUnits / PALLETS.base) * PALLETS.base - baseUnits : 0;
-                setEl('bom_contingency', autoContingency);
-                // Always update input to match current calculation — user can override after
                 var inputEl = document.getElementById('contingency_units');
-                if (inputEl) inputEl.value = autoContingency;
+
+                // Flask echoes form_data back into the input value= attribute on every
+                // page reload, so whatever the user submitted is already in currentVal.
+                // Only overwrite with auto-calc if the user's submitted value matches
+                // the auto-calc (meaning they haven't manually changed it), or if the
+                // field is at its default of 0 and autoContingency is also 0.
+                var currentVal = inputEl ? parseInt(inputEl.value) : autoContingency;
+                var userHasOverridden = !isNaN(currentVal) && (currentVal !== autoContingency);
+                var usedContingency   = userHasOverridden ? currentVal : autoContingency;
+
+                if (inputEl && !userHasOverridden) {
+                    inputEl.value = autoContingency;
+                }
+                setEl('bom_contingency', usedContingency);
 
                 // ── Quantities ──
                 var qty = {
@@ -953,7 +964,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     pipe:        getQty('bom_pipe_connectors'),
                     adapter12:   getQty('bom_top_adapters_12'),
                     adapter16:   getQty('bom_top_adapters_16'),
-                    contingency: autoContingency
+                    contingency: usedContingency
                 };
 
                 // ── Calculate and populate weights & pallets ──
