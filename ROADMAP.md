@@ -40,6 +40,7 @@ Professional web-based calculator for designing and quoting underground stormwat
  
 ** ## Next Up (High Priority – Do These Next)**
 
+- add a COST PER CUBIC FOOT Field on the quote that is just a calculation of the total sum / AquaCell tank storage
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
 - add biaxial geogrid total to the quote sheet as a product by others (based on excavation area + overage)
 - command button to collapse all cards
