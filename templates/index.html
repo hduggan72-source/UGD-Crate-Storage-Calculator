@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>AquaCell V12 Crate Calculator</title>
+    <title>AquaCell v15 Crate Calculator</title>
     <style>
         :root {
             --bg: #f8f9fa;
@@ -559,6 +559,7 @@
         <button class="topbar-btn" onclick="downloadPDF()" style="background:#28a745;color:white;">⬇ Report</button>
         <button class="topbar-btn" onclick="downloadQuote()" style="background:#e67e22;color:white;">📄 Quote</button>
         <button class="topbar-btn" onclick="downloadStageCSV()" style="background:#0891b2;color:white;">📊 Stage CSV</button>
+        <button class="topbar-btn" onclick="downloadStagePNG()" style="background:#28a745;color:white;">📈 Stage PNG</button>
         <button class="topbar-btn" onclick="openDetailsModal()" style="background:#0f4c81;color:white;border:1px solid #3b82f6;">📋 Details</button>
         <button class="topbar-btn" onclick="copyToEmail()" style="background:#6f42c1;color:white;">📋 Copy</button>
         <button class="topbar-btn" onclick="exportProject()" style="background:#17a2b8;color:white;">Export</button>
@@ -939,23 +940,10 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 // ── Auto-calc contingency ──
                 var baseUnits = getQty('bom_base_units');
                 var autoContingency = baseUnits > 0 ? Math.ceil(baseUnits / PALLETS.base) * PALLETS.base - baseUnits : 0;
+                setEl('bom_contingency', autoContingency);
+                // Always update input to match current calculation — user can override after
                 var inputEl = document.getElementById('contingency_units');
-
-                // The input value was set by Flask from form_data on page reload.
-                // Only overwrite with auto-calc if the field is empty OR matches the
-                // previous auto-calc value (i.e. the user has not manually changed it).
-                // A user override of 0 or any other value is preserved across submits
-                // because Flask echoes form_data back into the value attribute.
-                var currentVal = inputEl ? inputEl.value.trim() : '';
-                var userHasOverridden = (currentVal !== '' && parseInt(currentVal) !== autoContingency);
-                var usedContingency = userHasOverridden
-                    ? (parseInt(currentVal) || 0)
-                    : autoContingency;
-
-                if (inputEl && !userHasOverridden) {
-                    inputEl.value = autoContingency;
-                }
-                setEl('bom_contingency', usedContingency);
+                if (inputEl) inputEl.value = autoContingency;
 
                 // ── Quantities ──
                 var qty = {
@@ -965,7 +953,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     pipe:        getQty('bom_pipe_connectors'),
                     adapter12:   getQty('bom_top_adapters_12'),
                     adapter16:   getQty('bom_top_adapters_16'),
-                    contingency: usedContingency
+                    contingency: autoContingency
                 };
 
                 // ── Calculate and populate weights & pallets ──
@@ -1414,7 +1402,10 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
 
                     <!-- Volume Curve Chart -->
                     <div style="padding:16px 12px 8px;">
-                        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:10px;">Stage-Storage Volume Curve</div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;">Stage-Storage Volume Curve</div>
+                            <button onclick="downloadStagePNG()" style="padding:5px 12px;background:#28a745;color:white;border:none;border-radius:4px;font-size:12px;font-weight:bold;cursor:pointer;">📥 Download PNG</button>
+                        </div>
                         <div style="position:relative;height:320px;">
                             <canvas id="stageCurveChart"></canvas>
                         </div>
@@ -1443,7 +1434,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     var gridClr  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
                     var lblClr   = isDark ? '#94a3b8' : '#64748b';
                     var ctx = document.getElementById('stageCurveChart').getContext('2d');
-                    new Chart(ctx, {
+                    window._stageCurveChart = new Chart(ctx, {
                         type: 'line',
                         data: {
                             labels: labels,
@@ -2087,6 +2078,35 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     document.getElementById('base_stone').addEventListener('input', renderSheet);
 
     // ====================== COPY TO EMAIL ======================
+    function downloadStagePNG() {
+        var canvas = document.getElementById('stageCurveChart');
+        if (!canvas) {
+            alert('Stage Storage chart not found. Run Calculate System with Stage Storage enabled first.');
+            return;
+        }
+
+        // Chart.js renders on a transparent canvas — stamp white background first
+        var exportCanvas = document.createElement('canvas');
+        exportCanvas.width  = canvas.width;
+        exportCanvas.height = canvas.height;
+        var ectx = exportCanvas.getContext('2d');
+        ectx.fillStyle = '#ffffff';
+        ectx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+        ectx.drawImage(canvas, 0, 0);
+
+        // Build filename using project info
+        var projectName = (document.querySelector('input[name="project_name"]')?.value || 'Project').trim().replace(/\s+/g, '_');
+        var dt = new Date();
+        var dateStr = String(dt.getMonth()+1).padStart(2,'0')
+                    + String(dt.getDate()).padStart(2,'0')
+                    + dt.getFullYear();
+
+        var a = document.createElement('a');
+        a.href     = exportCanvas.toDataURL('image/png');
+        a.download = 'AquaCell_StageStorage_' + projectName + '_' + dateStr + '.png';
+        a.click();
+    }
+
     function downloadStageCSV() {
         const form = document.getElementById('mainForm');
         if (!form) { alert('Please run Calculate System first.'); return; }
