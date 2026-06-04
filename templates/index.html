@@ -934,15 +934,37 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 }
                 function fmtLbs(v) { return v > 0 ? v.toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1}) + ' lbs' : '—'; }
                 function fmtPal(v) { return v > 0 ? v.toLocaleString() : '—'; }
+
+                // Mark contingency field as user-edited when they type in it
+                (function() {
+                    var ci = document.getElementById('contingency_units');
+                    if (ci && !ci._contingencyListenerAdded) {
+                        ci.addEventListener('input', function() {
+                            ci._contingencyUserEdited = true;
+                        });
+                        ci._contingencyListenerAdded = true;
+                    }
+                })();
                 function pallets(qty, perPallet) { return qty > 0 ? Math.ceil(qty / perPallet) : 0; }
 
                 // ── Auto-calc contingency ──
                 var baseUnits = getQty('bom_base_units');
                 var autoContingency = baseUnits > 0 ? Math.ceil(baseUnits / PALLETS.base) * PALLETS.base - baseUnits : 0;
-                setEl('bom_contingency', autoContingency);
-                // Always update input to match current calculation — user can override after
                 var inputEl = document.getElementById('contingency_units');
-                if (inputEl) inputEl.value = autoContingency;
+
+                // Only auto-populate if the user has NOT manually edited the field.
+                // _contingencyUserEdited is set to true on any input event, and cleared
+                // on form reset. This preserves a user override of 0 or any other value.
+                if (inputEl && !inputEl._contingencyUserEdited) {
+                    inputEl.value = autoContingency;
+                }
+
+                // Use user's value if they have overridden, otherwise use auto value
+                var usedContingency = (inputEl && inputEl._contingencyUserEdited)
+                    ? (parseInt(inputEl.value) || 0)
+                    : autoContingency;
+
+                setEl('bom_contingency', usedContingency);
 
                 // ── Quantities ──
                 var qty = {
@@ -952,7 +974,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     pipe:        getQty('bom_pipe_connectors'),
                     adapter12:   getQty('bom_top_adapters_12'),
                     adapter16:   getQty('bom_top_adapters_16'),
-                    contingency: autoContingency
+                    contingency: usedContingency
                 };
 
                 // ── Calculate and populate weights & pallets ──
@@ -1593,6 +1615,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             const el = document.getElementById(id);
             if (el) el.textContent = '—';
         });
+        // Clear contingency user-edited flag so next calc auto-populates
+        const ciReset = document.getElementById('contingency_units');
+        if (ciReset) {
+            ciReset._contingencyUserEdited = false;
+            ciReset.value = '0';
+        }
         const canvas = document.getElementById('sheet');
         if (canvas) { const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height); }
         document.querySelectorAll('.suggested').forEach(el => el.textContent = '');
