@@ -2014,8 +2014,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             a.href = url;
             const projNum = (document.getElementById('project_num')?.value || '').trim().replace(/[^a-zA-Z0-9\-_]/g,'_');
             const qDate = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'');
-            const qParts = [projNum, projectName].filter(Boolean).join('_');
-            a.download = `AquaCell_Quote_${qParts}_${qDate}.pdf`;
+            const qParts = [projNum, projectName, 'AquaCell_Quote', qDate].filter(Boolean).join('_');
+            a.download = `${qParts}.pdf`;
             a.click();
             URL.revokeObjectURL(url);
         })
@@ -2740,7 +2740,10 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             var dt  = (d.getMonth()+1).toString().padStart(2,'0') +
                       d.getDate().toString().padStart(2,'0') +
                       d.getFullYear();
-            a.download = 'AquaCell_Details_' + dt + '.pdf';
+            var detailName = (document.getElementById('project_name')?.value || '').trim()
+                             .replace(/[^a-zA-Z0-9\-_ ]/g,'_').replace(/\s+/g,'_');
+            var detailParts = ['AquaCell_Details', detailName, dt].filter(Boolean).join('_');
+            a.download = detailParts + '.pdf';
             a.click();
             URL.revokeObjectURL(url);
         })
