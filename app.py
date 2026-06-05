@@ -1859,6 +1859,38 @@ def download_stage_csv():
 
     total_stone_storage = stone_envelope_volume * stone_void
 
+    # ── Stone layer inclusion toggles ─────────────────────────────
+    stone_top_included   = request.form.get('stone_top_included',   '1') == '1'
+    stone_perim_included = request.form.get('stone_perim_included', '1') == '1'
+    stone_base_included  = request.form.get('stone_base_included',  '1') == '1'
+
+    # Compute full net volumes by layer so we can apply the toggle ratio
+    if shape_mode == 'complex':
+        _excav_area = complex_excav_area
+        _tank_fp    = snapped_known * snapped_other
+    else:
+        _excav_area = outer_width * outer_length
+        _tank_fp    = tank_width * tank_length
+
+    _top_net   = round(_excav_area * cover_stone * stone_void, 4)
+    _perim_net = round((_excav_area - _tank_fp) * tank_height * stone_void, 4)
+    _base_net  = round(_excav_area * base_stone * stone_void, 4)
+    _full_net  = _top_net + _perim_net + _base_net
+
+    _incl_net  = ((  _top_net if stone_top_included   else 0)
+               + (_perim_net if stone_perim_included else 0)
+               + ( _base_net if stone_base_included  else 0))
+
+    stone_ratio = _incl_net / _full_net if _full_net > 0 else 0.0
+    total_stone_storage_csv = total_stone_storage * stone_ratio
+
+    # Build the toggle label for the CSV header
+    incl_labels = []
+    if stone_top_included:   incl_labels.append('Top')
+    if stone_perim_included: incl_labels.append('Perimeter')
+    if stone_base_included:  incl_labels.append('Base')
+    incl_str = ', '.join(incl_labels) if incl_labels else 'None'
+
     # Build rows
     increment_ft  = stage_increment_in / 12.0
     top_of_stone  = tank_bottom_elev + tank_height + cover_stone
@@ -1868,7 +1900,7 @@ def download_stage_csv():
         depth_tank  = max(0, min(tank_height, current_elev - tank_bottom_elev))
         tank_vol    = (depth_tank / tank_height) * tank_storage if tank_height > 0 else 0
         depth_stone = max(0, min(total_system_depth, current_elev - (tank_bottom_elev - base_stone)))
-        stone_vol   = (depth_stone / total_system_depth) * total_stone_storage if total_system_depth > 0 else 0
+        stone_vol   = (depth_stone / total_system_depth) * total_stone_storage_csv if total_system_depth > 0 else 0
         rows.append((round(current_elev, 4), round(tank_vol, 2), round(stone_vol, 2), round(tank_vol + stone_vol, 2)))
         current_elev += increment_ft
 
@@ -1879,6 +1911,7 @@ def download_stage_csv():
     writer.writerow([f'# Project: {project_name}'])
     writer.writerow([f'# Configuration: {config}-{layers}  |  Stage Increment: {stage_increment_in} in'])
     writer.writerow([f'# Tank Bottom Elev: {tank_bottom_elev} ft  |  Surface Elev: {surface_elev} ft'])
+    writer.writerow([f'# Stone Layers Included in Net Total: {incl_str}'])
     writer.writerow([f'# Generated: {datetime.datetime.now().strftime("%m/%d/%Y %H:%M")}'])
     writer.writerow([])
     writer.writerow(['Elevation (ft)', 'Tank Storage (ft3)', 'Stone Storage (ft3)', 'Total Storage (ft3)'])

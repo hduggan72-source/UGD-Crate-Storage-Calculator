@@ -1039,6 +1039,15 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             <div id="priceTotalCost" class="result-stat-value" style="color:#2ecc71;">—</div>
                         </div>
                     </div>
+                    <div style="margin-top:8px;">
+                        <div class="result-stat" style="border:1px solid #00b0ff;border-radius:6px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                            <div>
+                                <div class="result-stat-label" style="color:#00b0ff;">Selling Price per ft³ of AquaCell Tank Storage</div>
+                                <div style="font-size:10px;opacity:0.55;margin-top:2px;">Selling Price ÷ Tank ft³ &nbsp;|&nbsp; set Markup % = 0 for floor cost/ft³</div>
+                            </div>
+                            <div id="priceCostPerFt3" class="result-stat-value" style="color:#00b0ff;font-size:20px;white-space:nowrap;">—</div>
+                        </div>
+                    </div>
                     <input type="hidden" id="hiddenFloorCost"        name="floorCost"        value="">
                     <input type="hidden" id="hiddenTotalAquaCellCost" name="totalAquaCellCost" value="">
                     <input type="hidden" id="hiddenFreightCost"      name="freightCost"      value="">
@@ -1427,7 +1436,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             <div class="result-card">
                 <div class="result-card-header" onclick="toggleResultCard(this)"><span>📈 Stage Storage Table ({{ results.stage_increment_in }}-inch increments)</span><span class="rc-arrow">▼</span></div>
                 <div class="result-card-body" style="padding:0;">
-                    <table style="margin-top:0;">
+                    <table style="margin-top:0;" id="stageStorageTable">
                         <tr>
                             <th>Elevation (ft)</th>
                             <th style="text-align:right;">Tank (ft³)</th>
@@ -1438,8 +1447,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         <tr>
                             <td>{{ row.elevation_ft }}</td>
                             <td style="text-align:right;">{{ row.tank_storage }}</td>
-                            <td style="text-align:right;">{{ row.stone_storage }}</td>
-                            <td style="text-align:right;font-weight:bold;color:var(--accent);">{{ row.total_storage }}</td>
+                            <td style="text-align:right;" class="ss-stone-cell" data-raw-stone="{{ row.stone_storage }}" data-raw-tank="{{ row.tank_storage }}">{{ row.stone_storage }}</td>
+                            <td style="text-align:right;font-weight:bold;color:var(--accent);" class="ss-total-cell">{{ row.total_storage }}</td>
                         </tr>
                         {% endfor %}
                     </table>
@@ -1459,7 +1468,11 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
 
             <script>
             (function() {
-                var stageData = [{% for row in results.stage_storage %}{ elev: {{ row.elevation_ft }}, tank: {{ row.tank_storage }}, stone: {{ row.stone_storage }}, total: {{ row.total_storage }} },{% endfor %}];
+                // Raw per-row data from server — stoneRaw is the full (all-layers-included) stone value.
+                // recalcStoneToggles() will apply the inclusion ratio and call updateStageChart().
+                var stageData = [{% for row in results.stage_storage %}{ elev: {{ row.elevation_ft }}, tank: {{ row.tank_storage }}, stoneRaw: {{ row.stone_storage }}, totalRaw: {{ row.total_storage }} },{% endfor %}];
+                window._stageDataRaw = stageData;   // expose for recalcStoneToggles
+
                 var tankBottomElev  = {{ results.tank_bottom_elev }};
                 var tankTopElev     = {{ results.tank_top_elev }};
                 var baseStoneDepth  = {{ form_data.get('base_stone', 0.333)|float }};
@@ -1469,8 +1482,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
 
                 var labels    = stageData.map(function(d){ return d.elev; });
                 var tankVals  = stageData.map(function(d){ return d.tank; });
-                var stoneVals = stageData.map(function(d){ return d.stone; });
-                var totalVals = stageData.map(function(d){ return d.total; });
+                var stoneVals = stageData.map(function(d){ return d.stoneRaw; });
+                var totalVals = stageData.map(function(d){ return d.totalRaw; });
                 var maxVol    = Math.max.apply(null, totalVals) * 1.08;
 
                 function renderChart() {
@@ -1566,6 +1579,24 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     s.onload = renderChart;
                     document.head.appendChild(s);
                 }
+
+                // Called by recalcStoneToggles() to push new stone/total arrays into the chart.
+                // stoneRatio: fraction of raw stone storage that is included (0.0 – 1.0)
+                window.updateStageChart = function(stoneRatio) {
+                    var chart = window._stageCurveChart;
+                    if (!chart) return;
+                    var raw = window._stageDataRaw;
+                    if (!raw) return;
+
+                    var newStone = raw.map(function(d){ return Math.round(d.stoneRaw * stoneRatio * 10) / 10; });
+                    var newTotal = raw.map(function(d, i){ return Math.round((d.tank + newStone[i]) * 10) / 10; });
+                    var newMax   = Math.max.apply(null, newTotal) * 1.08;
+
+                    chart.data.datasets[1].data = newStone;   // Stone Backfill series
+                    chart.data.datasets[2].data = newTotal;   // Total Storage series
+                    chart.options.scales.x.max  = newMax;
+                    chart.update();
+                };
             })();
             </script>
             {% endif %}
@@ -1637,7 +1668,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const resultsDiv = document.querySelector('.results');
         if (resultsDiv) resultsDiv.innerHTML = '';
         ['priceCrateStorage','priceFloorCost','priceSubtotal',
-         'priceFreight','priceTotalCost'].forEach(id => {
+         'priceFreight','priceTotalCost','priceCostPerFt3'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.textContent = '—';
         });
@@ -1701,7 +1732,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             return v.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1});
         };
 
-        // Update Storage Summary card
+        // ── Storage Summary card ──────────────────────────────────────
         var stoneEl = document.getElementById('rv_stone_storage');
         if (stoneEl) stoneEl.textContent = fmt(stoneNet) + ' ft³';
         var totalEl = document.getElementById('rv_total_storage');
@@ -1715,11 +1746,11 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             statusEl.className   = passes ? 'pass' : 'fail';
         }
 
-        // Update stone backfill table total net cell
+        // ── Stone backfill table total net cell ───────────────────────
         var tnetEl = document.getElementById('stoneTotalNetCell');
         if (tnetEl) tnetEl.textContent = fmt(stoneNet);
 
-        // Dim/highlight individual net cells based on inclusion
+        // Dim/highlight individual net cells
         var topNetEl   = document.getElementById('stoneTopNetCell');
         var perimNetEl = document.getElementById('stonePerimNetCell');
         var baseNetEl  = document.getElementById('stoneBaseNetCell');
@@ -1727,7 +1758,30 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         if (perimNetEl) perimNetEl.style.opacity = inclPerim ? '1' : '0.35';
         if (baseNetEl)  baseNetEl.style.opacity  = inclBase  ? '1' : '0.35';
 
-        // Sync hidden fields (passed to Flask on every form POST / fetch)
+        // ── Stage storage table rows ──────────────────────────────────
+        // Stone ratio = included net / full net.  Applied per-row to raw server values.
+        var fullStoneNet = raw.top + raw.perim + raw.base;
+        var stoneRatio   = (fullStoneNet > 0) ? (stoneNet / fullStoneNet) : 0;
+
+        var stoneCells = document.querySelectorAll('.ss-stone-cell');
+        var totalCells = document.querySelectorAll('.ss-total-cell');
+        stoneCells.forEach(function(cell, i) {
+            var rawStone = parseFloat(cell.getAttribute('data-raw-stone')) || 0;
+            var rawTank  = parseFloat(cell.getAttribute('data-raw-tank'))  || 0;
+            var adjStone = Math.round(rawStone * stoneRatio * 10) / 10;
+            var adjTotal = Math.round((rawTank + adjStone) * 10) / 10;
+            cell.textContent = adjStone.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1});
+            if (totalCells[i]) {
+                totalCells[i].textContent = adjTotal.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1});
+            }
+        });
+
+        // ── Chart.js curve ────────────────────────────────────────────
+        if (typeof window.updateStageChart === 'function') {
+            window.updateStageChart(stoneRatio);
+        }
+
+        // ── Sync hidden fields ────────────────────────────────────────
         var h_top   = document.getElementById('hiddenStoneTopIncl');
         var h_perim = document.getElementById('hiddenStonePerimIncl');
         var h_base  = document.getElementById('hiddenStoneBaseIncl');
@@ -1785,7 +1839,14 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const freightCost  = sellingPrice * (freightPct / 100);
         const totalToCustomer = sellingPrice + freightCost;
 
-        const fmt  = (v) => '$' + v.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+        // Cost per ft³ — Selling Price ÷ AquaCell tank storage
+        const tankFt3 = parseFloat(
+            (document.getElementById('tankStorageStat')?.textContent || '0').replace(/[^0-9.]/g, '')
+        ) || 0;
+        const costPerFt3 = tankFt3 > 0 ? sellingPrice / tankFt3 : 0;
+
+        const fmt    = (v) => '$' + v.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+        const fmtFt3 = (v) => '$' + v.toLocaleString(undefined, {minimumFractionDigits:4, maximumFractionDigits:4}) + ' /ft³';
 
         document.getElementById('priceFloorCost').textContent  = fmt(floorCost);
         document.getElementById('priceSubtotal').textContent   = fmt(sellingPrice)
@@ -1793,6 +1854,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         document.getElementById('priceFreight').textContent    = fmt(freightCost)
             + (freightPct > 0 ? '  (' + freightPct + '%)' : '');
         document.getElementById('priceTotalCost').textContent  = fmt(totalToCustomer);
+        document.getElementById('priceCostPerFt3').textContent = tankFt3 > 0 ? fmtFt3(costPerFt3) : '— (run Calculate first)';
 
         // Store for quote export
         document.getElementById('hiddenFloorCost').value        = floorCost.toFixed(2);
@@ -2215,6 +2277,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const form = document.getElementById('mainForm');
         if (!form) { alert('Please run Calculate System first.'); return; }
         const formData = new FormData(form);
+
+        // Pass stone layer toggles explicitly
+        formData.set('stone_top_included',   document.getElementById('hiddenStoneTopIncl')?.value   ?? '1');
+        formData.set('stone_perim_included', document.getElementById('hiddenStonePerimIncl')?.value ?? '1');
+        formData.set('stone_base_included',  document.getElementById('hiddenStoneBaseIncl')?.value  ?? '1');
+
         const projectName = (document.getElementById('project_name')?.value || 'Project').trim().replace(/[^a-zA-Z0-9\-_ ]/g,'_').replace(/\s+/g,'_');
         fetch('/download_stage_csv', { method: 'POST', body: formData })
         .then(r => {
