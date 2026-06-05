@@ -790,6 +790,16 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 Reset Form
             </button>
 
+            <!-- Geogrid quantities — live-synced from the results card display inputs.
+                 Kept inside the form so they POST correctly on Calculate and export. -->
+            {% if results %}
+            <input type="hidden" id="formGeogridTop"    name="geogrid_top_yd2"    value="{{ results.geogrid_top_yd2 }}">
+            <input type="hidden" id="formGeogridBottom" name="geogrid_bottom_yd2" value="{{ results.geogrid_bottom_yd2 }}">
+            {% else %}
+            <input type="hidden" id="formGeogridTop"    name="geogrid_top_yd2"    value="">
+            <input type="hidden" id="formGeogridBottom" name="geogrid_bottom_yd2" value="">
+            {% endif %}
+
         </form>
     </div><!-- /left-panel -->
 
@@ -1202,8 +1212,9 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                                 <div style="font-size:11px;font-weight:600;margin-bottom:2px;">Top / Cover Geogrid</div>
                                 <div style="font-size:10px;opacity:0.55;margin-bottom:6px;">Excav. area + 2 ft overlap ea. side × waste</div>
                                 <div style="display:flex;align-items:center;gap:8px;">
-                                    <input type="number" id="geogridTopQty" name="geogrid_top_yd2"
-                                        min="0" step="1" value="0"
+                                    <input type="number" id="geogridTopQty"
+                                        min="0" step="1" value="{{ results.geogrid_top_yd2 }}"
+                                        oninput="document.getElementById('formGeogridTop').value=this.value; updateCombinedDisplay();"
                                         style="width:90px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;font-weight:bold;">
                                     <span style="font-size:12px;opacity:0.7;">sq yd</span>
                                     <button type="button" onclick="calcGeogridTop()"
@@ -1217,8 +1228,9 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                                 <div style="font-size:11px;font-weight:600;margin-bottom:2px;">Bottom / Tank Base Geogrid</div>
                                 <div style="font-size:10px;opacity:0.55;margin-bottom:6px;">Tank footprint only × waste</div>
                                 <div style="display:flex;align-items:center;gap:8px;">
-                                    <input type="number" id="geogridBottomQty" name="geogrid_bottom_yd2"
-                                        min="0" step="1" value="0"
+                                    <input type="number" id="geogridBottomQty"
+                                        min="0" step="1" value="{{ results.geogrid_bottom_yd2 }}"
+                                        oninput="document.getElementById('formGeogridBottom').value=this.value; updateCombinedDisplay();"
                                         style="width:90px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;font-weight:bold;">
                                     <span style="font-size:12px;opacity:0.7;">sq yd</span>
                                     <button type="button" onclick="calcGeogridBottom()"
@@ -1255,6 +1267,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         }
                         document.getElementById('geogridTopQty').addEventListener('input', updateCombinedDisplay);
                         document.getElementById('geogridBottomQty').addEventListener('input', updateCombinedDisplay);
+                        updateCombinedDisplay();  // initialise on page load with server values
 
                         window.calcGeogridTop = function() {
                             var g = window._geogridRaw;
@@ -1265,6 +1278,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             var areaSqFt = w * l * (1 + g.geoWaste / 100);
                             var areaSqYd = Math.ceil(areaSqFt / 9);
                             document.getElementById('geogridTopQty').value = areaSqYd;
+                            document.getElementById('formGeogridTop').value = areaSqYd;
                             updateCombinedDisplay();
                         };
 
@@ -1274,6 +1288,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             var areaSqFt = g.tankWidth * g.tankLength * (1 + g.geoWaste / 100);
                             var areaSqYd = Math.ceil(areaSqFt / 9);
                             document.getElementById('geogridBottomQty').value = areaSqYd;
+                            document.getElementById('formGeogridBottom').value = areaSqYd;
                             updateCombinedDisplay();
                         };
                     })();

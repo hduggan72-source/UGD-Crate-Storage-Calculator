@@ -196,6 +196,26 @@ def index():
         stone_layer_total_gross = round(stone_top_gross + stone_perim_gross + stone_base_gross, 1)
         stone_layer_total_net   = round(stone_top_net + stone_perim_net + stone_base_net, 1)
 
+        # ── Geogrid default quantities ────────────────────────────────
+        # Top/Cover: excavation area + 2 ft overlap each side, with waste
+        # Bottom: tank footprint only, with waste
+        # If the estimator already submitted overrides, use those; otherwise auto-calc.
+        _geo_overlap = 2.0   # ft beyond excavation perimeter each side
+        if shape_mode == 'complex':
+            _geo_top_area = complex_excav_area   # complex mode uses polygon area; no simple W×L to extend
+        else:
+            _geo_top_area = (outer_width + 2*_geo_overlap) * (outer_length + 2*_geo_overlap)
+        _geo_bottom_area = tank_footprint
+
+        _geogrid_top_auto    = math.ceil(_geo_top_area    * (1 + geoWaste/100.0) / 9)
+        _geogrid_bottom_auto = math.ceil(_geo_bottom_area * (1 + geoWaste/100.0) / 9)
+
+        # Respect user overrides submitted with the form (blank = first load → use auto)
+        _top_raw    = request.form.get('geogrid_top_yd2',    '').strip()
+        _bottom_raw = request.form.get('geogrid_bottom_yd2', '').strip()
+        geogrid_top_yd2    = int(_top_raw)    if _top_raw    != '' else _geogrid_top_auto
+        geogrid_bottom_yd2 = int(_bottom_raw) if _bottom_raw != '' else _geogrid_bottom_auto
+
         stage_storage = None
         if include_stage_storage:
             stage_storage = []
@@ -278,6 +298,8 @@ def index():
             'stone_layer_total_net':   stone_layer_total_net,
             'geoTank': geoTank, 'geoStone': geoStone, 'geoTotal': geoTotal,
             'geoWaste': geoWaste, 'include_schematic': include_schematic,
+            'geogrid_top_yd2': geogrid_top_yd2,
+            'geogrid_bottom_yd2': geogrid_bottom_yd2,
         }
         form_data = request.form
 
