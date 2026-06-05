@@ -2532,6 +2532,10 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const geoWastePct = (document.querySelector('input[name="geoWaste"]')?.value || '0').trim();
         const geoWasteLabel = geoWastePct !== '0' ? `  (w/ ${geoWastePct}% overlap)` : '';
 
+        // --- Geogrid ---
+        const geogridTop    = document.getElementById('geogridTopQty')?.value    || '0';
+        const geogridBottom = document.getElementById('geogridBottomQty')?.value || '0';
+
         // --- Stone Backfill Bulk ---
         const stoneBulkDisplay = txt('stoneBulkDisplay');
 
@@ -2552,6 +2556,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             `AquaCell Tank Wrap Geotextile (ft²):              ${geoTank}${geoWasteLabel}`,
             `Stone Backfill Envelope Geotextile (ft²):         ${geoStone}${geoWasteLabel}`,
             `Total Geotextile (ft²):                           ${geoTotal}${geoWasteLabel}`,
+            `Biaxial Geogrid - Top/Cover (sq yd):              ${geogridTop}`,
+            `Biaxial Geogrid - Bottom/Tank Base (sq yd):       ${geogridBottom}`,
             `Total Estimated Stone Backfill Volume (with 10%): ${stoneBulkDisplay}`,
         ].join('\n');
 
