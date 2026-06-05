@@ -7,19 +7,15 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 ** ## Next Up (High Priority – Do These Next)**
 
-- stage storage table must be adjusted when the net stone backfill is adjusted
+- on MAIN DASHBOARD, RESULTS "STORAGE SUMMARY" CARD IS NOT CHANGING FONT COLOR FROM RED TO GREEN DURING PASS/FAIL AUDIT
 - ADD DISTANCE FROM BUILDING CALCULATOR (THAT AND BUOYANCY SHOULD BE SEPARATE BRANCHES SIMILAR TO MULTI-TANK)
-- add biaxial geogrid total to the quote sheet as a product by others (based on excavation area + overage)
 - ADD COMPLEX CALCULATOR (SIMPLE) TO MULTI TANK UI/UX
 - ADD FABRIC AND ACCESSORY AMOUNTS TO THE MULTI-TANK QUOTE
-- add project name to details export name extension
-- add a COST PER CUBIC FOOT Field on the quote that is just a calculation of the total sum / AquaCell tank storage
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
 - command button to collapse all cards
 - add place for "additional accessories" in BOM
 - TAKE PRICING OUT OF SEPARATE CALCULATIONS TOOL FOR CLIENT USE
 - toggle DISTRIBUTOR, MARKET,  BUDGET ESTIMATE PRICING for quote page export (HEADER TITLE)
-
 - ONE BUTTON THAT TAKES YOU TO "TOOLS" WHERE MULTIPLE CALCULATORS LIVE AND EXPORT TO THEIR OWN PAGE WITH GRAPHICS
 
 **##SYSTEM CHECKS TO VERIFY / CONFIRM**
@@ -40,8 +36,11 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 **## PREVIOUS Version (v12-v14) — Completed**
 
-
+-  [X] add a COST PER CUBIC FOOT Field on the quote that is just a calculation of the total sum / AquaCell tank storage
+-  [X] add project name to details export name extension
+-  [X] add biaxial geogrid total to the quote sheet as a product by others (based on excavation area + overage)
 -  [X] add feature on UX/UI to toggle on/off layers of backfill included in storage
+-  [X] stage storage table must be adjusted when the net stone backfill is adjusted
 -  [X] reformat the UI/UX into "Cards"
 -  [X] added Quick Summary copy/paste for body of emails
 -  [X] add command to convert stone backfill & geotextile totals to desired dimensions (tons, cubic yards, cubic ft, square yards or ft)
