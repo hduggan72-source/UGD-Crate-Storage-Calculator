@@ -1143,7 +1143,7 @@ def multi_download_quote():
             ('B', f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD²) + {geoWaste_pct}% WASTE (BACKFILL ONLY)',
              cum_geoStone_yd2, 'SQ YD'),
             ('C', 'WOVEN GEOTEXTILE + 20% WASTE (TANK ONLY)', 0, 'SQ YD'),
-            ('D', 'BIAXIAL GEOGRID (INTEGRALLY FORMED POLYPROPYLENE) + 20% WASTE', 0, 'SQ YD'),
+            ('D', f'BIAXIAL GEOGRID (INTEGRALLY FORMED POLYPROPYLENE) + {geoWaste_pct}% WASTE', 0, 'SQ YD'),
             ('E', 'CASTINGS FOR VENTING / INSPECTION PORTS / INLETS', int(cum_adapters), 'EACH'),
             ('F', 'LARGE CUSTOM PIPE ADAPTERS (18″–36″) FOR FIELD INSTALL', 0, 'EACH'),
             ('G', 'STONE BACKFILL OR SELECT BACKFILL ESTIMATED FOR UG SYSTEM', cum_stone_yd3, 'CU YD'),
@@ -2065,6 +2065,11 @@ def download_quote():
       geoStone_yd2 = round(geoStone / 9, 0)
       stone_yd3    = round(stone_envelope_volume * 1.10 / 27, 0)
 
+      # ── Geogrid quantities from UI inputs ──────────────────────────
+      geogrid_top_yd2    = int(request.form.get('geogrid_top_yd2',    0) or 0)
+      geogrid_bottom_yd2 = int(request.form.get('geogrid_bottom_yd2', 0) or 0)
+      geogrid_total_yd2  = geogrid_top_yd2 + geogrid_bottom_yd2
+
       config_label = f'{config}-{layers}'   # e.g. SC-5
       generated_str = datetime.datetime.now().strftime('%m/%d/%Y')
       logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
@@ -2285,7 +2290,10 @@ def download_quote():
           (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE (BACKFILL ONLY)',
            int(geoStone_yd2), 'SQ YD'),
           ('WOVEN GEOTEXTILE + 20% WASTE (TANK ONLY)', 0, 'SQ YD'),
-          ('BIAXIAL GEOGRID (INTEGRALLY FORMED POLYPROPYLENE) + 20% WASTE', 0, 'SQ YD'),
+          (f'BIAXIAL GEOGRID (INTEGRALLY FORMED POLYPROPYLENE) + {geoWaste}% WASTE'
+           + (f'  [TOP: {geogrid_top_yd2} SY + BOTTOM: {geogrid_bottom_yd2} SY]'
+              if geogrid_top_yd2 > 0 and geogrid_bottom_yd2 > 0 else ''),
+           geogrid_total_yd2, 'SQ YD'),
           ('CASTINGS FOR VENTING / INSPECTION PORTS / INLETS',
            top_adapters_12 + top_adapters_16, 'EACH'),
           ('LARGE CUSTOM PIPE ADAPTERS (18\u2033\u201336\u2033) FOR FIELD INSTALL', 0, 'EACH'),

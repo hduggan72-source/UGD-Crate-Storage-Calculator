@@ -1165,7 +1165,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             <!-- ══ CARD 5: Geotextile Fabric ══ -->
             <div class="result-card">
                 <div class="result-card-header" onclick="toggleResultCard(this)">
-                    <span>🧵 Geotextile Fabric
+                    <span>🧵 Geotextile &amp; Geogrid
                     <span style="font-size:11px;font-weight:normal;opacity:0.75;">(provided by others)</span></span>
                     <span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center;">
                         <span style="display:inline-flex;border:1px solid rgba(255,255,255,0.3);border-radius:5px;overflow:hidden;" onclick="event.stopPropagation()">
@@ -1185,6 +1185,99 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         <tr><td><strong>Total Geotextile</strong></td><td id="geoTotalCell" style="text-align:right;font-weight:bold;"></td></tr>
                         <tr><td style="font-size:12px;opacity:0.7;">Waste/Overlap</td><td style="text-align:right;font-size:12px;opacity:0.7;">{{ results.geoWaste }}%</td></tr>
                     </table>
+
+                    <!-- ── Geogrid section ── -->
+                    <div style="margin:10px 12px 4px;padding-top:10px;border-top:1px solid var(--border);">
+                        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:8px;">
+                            Biaxial Geogrid (Integrally Formed Polypropylene) — Optional
+                        </div>
+                        <div style="font-size:11px;opacity:0.6;margin-bottom:10px;line-height:1.5;">
+                            Auto-calculated below. Override to <strong>0</strong> to exclude from quote. Both quantities combine onto line D of the PDF quote.
+                            Top/Cover geogrid = excavation area + 2 ft overlap each side. Bottom geogrid = tank footprint only. Both include {{ results.geoWaste }}% waste.
+                        </div>
+
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                            <!-- Top / Cover geogrid -->
+                            <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;">
+                                <div style="font-size:11px;font-weight:600;margin-bottom:2px;">Top / Cover Geogrid</div>
+                                <div style="font-size:10px;opacity:0.55;margin-bottom:6px;">Excav. area + 2 ft overlap ea. side × waste</div>
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <input type="number" id="geogridTopQty" name="geogrid_top_yd2"
+                                        min="0" step="1" value="0"
+                                        style="width:90px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;font-weight:bold;">
+                                    <span style="font-size:12px;opacity:0.7;">sq yd</span>
+                                    <button type="button" onclick="calcGeogridTop()"
+                                        style="padding:5px 10px;background:#7c3aed;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap;">
+                                        Auto-Calc
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- Bottom / Tank geogrid -->
+                            <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;">
+                                <div style="font-size:11px;font-weight:600;margin-bottom:2px;">Bottom / Tank Base Geogrid</div>
+                                <div style="font-size:10px;opacity:0.55;margin-bottom:6px;">Tank footprint only × waste</div>
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <input type="number" id="geogridBottomQty" name="geogrid_bottom_yd2"
+                                        min="0" step="1" value="0"
+                                        style="width:90px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;font-weight:bold;">
+                                    <span style="font-size:12px;opacity:0.7;">sq yd</span>
+                                    <button type="button" onclick="calcGeogridBottom()"
+                                        style="padding:5px 10px;background:#7c3aed;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap;">
+                                        Auto-Calc
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="font-size:11px;opacity:0.55;padding:0 2px;">
+                            Combined total on PDF Quote line D: <strong id="geogridCombinedDisplay">0 sq yd</strong>
+                        </div>
+                    </div>
+
+                    <script>
+                    (function(){
+                        // Raw geometry values from server for geogrid auto-calc
+                        window._geogridRaw = {
+                            outerWidth:  {{ (results.tank_width + 2 * form_data.get('perimeter_stone_width', 1.0)|float)|round(4) }},
+                            outerLength: {{ (results.tank_length + 2 * form_data.get('perimeter_stone_width', 1.0)|float)|round(4) }},
+                            tankWidth:   {{ results.tank_width }},
+                            tankLength:  {{ results.tank_length }},
+                            geoWaste:    {{ results.geoWaste }},
+                        };
+
+                        function updateCombinedDisplay() {
+                            var top    = parseInt(document.getElementById('geogridTopQty').value)    || 0;
+                            var bottom = parseInt(document.getElementById('geogridBottomQty').value) || 0;
+                            var el = document.getElementById('geogridCombinedDisplay');
+                            if (el) el.textContent = (top + bottom).toLocaleString() + ' sq yd';
+                            // Show/hide geogrid remedy note on Cover & Load card
+                            var note = document.getElementById('geogridRemedyNote');
+                            if (note) note.style.display = (top + bottom > 0) ? 'block' : 'none';
+                        }
+                        document.getElementById('geogridTopQty').addEventListener('input', updateCombinedDisplay);
+                        document.getElementById('geogridBottomQty').addEventListener('input', updateCombinedDisplay);
+
+                        window.calcGeogridTop = function() {
+                            var g = window._geogridRaw;
+                            if (!g) return;
+                            var overlap = 2;   // 2 ft beyond perimeter stone each side
+                            var w = g.outerWidth  + 2 * overlap;
+                            var l = g.outerLength + 2 * overlap;
+                            var areaSqFt = w * l * (1 + g.geoWaste / 100);
+                            var areaSqYd = Math.ceil(areaSqFt / 9);
+                            document.getElementById('geogridTopQty').value = areaSqYd;
+                            updateCombinedDisplay();
+                        };
+
+                        window.calcGeogridBottom = function() {
+                            var g = window._geogridRaw;
+                            if (!g) return;
+                            var areaSqFt = g.tankWidth * g.tankLength * (1 + g.geoWaste / 100);
+                            var areaSqYd = Math.ceil(areaSqFt / 9);
+                            document.getElementById('geogridBottomQty').value = areaSqYd;
+                            updateCombinedDisplay();
+                        };
+                    })();
+                    </script>
                 </div>
                 <script>
                     (function(){
@@ -1279,6 +1372,19 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             {{ results.fos_live_load if results.fos_live_load else '—' }}
                         </span>
                     </div>
+
+                    <!-- Geogrid reinforcement note — shown when cover FAILS min depth but FoS LL ≥ 1.75 AND geogrid is entered -->
+                    {% if results.cover_status == 'FAIL' and results.fos_live_load and results.fos_live_load >= 1.75 %}
+                    <div id="geogridRemedyNote" style="display:none;margin-top:10px;padding:10px 12px;background:rgba(245,158,11,0.12);border:1px solid #f59e0b;border-radius:6px;font-size:12px;line-height:1.5;">
+                        <strong style="color:#d97706;">⚠ Geogrid Reinforcement Note</strong><br>
+                        Cover depth is below the minimum recommended for <strong>{{ results.traffic_load }}</strong> loading, but the
+                        Factor of Safety — Live Load (<strong>{{ results.fos_live_load }}</strong>) meets the 1.75 minimum.
+                        Biaxial geogrid reinforcement has been specified. This installation may be acceptable pending
+                        Engineer of Record review. <em>Wavin testing on geogrid-assisted installations is ongoing —
+                        confirm with Wavin technical support before finalizing.</em>
+                    </div>
+                    {% endif %}
+
                     <div class="footnote" style="margin-top:10px;margin-bottom:0;font-size:11px;line-height:1.5;">
                         <strong>Dead Load:</strong> Cover Depth × 120 pcf ÷ 144 &nbsp;|&nbsp;
                         <strong>FoS DL</strong> = Max Strength ÷ DL Pressure &nbsp;|&nbsp; Min recommended: 1.95<br>
