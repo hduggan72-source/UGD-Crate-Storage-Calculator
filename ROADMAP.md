@@ -5,8 +5,43 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 **Current Status:** Live on Flask (production-ready core)
 
-**## PREVIOUS Version (v14) — Completed**
+** ## Next Up (High Priority – Do These Next)**
 
+- stage storage table must be adjusted when the net stone backfill is adjusted
+- ADD DISTANCE FROM BUILDING CALCULATOR (THAT AND BUOYANCY SHOULD BE SEPARATE BRANCHES SIMILAR TO MULTI-TANK)
+- add biaxial geogrid total to the quote sheet as a product by others (based on excavation area + overage)
+- ADD COMPLEX CALCULATOR (SIMPLE) TO MULTI TANK UI/UX
+- ADD FABRIC AND ACCESSORY AMOUNTS TO THE MULTI-TANK QUOTE
+- add project name to details export name extension
+- add a COST PER CUBIC FOOT Field on the quote that is just a calculation of the total sum / AquaCell tank storage
+- System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
+- command button to collapse all cards
+- add place for "additional accessories" in BOM
+- TAKE PRICING OUT OF SEPARATE CALCULATIONS TOOL FOR CLIENT USE
+- toggle DISTRIBUTOR, MARKET,  BUDGET ESTIMATE PRICING for quote page export (HEADER TITLE)
+
+- ONE BUTTON THAT TAKES YOU TO "TOOLS" WHERE MULTIPLE CALCULATORS LIVE AND EXPORT TO THEIR OWN PAGE WITH GRAPHICS
+
+**##SYSTEM CHECKS TO VERIFY / CONFIRM**
+
+**## Backlog / Future Enhancements (Add here when ideas come up)**
+
+- Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed (added to excavation & dimensional summary card
+- bouyancy calculator
+- Metric toggle
+- Update font to Nunito (Wavin speciifc calculator ONLY)
+
+**Future Version Releases**
+
+- (v16) UPLOAD PLAN SHEET AND CREATE AN OVERLAY OF TANK (RECTANGLE/SQUARE ONLY); OR CRATE BUILDER FOR COMPLEX (ENTER ROW BY ROW, THEN DESIGNATE HOW MANY CRATES IN THE ROW)
+- (v17) USE CANVAS TO BUILD A CONCEPTUAL TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
+- (v18) Optional 3D isometric view of the crate layout
+- (v19) SEPARATE CALCULATOR TOOL WITH NO PRICING; 
+
+**## PREVIOUS Version (v12-v14) — Completed**
+
+
+-  [X] add feature on UX/UI to toggle on/off layers of backfill included in storage
 -  [X] reformat the UI/UX into "Cards"
 -  [X] added Quick Summary copy/paste for body of emails
 -  [X] add command to convert stone backfill & geotextile totals to desired dimensions (tons, cubic yards, cubic ft, square yards or ft)
@@ -38,35 +73,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 -  [X] v15 PRICING ENGINE THAT CAN BE EASILY ADJUSTED FOR DIST, MARKET, MSRP ESTIMATES. COMPONENT PRICING HARDCODED AND EDITABLE WHEN PRICE INCREASES OCCUR
 -  [X] EXPORT STAGE STORAGE CURVE FROM UI
  
-** ## Next Up (High Priority – Do These Next)**
 
-- add feature on UX/UI to toggle on/off layers of backfill included in storage
-- add project name to details export name extension
-- add a COST PER CUBIC FOOT Field on the quote that is just a calculation of the total sum / AquaCell tank storage
-- System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
-- add biaxial geogrid total to the quote sheet as a product by others (based on excavation area + overage)
-- command button to collapse all cards
-- add place for "additional accessories" in BOM
-- TAKE PRICING OUT OF SEPARATE CALCULATIONS TOOL FOR CLIENT USE
-- toggle DISTRIBUTOR, MARKET,  BUDGET ESTIMATE PRICING for quote page export (HEADER TITLE)
-- ADD DISTANCE FROM BUILDING CALCULATOR (THAT AND BUOYANCY SHOULD BE SEPARATE BRANCHES SIMILAR TO MULTI-TANK)
-- ONE BUTTON THAT TAKES YOU TO "TOOLS" WHERE MULTIPLE CALCULATORS LIVE AND EXPORT TO THEIR OWN PAGE WITH GRAPHICS
-
-**##SYSTEM CHECKS TO VERIFY / CONFIRM**
-
-**## Backlog / Future Enhancements (Add here when ideas come up)**
-
-- Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed (added to excavation & dimensional summary card
-- bouyancy calculator
-- Metric toggle
-- Update font to Nunito (Wavin speciifc calculator ONLY)
-
-**Future Version Releases**
-
-- (v16) UPLOAD PLAN SHEET AND CREATE AN OVERLAY OF TANK (RECTANGLE/SQUARE ONLY); OR CRATE BUILDER FOR COMPLEX (ENTER ROW BY ROW, THEN DESIGNATE HOW MANY CRATES IN THE ROW)
-- (v17) USE CANVAS TO BUILD A CONCEPTUAL TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
-- (v18) Optional 3D isometric view of the crate layout
-- (v19) SEPARATE CALCULATOR TOOL WITH NO PRICING; 
 
 **How to use this file:**
 - Open `ROADMAP.md` every time you work on the project.
