@@ -25,7 +25,7 @@ MODULE_LEN = 3.937    # ft
 # ══════════════════════════════════════════════════════════════════
 GITHUB_OWNER  = "hduggan72-source"
 GITHUB_REPO   = "UGD-Crate-Storage-Calculator"
-GITHUB_BRANCH = "Multiple_Tank_Calculator"
+GITHUB_BRANCH = "Pricing_Engine_v1"
 GITHUB_FOLDER = "Details"
 GITHUB_PAT    = os.environ.get("GITHUB_PAT", "")   # set in Render environment
 
