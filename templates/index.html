@@ -1433,75 +1433,164 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
 
                         function renderTable() {
                             var tbody = document.getElementById('ptrowRows');
-                            tbody.innerHTML = '';
-                            var totalCrates = 0;
-                            rows.forEach(function(r, i) {
-                                var c = calcRow(r);
-                                totalCrates += c.nCrates;
+
+                            // ── Add/remove rows to match data length ──────────────────
+                            // Only touch the DOM structurally if row count changed.
+                            while (tbody.children.length > rows.length) tbody.removeChild(tbody.lastChild);
+                            while (tbody.children.length < rows.length) {
                                 var tr = document.createElement('tr');
-                                tr.style.background = i % 2 === 0 ? 'transparent' : 'rgba(124,58,237,0.05)';
                                 tr.innerHTML =
                                     '<td style="padding:5px 8px;">' +
-                                        '<input type="text" value="' + r.label + '" ' +
-                                        'oninput="window._ptrowRows[' + i + '].label=this.value;window.syncPtrowHidden();" ' +
+                                        '<input type="text" class="ptrow-label" ' +
                                         'style="width:90px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;">' +
                                     '</td>' +
                                     '<td style="text-align:right;padding:5px 8px;">' +
-                                        '<input type="text" inputmode="numeric" value="' + r.wqv + '" ' +
-                                        'oninput="window._ptrowRows[' + i + '].wqv=parseFloat(this.value.replace(/[^0-9.]/g,\'\'))||0;window.recalcPtrow();" ' +
+                                        '<input type="text" inputmode="numeric" class="ptrow-wqv" ' +
                                         'style="width:80px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;text-align:right;">' +
                                     '</td>' +
-                                    '<td style="text-align:center;padding:5px 8px;">' +
-                                        '<select oninput="window._ptrowRows[' + i + '].pct=parseFloat(this.value);window.recalcPtrow();" ' +
-                                        'style="padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;">' +
-                                        '<option value="10"' + (r.pct==10?' selected':'') + '>10%</option>' +
-                                        '<option value="15"' + (r.pct==15?' selected':'') + '>15%</option>' +
-                                        '<option value="12"' + (r.pct==12?' selected':'') + '>12%</option>' +
-                                        '<option value="20"' + (r.pct==20?' selected':'') + '>20%</option>' +
-                                        '<option value="custom"' + (![10,12,15,20].includes(r.pct)?' selected':'') + '>Custom</option>' +
-                                        '</select>' +
-                                        ([10,12,15,20].includes(r.pct) ? '' :
-                                        '<input type="number" value="' + r.pct + '" min="1" max="100" step="1" ' +
-                                        'oninput="window._ptrowRows[' + i + '].pct=parseFloat(this.value)||10;window.recalcPtrow();" ' +
-                                        'style="width:45px;margin-left:4px;padding:4px 4px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;">') +
-                                    '</td>' +
-                                    '<td style="text-align:right;padding:5px 8px;opacity:0.7;">' + c.ptVol.toLocaleString() + '</td>' +
-                                    '<td style="text-align:right;padding:5px 8px;font-weight:bold;color:#7c3aed;">' + c.nCrates + '</td>' +
-                                    '<td style="text-align:center;padding:5px 4px;">' +
-                                        (rows.length > 1 ?
-                                        '<button type="button" onclick="window.removePtrowRow(' + i + ')" ' +
-                                        'style="background:#ef4444;color:white;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;font-size:11px;">✕</button>'
-                                        : '') +
-                                    '</td>';
+                                    '<td style="text-align:center;padding:5px 8px;" class="ptrow-pct-cell"></td>' +
+                                    '<td style="text-align:right;padding:5px 8px;opacity:0.7;" class="ptrow-ptvol"></td>' +
+                                    '<td style="text-align:right;padding:5px 8px;font-weight:bold;color:#7c3aed;" class="ptrow-ncrates"></td>' +
+                                    '<td style="text-align:center;padding:5px 4px;" class="ptrow-remove"></td>';
                                 tbody.appendChild(tr);
+                            }
+
+                            // ── Update each row's values and wire handlers ─────────────
+                            var totalCrates = 0;
+                            rows.forEach(function(r, i) {
+                                var c   = calcRow(r);
+                                totalCrates += c.nCrates;
+                                var tr  = tbody.children[i];
+                                tr.style.background = i % 2 === 0 ? 'transparent' : 'rgba(124,58,237,0.05)';
+
+                                // Label input — only set value if not currently focused
+                                var lblInp = tr.querySelector('.ptrow-label');
+                                if (document.activeElement !== lblInp) lblInp.value = r.label;
+                                lblInp.oninput = (function(idx){ return function(){
+                                    window._ptrowRows[idx].label = this.value;
+                                    window.syncPtrowHidden();
+                                }; })(i);
+
+                                // WQV input — only set value if not currently focused
+                                var wqvInp = tr.querySelector('.ptrow-wqv');
+                                if (document.activeElement !== wqvInp) wqvInp.value = r.wqv || '';
+                                wqvInp.oninput = (function(idx){ return function(){
+                                    window._ptrowRows[idx].wqv = parseFloat(this.value.replace(/[^0-9.]/g,'')) || 0;
+                                    window.updateOutputs();
+                                }; })(i);
+
+                                // Pretreat % — rebuild only if value changed
+                                var pctCell = tr.querySelector('.ptrow-pct-cell');
+                                var sel = pctCell.querySelector('select');
+                                var standardPcts = [10, 12, 15, 20];
+                                if (!sel) {
+                                    sel = document.createElement('select');
+                                    sel.style.cssText = 'padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;';
+                                    [['10','10%'],['15','15%'],['12','12%'],['20','20%'],['custom','Custom']].forEach(function(o){
+                                        var opt = document.createElement('option');
+                                        opt.value = o[0]; opt.textContent = o[1];
+                                        sel.appendChild(opt);
+                                    });
+                                    pctCell.innerHTML = '';
+                                    pctCell.appendChild(sel);
+                                }
+                                sel.value = standardPcts.includes(r.pct) ? String(r.pct) : 'custom';
+                                sel.oninput = (function(idx){ return function(){
+                                    if (this.value === 'custom') return;
+                                    window._ptrowRows[idx].pct = parseFloat(this.value) || 10;
+                                    window.updateOutputs();
+                                }; })(i);
+
+                                // Custom % text input
+                                var custInp = pctCell.querySelector('.ptrow-custom-pct');
+                                if (!standardPcts.includes(r.pct)) {
+                                    if (!custInp) {
+                                        custInp = document.createElement('input');
+                                        custInp.type = 'number'; custInp.min = 1; custInp.max = 100; custInp.step = 1;
+                                        custInp.className = 'ptrow-custom-pct';
+                                        custInp.style.cssText = 'width:45px;margin-left:4px;padding:4px 4px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;';
+                                        pctCell.appendChild(custInp);
+                                    }
+                                    if (document.activeElement !== custInp) custInp.value = r.pct;
+                                    custInp.oninput = (function(idx){ return function(){
+                                        window._ptrowRows[idx].pct = parseFloat(this.value) || 10;
+                                        window.updateOutputs();
+                                    }; })(i);
+                                } else if (custInp) {
+                                    custInp.remove();
+                                }
+
+                                // Output-only cells — always safe to update
+                                tr.querySelector('.ptrow-ptvol').textContent   = c.ptVol.toLocaleString();
+                                tr.querySelector('.ptrow-ncrates').textContent = c.nCrates;
+
+                                // Remove button
+                                var removeCell = tr.querySelector('.ptrow-remove');
+                                if (rows.length > 1) {
+                                    if (!removeCell.querySelector('button')) {
+                                        var btn = document.createElement('button');
+                                        btn.type = 'button';
+                                        btn.textContent = '✕';
+                                        btn.style.cssText = 'background:#ef4444;color:white;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;font-size:11px;';
+                                        removeCell.appendChild(btn);
+                                    }
+                                    removeCell.querySelector('button').onclick = (function(idx){ return function(){
+                                        window.removePtrowRow(idx);
+                                    }; })(i);
+                                } else {
+                                    removeCell.innerHTML = '';
+                                }
                             });
+
+                            window.updateOutputs(totalCrates);
+                        }
+
+                        // ── Update only the calculated totals + fabric ─────────────────
+                        // Called on every WQV/pct keystroke — never touches input elements.
+                        window.updateOutputs = function(knownTotal) {
+                            var totalCrates = 0;
+                            if (knownTotal !== undefined) {
+                                totalCrates = knownTotal;
+                            } else {
+                                rows.forEach(function(r) { totalCrates += calcRow(r).nCrates; });
+                                // Also update per-row output cells
+                                var tbody = document.getElementById('ptrowRows');
+                                rows.forEach(function(r, i) {
+                                    var c  = calcRow(r);
+                                    var tr = tbody.children[i];
+                                    if (!tr) return;
+                                    var pv = tr.querySelector('.ptrow-ptvol');
+                                    var nc = tr.querySelector('.ptrow-ncrates');
+                                    if (pv) pv.textContent = c.ptVol.toLocaleString();
+                                    if (nc) nc.textContent = c.nCrates;
+                                });
+                            }
 
                             var totalEl = document.getElementById('ptrowTotalCrates');
                             if (totalEl) totalEl.textContent = totalCrates;
 
-                            // Fabric calc
-                            var rowLen    = totalCrates * MOD_LEN;
-                            var fabW      = MOD_WID + 2*LAYER_HT + 2*WRAP_EXT;
-                            var fabL      = rowLen + 2*WRAP_EXT;
-                            var fabFt2    = fabW * fabL * (1 + GEO_WASTE/100.0);
-                            var fabYd2    = Math.ceil(fabFt2 / 9);
+                            var rowLen  = totalCrates * MOD_LEN;
+                            var fabW    = MOD_WID + 2*LAYER_HT + 2*WRAP_EXT;
+                            var fabL    = rowLen + 2*WRAP_EXT;
+                            var fabFt2  = fabW * fabL * (1 + GEO_WASTE/100.0);
+                            var fabYd2  = Math.ceil(fabFt2 / 9);
 
                             var fabResult = document.getElementById('ptrowFabricResult');
                             if (totalCrates > 0) {
                                 fabResult.style.display = 'block';
-                                document.getElementById('ptrowFabW').textContent    = fabW.toFixed(2) + ' ft';
-                                document.getElementById('ptrowFabL').textContent    = fabL.toFixed(2) + ' ft';
-                                document.getElementById('ptrowFabYd2').textContent  = fabYd2.toLocaleString() + ' sq yd';
+                                document.getElementById('ptrowFabW').textContent   = fabW.toFixed(2) + ' ft';
+                                document.getElementById('ptrowFabL').textContent   = fabL.toFixed(2) + ' ft';
+                                document.getElementById('ptrowFabYd2').textContent = fabYd2.toLocaleString() + ' sq yd';
                             } else {
                                 fabResult.style.display = 'none';
                             }
 
                             window.syncPtrowHidden();
-                        }
+                        };
 
                         window._ptrowRows = rows;
 
-                        window.recalcPtrow = function() { renderTable(); };
+                        window.recalcPtrow = function() { window.updateOutputs(); };
 
                         window.addPtrowRow = function() {
                             rows.push({ label: 'Area ' + (rows.length + 1), wqv: 0, pct: 10 });
