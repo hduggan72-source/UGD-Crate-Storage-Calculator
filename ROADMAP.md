@@ -29,6 +29,11 @@ Professional web-based calculator for designing and quoting underground stormwat
 - Metric toggle
 - Update font to Nunito (Wavin speciifc calculator ONLY)
 
+**Proposed Workflow & Calculator Evolution*
+[ ] Pricing_Engine_v1 → git checkout -b Client_Facing_v1 → strip pricing
+[ ] Pricing_Engine_v1 → git checkout -b MTC_Pricing → tweak MTC
+[ ] Client_Facing_v1  → git checkout -b MTC_Client → strip MTC pricing
+
 **Future Version Releases**
 
 - (v16) UPLOAD PLAN SHEET AND CREATE AN OVERLAY OF TANK (RECTANGLE/SQUARE ONLY); OR CRATE BUILDER FOR COMPLEX (ENTER ROW BY ROW, THEN DESIGNATE HOW MANY CRATES IN THE ROW)
