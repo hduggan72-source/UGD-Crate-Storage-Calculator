@@ -575,7 +575,7 @@
 
     <!-- ── LEFT PANEL: all inputs ── -->
     <div class="left-panel" id="leftPanel">
-        <form id="mainForm" method="post" action="/">
+        <form id="mainForm" method="post" action="/" onsubmit="injectPtrowToForm()">
 
             <!-- Project Info -->
             <div class="section-card">
@@ -795,9 +795,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             {% if results %}
             <input type="hidden" id="formGeogridTop"    name="geogrid_top_yd2"    value="{{ results.geogrid_top_yd2 }}">
             <input type="hidden" id="formGeogridBottom" name="geogrid_bottom_yd2" value="{{ results.geogrid_bottom_yd2 }}">
+            <!-- PT-ROW enabled flag (always present so Flask can read it) -->
+            <input type="hidden" id="formPtrowEnabled" name="ptrow_enabled" value="{{ '1' if results.ptrow_enabled else '0' }}">
             {% else %}
             <input type="hidden" id="formGeogridTop"    name="geogrid_top_yd2"    value="">
             <input type="hidden" id="formGeogridBottom" name="geogrid_bottom_yd2" value="">
+            <input type="hidden" id="formPtrowEnabled" name="ptrow_enabled" value="0">
             {% endif %}
 
         </form>
@@ -1323,6 +1326,230 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 </script>
             </div>
 
+            <!-- ══ CARD 5b: PT-ROW™ Pre-Treatment Row ══ -->
+            {% if results %}
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)" style="display:flex;align-items:center;gap:10px;">
+                    <span>🔵 PT-ROW™ Pre-Treatment Sizing</span>
+                    <label onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:normal;cursor:pointer;margin-left:auto;">
+                        <input type="checkbox" id="ptrowToggle"
+                            style="width:15px;height:15px;accent-color:#7c3aed;cursor:pointer;"
+                            onchange="togglePtrow(this.checked)">
+                        Enable PT-ROW™
+                    </label>
+                    <span class="rc-arrow">▼</span>
+                </div>
+                <div class="result-card-body" id="ptrowBody" style="display:none;">
+
+                    <!-- Config info banner -->
+                    <div style="font-size:11px;padding:8px 10px;background:rgba(124,58,237,0.10);border:1px solid rgba(124,58,237,0.3);border-radius:5px;margin-bottom:12px;line-height:1.6;">
+                        <strong>PT-ROW™ Config:</strong>
+                        Single-layer {{ results.config }} crate &nbsp;|&nbsp;
+                        Crate void volume: <strong>{{ results.ptrow_crate_vol }} ft³</strong> &nbsp;|&nbsp;
+                        Layer height: <strong>{{ results.ptrow_layer_ht }} ft</strong> &nbsp;|&nbsp;
+                        Wrap extension: <strong>1.5 ft (18")</strong> each side
+                    </div>
+
+                    <!-- Drainage area table -->
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:6px;">
+                        Drainage Areas — Volume-Based Sizing
+                    </div>
+                    <table id="ptrowTable" style="margin-top:0;font-size:13px;width:100%;">
+                        <thead>
+                            <tr style="background:rgba(124,58,237,0.12);">
+                                <th style="text-align:left;padding:6px 8px;">Area Label</th>
+                                <th style="text-align:right;padding:6px 8px;">WQV (ft³)</th>
+                                <th style="text-align:center;padding:6px 8px;">Pretreat %</th>
+                                <th style="text-align:right;padding:6px 8px;">PT Vol (ft³)</th>
+                                <th style="text-align:right;padding:6px 8px;"># Crates</th>
+                                <th style="text-align:center;padding:6px 4px;width:30px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="ptrowRows">
+                            <!-- rows injected by JS -->
+                        </tbody>
+                        <tfoot>
+                            <tr style="background:rgba(124,58,237,0.18);font-weight:bold;">
+                                <td colspan="4" style="padding:6px 8px;">TOTAL PT-ROW™ CRATES</td>
+                                <td style="text-align:right;padding:6px 8px;color:#7c3aed;" id="ptrowTotalCrates">0</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <button type="button" onclick="addPtrowRow()"
+                        style="margin-top:8px;padding:6px 14px;background:#7c3aed;color:white;border:none;border-radius:4px;font-size:12px;font-weight:bold;cursor:pointer;">
+                        + Add Drainage Area
+                    </button>
+
+                    <!-- Woven fabric result -->
+                    <div id="ptrowFabricResult" style="display:none;margin-top:14px;padding:10px 12px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.3);border-radius:6px;">
+                        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:6px;">Woven Fabric — Taco Wrap (Bottom + 2 Long Sides + Back End)</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+                            <div class="result-stat">
+                                <div class="result-stat-label">Fabric Width</div>
+                                <div class="result-stat-value" id="ptrowFabW" style="font-size:14px;">—</div>
+                            </div>
+                            <div class="result-stat">
+                                <div class="result-stat-label">Fabric Length</div>
+                                <div class="result-stat-value" id="ptrowFabL" style="font-size:14px;">—</div>
+                            </div>
+                            <div class="result-stat" style="border:1px solid #7c3aed;border-radius:5px;">
+                                <div class="result-stat-label" style="color:#7c3aed;">Woven Fabric (SQ YD)</div>
+                                <div class="result-stat-value" id="ptrowFabYd2" style="color:#7c3aed;">—</div>
+                            </div>
+                        </div>
+                        <div style="font-size:10px;opacity:0.55;margin-top:6px;">
+                            Formula: (crate W + 2×layer ht + 2×1.5 ft) × (row length + 2×1.5 ft) × (1 + {{ results.geoWaste }}% waste) ÷ 9
+                            &nbsp;|&nbsp; Flows to Quote PDF line C
+                        </div>
+                    </div>
+
+                    <!-- Hidden form inputs — inside the results section but synced to form via JS on submit -->
+                    <div id="ptrowHiddenInputs"></div>
+
+                    <script>
+                    (function(){
+                        var CRATE_VOL  = {{ results.ptrow_crate_vol }};
+                        var LAYER_HT   = {{ results.ptrow_layer_ht }};
+                        var MOD_WID    = 1.9685;
+                        var MOD_LEN    = 3.937;
+                        var WRAP_EXT   = 1.5;
+                        var GEO_WASTE  = {{ results.geoWaste }};
+
+                        var rows = [];   // [{label, wqv, pct}]
+
+                        // Restore from server if previously submitted
+                        {% for area in results.ptrow_areas %}
+                        rows.push({ label: {{ area.label|tojson }}, wqv: {{ area.wqv }}, pct: {{ area.pct }} });
+                        {% endfor %}
+                        if (rows.length === 0) rows.push({ label: 'Area 1', wqv: 0, pct: 10 });
+
+                        function calcRow(r) {
+                            var ptVol   = r.wqv * r.pct / 100.0;
+                            var nCrates = CRATE_VOL > 0 ? Math.ceil(ptVol / CRATE_VOL) : 0;
+                            return { ptVol: Math.round(ptVol * 100)/100, nCrates: nCrates };
+                        }
+
+                        function renderTable() {
+                            var tbody = document.getElementById('ptrowRows');
+                            tbody.innerHTML = '';
+                            var totalCrates = 0;
+                            rows.forEach(function(r, i) {
+                                var c = calcRow(r);
+                                totalCrates += c.nCrates;
+                                var tr = document.createElement('tr');
+                                tr.style.background = i % 2 === 0 ? 'transparent' : 'rgba(124,58,237,0.05)';
+                                tr.innerHTML =
+                                    '<td style="padding:5px 8px;">' +
+                                        '<input type="text" value="' + r.label + '" ' +
+                                        'oninput="window._ptrowRows[' + i + '].label=this.value;window.syncPtrowHidden();" ' +
+                                        'style="width:90px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;">' +
+                                    '</td>' +
+                                    '<td style="text-align:right;padding:5px 8px;">' +
+                                        '<input type="number" value="' + r.wqv + '" min="0" step="1" ' +
+                                        'oninput="window._ptrowRows[' + i + '].wqv=parseFloat(this.value)||0;window.recalcPtrow();" ' +
+                                        'style="width:80px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;text-align:right;">' +
+                                    '</td>' +
+                                    '<td style="text-align:center;padding:5px 8px;">' +
+                                        '<select oninput="window._ptrowRows[' + i + '].pct=parseFloat(this.value);window.recalcPtrow();" ' +
+                                        'style="padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;">' +
+                                        '<option value="10"' + (r.pct==10?' selected':'') + '>10%</option>' +
+                                        '<option value="15"' + (r.pct==15?' selected':'') + '>15%</option>' +
+                                        '<option value="12"' + (r.pct==12?' selected':'') + '>12%</option>' +
+                                        '<option value="20"' + (r.pct==20?' selected':'') + '>20%</option>' +
+                                        '<option value="custom"' + (![10,12,15,20].includes(r.pct)?' selected':'') + '>Custom</option>' +
+                                        '</select>' +
+                                        ([10,12,15,20].includes(r.pct) ? '' :
+                                        '<input type="number" value="' + r.pct + '" min="1" max="100" step="1" ' +
+                                        'oninput="window._ptrowRows[' + i + '].pct=parseFloat(this.value)||10;window.recalcPtrow();" ' +
+                                        'style="width:45px;margin-left:4px;padding:4px 4px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;">') +
+                                    '</td>' +
+                                    '<td style="text-align:right;padding:5px 8px;opacity:0.7;">' + c.ptVol.toLocaleString() + '</td>' +
+                                    '<td style="text-align:right;padding:5px 8px;font-weight:bold;color:#7c3aed;">' + c.nCrates + '</td>' +
+                                    '<td style="text-align:center;padding:5px 4px;">' +
+                                        (rows.length > 1 ?
+                                        '<button type="button" onclick="window.removePtrowRow(' + i + ')" ' +
+                                        'style="background:#ef4444;color:white;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;font-size:11px;">✕</button>'
+                                        : '') +
+                                    '</td>';
+                                tbody.appendChild(tr);
+                            });
+
+                            var totalEl = document.getElementById('ptrowTotalCrates');
+                            if (totalEl) totalEl.textContent = totalCrates;
+
+                            // Fabric calc
+                            var rowLen    = totalCrates * MOD_LEN;
+                            var fabW      = MOD_WID + 2*LAYER_HT + 2*WRAP_EXT;
+                            var fabL      = rowLen + 2*WRAP_EXT;
+                            var fabFt2    = fabW * fabL * (1 + GEO_WASTE/100.0);
+                            var fabYd2    = Math.ceil(fabFt2 / 9);
+
+                            var fabResult = document.getElementById('ptrowFabricResult');
+                            if (totalCrates > 0) {
+                                fabResult.style.display = 'block';
+                                document.getElementById('ptrowFabW').textContent    = fabW.toFixed(2) + ' ft';
+                                document.getElementById('ptrowFabL').textContent    = fabL.toFixed(2) + ' ft';
+                                document.getElementById('ptrowFabYd2').textContent  = fabYd2.toLocaleString() + ' sq yd';
+                            } else {
+                                fabResult.style.display = 'none';
+                            }
+
+                            window.syncPtrowHidden();
+                        }
+
+                        window._ptrowRows = rows;
+
+                        window.recalcPtrow = function() { renderTable(); };
+
+                        window.addPtrowRow = function() {
+                            rows.push({ label: 'Area ' + (rows.length + 1), wqv: 0, pct: 10 });
+                            renderTable();
+                        };
+
+                        window.removePtrowRow = function(i) {
+                            rows.splice(i, 1);
+                            renderTable();
+                        };
+
+                        window.syncPtrowHidden = function() {
+                            var container = document.getElementById('ptrowHiddenInputs');
+                            if (!container) return;
+                            container.innerHTML = '';
+                            var enabled = document.getElementById('ptrowToggle')?.checked ? '1' : '0';
+                            var add = function(name, val) {
+                                var inp = document.createElement('input');
+                                inp.type = 'hidden'; inp.name = name; inp.value = val;
+                                container.appendChild(inp);
+                            };
+                            add('ptrow_enabled', enabled);
+                            rows.forEach(function(r, i) {
+                                add('ptrow_label_' + i, r.label);
+                                add('ptrow_wqv_'   + i, r.wqv);
+                                add('ptrow_pct_'   + i, r.pct);
+                            });
+                        };
+
+                        window.togglePtrow = function(on) {
+                            document.getElementById('ptrowBody').style.display = on ? 'block' : 'none';
+                            window.syncPtrowHidden();
+                        };
+
+                        // Restore toggle state from server
+                        {% if results.ptrow_enabled %}
+                        document.getElementById('ptrowToggle').checked = true;
+                        document.getElementById('ptrowBody').style.display = 'block';
+                        {% endif %}
+
+                        // Initial render
+                        renderTable();
+                    })();
+                    </script>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- ══ CARD 6: Cover & Load Verification ══ -->
             <div class="result-card">
                 <div class="result-card-header" onclick="toggleResultCard(this)"><span>🛡 Cover &amp; Load Verification</span><span class="rc-arrow">▼</span></div>
@@ -1811,6 +2038,9 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         formData.set('stone_perim_included', document.getElementById('hiddenStonePerimIncl')?.value ?? '1');
         formData.set('stone_base_included',  document.getElementById('hiddenStoneBaseIncl')?.value  ?? '1');
 
+        // PT-ROW™ data — inject from results card hidden inputs
+        injectPtrowToFormData(formData);
+
         const canvas = document.getElementById('sheet');
         const includeSchematic = document.getElementById('include_schematic').checked;
         if (includeSchematic && canvas) {
@@ -1911,6 +2141,42 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         if (h_base)  h_base.value  = inclBase  ? '1' : '0';
     }
 
+    // ====================== PT-ROW FORM INJECTION ======================
+    function injectPtrowToForm() {
+        // Move ptrow hidden inputs from the results card into the main form
+        // so they POST correctly on Calculate
+        var src = document.getElementById('ptrowHiddenInputs');
+        var form = document.getElementById('mainForm');
+        if (!src || !form) return;
+        // Remove any stale ptrow_ inputs already in the form
+        form.querySelectorAll('input[name^="ptrow_"]').forEach(function(el) {
+            if (el.id !== 'formPtrowEnabled') el.remove();
+        });
+        // Clone and append current ones
+        src.querySelectorAll('input').forEach(function(el) {
+            if (el.name === 'ptrow_enabled') {
+                // Update the existing hidden flag
+                var flag = document.getElementById('formPtrowEnabled');
+                if (flag) flag.value = el.value;
+            } else {
+                var clone = el.cloneNode(true);
+                form.appendChild(clone);
+            }
+        });
+    }
+
+    function injectPtrowToFormData(formData) {
+        // For fetch-based exports (PDF, Quote, CSV) — append PT-ROW fields to FormData
+        var src = document.getElementById('ptrowHiddenInputs');
+        if (src) {
+            src.querySelectorAll('input').forEach(function(el) {
+                formData.set(el.name, el.value);
+            });
+        }
+        var toggle = document.getElementById('ptrowToggle');
+        formData.set('ptrow_enabled', (toggle && toggle.checked) ? '1' : '0');
+    }
+
     function calculateAquaCellPrice() {
         // ── Hardcoded floor unit prices (update here on price increase) ──
         const UNIT_PRICES = {
@@ -2000,6 +2266,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         formData.append('markupPct',          document.getElementById('hiddenMarkupPct').value          || '0');
         // Explicitly pass project number to guarantee filename
         formData.set('project_num', document.getElementById('project_num')?.value || '');
+        // PT-ROW™ data
+        injectPtrowToFormData(formData);
 
         const projectName = (document.getElementById('project_name').value || 'Project').trim()
                             .replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
@@ -2539,7 +2807,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         // --- Stone Backfill Bulk ---
         const stoneBulkDisplay = txt('stoneBulkDisplay');
 
-        const emailText = [
+        const emailLines = [
             'AquaCell Proposed System',
             '',
             `Tank Configuration/Layers:                        ${configSelect}/${layersSelect} Layer(s)`,
@@ -2559,7 +2827,29 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             `Biaxial Geogrid - Top/Cover (sq yd):              ${geogridTop}`,
             `Biaxial Geogrid - Bottom/Tank Base (sq yd):       ${geogridBottom}`,
             `Total Estimated Stone Backfill Volume (with 10%): ${stoneBulkDisplay}`,
-        ].join('\n');
+        ];
+
+        // PT-ROW™ section — only if enabled
+        const ptrowToggle = document.getElementById('ptrowToggle');
+        if (ptrowToggle && ptrowToggle.checked && window._ptrowRows && window._ptrowRows.length > 0) {
+            const CRATE_VOL = {{ results.ptrow_crate_vol if results else 0 }};
+            var ptrowTotal = 0;
+            var ptrowLines = ['\n--- PT-ROW™ Pre-Treatment ---'];
+            window._ptrowRows.forEach(function(r) {
+                var ptVol   = r.wqv * r.pct / 100.0;
+                var nCrates = CRATE_VOL > 0 ? Math.ceil(ptVol / CRATE_VOL) : 0;
+                ptrowTotal += nCrates;
+                ptrowLines.push(`  ${r.label}: WQV=${r.wqv} ft³ @ ${r.pct}% → ${Math.round(ptVol*100)/100} ft³ PT vol → ${nCrates} crates`);
+            });
+            ptrowLines.push(`  TOTAL PT-ROW™ CRATES:                          ${ptrowTotal}`);
+            var fabYd2El = document.getElementById('ptrowFabYd2');
+            if (fabYd2El && fabYd2El.textContent !== '—') {
+                ptrowLines.push(`  Woven Monofilament Fabric (sq yd):             ${fabYd2El.textContent}`);
+            }
+            emailLines.push(...ptrowLines);
+        }
+
+        const emailText = emailLines.join('\n');
 
         navigator.clipboard.writeText(emailText).then(() => {
             alert('✅ Results copied to clipboard! Paste directly into your email.');

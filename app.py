@@ -216,6 +216,56 @@ def index():
         geogrid_top_yd2    = int(_top_raw)    if _top_raw    != '' else _geogrid_top_auto
         geogrid_bottom_yd2 = int(_bottom_raw) if _bottom_raw != '' else _geogrid_bottom_auto
 
+        # ── PT-ROW™ Pre-Treatment Row ─────────────────────────────────
+        # Crate void volume per single-layer crate (matches selected config)
+        ptrow_enabled      = request.form.get('ptrow_enabled', '0') == '1'
+        ptrow_crate_vol    = round(MODULE_WID * MODULE_LEN * layer_heights[0] * void_ratio, 4)
+        # 1-layer height for wrapping regardless of main tank layers
+        ptrow_layer_ht     = layer_heights[0]
+        ptrow_wrap_ext     = 1.5   # ft — 18" single-layer extension per AQ-100-25
+
+        # Parse drainage area rows submitted from the form
+        # Format: ptrow_wqv_0, ptrow_pct_0, ptrow_label_0 ... up to N rows
+        ptrow_areas = []
+        ptrow_total_crates = 0
+        idx = 0
+        while True:
+            wqv_key = f'ptrow_wqv_{idx}'
+            pct_key = f'ptrow_pct_{idx}'
+            lbl_key = f'ptrow_label_{idx}'
+            if wqv_key not in request.form:
+                break
+            wqv_val = float(request.form.get(wqv_key, 0) or 0)
+            pct_val = float(request.form.get(pct_key, 10) or 10)
+            lbl_val = request.form.get(lbl_key, f'Area {idx+1}').strip() or f'Area {idx+1}'
+            pt_vol  = round(wqv_val * pct_val / 100.0, 2)
+            n_crates = math.ceil(pt_vol / ptrow_crate_vol) if ptrow_crate_vol > 0 else 0
+            ptrow_areas.append({
+                'label':    lbl_val,
+                'wqv':      wqv_val,
+                'pct':      pct_val,
+                'pt_vol':   pt_vol,
+                'n_crates': n_crates,
+            })
+            ptrow_total_crates += n_crates
+            idx += 1
+
+        # Woven fabric — taco wrap: bottom + 2 long sides + 1 back end
+        # Single sheet laid flat then wrapped:
+        #   fabric_width  = crate_width  + 2×layer_ht + 2×wrap_ext  (bottom + up both sides + overlap to secure)
+        #   fabric_length = row_length   + 2×wrap_ext                (length + back end overlap + front tuck)
+        if ptrow_enabled and ptrow_total_crates > 0:
+            _ptrow_row_len   = ptrow_total_crates * MODULE_LEN
+            _ptrow_fab_w     = MODULE_WID + 2*ptrow_layer_ht + 2*ptrow_wrap_ext
+            _ptrow_fab_l     = _ptrow_row_len + 2*ptrow_wrap_ext
+            _ptrow_fab_ft2   = _ptrow_fab_w * _ptrow_fab_l * (1 + geoWaste/100.0)
+            ptrow_woven_yd2  = math.ceil(_ptrow_fab_ft2 / 9)
+            ptrow_woven_ft2  = round(_ptrow_fab_ft2, 1)
+        else:
+            ptrow_woven_yd2  = 0
+            ptrow_woven_ft2  = 0.0
+            ptrow_crate_vol  = round(ptrow_crate_vol, 4)
+
         stage_storage = None
         if include_stage_storage:
             stage_storage = []
@@ -300,6 +350,13 @@ def index():
             'geoWaste': geoWaste, 'include_schematic': include_schematic,
             'geogrid_top_yd2': geogrid_top_yd2,
             'geogrid_bottom_yd2': geogrid_bottom_yd2,
+            'ptrow_enabled':       ptrow_enabled,
+            'ptrow_crate_vol':     round(ptrow_crate_vol, 4),
+            'ptrow_layer_ht':      round(ptrow_layer_ht, 4),
+            'ptrow_areas':         ptrow_areas,
+            'ptrow_total_crates':  ptrow_total_crates,
+            'ptrow_woven_yd2':     ptrow_woven_yd2,
+            'ptrow_woven_ft2':     ptrow_woven_ft2,
         }
         form_data = request.form
 
@@ -2092,6 +2149,31 @@ def download_quote():
       geogrid_bottom_yd2 = int(request.form.get('geogrid_bottom_yd2', 0) or 0)
       geogrid_total_yd2  = geogrid_top_yd2 + geogrid_bottom_yd2
 
+      # ── PT-ROW™ quantities ──────────────────────────────────────────
+      if config == 'SC':
+          _q_layer_heights = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]
+          _q_void_ratio    = 0.95486
+      else:
+          _q_layer_heights = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
+          _q_void_ratio    = 0.92633
+      _q_ptrow_ht  = _q_layer_heights[0]
+      _q_ptrow_vol = MODULE_WID * MODULE_LEN * _q_ptrow_ht * _q_void_ratio
+
+      ptrow_enabled_q = request.form.get('ptrow_enabled', '0') == '1'
+      ptrow_total_q   = 0
+      idx = 0
+      while True:
+          if f'ptrow_wqv_{idx}' not in request.form:
+              break
+          wqv = float(request.form.get(f'ptrow_wqv_{idx}', 0) or 0)
+          pct = float(request.form.get(f'ptrow_pct_{idx}', 10) or 10)
+          ptrow_total_q += math.ceil((wqv * pct / 100.0) / _q_ptrow_vol) if _q_ptrow_vol > 0 else 0
+          idx += 1
+
+      _ptrow_fab_w   = MODULE_WID + 2*_q_ptrow_ht + 2*1.5
+      _ptrow_fab_l   = (ptrow_total_q * MODULE_LEN) + 2*1.5
+      ptrow_woven_q  = math.ceil(_ptrow_fab_w * _ptrow_fab_l * (1 + geoWaste/100.0) / 9) if ptrow_enabled_q and ptrow_total_q > 0 else 0
+
       config_label = f'{config}-{layers}'   # e.g. SC-5
       generated_str = datetime.datetime.now().strftime('%m/%d/%Y')
       logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
@@ -2261,7 +2343,8 @@ def download_quote():
           ('4', '2476631200', 'AQUACELL 8\u201312\u2033 PIPE CONNECTOR', pipe_connectors, 'EACH', ''),
           ('5', '3085857',    'AQUACELL TOP CONNECTOR (12\u2033)', top_adapters_12, 'EACH', ''),
           ('5', '2476842000', 'AQUACELL TOP CONNECTOR (16\u2033)', top_adapters_16, 'EACH', ''),
-          ('6', '3091506',    'AQUACELL BASE UNITS — CONTINGENCY (PRICED AT SAME RATE)', contingency_units, 'EACH', ''),
+          ('6', '3091506',    'AQUACELL BASE UNITS \u2014 PT-ROW\u2122 PRE-TREATMENT (SAME SKU)', ptrow_total_q, 'EACH', 'PT-ROW\u2122'),
+          ('7', '3091506',    'AQUACELL BASE UNITS \u2014 CONTINGENCY (PRICED AT SAME RATE)', contingency_units, 'EACH', ''),
       ]
 
       for i, (ln, pc, ds, qt, un, nt) in enumerate(bom_rows):
@@ -2305,13 +2388,14 @@ def download_quote():
           q_text(x, y - 9, lbl, 'Helvetica-Bold', 7, WHITE)
       y -= 13
 
-      alpha = ['A','B','C','D','E','F','G']
+      alpha = ['A','B','C','D','E','F','G','H']
       others_rows = [
           (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE (TANK ONLY)',
            int(geoTank_yd2), 'SQ YD'),
           (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE (BACKFILL ONLY)',
            int(geoStone_yd2), 'SQ YD'),
-          ('WOVEN GEOTEXTILE + 20% WASTE (TANK ONLY)', 0, 'SQ YD'),
+          (f'WOVEN MONOFILAMENT GEOTEXTILE \u2014 PT-ROW\u2122 PRE-TREATMENT + {geoWaste}% WASTE',
+           int(ptrow_woven_q), 'SQ YD'),
           (f'BIAXIAL GEOGRID (INTEGRALLY FORMED POLYPROPYLENE) + {geoWaste}% WASTE'
            + (f'  [TOP: {geogrid_top_yd2} SY + BOTTOM: {geogrid_bottom_yd2} SY]'
               if geogrid_top_yd2 > 0 and geogrid_bottom_yd2 > 0 else ''),
