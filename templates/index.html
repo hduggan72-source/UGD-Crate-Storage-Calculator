@@ -1447,8 +1447,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                                         'style="width:90px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;">' +
                                     '</td>' +
                                     '<td style="text-align:right;padding:5px 8px;">' +
-                                        '<input type="number" value="' + r.wqv + '" min="0" step="1" ' +
-                                        'oninput="window._ptrowRows[' + i + '].wqv=parseFloat(this.value)||0;window.recalcPtrow();" ' +
+                                        '<input type="text" inputmode="numeric" value="' + r.wqv + '" ' +
+                                        'oninput="window._ptrowRows[' + i + '].wqv=parseFloat(this.value.replace(/[^0-9.]/g,\'\'))||0;window.recalcPtrow();" ' +
                                         'style="width:80px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;text-align:right;">' +
                                     '</td>' +
                                     '<td style="text-align:center;padding:5px 8px;">' +

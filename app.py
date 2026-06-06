@@ -2343,8 +2343,7 @@ def download_quote():
           ('4', '2476631200', 'AQUACELL 8\u201312\u2033 PIPE CONNECTOR', pipe_connectors, 'EACH', ''),
           ('5', '3085857',    'AQUACELL TOP CONNECTOR (12\u2033)', top_adapters_12, 'EACH', ''),
           ('5', '2476842000', 'AQUACELL TOP CONNECTOR (16\u2033)', top_adapters_16, 'EACH', ''),
-          ('6', '3091506',    'AQUACELL BASE UNITS \u2014 PT-ROW\u2122 PRE-TREATMENT (SAME SKU)', ptrow_total_q, 'EACH', 'PT-ROW\u2122'),
-          ('7', '3091506',    'AQUACELL BASE UNITS \u2014 CONTINGENCY (PRICED AT SAME RATE)', contingency_units, 'EACH', ''),
+          ('6', '3091506',    'AQUACELL BASE UNITS \u2014 CONTINGENCY (PRICED AT SAME RATE)', contingency_units, 'EACH', ''),
       ]
 
       for i, (ln, pc, ds, qt, un, nt) in enumerate(bom_rows):
