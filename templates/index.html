@@ -2615,7 +2615,10 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     function downloadSheetPNG() {
         const a = document.createElement('a');
         a.href = document.getElementById('sheet').toDataURL('image/png');
-        a.download = 'AquaCell_Schematic.png';
+        const projName = (document.getElementById('project_name')?.value || '').trim()
+                         .replace(/[^a-zA-Z0-9\-_ ]/g,'_').replace(/\s+/g,'_');
+        const parts = ['AquaCell_Schematic', projName].filter(Boolean).join('_');
+        a.download = parts + '.png';
         a.click();
     }
 
