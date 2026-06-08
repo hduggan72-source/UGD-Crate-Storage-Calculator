@@ -7,8 +7,6 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 ** ## Next Up (High Priority – Do These Next)**
 
-- ADD WOVEN FABRIC FOR PT-ROW™ TANK
-- CONCEPTUAL SCHEMATIC NEEDS TO HAVE THE PROJECT NAME ADDED TO FILE EXTENSION
 - on MAIN DASHBOARD, RESULTS "STORAGE SUMMARY" CARD IS NOT CHANGING FONT COLOR FROM RED TO GREEN DURING PASS/FAIL AUDIT
 - ADD DISTANCE FROM BUILDING CALCULATOR (THAT AND BUOYANCY SHOULD BE SEPARATE BRANCHES SIMILAR TO MULTI-TANK)
 - ADD COMPLEX CALCULATOR (SIMPLE) TO MULTI TANK UI/UX
@@ -41,9 +39,10 @@ Professional web-based calculator for designing and quoting underground stormwat
 - (v18) Optional 3D isometric view of the crate layout
 - (v19) SEPARATE CALCULATOR TOOL WITH NO PRICING; 
 
-**## PREVIOUS Version (v12-v14) — Completed**
-
+**## PREVIOUS Version (v12-v14) — v15 Completed**
+-  [X] CONCEPTUAL SCHEMATIC NEEDS TO HAVE THE PROJECT NAME ADDED TO FILE EXTENSION
 -  [X] add a COST PER CUBIC FOOT Field on the quote that is just a calculation of the total sum / AquaCell tank storage
+-  [X] ADD WOVEN FABRIC FOR PT-ROW™ TANK
 -  [X] add project name to details export name extension
 -  [X] add biaxial geogrid total to the quote sheet as a product by others (based on excavation area + overage)
 -  [X] add feature on UX/UI to toggle on/off layers of backfill included in storage
