@@ -1196,6 +1196,14 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     <table style="margin-top:0;">
                         <tr><th>Item</th><th id="geoUnitHeader" style="text-align:right;">Quantity (ft²)</th></tr>
                         <tr><td>AquaCell Tank Only</td><td id="geoTankCell" style="text-align:right;font-weight:bold;"></td></tr>
+                        <tr id="geoDeductRow" style="display:none;color:#f59e0b;">
+                            <td style="font-size:11px;padding-left:14px;">↳ Less: Geogrid Bottom Substitution</td>
+                            <td id="geoDeductCell" style="text-align:right;font-size:11px;"></td>
+                        </tr>
+                        <tr id="geoAdjRow" style="display:none;">
+                            <td style="font-size:11px;padding-left:14px;font-weight:600;">Adjusted Tank Non-Woven</td>
+                            <td id="geoTankAdjCell" style="text-align:right;font-size:11px;font-weight:600;color:#10b981;"></td>
+                        </tr>
                         <tr><td>Stone Backfill Envelope</td><td id="geoStoneCell" style="text-align:right;font-weight:bold;"></td></tr>
                         <tr><td><strong>Total Geotextile</strong></td><td id="geoTotalCell" style="text-align:right;font-weight:bold;"></td></tr>
                         <tr><td style="font-size:12px;opacity:0.7;">Waste/Overlap</td><td style="text-align:right;font-size:12px;opacity:0.7;">{{ results.geoWaste }}%</td></tr>
@@ -1235,7 +1243,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                                 <div style="display:flex;align-items:center;gap:8px;">
                                     <input type="number" id="geogridBottomQty"
                                         min="0" step="1" value="{{ results.geogrid_bottom_yd2 }}"
-                                        oninput="document.getElementById('formGeogridBottom').value=this.value; updateCombinedDisplay();"
+                                        oninput="document.getElementById('formGeogridBottom').value=this.value; updateCombinedDisplay(); if(window.setGeoUnit) window.setGeoUnit(window._currentGeoUnit||'ft2');"
                                         style="width:90px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;font-weight:bold;">
                                     <span style="font-size:12px;opacity:0.7;">sq yd</span>
                                     <button type="button" onclick="calcGeogridBottom()"
@@ -1295,6 +1303,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             document.getElementById('geogridBottomQty').value = areaSqYd;
                             document.getElementById('formGeogridBottom').value = areaSqYd;
                             updateCombinedDisplay();
+                            if (window.setGeoUnit) window.setGeoUnit(window._currentGeoUnit || 'ft2');
                         };
                     })();
                     </script>
@@ -1309,12 +1318,33 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         var _tyd2 = Math.round(_tft2 / 9 * 10) / 10;
                         window._geoVals = { ft2: { tank:_gft2, stone:_sft2, total:_tft2 }, yd2: { tank:_gyd2, stone:_syd2, total:_tyd2 } };
                         window.setGeoUnit = function(unit) {
-                            var v = window._geoVals[unit];
+                            var v   = window._geoVals[unit];
                             var lbl = unit === 'ft2' ? 'ft²' : 'yd²';
+
+                            // Geogrid bottom deduction
+                            var geoBotYd2 = parseFloat(document.getElementById('formGeogridBottom')?.value) || 0;
+                            var geoBotFt2 = geoBotYd2 * 9;
+                            var deduct    = unit === 'ft2' ? geoBotFt2 : geoBotYd2;
+                            var adjTank   = Math.max(0, v.tank - deduct);
+
                             document.getElementById('geoUnitHeader').textContent = 'Quantity (' + lbl + ')';
-                            document.getElementById('geoTankCell').textContent  = v.tank.toLocaleString()  + ' ' + lbl;
-                            document.getElementById('geoStoneCell').textContent = v.stone.toLocaleString() + ' ' + lbl;
-                            document.getElementById('geoTotalCell').innerHTML   = '<strong>' + v.total.toLocaleString() + ' ' + lbl + '</strong>';
+                            document.getElementById('geoTankCell').textContent   = v.tank.toLocaleString() + ' ' + lbl;
+                            document.getElementById('geoStoneCell').textContent  = v.stone.toLocaleString() + ' ' + lbl;
+                            document.getElementById('geoTotalCell').innerHTML    = '<strong>' + v.total.toLocaleString() + ' ' + lbl + '</strong>';
+
+                            // Show/hide deduction rows
+                            var deductRow = document.getElementById('geoDeductRow');
+                            var adjRow    = document.getElementById('geoAdjRow');
+                            if (geoBotYd2 > 0) {
+                                deductRow.style.display = '';
+                                adjRow.style.display    = '';
+                                document.getElementById('geoDeductCell').textContent   = '− ' + deduct.toLocaleString() + ' ' + lbl;
+                                document.getElementById('geoTankAdjCell').textContent  = adjTank.toLocaleString() + ' ' + lbl;
+                            } else {
+                                deductRow.style.display = 'none';
+                                adjRow.style.display    = 'none';
+                            }
+
                             document.getElementById('geoUnitFt2').style.background = unit === 'ft2' ? 'rgba(255,255,255,0.25)' : 'transparent';
                             document.getElementById('geoUnitFt2').style.color      = unit === 'ft2' ? '#fff' : 'rgba(255,255,255,0.6)';
                             document.getElementById('geoUnitFt2').style.fontWeight = unit === 'ft2' ? 'bold' : 'normal';

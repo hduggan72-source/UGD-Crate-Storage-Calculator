@@ -2149,6 +2149,16 @@ def download_quote():
       geogrid_bottom_yd2 = int(request.form.get('geogrid_bottom_yd2', 0) or 0)
       geogrid_total_yd2  = geogrid_top_yd2 + geogrid_bottom_yd2
 
+      # ── Non-woven deduction: geogrid bottom substitutes for fabric on tank floor ──
+      # Line A (tank-only non-woven) is reduced by the bottom geogrid area.
+      # Line B (backfill envelope) is never affected.
+      geoTank_yd2_adj = max(0, int(geoTank_yd2) - geogrid_bottom_yd2)
+      nw_tank_label = (
+          f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE (TANK ONLY — EXCL. BOTTOM: GEOGRID SUB.)'
+          if geogrid_bottom_yd2 > 0 else
+          f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE (TANK ONLY)'
+      )
+
       # ── PT-ROW™ quantities ──────────────────────────────────────────
       if config == 'SC':
           _q_layer_heights = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]
@@ -2389,8 +2399,7 @@ def download_quote():
 
       alpha = ['A','B','C','D','E','F','G','H']
       others_rows = [
-          (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE (TANK ONLY)',
-           int(geoTank_yd2), 'SQ YD'),
+          (nw_tank_label, geoTank_yd2_adj, 'SQ YD'),
           (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE (BACKFILL ONLY)',
            int(geoStone_yd2), 'SQ YD'),
           (f'WOVEN MONOFILAMENT GEOTEXTILE \u2014 PT-ROW\u2122 PRE-TREATMENT + {geoWaste}% WASTE',
