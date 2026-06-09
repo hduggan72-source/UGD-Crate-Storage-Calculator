@@ -1224,7 +1224,7 @@ def multi_download_quote():
             ('C', 'WOVEN GEOTEXTILE + 20% WASTE (TANK ONLY)', 0, 'SQ YD'),
             ('D', f'BIAXIAL GEOGRID (INTEGRALLY FORMED POLYPROPYLENE) + {geoWaste_pct}% WASTE', 0, 'SQ YD'),
             ('E', 'CASTINGS FOR VENTING / INSPECTION PORTS / INLETS', int(cum_adapters), 'EACH'),
-            ('F', 'LARGE CUSTOM PIPE ADAPTERS (18″–36″) FOR FIELD INSTALL', 0, 'EACH'),
+            ('F', 'LARGE DIAMETER PIPE CONNECTION (18\u201336\u2033) \u2014 GEOTEXTILE BOOT / ABUTMENT', 0, 'EACH'),
             ('G', 'STONE BACKFILL OR SELECT BACKFILL ESTIMATED FOR UG SYSTEM', cum_stone_yd3, 'CU YD'),
         ]
 
@@ -2159,7 +2159,9 @@ def download_quote():
           f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE (TANK ONLY)'
       )
 
-      # ── PT-ROW™ quantities ──────────────────────────────────────────
+      # ── Large diameter pipe connection (line F) ────────────────────
+      large_pipe_qty  = int(request.form.get('large_pipe_qty', 0) or 0)
+      large_pipe_desc = 'LARGE DIAMETER PIPE CONNECTION (18\u201336\u2033) \u2014 GEOTEXTILE BOOT / ABUTMENT'
       if config == 'SC':
           _q_layer_heights = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]
           _q_void_ratio    = 0.95486
@@ -2410,7 +2412,7 @@ def download_quote():
            geogrid_total_yd2, 'SQ YD'),
           ('CASTINGS FOR VENTING / INSPECTION PORTS / INLETS',
            top_adapters_12 + top_adapters_16, 'EACH'),
-          ('LARGE CUSTOM PIPE ADAPTERS (18\u2033\u201336\u2033) FOR FIELD INSTALL', 0, 'EACH'),
+          (large_pipe_desc, large_pipe_qty, 'EACH'),
           ('STONE BACKFILL OR SELECT BACKFILL ESTIMATED FOR UG SYSTEM',
            int(stone_yd3), 'CU YD'),
       ]
