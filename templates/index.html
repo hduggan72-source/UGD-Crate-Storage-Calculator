@@ -2263,6 +2263,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         // PT-ROW™ data — inject from results card hidden inputs
         injectPtrowToFormData(formData);
 
+        // Liner fields — outside the form, must be injected explicitly
+        formData.set('liner_on_tank',   document.getElementById('formLinerOnTank')?.value   ?? '0');
+        formData.set('liner_on_stone',  document.getElementById('formLinerOnStone')?.value  ?? '0');
+        formData.set('liner_tank_yd2',  document.getElementById('formLinerTankQty')?.value  ?? '0');
+        formData.set('liner_stone_yd2', document.getElementById('formLinerStoneQty')?.value ?? '0');
+
         const canvas = document.getElementById('sheet');
         const includeSchematic = document.getElementById('include_schematic').checked;
         if (includeSchematic && canvas) {
@@ -2490,6 +2496,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         formData.set('project_num', document.getElementById('project_num')?.value || '');
         // PT-ROW™ data
         injectPtrowToFormData(formData);
+
+        // Liner fields — outside the form, must be injected explicitly
+        formData.set('liner_on_tank',   document.getElementById('formLinerOnTank')?.value   ?? '0');
+        formData.set('liner_on_stone',  document.getElementById('formLinerOnStone')?.value  ?? '0');
+        formData.set('liner_tank_yd2',  document.getElementById('formLinerTankQty')?.value  ?? '0');
+        formData.set('liner_stone_yd2', document.getElementById('formLinerStoneQty')?.value ?? '0');
 
         const projectName = (document.getElementById('project_name').value || 'Project').trim()
                             .replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
