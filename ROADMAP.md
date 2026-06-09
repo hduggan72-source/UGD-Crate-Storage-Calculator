@@ -13,7 +13,6 @@ Professional web-based calculator for designing and quoting underground stormwat
 - ADD FABRIC AND ACCESSORY AMOUNTS TO THE MULTI-TANK QUOTE
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
 - command button to collapse all cards
-- add place for "additional accessories" in BOM
 - TAKE PRICING OUT OF SEPARATE CALCULATIONS TOOL FOR CLIENT USE
 - toggle DISTRIBUTOR, MARKET,  BUDGET ESTIMATE PRICING for quote page export (HEADER TITLE)
 - ONE BUTTON THAT TAKES YOU TO "TOOLS" WHERE MULTIPLE CALCULATORS LIVE AND EXPORT TO THEIR OWN PAGE WITH GRAPHICS
@@ -41,6 +40,8 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 **## PREVIOUS Version (v12-v14) — v15 Completed**
 
+-  [X] add place for Large Diameter Pipe Connections on quote sheet
+-  [X] bottom of tank non-woven fabric quantity can be eliminated with Geogrid as a replacement (recommended)
 -  [X] on MAIN DASHBOARD, RESULTS "STORAGE SUMMARY" CARD IS NOT CHANGING FONT COLOR FROM RED TO GREEN DURING PASS/FAIL AUDIT
 -  [X] CONCEPTUAL SCHEMATIC NEEDS TO HAVE THE PROJECT NAME ADDED TO FILE EXTENSION
 -  [X] add a COST PER CUBIC FOOT Field on the quote that is just a calculation of the total sum / AquaCell tank storage
