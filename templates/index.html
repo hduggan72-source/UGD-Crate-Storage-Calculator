@@ -1313,6 +1313,102 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     })();
                     </script>
                 </div>
+
+                <!-- ── PVC Liner section ── -->
+                <div style="margin:0 12px 12px;padding-top:10px;border-top:1px solid var(--border);">
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:8px;">
+                        Watertight Liner (Min. 30 Mil Geomembrane) — Optional
+                    </div>
+                    <div style="font-size:11px;opacity:0.6;margin-bottom:10px;line-height:1.5;">
+                        Select which envelope(s) require a liner. Quantities auto-calculated using same waste % as geotextiles.
+                        Geotextile quantities are <strong>not affected</strong>. Flows to Quote PDF line H.
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">
+                        <!-- Liner on Tank Envelope -->
+                        <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;">
+                            <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:6px;">
+                                <input type="checkbox" id="linerOnTank"
+                                    style="width:14px;height:14px;accent-color:#0891b2;cursor:pointer;"
+                                    onchange="calcLiner()">
+                                Liner on Tank Envelope
+                            </label>
+                            <div style="font-size:10px;opacity:0.55;margin-bottom:6px;">Tank top + bottom + 4 sides × waste<br>(AQ-100-03.2 — no stone required)</div>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                                <input type="number" id="linerTankQty" min="0" step="1" value="0" readonly
+                                    style="width:80px;padding:5px 7px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:13px;font-weight:bold;opacity:0.7;">
+                                <span style="font-size:12px;opacity:0.7;">sq yd</span>
+                            </div>
+                        </div>
+
+                        <!-- Liner on Stone Envelope -->
+                        <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;">
+                            <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:6px;">
+                                <input type="checkbox" id="linerOnStone"
+                                    style="width:14px;height:14px;accent-color:#0891b2;cursor:pointer;"
+                                    onchange="calcLiner()">
+                                Liner on Stone Envelope
+                            </label>
+                            <div style="font-size:10px;opacity:0.55;margin-bottom:6px;">Excav. top + bottom + 4 sides (full depth) × waste<br>(AQ-100-03.4 — stone present)</div>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                                <input type="number" id="linerStoneQty" min="0" step="1" value="0" readonly
+                                    style="width:80px;padding:5px 7px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:13px;font-weight:bold;opacity:0.7;">
+                                <span style="font-size:12px;opacity:0.7;">sq yd</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="font-size:11px;opacity:0.55;padding:0 2px;">
+                        Combined liner on Quote PDF line H: <strong id="linerCombinedDisplay">0 sq yd</strong>
+                    </div>
+
+                    <!-- Hidden form inputs for liner -->
+                    <input type="hidden" id="formLinerOnTank"   name="liner_on_tank"   value="{{ '1' if form_data.get('liner_on_tank')  == '1' else '0' }}">
+                    <input type="hidden" id="formLinerOnStone"  name="liner_on_stone"  value="{{ '1' if form_data.get('liner_on_stone') == '1' else '0' }}">
+                    <input type="hidden" id="formLinerTankQty"  name="liner_tank_yd2"  value="{{ form_data.get('liner_tank_yd2',  0) }}">
+                    <input type="hidden" id="formLinerStoneQty" name="liner_stone_yd2" value="{{ form_data.get('liner_stone_yd2', 0) }}">
+
+                    <script>
+                    (function(){
+                        // Raw ft² values from server — same as geoTank and geoStone
+                        var _linerTankFt2  = {{ results.geoTank }};    // tank envelope ft²
+                        var _linerStoneFt2 = {{ results.geoStone }};   // full excav envelope ft²
+                        var _geoWaste      = {{ results.geoWaste }};
+
+                        // Restore state from server (survives recalculate)
+                        var _linerOnTank  = {{ '1' if form_data.get('liner_on_tank')  == '1' else '0' }};
+                        var _linerOnStone = {{ '1' if form_data.get('liner_on_stone') == '1' else '0' }};
+                        if (_linerOnTank)  { document.getElementById('linerOnTank').checked  = true; }
+                        if (_linerOnStone) { document.getElementById('linerOnStone').checked = true; }
+
+                        window.calcLiner = function() {
+                            var onTank  = document.getElementById('linerOnTank').checked;
+                            var onStone = document.getElementById('linerOnStone').checked;
+
+                            var tankYd2  = onTank  ? Math.ceil(_linerTankFt2  * (1 + _geoWaste/100) / 9) : 0;
+                            var stoneYd2 = onStone ? Math.ceil(_linerStoneFt2 * (1 + _geoWaste/100) / 9) : 0;
+                            var combined = tankYd2 + stoneYd2;
+
+                            var tInp = document.getElementById('linerTankQty');
+                            var sInp = document.getElementById('linerStoneQty');
+                            if (tInp) { tInp.value = tankYd2;  tInp.style.opacity = onTank  ? '1' : '0.4'; }
+                            if (sInp) { sInp.value = stoneYd2; sInp.style.opacity = onStone ? '1' : '0.4'; }
+
+                            var disp = document.getElementById('linerCombinedDisplay');
+                            if (disp) disp.textContent = combined.toLocaleString() + ' sq yd';
+
+                            // Sync hidden form fields
+                            document.getElementById('formLinerOnTank').value   = onTank  ? '1' : '0';
+                            document.getElementById('formLinerOnStone').value  = onStone ? '1' : '0';
+                            document.getElementById('formLinerTankQty').value  = tankYd2;
+                            document.getElementById('formLinerStoneQty').value = stoneYd2;
+                        };
+
+                        // Initialise on page load
+                        window.calcLiner();
+                    })();
+                    </script>
+                </div>
                 <script>
                     (function(){
                         var _gft2 = {{ results.geoTank }};
@@ -2939,6 +3035,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         // --- Large diameter pipe connection ---
         const largePipeQty = (document.getElementById('large_pipe_qty')?.value || '0').trim();
 
+        // --- PVC Liner ---
+        const linerTankQty  = document.getElementById('linerTankQty')?.value  || '0';
+        const linerStoneQty = document.getElementById('linerStoneQty')?.value || '0';
+        const linerOnTank   = document.getElementById('linerOnTank')?.checked  || false;
+        const linerOnStone  = document.getElementById('linerOnStone')?.checked || false;
+
         const emailLines = [
             'AquaCell Proposed System',
             '',
@@ -2960,6 +3062,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             `Biaxial Geogrid - Top/Cover (sq yd):              ${geogridTop}`,
             `Biaxial Geogrid - Bottom/Tank Base (sq yd):       ${geogridBottom}`,
             `Total Estimated Stone Backfill Volume (with 10%): ${stoneBulkDisplay}`,
+            `WT Liner on Tank Envelope (sq yd):                ${linerOnTank  ? linerTankQty  : '0 (not specified)'}`,
+            `WT Liner on Stone Envelope (sq yd):               ${linerOnStone ? linerStoneQty : '0 (not specified)'}`,
         ];
 
         // PT-ROW™ section — only if enabled

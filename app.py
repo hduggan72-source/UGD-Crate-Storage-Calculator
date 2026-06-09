@@ -2159,6 +2159,22 @@ def download_quote():
           f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE (TANK ONLY)'
       )
 
+      # ── PVC / Geomembrane liner (line H) ───────────────────────────
+      liner_on_tank   = request.form.get('liner_on_tank',   '0') == '1'
+      liner_on_stone  = request.form.get('liner_on_stone',  '0') == '1'
+      liner_tank_yd2  = int(request.form.get('liner_tank_yd2',  0) or 0)
+      liner_stone_yd2 = int(request.form.get('liner_stone_yd2', 0) or 0)
+      liner_total_yd2 = liner_tank_yd2 + liner_stone_yd2
+
+      if liner_on_tank and liner_on_stone:
+          liner_label = f'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 TANK + STONE ENVELOPE  [{liner_tank_yd2} SY TANK + {liner_stone_yd2} SY STONE]'
+      elif liner_on_tank:
+          liner_label = f'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 TANK ENVELOPE ONLY  (AQ-100-03.2)'
+      elif liner_on_stone:
+          liner_label = f'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 STONE BACKFILL ENVELOPE  (AQ-100-03.4)'
+      else:
+          liner_label = 'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 NOT SPECIFIED'
+
       # ── Large diameter pipe connection (line F) ────────────────────
       large_pipe_qty  = int(request.form.get('large_pipe_qty', 0) or 0)
       large_pipe_desc = 'LARGE DIAMETER PIPE CONNECTION (18\u201336\u2033) \u2014 GEOTEXTILE BOOT / ABUTMENT'
@@ -2399,7 +2415,7 @@ def download_quote():
           q_text(x, y - 9, lbl, 'Helvetica-Bold', 7, WHITE)
       y -= 13
 
-      alpha = ['A','B','C','D','E','F','G','H']
+      alpha = ['A','B','C','D','E','F','G','H','I']
       others_rows = [
           (nw_tank_label, geoTank_yd2_adj, 'SQ YD'),
           (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE (BACKFILL ONLY)',
@@ -2415,6 +2431,7 @@ def download_quote():
           (large_pipe_desc, large_pipe_qty, 'EACH'),
           ('STONE BACKFILL OR SELECT BACKFILL ESTIMATED FOR UG SYSTEM',
            int(stone_yd3), 'CU YD'),
+          (liner_label, liner_total_yd2, 'SQ YD'),
       ]
 
       for i, (ds, qt, un) in enumerate(others_rows):
