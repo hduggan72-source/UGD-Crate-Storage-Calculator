@@ -56,6 +56,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 **## PREVIOUS Version (v12-v14) — v15 Completed**
 
+-  [X] ADDED FLOW RATE SIZING TO THE PT-ROW™ CARD
 -  [X] ADD FABRIC AND ACCESSORY AMOUNTS TO THE MULTI-TANK QUOTE
 -  [X] add place for Large Diameter Pipe Connections on quote sheet
 -  [X] bottom of tank non-woven fabric quantity can be eliminated with Geogrid as a replacement (recommended)
