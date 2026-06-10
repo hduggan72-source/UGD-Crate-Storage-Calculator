@@ -666,34 +666,85 @@
             </div>
             <div id="ptrowSection" style="display:none;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:5px;margin-bottom:10px;">
                 <div style="font-size:11px;opacity:0.6;margin-bottom:8px;line-height:1.5;">
-                    Volume-based sizing. Crate void volume uses this tank's config/layers for single-layer PT-ROW™.
-                    Woven fabric = taco wrap (bottom + 2 long sides + back end) per AQ-100-25. Flows to Quote line C.
+                    Crate void volume uses this tank's config/layers for single-layer PT-ROW™.
+                    Woven fabric = taco wrap per AQ-100-25. Flows to Quote line C.
                 </div>
                 <div id="ptrowConfigInfo" style="font-size:11px;padding:6px 8px;background:rgba(124,58,237,0.1);border-radius:4px;margin-bottom:8px;opacity:0.8;"></div>
-                <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px;" id="ptrowTableEditor">
-                    <thead>
-                        <tr style="background:rgba(124,58,237,0.12);">
-                            <th style="padding:4px 6px;text-align:left;">Label</th>
-                            <th style="padding:4px 6px;text-align:right;">WQV (ft³)</th>
-                            <th style="padding:4px 6px;text-align:center;">%</th>
-                            <th style="padding:4px 6px;text-align:right;">PT Vol</th>
-                            <th style="padding:4px 6px;text-align:right;"># Crates</th>
-                            <th style="padding:4px 6px;width:28px;"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="ptrowTableBody"></tbody>
-                    <tfoot>
-                        <tr style="background:rgba(124,58,237,0.15);font-weight:bold;">
-                            <td colspan="4" style="padding:4px 6px;">TOTAL PT-ROW™ CRATES</td>
-                            <td style="padding:4px 6px;text-align:right;color:#7c3aed;" id="ptrowTotalCratesEditor">0</td>
-                            <td></td>
-                        </tr>
-                    </tfoot>
-                </table>
-                <button type="button" onclick="addPtrowArea()"
-                    style="padding:5px 12px;background:#7c3aed;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;">
-                    + Add Area
-                </button>
+
+                <!-- Method toggle -->
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                    <span style="font-size:11px;font-weight:600;opacity:0.7;">METHOD:</span>
+                    <div style="display:inline-flex;border:1px solid rgba(124,58,237,0.5);border-radius:5px;overflow:hidden;">
+                        <button type="button" id="mtPtrowMethodVol" onclick="setMtPtrowMethod('volume')"
+                            style="padding:3px 10px;border:none;cursor:pointer;background:rgba(124,58,237,0.8);color:#fff;font-size:11px;font-weight:bold;">
+                            📊 Volume
+                        </button>
+                        <button type="button" id="mtPtrowMethodFlow" onclick="setMtPtrowMethod('flow')"
+                            style="padding:3px 10px;border:none;cursor:pointer;background:transparent;color:rgba(124,58,237,0.8);font-size:11px;font-weight:bold;">
+                            💧 Flow (CFS)
+                        </button>
+                    </div>
+                    <span style="font-size:10px;opacity:0.5;" id="mtPtrowMethodNote">WQV × % ÷ crate vol</span>
+                </div>
+
+                <!-- Volume-based table -->
+                <div id="mtPtrowVolSection">
+                    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px;" id="ptrowTableEditor">
+                        <thead>
+                            <tr style="background:rgba(124,58,237,0.12);">
+                                <th style="padding:4px 6px;text-align:left;">Label</th>
+                                <th style="padding:4px 6px;text-align:right;">WQV (ft³)</th>
+                                <th style="padding:4px 6px;text-align:center;">%</th>
+                                <th style="padding:4px 6px;text-align:right;">PT Vol</th>
+                                <th style="padding:4px 6px;text-align:right;"># Crates</th>
+                                <th style="padding:4px 6px;width:28px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="ptrowTableBody"></tbody>
+                        <tfoot>
+                            <tr style="background:rgba(124,58,237,0.15);font-weight:bold;">
+                                <td colspan="4" style="padding:4px 6px;">TOTAL PT-ROW™ CRATES</td>
+                                <td style="padding:4px 6px;text-align:right;color:#7c3aed;" id="ptrowTotalCratesEditor">0</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <button type="button" onclick="addPtrowArea()"
+                        style="padding:5px 12px;background:#7c3aed;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;">
+                        + Add Area
+                    </button>
+                </div>
+
+                <!-- Flow-based table -->
+                <div id="mtPtrowFlowSection" style="display:none;">
+                    <div style="font-size:11px;opacity:0.6;margin-bottom:6px;">
+                        # Crates = CEILING(Q ÷ 0.464 CFS/crate) per Wavin PT-ROW™ Sizing Guidance
+                    </div>
+                    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px;">
+                        <thead>
+                            <tr style="background:rgba(124,58,237,0.12);">
+                                <th style="padding:4px 6px;text-align:left;">Label</th>
+                                <th style="padding:4px 6px;text-align:right;">Q (CFS)</th>
+                                <th style="padding:4px 6px;text-align:right;">÷ 0.464</th>
+                                <th style="padding:4px 6px;text-align:right;"># Crates</th>
+                                <th style="padding:4px 6px;width:28px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="ptrowFlowTableBody"></tbody>
+                        <tfoot>
+                            <tr style="background:rgba(124,58,237,0.15);font-weight:bold;">
+                                <td colspan="3" style="padding:4px 6px;">TOTAL PT-ROW™ CRATES</td>
+                                <td style="padding:4px 6px;text-align:right;color:#7c3aed;" id="ptrowTotalCratesFlowEditor">0</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <button type="button" onclick="addPtrowFlowAreaMt()"
+                        style="padding:5px 12px;background:#7c3aed;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;">
+                        + Add Area
+                    </button>
+                </div>
+
                 <div id="ptrowFabricInfo" style="display:none;margin-top:8px;padding:7px 10px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.3);border-radius:4px;font-size:11px;">
                     Woven fabric: <strong id="ptrowFabWidth">—</strong> × <strong id="ptrowFabLength">—</strong> =
                     <strong style="color:#7c3aed;" id="ptrowFabYd2">—</strong> sq yd
@@ -1053,6 +1104,7 @@ function addTank() {
         geogrid_top_yd2: 0, geogrid_bottom_yd2: 0,
         large_pipe_qty: 0,
         ptrow_enabled: false, ptrow_areas: [{label:'Area 1', wqv:0, pct:10}],
+        ptrow_flow_areas: [{label:'Area 1', cfs:0}], ptrow_method: 'volume',
         liner_on_tank: false, liner_on_stone: false,
     });
     results.push(null);
@@ -1170,7 +1222,10 @@ function loadEditor(idx) {
         ptToggle.checked = !!tanks[idx].ptrow_enabled;
         togglePtrowSection(ptToggle.checked, false);
     }
-    window._ptrowAreas = JSON.parse(JSON.stringify(tanks[idx].ptrow_areas || [{label:'Area 1', wqv:0, pct:10}]));
+    window._ptrowAreas     = JSON.parse(JSON.stringify(tanks[idx].ptrow_areas      || [{label:'Area 1', wqv:0, pct:10}]));
+    window._ptrowFlowAreas = JSON.parse(JSON.stringify(tanks[idx].ptrow_flow_areas || [{label:'Area 1', cfs:0}]));
+    window._mtPtrowMethod  = tanks[idx].ptrow_method || 'volume';
+    setMtPtrowMethod(window._mtPtrowMethod);
     renderPtrowTable();
 
     // Non-scalar: liner checkboxes
@@ -1189,7 +1244,9 @@ function saveDraft() {
     // Non-scalar fields
     const ptToggle = document.getElementById('f_ptrow_enabled');
     if (ptToggle) tanks[activeIdx].ptrow_enabled = ptToggle.checked;
-    tanks[activeIdx].ptrow_areas = JSON.parse(JSON.stringify(window._ptrowAreas || []));
+    tanks[activeIdx].ptrow_areas      = JSON.parse(JSON.stringify(window._ptrowAreas || []));
+    tanks[activeIdx].ptrow_flow_areas = JSON.parse(JSON.stringify(window._ptrowFlowAreas || []));
+    tanks[activeIdx].ptrow_method     = window._mtPtrowMethod || 'volume';
     const lnkTank  = document.getElementById('f_liner_on_tank');
     const lnkStone = document.getElementById('f_liner_on_stone');
     if (lnkTank)  tanks[activeIdx].liner_on_tank  = lnkTank.checked;
@@ -1703,6 +1760,94 @@ function autoCalcGeogridBottom() {
 
 // ── PT-ROW Table ───────────────────────────────────────────────────
 window._ptrowAreas = [{label:'Area 1', wqv:0, pct:10}];
+window._ptrowFlowAreas = [{label:'Area 1', cfs:0}];
+window._mtPtrowMethod  = 'volume';
+const MT_FLOW_COEFF = 0.464;
+
+function setMtPtrowMethod(m) {
+    window._mtPtrowMethod = m;
+    var volBtn  = document.getElementById('mtPtrowMethodVol');
+    var flowBtn = document.getElementById('mtPtrowMethodFlow');
+    var note    = document.getElementById('mtPtrowMethodNote');
+    var volSec  = document.getElementById('mtPtrowVolSection');
+    var flowSec = document.getElementById('mtPtrowFlowSection');
+    if (!volBtn) return;
+    if (m === 'volume') {
+        volBtn.style.background  = 'rgba(124,58,237,0.8)'; volBtn.style.color  = '#fff';
+        flowBtn.style.background = 'transparent';          flowBtn.style.color = 'rgba(124,58,237,0.8)';
+        if (volSec)  volSec.style.display  = 'block';
+        if (flowSec) flowSec.style.display = 'none';
+        if (note) note.textContent = 'WQV × % ÷ crate vol';
+    } else {
+        flowBtn.style.background = 'rgba(124,58,237,0.8)'; flowBtn.style.color  = '#fff';
+        volBtn.style.background  = 'transparent';          volBtn.style.color   = 'rgba(124,58,237,0.8)';
+        if (volSec)  volSec.style.display  = 'none';
+        if (flowSec) flowSec.style.display = 'block';
+        if (note) note.textContent = 'Q ÷ 0.464 CFS/crate';
+        renderPtrowFlowTable();
+    }
+    saveDraft();
+}
+
+function renderPtrowFlowTable() {
+    var r   = window._lastTankResult;
+    var lh  = r ? r.ptrow_layer_ht || 1.394 : 1.394;
+    var gw  = parseFloat(document.getElementById('f_geoWaste')?.value) || 20;
+    var tbody = document.getElementById('ptrowFlowTableBody');
+    if (!tbody) return;
+    while (tbody.children.length > window._ptrowFlowAreas.length) tbody.removeChild(tbody.lastChild);
+    while (tbody.children.length < window._ptrowFlowAreas.length) {
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+            '<td style="padding:3px 4px;"><input type="text" class="pfl-lbl" style="width:72px;padding:3px 4px;border:1px solid var(--border);border-radius:3px;background:var(--card);color:var(--text);font-size:11px;"></td>' +
+            '<td style="padding:3px 4px;"><input type="text" inputmode="decimal" class="pfl-cfs" style="width:68px;padding:3px 4px;border:1px solid var(--border);border-radius:3px;background:var(--card);color:var(--text);font-size:11px;text-align:right;"></td>' +
+            '<td style="padding:3px 4px;text-align:right;font-size:11px;opacity:0.6;" class="pfl-raw">—</td>' +
+            '<td style="padding:3px 4px;text-align:right;font-size:11px;font-weight:bold;color:#7c3aed;" class="pfl-nc">—</td>' +
+            '<td style="padding:3px 4px;" class="pfl-del"></td>';
+        tbody.appendChild(tr);
+    }
+    var total = 0;
+    window._ptrowFlowAreas.forEach(function(area, i) {
+        var tr = tbody.children[i];
+        var lblE = tr.querySelector('.pfl-lbl');
+        var cfsE = tr.querySelector('.pfl-cfs');
+        var rawE = tr.querySelector('.pfl-raw');
+        var ncE  = tr.querySelector('.pfl-nc');
+        var delE = tr.querySelector('.pfl-del');
+        var raw  = MT_FLOW_COEFF > 0 ? area.cfs / MT_FLOW_COEFF : 0;
+        var nc   = MT_FLOW_COEFF > 0 ? Math.ceil(area.cfs / MT_FLOW_COEFF) : 0;
+        total += nc;
+        if (document.activeElement !== lblE) lblE.value = area.label;
+        if (document.activeElement !== cfsE) cfsE.value = area.cfs || '';
+        rawE.textContent = raw > 0 ? raw.toFixed(2) : '—';
+        ncE.textContent  = nc;
+        lblE.oninput = (idx => function() { window._ptrowFlowAreas[idx].label = this.value; saveDraft(); })(i);
+        cfsE.oninput = (idx => function() {
+            window._ptrowFlowAreas[idx].cfs = parseFloat(this.value.replace(/[^0-9.]/g,'')) || 0;
+            renderPtrowFlowTable();
+        })(i);
+        delE.innerHTML = window._ptrowFlowAreas.length > 1
+            ? `<button type="button" onclick="removePtrowFlowAreaMt(${i})" style="background:#ef4444;color:#fff;border:none;border-radius:3px;padding:1px 5px;cursor:pointer;font-size:10px;">✕</button>` : '';
+    });
+    setEl('ptrowTotalCratesFlowEditor', total);
+    if (r && total > 0) {
+        const wrap = 1.5;
+        const fabW = MODULE_WID + 2*lh + 2*wrap;
+        const fabL = total * MODULE_LEN + 2*wrap;
+        const fabYd2 = Math.ceil(fabW * fabL * (1 + gw/100) / 9);
+        const fabEl = document.getElementById('ptrowFabricInfo');
+        if (fabEl) {
+            fabEl.style.display = 'block';
+            setEl('ptrowFabWidth',  fabW.toFixed(2) + ' ft');
+            setEl('ptrowFabLength', fabL.toFixed(2) + ' ft');
+            setEl('ptrowFabYd2',    fabYd2.toLocaleString() + ' sq yd');
+        }
+    }
+    saveDraft();
+}
+
+window.addPtrowFlowAreaMt  = function() { window._ptrowFlowAreas.push({label:'Area '+(window._ptrowFlowAreas.length+1),cfs:0}); renderPtrowFlowTable(); };
+window.removePtrowFlowAreaMt = function(i) { window._ptrowFlowAreas.splice(i,1); renderPtrowFlowTable(); };
 
 function renderPtrowTable() {
     const r   = window._lastTankResult;

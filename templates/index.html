@@ -1483,37 +1483,92 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         Wrap extension: <strong>1.5 ft (18")</strong> each side
                     </div>
 
-                    <!-- Drainage area table -->
-                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:6px;">
-                        Drainage Areas — Volume-Based Sizing
+                    <!-- Sizing Method Toggle -->
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                        <span style="font-size:11px;font-weight:600;opacity:0.7;">SIZING METHOD:</span>
+                        <div style="display:inline-flex;border:1px solid rgba(124,58,237,0.5);border-radius:5px;overflow:hidden;">
+                            <button type="button" id="ptrowMethodVol"
+                                onclick="setPtrowMethod('volume')"
+                                style="padding:4px 14px;border:none;cursor:pointer;background:rgba(124,58,237,0.8);color:#fff;font-size:11px;font-weight:bold;">
+                                📊 Volume-Based
+                            </button>
+                            <button type="button" id="ptrowMethodFlow"
+                                onclick="setPtrowMethod('flow')"
+                                style="padding:4px 14px;border:none;cursor:pointer;background:transparent;color:rgba(124,58,237,0.8);font-size:11px;font-weight:bold;">
+                                💧 Flow-Based (CFS)
+                            </button>
+                        </div>
+                        <span style="font-size:10px;opacity:0.5;" id="ptrowMethodNote">WQV × pretreat % ÷ crate vol</span>
                     </div>
-                    <table id="ptrowTable" style="margin-top:0;font-size:13px;width:100%;">
-                        <thead>
-                            <tr style="background:rgba(124,58,237,0.12);">
-                                <th style="text-align:left;padding:6px 8px;">Area Label</th>
-                                <th style="text-align:right;padding:6px 8px;">WQV (ft³)</th>
-                                <th style="text-align:center;padding:6px 8px;">Pretreat %</th>
-                                <th style="text-align:right;padding:6px 8px;">PT Vol (ft³)</th>
-                                <th style="text-align:right;padding:6px 8px;"># Crates</th>
-                                <th style="text-align:center;padding:6px 4px;width:30px;"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="ptrowRows">
-                            <!-- rows injected by JS -->
-                        </tbody>
-                        <tfoot>
-                            <tr style="background:rgba(124,58,237,0.18);font-weight:bold;">
-                                <td colspan="4" style="padding:6px 8px;">TOTAL PT-ROW™ CRATES</td>
-                                <td style="text-align:right;padding:6px 8px;color:#7c3aed;" id="ptrowTotalCrates">0</td>
-                                <td></td>
-                            </tr>
-                        </tfoot>
-                    </table>
 
-                    <button type="button" onclick="addPtrowRow()"
-                        style="margin-top:8px;padding:6px 14px;background:#7c3aed;color:white;border:none;border-radius:4px;font-size:12px;font-weight:bold;cursor:pointer;">
-                        + Add Drainage Area
-                    </button>
+                    <!-- Volume-Based section -->
+                    <div id="ptrowVolSection">
+                        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:6px;">
+                            Drainage Areas — Volume-Based Sizing
+                        </div>
+                        <table id="ptrowTable" style="margin-top:0;font-size:13px;width:100%;">
+                            <thead>
+                                <tr style="background:rgba(124,58,237,0.12);">
+                                    <th style="text-align:left;padding:6px 8px;">Area Label</th>
+                                    <th style="text-align:right;padding:6px 8px;">WQV (ft³)</th>
+                                    <th style="text-align:center;padding:6px 8px;">Pretreat %</th>
+                                    <th style="text-align:right;padding:6px 8px;">PT Vol (ft³)</th>
+                                    <th style="text-align:right;padding:6px 8px;"># Crates</th>
+                                    <th style="text-align:center;padding:6px 4px;width:30px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="ptrowRows">
+                                <!-- rows injected by JS -->
+                            </tbody>
+                            <tfoot>
+                                <tr style="background:rgba(124,58,237,0.18);font-weight:bold;">
+                                    <td colspan="4" style="padding:6px 8px;">TOTAL PT-ROW™ CRATES</td>
+                                    <td style="text-align:right;padding:6px 8px;color:#7c3aed;" id="ptrowTotalCrates">0</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        <button type="button" onclick="addPtrowRow()"
+                            style="margin-top:8px;padding:6px 14px;background:#7c3aed;color:white;border:none;border-radius:4px;font-size:12px;font-weight:bold;cursor:pointer;">
+                            + Add Drainage Area
+                        </button>
+                    </div>
+
+                    <!-- Flow-Based section -->
+                    <div id="ptrowFlowSection" style="display:none;">
+                        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:6px;">
+                            Drainage Areas — Flow-Based Sizing
+                        </div>
+                        <div style="font-size:11px;opacity:0.6;margin-bottom:8px;padding:6px 8px;background:rgba(124,58,237,0.06);border-radius:4px;">
+                            Formula: # Crates = CEILING(Q_treatment ÷ 0.464 CFS/crate) &nbsp;|&nbsp;
+                            Coefficient per Wavin PT-ROW™ Sizing & Design Guidance
+                        </div>
+                        <table style="margin-top:0;font-size:13px;width:100%;">
+                            <thead>
+                                <tr style="background:rgba(124,58,237,0.12);">
+                                    <th style="text-align:left;padding:6px 8px;">Area Label</th>
+                                    <th style="text-align:right;padding:6px 8px;">Q Treatment (CFS)</th>
+                                    <th style="text-align:right;padding:6px 8px;">÷ 0.464</th>
+                                    <th style="text-align:right;padding:6px 8px;"># Crates</th>
+                                    <th style="text-align:center;padding:6px 4px;width:30px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="ptrowFlowRows">
+                                <!-- rows injected by JS -->
+                            </tbody>
+                            <tfoot>
+                                <tr style="background:rgba(124,58,237,0.18);font-weight:bold;">
+                                    <td colspan="3" style="padding:6px 8px;">TOTAL PT-ROW™ CRATES</td>
+                                    <td style="text-align:right;padding:6px 8px;color:#7c3aed;" id="ptrowTotalCratesFlow">0</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        <button type="button" onclick="addPtrowFlowRow()"
+                            style="margin-top:8px;padding:6px 14px;background:#7c3aed;color:white;border:none;border-radius:4px;font-size:12px;font-weight:bold;cursor:pointer;">
+                            + Add Drainage Area
+                        </button>
+                    </div>
 
                     <!-- Woven fabric result -->
                     <div id="ptrowFabricResult" style="display:none;margin-top:14px;padding:10px 12px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.3);border-radius:6px;">
@@ -1549,14 +1604,175 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         var MOD_LEN    = 3.937;
                         var WRAP_EXT   = 1.5;
                         var GEO_WASTE  = {{ results.geoWaste }};
+                        var FLOW_COEFF = 0.464;   // CFS per AquaCell module per Wavin guidance
 
-                        var rows = [];   // [{label, wqv, pct}]
+                        var rows      = [];   // volume-based: [{label, wqv, pct}]
+                        var flowRows  = [];   // flow-based:   [{label, cfs}]
+                        var _method   = 'volume';  // 'volume' | 'flow'
 
-                        // Restore from server if previously submitted
+                        // Restore from server
                         {% for area in results.ptrow_areas %}
                         rows.push({ label: {{ area.label|tojson }}, wqv: {{ area.wqv }}, pct: {{ area.pct }} });
                         {% endfor %}
                         if (rows.length === 0) rows.push({ label: 'Area 1', wqv: 0, pct: 10 });
+
+                        // Restore flow rows from server if present
+                        {% if results.ptrow_flow_areas is defined %}
+                        {% for fa in results.ptrow_flow_areas %}
+                        flowRows.push({ label: {{ fa.label|tojson }}, cfs: {{ fa.cfs }} });
+                        {% endfor %}
+                        {% endif %}
+                        if (flowRows.length === 0) flowRows.push({ label: 'Area 1', cfs: 0 });
+
+                        // Restore method
+                        var _savedMethod = '{{ results.ptrow_method if results.ptrow_method else "volume" }}';
+                        _method = _savedMethod;
+
+                        // ── Method toggle ──────────────────────────────────────────
+                        window.setPtrowMethod = function(m) {
+                            _method = m;
+                            var volBtn  = document.getElementById('ptrowMethodVol');
+                            var flowBtn = document.getElementById('ptrowMethodFlow');
+                            var note    = document.getElementById('ptrowMethodNote');
+                            var volSec  = document.getElementById('ptrowVolSection');
+                            var flowSec = document.getElementById('ptrowFlowSection');
+
+                            if (m === 'volume') {
+                                volBtn.style.background  = 'rgba(124,58,237,0.8)';
+                                volBtn.style.color       = '#fff';
+                                flowBtn.style.background = 'transparent';
+                                flowBtn.style.color      = 'rgba(124,58,237,0.8)';
+                                volSec.style.display  = 'block';
+                                flowSec.style.display = 'none';
+                                if (note) note.textContent = 'WQV × pretreat % ÷ crate vol';
+                            } else {
+                                flowBtn.style.background = 'rgba(124,58,237,0.8)';
+                                flowBtn.style.color      = '#fff';
+                                volBtn.style.background  = 'transparent';
+                                volBtn.style.color       = 'rgba(124,58,237,0.8)';
+                                volSec.style.display  = 'none';
+                                flowSec.style.display = 'block';
+                                if (note) note.textContent = 'Q_treatment ÷ 0.464 CFS/crate';
+                                renderFlowTable();
+                            }
+                            syncPtrowHidden();
+                        };
+
+                        // ── Shared fabric + total update ───────────────────────────
+                        function getTotalCrates() {
+                            if (_method === 'flow') {
+                                return flowRows.reduce(function(s, r) {
+                                    return s + (FLOW_COEFF > 0 ? Math.ceil(r.cfs / FLOW_COEFF) : 0);
+                                }, 0);
+                            } else {
+                                return rows.reduce(function(s, r) {
+                                    var ptVol = r.wqv * r.pct / 100.0;
+                                    return s + (CRATE_VOL > 0 ? Math.ceil(ptVol / CRATE_VOL) : 0);
+                                }, 0);
+                            }
+                        }
+
+                        function updateFabric(totalCrates) {
+                            var rowLen    = totalCrates * MOD_LEN;
+                            var fabW      = MOD_WID + 2*LAYER_HT + 2*WRAP_EXT;
+                            var fabL      = rowLen + 2*WRAP_EXT;
+                            var fabFt2    = fabW * fabL * (1 + GEO_WASTE/100.0);
+                            var fabYd2    = Math.ceil(fabFt2 / 9);
+                            var fabResult = document.getElementById('ptrowFabricResult');
+                            if (totalCrates > 0) {
+                                fabResult.style.display = 'block';
+                                document.getElementById('ptrowFabW').textContent   = fabW.toFixed(2) + ' ft';
+                                document.getElementById('ptrowFabL').textContent   = fabL.toFixed(2) + ' ft';
+                                document.getElementById('ptrowFabYd2').textContent = fabYd2.toLocaleString() + ' sq yd';
+                            } else {
+                                fabResult.style.display = 'none';
+                            }
+                        }
+
+                        // ── Flow-based table ───────────────────────────────────────
+                        function renderFlowTable() {
+                            var tbody = document.getElementById('ptrowFlowRows');
+                            if (!tbody) return;
+
+                            while (tbody.children.length > flowRows.length) tbody.removeChild(tbody.lastChild);
+                            while (tbody.children.length < flowRows.length) {
+                                var tr = document.createElement('tr');
+                                tr.innerHTML =
+                                    '<td style="padding:5px 8px;"><input type="text" class="pf-lbl" style="width:90px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;"></td>' +
+                                    '<td style="text-align:right;padding:5px 8px;"><input type="text" inputmode="decimal" class="pf-cfs" style="width:80px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;text-align:right;"></td>' +
+                                    '<td style="text-align:right;padding:5px 8px;opacity:0.6;font-size:12px;" class="pf-raw">—</td>' +
+                                    '<td style="text-align:right;padding:5px 8px;font-weight:bold;color:#7c3aed;" class="pf-nc">—</td>' +
+                                    '<td style="text-align:center;padding:5px 4px;" class="pf-del"></td>';
+                                tbody.appendChild(tr);
+                            }
+
+                            var totalCrates = 0;
+                            flowRows.forEach(function(r, i) {
+                                var tr   = tbody.children[i];
+                                var lblE = tr.querySelector('.pf-lbl');
+                                var cfsE = tr.querySelector('.pf-cfs');
+                                var rawE = tr.querySelector('.pf-raw');
+                                var ncE  = tr.querySelector('.pf-nc');
+                                var delE = tr.querySelector('.pf-del');
+                                var raw  = FLOW_COEFF > 0 ? r.cfs / FLOW_COEFF : 0;
+                                var nc   = FLOW_COEFF > 0 ? Math.ceil(r.cfs / FLOW_COEFF) : 0;
+                                totalCrates += nc;
+
+                                if (document.activeElement !== lblE) lblE.value = r.label;
+                                if (document.activeElement !== cfsE) cfsE.value = r.cfs || '';
+                                rawE.textContent = raw > 0 ? raw.toFixed(2) : '—';
+                                ncE.textContent  = nc;
+
+                                lblE.oninput = (function(idx){ return function() {
+                                    flowRows[idx].label = this.value;
+                                    syncPtrowHidden();
+                                }; })(i);
+                                cfsE.oninput = (function(idx){ return function() {
+                                    flowRows[idx].cfs = parseFloat(this.value.replace(/[^0-9.]/g,'')) || 0;
+                                    updateFlowOutputs();
+                                }; })(i);
+
+                                delE.innerHTML = flowRows.length > 1
+                                    ? '<button type="button" onclick="removePtrowFlowRow(' + i + ')" style="background:#ef4444;color:#fff;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;font-size:11px;">✕</button>'
+                                    : '';
+                            });
+
+                            var totEl = document.getElementById('ptrowTotalCratesFlow');
+                            if (totEl) totEl.textContent = totalCrates;
+                            updateFabric(totalCrates);
+                            syncPtrowHidden();
+                        }
+
+                        function updateFlowOutputs() {
+                            var tbody = document.getElementById('ptrowFlowRows');
+                            var total = 0;
+                            flowRows.forEach(function(r, i) {
+                                var raw = FLOW_COEFF > 0 ? r.cfs / FLOW_COEFF : 0;
+                                var nc  = FLOW_COEFF > 0 ? Math.ceil(r.cfs / FLOW_COEFF) : 0;
+                                total  += nc;
+                                var tr  = tbody ? tbody.children[i] : null;
+                                if (tr) {
+                                    var rawE = tr.querySelector('.pf-raw');
+                                    var ncE  = tr.querySelector('.pf-nc');
+                                    if (rawE) rawE.textContent = raw > 0 ? raw.toFixed(2) : '—';
+                                    if (ncE)  ncE.textContent  = nc;
+                                }
+                            });
+                            var totEl = document.getElementById('ptrowTotalCratesFlow');
+                            if (totEl) totEl.textContent = total;
+                            updateFabric(total);
+                            syncPtrowHidden();
+                        }
+
+                        window.addPtrowFlowRow = function() {
+                            flowRows.push({ label: 'Area ' + (flowRows.length + 1), cfs: 0 });
+                            renderFlowTable();
+                        };
+
+                        window.removePtrowFlowRow = function(i) {
+                            flowRows.splice(i, 1);
+                            renderFlowTable();
+                        };
 
                         function calcRow(r) {
                             var ptVol   = r.wqv * r.pct / 100.0;
@@ -1702,21 +1918,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             var totalEl = document.getElementById('ptrowTotalCrates');
                             if (totalEl) totalEl.textContent = totalCrates;
 
-                            var rowLen  = totalCrates * MOD_LEN;
-                            var fabW    = MOD_WID + 2*LAYER_HT + 2*WRAP_EXT;
-                            var fabL    = rowLen + 2*WRAP_EXT;
-                            var fabFt2  = fabW * fabL * (1 + GEO_WASTE/100.0);
-                            var fabYd2  = Math.ceil(fabFt2 / 9);
-
-                            var fabResult = document.getElementById('ptrowFabricResult');
-                            if (totalCrates > 0) {
-                                fabResult.style.display = 'block';
-                                document.getElementById('ptrowFabW').textContent   = fabW.toFixed(2) + ' ft';
-                                document.getElementById('ptrowFabL').textContent   = fabL.toFixed(2) + ' ft';
-                                document.getElementById('ptrowFabYd2').textContent = fabYd2.toLocaleString() + ' sq yd';
-                            } else {
-                                fabResult.style.display = 'none';
-                            }
+                            updateFabric(totalCrates);
 
                             window.syncPtrowHidden();
                         };
@@ -1746,10 +1948,15 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                                 container.appendChild(inp);
                             };
                             add('ptrow_enabled', enabled);
+                            add('ptrow_method',  _method);
                             rows.forEach(function(r, i) {
                                 add('ptrow_label_' + i, r.label);
                                 add('ptrow_wqv_'   + i, r.wqv);
                                 add('ptrow_pct_'   + i, r.pct);
+                            });
+                            flowRows.forEach(function(r, i) {
+                                add('ptrow_flow_label_' + i, r.label);
+                                add('ptrow_flow_cfs_'   + i, r.cfs);
                             });
                         };
 
@@ -1764,7 +1971,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         document.getElementById('ptrowBody').style.display = 'block';
                         {% endif %}
 
-                        // Initial render
+                        // Initial render — method first, then table
+                        window.setPtrowMethod(_method);
                         renderTable();
                     })();
                     </script>

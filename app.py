@@ -219,36 +219,45 @@ def index():
         # ── PT-ROW™ Pre-Treatment Row ─────────────────────────────────
         # Crate void volume per single-layer crate (matches selected config)
         ptrow_enabled      = request.form.get('ptrow_enabled', '0') == '1'
+        ptrow_method       = request.form.get('ptrow_method', 'volume')  # 'volume' | 'flow'
         ptrow_crate_vol    = round(MODULE_WID * MODULE_LEN * layer_heights[0] * void_ratio, 4)
-        # 1-layer height for wrapping regardless of main tank layers
         ptrow_layer_ht     = layer_heights[0]
-        ptrow_wrap_ext     = 1.5   # ft — 18" single-layer extension per AQ-100-25
+        ptrow_wrap_ext     = 1.5
+        FLOW_COEFF         = 0.464   # CFS per crate per Wavin PT-ROW™ Sizing Guidance
 
-        # Parse drainage area rows submitted from the form
-        # Format: ptrow_wqv_0, ptrow_pct_0, ptrow_label_0 ... up to N rows
-        ptrow_areas = []
+        ptrow_areas      = []
+        ptrow_flow_areas = []
         ptrow_total_crates = 0
-        idx = 0
-        while True:
-            wqv_key = f'ptrow_wqv_{idx}'
-            pct_key = f'ptrow_pct_{idx}'
-            lbl_key = f'ptrow_label_{idx}'
-            if wqv_key not in request.form:
-                break
-            wqv_val = float(request.form.get(wqv_key, 0) or 0)
-            pct_val = float(request.form.get(pct_key, 10) or 10)
-            lbl_val = request.form.get(lbl_key, f'Area {idx+1}').strip() or f'Area {idx+1}'
-            pt_vol  = round(wqv_val * pct_val / 100.0, 2)
-            n_crates = math.ceil(pt_vol / ptrow_crate_vol) if ptrow_crate_vol > 0 else 0
-            ptrow_areas.append({
-                'label':    lbl_val,
-                'wqv':      wqv_val,
-                'pct':      pct_val,
-                'pt_vol':   pt_vol,
-                'n_crates': n_crates,
-            })
-            ptrow_total_crates += n_crates
-            idx += 1
+
+        if ptrow_method == 'flow':
+            # Flow-based: # crates = CEILING(Q ÷ 0.464)
+            fi = 0
+            while f'ptrow_flow_cfs_{fi}' in request.form:
+                cfs_val = float(request.form.get(f'ptrow_flow_cfs_{fi}', 0) or 0)
+                lbl_val = request.form.get(f'ptrow_flow_label_{fi}', f'Area {fi+1}').strip()
+                nc = math.ceil(cfs_val / FLOW_COEFF) if FLOW_COEFF > 0 else 0
+                ptrow_flow_areas.append({
+                    'label':    lbl_val or f'Area {fi+1}',
+                    'cfs':      cfs_val,
+                    'n_crates': nc,
+                })
+                ptrow_total_crates += nc
+                fi += 1
+        else:
+            # Volume-based: # crates = CEILING(WQV × pct% ÷ crate_vol)
+            idx = 0
+            while f'ptrow_wqv_{idx}' in request.form:
+                wqv_val = float(request.form.get(f'ptrow_wqv_{idx}', 0) or 0)
+                pct_val = float(request.form.get(f'ptrow_pct_{idx}', 10) or 10)
+                lbl_val = request.form.get(f'ptrow_label_{idx}', f'Area {idx+1}').strip() or f'Area {idx+1}'
+                pt_vol  = round(wqv_val * pct_val / 100.0, 2)
+                nc      = math.ceil(pt_vol / ptrow_crate_vol) if ptrow_crate_vol > 0 else 0
+                ptrow_areas.append({
+                    'label': lbl_val, 'wqv': wqv_val, 'pct': pct_val,
+                    'pt_vol': pt_vol, 'n_crates': nc,
+                })
+                ptrow_total_crates += nc
+                idx += 1
 
         # Woven fabric — taco wrap: bottom + 2 long sides + 1 back end
         # Single sheet laid flat then wrapped:
@@ -351,9 +360,11 @@ def index():
             'geogrid_top_yd2': geogrid_top_yd2,
             'geogrid_bottom_yd2': geogrid_bottom_yd2,
             'ptrow_enabled':       ptrow_enabled,
+            'ptrow_method':        ptrow_method,
             'ptrow_crate_vol':     round(ptrow_crate_vol, 4),
             'ptrow_layer_ht':      round(ptrow_layer_ht, 4),
             'ptrow_areas':         ptrow_areas,
+            'ptrow_flow_areas':    ptrow_flow_areas,
             'ptrow_total_crates':  ptrow_total_crates,
             'ptrow_woven_yd2':     ptrow_woven_yd2,
             'ptrow_woven_ft2':     ptrow_woven_ft2,
@@ -716,7 +727,10 @@ def calc_tank(t):
     liner_on_tank      = bool(t.get('liner_on_tank',  False))
     liner_on_stone     = bool(t.get('liner_on_stone', False))
     ptrow_enabled      = bool(t.get('ptrow_enabled', False))
+    ptrow_method       = t.get('ptrow_method', 'volume')
     ptrow_areas        = t.get('ptrow_areas', [])
+    ptrow_flow_areas   = t.get('ptrow_flow_areas', [])
+    FLOW_COEFF         = 0.464
 
     layer_heights   = cd['layer_heights']
     void_ratio      = cd['void_ratio']
@@ -776,12 +790,17 @@ def calc_tank(t):
     _ptrow_crate_vol = round(MODULE_WID * MODULE_LEN * _ptrow_layer_ht * void_ratio, 4)
 
     ptrow_total_crates = 0
-    if ptrow_enabled and ptrow_areas:
-        for area in ptrow_areas:
-            wqv = float(area.get('wqv', 0) or 0)
-            pct = float(area.get('pct', 10) or 10)
-            pt_vol = wqv * pct / 100.0
-            ptrow_total_crates += math.ceil(pt_vol / _ptrow_crate_vol) if _ptrow_crate_vol > 0 else 0
+    if ptrow_enabled:
+        if ptrow_method == 'flow' and ptrow_flow_areas:
+            for area in ptrow_flow_areas:
+                cfs = float(area.get('cfs', 0) or 0)
+                ptrow_total_crates += math.ceil(cfs / FLOW_COEFF) if FLOW_COEFF > 0 else 0
+        elif ptrow_areas:
+            for area in ptrow_areas:
+                wqv = float(area.get('wqv', 0) or 0)
+                pct = float(area.get('pct', 10) or 10)
+                pt_vol = wqv * pct / 100.0
+                ptrow_total_crates += math.ceil(pt_vol / _ptrow_crate_vol) if _ptrow_crate_vol > 0 else 0
 
     if ptrow_enabled and ptrow_total_crates > 0:
         _fab_w          = MODULE_WID + 2*_ptrow_layer_ht + 2*_ptrow_wrap_ext
@@ -872,7 +891,9 @@ def calc_tank(t):
         'geoWaste':        geoWaste,
         # PT-ROW™
         'ptrow_enabled':      ptrow_enabled,
+        'ptrow_method':       ptrow_method,
         'ptrow_areas':        ptrow_areas,
+        'ptrow_flow_areas':   ptrow_flow_areas,
         'ptrow_total_crates': ptrow_total_crates,
         'ptrow_woven_yd2':    ptrow_woven_yd2,
         'ptrow_crate_vol':    _ptrow_crate_vol,
