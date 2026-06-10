@@ -10,7 +10,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 - ADD DISTANCE FROM BUILDING CALCULATOR (THAT AND BUOYANCY SHOULD BE SEPARATE BRANCHES SIMILAR TO MULTI-TANK)
 - ADD COMPLEX CALCULATOR (SIMPLE) TO MULTI TANK UI/UX
-- ADD FABRIC AND ACCESSORY AMOUNTS TO THE MULTI-TANK QUOTE
+
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
 - command button to collapse all cards
 - TAKE PRICING OUT OF SEPARATE CALCULATIONS TOOL FOR CLIENT USE
@@ -40,6 +40,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 **## PREVIOUS Version (v12-v14) — v15 Completed**
 
+-  [X] ADD FABRIC AND ACCESSORY AMOUNTS TO THE MULTI-TANK QUOTE
 -  [X] add place for Large Diameter Pipe Connections on quote sheet
 -  [X] bottom of tank non-woven fabric quantity can be eliminated with Geogrid as a replacement (recommended)
 -  [X] on MAIN DASHBOARD, RESULTS "STORAGE SUMMARY" CARD IS NOT CHANGING FONT COLOR FROM RED TO GREEN DURING PASS/FAIL AUDIT
