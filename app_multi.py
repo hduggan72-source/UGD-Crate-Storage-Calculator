@@ -105,6 +105,17 @@ def calc_tank(t):
     min_storage      = float(t.get('min_storage', 0) or 0)
     tank_label       = t.get('tank_label', 'Tank')
 
+    # ── Optional accessories ─────────────────────────────────────────
+    geogrid_top_yd2    = int(t.get('geogrid_top_yd2',    0) or 0)
+    geogrid_bottom_yd2 = int(t.get('geogrid_bottom_yd2', 0) or 0)
+    large_pipe_qty     = int(t.get('large_pipe_qty',     0) or 0)
+    liner_on_tank      = bool(t.get('liner_on_tank',  False))
+    liner_on_stone     = bool(t.get('liner_on_stone', False))
+
+    # PT-ROW™ — volume-based sizing per drainage area
+    ptrow_enabled  = bool(t.get('ptrow_enabled', False))
+    ptrow_areas    = t.get('ptrow_areas', [])
+
     layer_heights   = cd['layer_heights']
     void_ratio      = cd['void_ratio']
     side_multiplier = cd['side_multiplier']
@@ -150,6 +161,39 @@ def calc_tank(t):
     geoTank  = round((tank_top_bottom + tank_sides) * (1 + geoWaste / 100.0), 1)
     geoStone = round((excav_area * 2 + outer_width * total_system_depth * 2 + outer_length * total_system_depth * 2) * (1 + geoWaste / 100.0), 1)
     geoTotal = round(geoTank + geoStone, 1)
+
+    # ── Non-woven deduction: geogrid bottom substitutes tank floor fabric ──
+    geoTank_yd2     = round(geoTank  / 9, 1)
+    geoStone_yd2    = round(geoStone / 9, 1)
+    geoTotal_yd2    = round(geoTotal / 9, 1)
+    geoTank_yd2_adj = max(0, round(geoTank_yd2 - geogrid_bottom_yd2, 1))
+
+    # ── PT-ROW™ fabric (taco wrap: bottom + 2 long sides + back end) ──
+    _ptrow_layer_ht  = layer_heights[0]          # always single-layer
+    _ptrow_wrap_ext  = 1.5                        # 18" per AQ-100-25
+    _ptrow_crate_vol = round(MODULE_WID * MODULE_LEN * _ptrow_layer_ht * void_ratio, 4)
+
+    ptrow_total_crates = 0
+    if ptrow_enabled and ptrow_areas:
+        for area in ptrow_areas:
+            wqv = float(area.get('wqv', 0) or 0)
+            pct = float(area.get('pct', 10) or 10)
+            pt_vol  = wqv * pct / 100.0
+            ptrow_total_crates += math.ceil(pt_vol / _ptrow_crate_vol) if _ptrow_crate_vol > 0 else 0
+
+    if ptrow_enabled and ptrow_total_crates > 0:
+        _fab_w          = MODULE_WID + 2*_ptrow_layer_ht + 2*_ptrow_wrap_ext
+        _fab_l          = ptrow_total_crates * MODULE_LEN + 2*_ptrow_wrap_ext
+        ptrow_woven_yd2 = math.ceil(_fab_w * _fab_l * (1 + geoWaste/100.0) / 9)
+    else:
+        ptrow_woven_yd2 = 0
+
+    # ── PVC / Geomembrane liner ────────────────────────────────────────
+    _liner_tank_ft2  = geoTank    # tank envelope ft² (before waste — same geometry)
+    _liner_stone_ft2 = geoStone   # full excav envelope ft²
+    liner_tank_yd2   = math.ceil(_liner_tank_ft2  * (1 + geoWaste/100.0) / 9) if liner_on_tank  else 0
+    liner_stone_yd2  = math.ceil(_liner_stone_ft2 * (1 + geoWaste/100.0) / 9) if liner_on_stone else 0
+    liner_total_yd2  = liner_tank_yd2 + liner_stone_yd2
 
     # Stone backfill bulk
     stone_yd3  = round(stone_env_vol * 1.10 / 27, 1)
@@ -220,10 +264,32 @@ def calc_tank(t):
         'top_adapters_16': top_adapters_16,
         'contingency':     contingency,
         # Geotextile
-        'geoTank':   geoTank,
-        'geoStone':  geoStone,
-        'geoTotal':  geoTotal,
-        'geoWaste':  geoWaste,
+        'geoTank':      geoTank,
+        'geoStone':     geoStone,
+        'geoTotal':     geoTotal,
+        'geoTank_yd2':  geoTank_yd2,
+        'geoStone_yd2': geoStone_yd2,
+        'geoTotal_yd2': geoTotal_yd2,
+        'geoTank_yd2_adj': geoTank_yd2_adj,
+        'geoWaste':     geoWaste,
+        # PT-ROW™
+        'ptrow_enabled':       ptrow_enabled,
+        'ptrow_areas':         ptrow_areas,
+        'ptrow_total_crates':  ptrow_total_crates,
+        'ptrow_woven_yd2':     ptrow_woven_yd2,
+        'ptrow_crate_vol':     _ptrow_crate_vol,
+        'ptrow_layer_ht':      round(_ptrow_layer_ht, 4),
+        # Geogrid
+        'geogrid_top_yd2':    geogrid_top_yd2,
+        'geogrid_bottom_yd2': geogrid_bottom_yd2,
+        # Liner
+        'liner_on_tank':   liner_on_tank,
+        'liner_on_stone':  liner_on_stone,
+        'liner_tank_yd2':  liner_tank_yd2,
+        'liner_stone_yd2': liner_stone_yd2,
+        'liner_total_yd2': liner_total_yd2,
+        # Large pipe
+        'large_pipe_qty': large_pipe_qty,
         # Stone backfill
         'stone_yd3':       stone_yd3,
         'stone_tons':      stone_tons,
@@ -262,7 +328,13 @@ def cumulative_bom(tank_results):
         'contingency': 0,
         'tank_storage': 0.0, 'stone_storage': 0.0, 'total_storage': 0.0,
         'geoTank': 0.0, 'geoStone': 0.0, 'geoTotal': 0.0,
+        'geoTank_yd2': 0.0, 'geoStone_yd2': 0.0, 'geoTotal_yd2': 0.0,
+        'geoTank_yd2_adj': 0.0,
         'stone_yd3': 0.0, 'stone_tons': 0.0,
+        'ptrow_total_crates': 0, 'ptrow_woven_yd2': 0,
+        'geogrid_top_yd2': 0, 'geogrid_bottom_yd2': 0,
+        'liner_tank_yd2': 0, 'liner_stone_yd2': 0, 'liner_total_yd2': 0,
+        'large_pipe_qty': 0,
     }
     for r in tank_results:
         for k in bom:
@@ -598,8 +670,101 @@ def multi_download_quote():
         y -= 18
 
         # ════════════════════════════════════════
-        #  PRICING BLOCK
+        #  PROVIDED BY OTHERS — REFERENCE TABLE
         # ════════════════════════════════════════
+        # Use cumulative geoWaste from first tank (all tanks share same waste %)
+        cum_geoWaste = tank_results[0]['geoWaste'] if tank_results else 20
+
+        # Geogrid: show combined total with breakdown if both top and bottom present
+        cum_geogrid_top   = cum['geogrid_top_yd2']
+        cum_geogrid_bot   = cum['geogrid_bottom_yd2']
+        cum_geogrid_total = cum_geogrid_top + cum_geogrid_bot
+        geogrid_desc = (
+            f'BIAXIAL GEOGRID (INTEGRALLY FORMED POLYPROPYLENE) + {cum_geoWaste}% WASTE'
+            + (f'  [TOP: {cum_geogrid_top} SY + BOTTOM: {cum_geogrid_bot} SY]'
+               if cum_geogrid_top > 0 and cum_geogrid_bot > 0 else '')
+        )
+
+        # Liner: build label based on which envelopes are specified
+        cum_liner_tank   = cum['liner_tank_yd2']
+        cum_liner_stone  = cum['liner_stone_yd2']
+        cum_liner_total  = cum['liner_total_yd2']
+        any_liner_tank   = any(r['liner_on_tank']  for r in tank_results)
+        any_liner_stone  = any(r['liner_on_stone'] for r in tank_results)
+        if any_liner_tank and any_liner_stone:
+            liner_desc = (f'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 TANK + STONE ENVELOPE'
+                          f'  [{cum_liner_tank} SY TANK + {cum_liner_stone} SY STONE]')
+        elif any_liner_tank:
+            liner_desc = 'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 TANK ENVELOPE  (AQ-100-03.2)'
+        elif any_liner_stone:
+            liner_desc = 'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 STONE BACKFILL ENVELOPE  (AQ-100-03.4)'
+        else:
+            liner_desc = 'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 NOT SPECIFIED'
+
+        others_rows = [
+            (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {cum_geoWaste}% WASTE (TANK ONLY)',
+             int(cum['geoTank_yd2_adj']), 'SQ YD'),
+            (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {cum_geoWaste}% WASTE (BACKFILL ONLY)',
+             int(cum['geoStone_yd2']), 'SQ YD'),
+            (f'WOVEN MONOFILAMENT GEOTEXTILE \u2014 PT-ROW\u2122 PRE-TREATMENT + {cum_geoWaste}% WASTE',
+             int(cum['ptrow_woven_yd2']), 'SQ YD'),
+            (geogrid_desc, int(cum_geogrid_total), 'SQ YD'),
+            ('CASTINGS FOR VENTING / INSPECTION PORTS / INLETS',
+             int(cum['top_adapters_12'] + cum['top_adapters_16']), 'EACH'),
+            ('LARGE DIAMETER PIPE CONNECTION (18\u201336\u2033) \u2014 GEOTEXTILE BOOT / ABUTMENT',
+             int(cum['large_pipe_qty']), 'EACH'),
+            ('STONE BACKFILL OR SELECT BACKFILL ESTIMATED FOR UG SYSTEM',
+             int(cum['stone_yd3']), 'CU YD'),
+            (liner_desc, int(cum_liner_total), 'SQ YD'),
+        ]
+        alpha = ['A','B','C','D','E','F','G','H']
+
+        ref_col_ln = LQ + 4
+        ref_col_ds = LQ + 28
+        ref_col_qt = LQ + QW - 80
+        ref_col_un = LQ + QW - 4
+
+        # Section header
+        q_rect(LQ, y - 14, QW, 14, colors.HexColor('#8B0000'))
+        q_text(W / 2, y - 10,
+               'RECOMMENDED BY WAVIN \u2014 PROVIDED BY OTHERS  (ESTIMATES FOR REFERENCE ONLY \u2014 SUBJECT TO VERIFICATION)',
+               'Helvetica-Bold', 7, WHITE, 'center')
+        y -= 14
+
+        # Column headers
+        q_rect(LQ, y - 12, QW, 12, QMGY)
+        q_text(ref_col_ln, y - 8, 'LINE',        'Helvetica-Bold', 6.5, BLACK)
+        q_text(ref_col_ds, y - 8, 'DESCRIPTION', 'Helvetica-Bold', 6.5, BLACK)
+        q_text(ref_col_qt, y - 8, 'QUANTITY',    'Helvetica-Bold', 6.5, BLACK, 'right')
+        q_text(ref_col_un, y - 8, 'UNITS',       'Helvetica-Bold', 6.5, BLACK, 'right')
+        y -= 12
+
+        for i, (ds, qt, un) in enumerate(others_rows):
+            shade = QLGY if i % 2 == 0 else WHITE
+            # Wrap long descriptions
+            max_ds_chars = 95
+            if len(ds) > max_ds_chars:
+                # Two-line row
+                row_h = 20
+                q_rect(LQ, y - row_h, QW, row_h, shade)
+                q_text(ref_col_ln, y - 7,  alpha[i], 'Helvetica-Bold', 7, colors.HexColor('#8B0000'))
+                q_text(ref_col_ds, y - 7,  ds[:max_ds_chars], 'Helvetica', 6.5, BLACK)
+                q_text(ref_col_ds, y - 15, ds[max_ds_chars:].strip(), 'Helvetica', 6.5, BLACK)
+                q_text(ref_col_qt, y - 7,  str(qt) if qt else '0',
+                       'Helvetica-Bold', 7.5, colors.HexColor('#8B0000'), 'right')
+                q_text(ref_col_un, y - 7,  un, 'Helvetica', 6.5, BLACK, 'right')
+                y -= row_h
+            else:
+                row_h = 13
+                q_rect(LQ, y - row_h, QW, row_h, shade)
+                q_text(ref_col_ln, y - 9,  alpha[i], 'Helvetica-Bold', 7, colors.HexColor('#8B0000'))
+                q_text(ref_col_ds, y - 9,  ds, 'Helvetica', 6.5, BLACK)
+                q_text(ref_col_qt, y - 9,  str(qt) if qt else '0',
+                       'Helvetica-Bold', 7.5, colors.HexColor('#8B0000'), 'right')
+                q_text(ref_col_un, y - 9,  un, 'Helvetica', 6.5, BLACK, 'right')
+                y -= row_h
+
+        y -= 8
         if cost_per_ft3 > 0:
             q_rect(LQ, y - 13, QW - 120, 13, QLGY)
             q_text(LQ + 4, y - 9,
@@ -746,9 +911,10 @@ def multi_download_quote():
         safe_name = (project_name or 'Project').strip().replace(' ', '_')
         safe_num  = (project_num or '').strip().replace(' ', '_')
         name_part = '_'.join(filter(None, [safe_num, safe_name]))
+        dt_str    = datetime.datetime.now().strftime("%m%d%Y")
         return send_file(
             buffer, as_attachment=True,
-            download_name=f'AquaCell_MultiTank_Quote_{name_part}_{datetime.datetime.now().strftime("%m%d%Y")}.pdf',
+            download_name=f'{name_part}_AquaCell_MultiTank_Quote_{dt_str}.pdf',
             mimetype='application/pdf'
         )
 

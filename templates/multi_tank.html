@@ -618,6 +618,118 @@
                     <label>16" Top Adapters (2476842000)</label>
                     <input type="number" id="f_top_adapters_16" value="0" min="0" oninput="saveDraft()">
                 </div>
+                <div class="input-group">
+                    <label>Large Diameter Pipe Connection (18"–36")</label>
+                    <input type="number" id="f_large_pipe_qty" value="0" min="0" oninput="saveDraft()">
+                </div>
+            </div>
+
+            <!-- BIAXIAL GEOGRID -->
+            <div class="section-label" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleSection('geogridSection',this)">
+                <span>Biaxial Geogrid — Optional</span>
+                <span style="font-size:10px;opacity:0.6;">▼</span>
+            </div>
+            <div id="geogridSection" style="display:none;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:5px;margin-bottom:10px;">
+                <div style="font-size:11px;opacity:0.6;margin-bottom:8px;line-height:1.5;">
+                    Auto-Calc uses this tank's snapped geometry. Both quantities combine onto Quote line D.
+                    Top/Cover = excav area + 2 ft overlap × waste. Bottom = tank footprint × waste.
+                </div>
+                <div class="input-grid">
+                    <div class="input-group">
+                        <label>Top / Cover Geogrid (sq yd)</label>
+                        <div style="display:flex;gap:6px;">
+                            <input type="number" id="f_geogrid_top_yd2" value="0" min="0" style="flex:1;" oninput="saveDraft()">
+                            <button type="button" onclick="autoCalcGeogridTop()"
+                                style="padding:4px 8px;background:#7c3aed;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap;">Auto</button>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>Bottom / Tank Base Geogrid (sq yd)</label>
+                        <div style="display:flex;gap:6px;">
+                            <input type="number" id="f_geogrid_bottom_yd2" value="0" min="0" style="flex:1;" oninput="saveDraft()">
+                            <button type="button" onclick="autoCalcGeogridBottom()"
+                                style="padding:4px 8px;background:#7c3aed;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap;">Auto</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PT-ROW™ PRE-TREATMENT -->
+            <div class="section-label" style="display:flex;align-items:center;justify-content:space-between;">
+                <span>PT-ROW™ Pre-Treatment — Optional</span>
+                <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:normal;cursor:pointer;">
+                    <input type="checkbox" id="f_ptrow_enabled"
+                        style="width:14px;height:14px;accent-color:#7c3aed;cursor:pointer;"
+                        onchange="togglePtrowSection(this.checked,true)">
+                    Enable
+                </label>
+            </div>
+            <div id="ptrowSection" style="display:none;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:5px;margin-bottom:10px;">
+                <div style="font-size:11px;opacity:0.6;margin-bottom:8px;line-height:1.5;">
+                    Volume-based sizing. Crate void volume uses this tank's config/layers for single-layer PT-ROW™.
+                    Woven fabric = taco wrap (bottom + 2 long sides + back end) per AQ-100-25. Flows to Quote line C.
+                </div>
+                <div id="ptrowConfigInfo" style="font-size:11px;padding:6px 8px;background:rgba(124,58,237,0.1);border-radius:4px;margin-bottom:8px;opacity:0.8;"></div>
+                <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px;" id="ptrowTableEditor">
+                    <thead>
+                        <tr style="background:rgba(124,58,237,0.12);">
+                            <th style="padding:4px 6px;text-align:left;">Label</th>
+                            <th style="padding:4px 6px;text-align:right;">WQV (ft³)</th>
+                            <th style="padding:4px 6px;text-align:center;">%</th>
+                            <th style="padding:4px 6px;text-align:right;">PT Vol</th>
+                            <th style="padding:4px 6px;text-align:right;"># Crates</th>
+                            <th style="padding:4px 6px;width:28px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="ptrowTableBody"></tbody>
+                    <tfoot>
+                        <tr style="background:rgba(124,58,237,0.15);font-weight:bold;">
+                            <td colspan="4" style="padding:4px 6px;">TOTAL PT-ROW™ CRATES</td>
+                            <td style="padding:4px 6px;text-align:right;color:#7c3aed;" id="ptrowTotalCratesEditor">0</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                <button type="button" onclick="addPtrowArea()"
+                    style="padding:5px 12px;background:#7c3aed;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;">
+                    + Add Area
+                </button>
+                <div id="ptrowFabricInfo" style="display:none;margin-top:8px;padding:7px 10px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.3);border-radius:4px;font-size:11px;">
+                    Woven fabric: <strong id="ptrowFabWidth">—</strong> × <strong id="ptrowFabLength">—</strong> =
+                    <strong style="color:#7c3aed;" id="ptrowFabYd2">—</strong> sq yd
+                </div>
+            </div>
+
+            <!-- WATERTIGHT LINER -->
+            <div class="section-label" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleSection('linerSection',this)">
+                <span>Watertight Liner (Min. 30 Mil) — Optional</span>
+                <span style="font-size:10px;opacity:0.6;">▼</span>
+            </div>
+            <div id="linerSection" style="display:none;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:5px;margin-bottom:10px;">
+                <div style="font-size:11px;opacity:0.6;margin-bottom:8px;line-height:1.5;">
+                    Quantities auto-calculated from this tank's geometry using same waste %. Geotextile quantities unaffected.
+                    Combined onto Quote line H.
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <div style="padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:5px;">
+                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:4px;">
+                            <input type="checkbox" id="f_liner_on_tank"
+                                style="width:13px;height:13px;accent-color:#0891b2;" onchange="saveDraft()">
+                            Liner on Tank Envelope
+                        </label>
+                        <div style="font-size:10px;opacity:0.55;margin-bottom:4px;">Tank top + bottom + 4 sides × waste (AQ-100-03.2)</div>
+                        <div style="font-size:12px;font-weight:bold;" id="linerTankQtyDisplay">— sq yd</div>
+                    </div>
+                    <div style="padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:5px;">
+                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:4px;">
+                            <input type="checkbox" id="f_liner_on_stone"
+                                style="width:13px;height:13px;accent-color:#0891b2;" onchange="saveDraft()">
+                            Liner on Stone Envelope
+                        </label>
+                        <div style="font-size:10px;opacity:0.55;margin-bottom:4px;">Full excav top + bottom + 4 sides × waste (AQ-100-03.4)</div>
+                        <div style="font-size:12px;font-weight:bold;" id="linerStoneQtyDisplay">— sq yd</div>
+                    </div>
+                </div>
             </div>
 
             <button class="calc-btn" onclick="calculateCurrentTank()">▶ Calculate This Tank</button>
@@ -732,19 +844,27 @@
 
             <!-- Geotextile -->
             <div class="result-card">
-                <div class="result-card-hdr" onclick="toggleRC(this)" style="background:#1e40af;">🧵 Geotextile (by others) <span class="rcarrow">▼</span></div>
+                <div class="result-card-hdr" onclick="toggleRC(this)" style="background:#1e40af;">🧵 Geotextile &amp; Accessories (by others) <span class="rcarrow">▼</span></div>
                 <div class="result-card-body">
                     <div class="result-row">
-                        <span class="rl">Tank Wrap (ft²)</span>
+                        <span class="rl">Tank Wrap (yd²)</span>
                         <span class="rv" id="r_geoTank">—</span>
                     </div>
                     <div class="result-row">
-                        <span class="rl">Backfill Envelope (ft²)</span>
+                        <span class="rl">Backfill Envelope (yd²)</span>
                         <span class="rv" id="r_geoStone">—</span>
                     </div>
                     <div class="result-row">
-                        <span class="rl">Total Geotextile (ft²)</span>
+                        <span class="rl">Total Non-Woven Geotextile (yd²)</span>
                         <span class="rv accent" id="r_geoTotal">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">PT-ROW™ Woven Fabric</span>
+                        <span class="rv" id="r_ptrow_woven">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">Biaxial Geogrid</span>
+                        <span class="rv" id="r_geogrid">—</span>
                     </div>
                 </div>
             </div>
@@ -823,8 +943,32 @@
         <!-- Geotextile & Stone cumulative -->
         <div style="font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;opacity:0.65;margin:14px 0 6px;">By Others (Reference)</div>
         <div class="cum-bom-row">
-            <span class="cum-bom-label">Total Geotextile (ft²)</span>
+            <span class="cum-bom-label">Non-Woven Geo — Tank (yd²)</span>
+            <span class="cum-bom-val" id="cum_geo_tank_yd2">—</span>
+        </div>
+        <div class="cum-bom-row">
+            <span class="cum-bom-label">Non-Woven Geo — Backfill (yd²)</span>
+            <span class="cum-bom-val" id="cum_geo_stone_yd2">—</span>
+        </div>
+        <div class="cum-bom-row">
+            <span class="cum-bom-label">Total Non-Woven Geo (yd²)</span>
             <span class="cum-bom-val" id="cum_geo">—</span>
+        </div>
+        <div class="cum-bom-row">
+            <span class="cum-bom-label">PT-ROW™ Woven Fabric (yd²)</span>
+            <span class="cum-bom-val" id="cum_ptrow_woven_yd2">—</span>
+        </div>
+        <div class="cum-bom-row">
+            <span class="cum-bom-label">Biaxial Geogrid (yd²)</span>
+            <span class="cum-bom-val" id="cum_geogrid_total">—</span>
+        </div>
+        <div class="cum-bom-row">
+            <span class="cum-bom-label">Liner (yd²)</span>
+            <span class="cum-bom-val" id="cum_liner_total">—</span>
+        </div>
+        <div class="cum-bom-row">
+            <span class="cum-bom-label">Large Diameter Connections</span>
+            <span class="cum-bom-val" id="cum_large_pipe">—</span>
         </div>
         <div class="cum-bom-row">
             <span class="cum-bom-label">Total Stone (yd³ w/overage)</span>
@@ -901,6 +1045,11 @@ function addTank() {
         perimeter_stone_width: '1.0', stone_void: '0.40',
         geoWaste: '20', min_storage: '0',
         pipe_connectors: '0', top_adapters_12: '0', top_adapters_16: '0',
+        // Optional accessories
+        geogrid_top_yd2: 0, geogrid_bottom_yd2: 0,
+        large_pipe_qty: 0,
+        ptrow_enabled: false, ptrow_areas: [{label:'Area 1', wqv:0, pct:10}],
+        liner_on_tank: false, liner_on_stone: false,
     });
     results.push(null);
     renderSidebar();
@@ -996,7 +1145,9 @@ const FIELDS = [
     'surface_elev','tank_bottom_elev','cover_stone','base_stone',
     'perimeter_stone_width','stone_void','geoWaste','min_storage',
     'pipe_connectors','top_adapters_12','top_adapters_16',
+    'geogrid_top_yd2','geogrid_bottom_yd2','large_pipe_qty',
 ];
+// Non-scalar fields handled separately: ptrow_enabled, ptrow_areas, liner_on_tank, liner_on_stone
 
 function loadEditor(idx) {
     document.getElementById('emptyState').style.display = 'none';
@@ -1008,6 +1159,21 @@ function loadEditor(idx) {
         const el = document.getElementById('f_' + f);
         if (el) el.value = tanks[idx][f] !== undefined ? tanks[idx][f] : '';
     });
+
+    // Non-scalar: PT-ROW toggle & areas
+    const ptToggle = document.getElementById('f_ptrow_enabled');
+    if (ptToggle) {
+        ptToggle.checked = !!tanks[idx].ptrow_enabled;
+        togglePtrowSection(ptToggle.checked, false);
+    }
+    window._ptrowAreas = JSON.parse(JSON.stringify(tanks[idx].ptrow_areas || [{label:'Area 1', wqv:0, pct:10}]));
+    renderPtrowTable();
+
+    // Non-scalar: liner checkboxes
+    const lnkTank  = document.getElementById('f_liner_on_tank');
+    const lnkStone = document.getElementById('f_liner_on_stone');
+    if (lnkTank)  lnkTank.checked  = !!tanks[idx].liner_on_tank;
+    if (lnkStone) lnkStone.checked = !!tanks[idx].liner_on_stone;
 }
 
 function saveDraft() {
@@ -1016,6 +1182,15 @@ function saveDraft() {
         const el = document.getElementById('f_' + f);
         if (el) tanks[activeIdx][f] = el.value;
     });
+    // Non-scalar fields
+    const ptToggle = document.getElementById('f_ptrow_enabled');
+    if (ptToggle) tanks[activeIdx].ptrow_enabled = ptToggle.checked;
+    tanks[activeIdx].ptrow_areas = JSON.parse(JSON.stringify(window._ptrowAreas || []));
+    const lnkTank  = document.getElementById('f_liner_on_tank');
+    const lnkStone = document.getElementById('f_liner_on_stone');
+    if (lnkTank)  tanks[activeIdx].liner_on_tank  = lnkTank.checked;
+    if (lnkStone) tanks[activeIdx].liner_on_stone = lnkStone.checked;
+
     document.getElementById('editorTankTitle').textContent = tanks[activeIdx].tank_label || `Tank ${activeIdx + 1}`;
     renderSidebar();
 }
@@ -1144,10 +1319,48 @@ function showResults(r) {
     setEl('r_perim',     `${r.used_perimeter} ft`);
     setEl('r_excav',     `${r.outer_width} ft × ${r.outer_length} ft`);
 
-    // Geotextile
-    setEl('r_geoTank',  fmtNum(r.geoTank, 1) + ' ft²');
-    setEl('r_geoStone', fmtNum(r.geoStone, 1) + ' ft²');
-    setEl('r_geoTotal', fmtNum(r.geoTotal, 1) + ' ft²');
+    // Geotextile — show in sq yd consistent with quote
+    const geoWaste = r.geoWaste || 20;
+    setEl('r_geoTank',  Math.round(r.geoTank  / 9 * 10) / 10 + ' yd²');
+    setEl('r_geoStone', Math.round(r.geoStone / 9 * 10) / 10 + ' yd²');
+    setEl('r_geoTotal', Math.round(r.geoTotal / 9 * 10) / 10 + ' yd²');
+
+    // PT-ROW fabric display
+    const ptrowFabEl = document.getElementById('r_ptrow_woven');
+    if (ptrowFabEl) {
+        ptrowFabEl.textContent = r.ptrow_enabled && r.ptrow_total_crates > 0
+            ? r.ptrow_total_crates + ' crates → ' + r.ptrow_woven_yd2 + ' sq yd woven'
+            : '—';
+    }
+
+    // Geogrid display
+    const geogridEl = document.getElementById('r_geogrid');
+    if (geogridEl) {
+        const gtop = r.geogrid_top_yd2 || 0;
+        const gbot = r.geogrid_bottom_yd2 || 0;
+        geogridEl.textContent = (gtop + gbot) > 0
+            ? `Top: ${gtop} + Bottom: ${gbot} = ${gtop + gbot} sq yd`
+            : '—';
+    }
+
+    // Update liner qty displays in editor
+    if (r.geoTank && r.geoStone) {
+        const lnkT = Math.ceil(r.geoTank  * (1 + geoWaste/100) / 9);
+        const lnkS = Math.ceil(r.geoStone * (1 + geoWaste/100) / 9);
+        const lnkTEl = document.getElementById('linerTankQtyDisplay');
+        const lnkSEl = document.getElementById('linerStoneQtyDisplay');
+        if (lnkTEl) lnkTEl.textContent = lnkT.toLocaleString() + ' sq yd';
+        if (lnkSEl) lnkSEl.textContent = lnkS.toLocaleString() + ' sq yd';
+    }
+
+    // Update PT-ROW config info banner
+    const ptCfgEl = document.getElementById('ptrowConfigInfo');
+    if (ptCfgEl && r.ptrow_crate_vol) {
+        ptCfgEl.textContent = `Config: ${r.config} single-layer  |  Crate void vol: ${r.ptrow_crate_vol} ft³  |  Layer ht: ${r.ptrow_layer_ht} ft  |  Wrap ext: 1.5 ft (18")`;
+    }
+
+    // Store geometry on window for auto-calc functions
+    window._lastTankResult = r;
 
     // Stone
     setEl('r_stone_yd3', fmtNum(r.stone_yd3, 1) + ' yd³');
@@ -1197,7 +1410,18 @@ function renderCumulative(data) {
     setEl('cum_contingency',    cum.contingency.toLocaleString());
     setEl('cum_weight',         data.total_weight.toLocaleString(undefined,{minimumFractionDigits:1}) + ' lbs');
     setEl('cum_pallets',        data.total_pallets.toLocaleString() + ' pallets');
-    setEl('cum_geo',            fmtNum(cum.geoTotal, 1) + ' ft²');
+
+    // By Others — yd²
+    const totGeoTankYd2  = Math.round(cum.geoTank  / 9 * 10) / 10;
+    const totGeoStoneYd2 = Math.round(cum.geoStone / 9 * 10) / 10;
+    const totGeoTotalYd2 = Math.round(cum.geoTotal / 9 * 10) / 10;
+    setEl('cum_geo_tank_yd2',   totGeoTankYd2.toLocaleString()  + ' yd²');
+    setEl('cum_geo_stone_yd2',  totGeoStoneYd2.toLocaleString() + ' yd²');
+    setEl('cum_geo',            totGeoTotalYd2.toLocaleString() + ' yd²');
+    setEl('cum_ptrow_woven_yd2', (cum.ptrow_woven_yd2 || 0).toLocaleString() + ' yd²');
+    setEl('cum_geogrid_total',  ((cum.geogrid_top_yd2||0) + (cum.geogrid_bottom_yd2||0)).toLocaleString() + ' yd²');
+    setEl('cum_liner_total',    (cum.liner_total_yd2 || 0).toLocaleString() + ' yd²');
+    setEl('cum_large_pipe',     (cum.large_pipe_qty  || 0).toLocaleString() + ' ea.');
     setEl('cum_stone_yd3',      fmtNum(cum.stone_yd3, 1) + ' yd³');
 
     // Tank summary table
@@ -1222,7 +1446,10 @@ function renderCumulative(data) {
 function clearCumulative() {
     ['cum_tank_storage','cum_total_storage','cum_base_units','cum_side_plates',
      'cum_bottom_plates','cum_pipe_connectors','cum_top_adapters_12','cum_top_adapters_16',
-     'cum_contingency','cum_weight','cum_pallets','cum_geo','cum_stone_yd3'].forEach(id => setEl(id, '—'));
+     'cum_contingency','cum_weight','cum_pallets',
+     'cum_geo_tank_yd2','cum_geo_stone_yd2','cum_geo',
+     'cum_ptrow_woven_yd2','cum_geogrid_total','cum_liner_total','cum_large_pipe',
+     'cum_stone_yd3'].forEach(id => setEl(id, '—'));
     document.getElementById('cum_tank_summary').innerHTML = '<span style="font-size:11px;opacity:0.5;">No tanks calculated yet.</span>';
 }
 
@@ -1413,6 +1640,171 @@ toggleBtn.addEventListener('click', () => {
 
 
 // ══════════════════════════════════════════════════════════════════
+//  ACCESSORY HELPERS
+// ══════════════════════════════════════════════════════════════════
+const MODULE_WID = 1.9685;
+const MODULE_LEN = 3.937;
+
+function toggleSection(sectionId, btn) {
+    const sec = document.getElementById(sectionId);
+    if (!sec) return;
+    const isHidden = sec.style.display === 'none';
+    sec.style.display = isHidden ? 'block' : 'none';
+    if (btn && btn.lastElementChild) btn.lastElementChild.textContent = isHidden ? '▲' : '▼';
+}
+
+function togglePtrowSection(on, doSave) {
+    const sec = document.getElementById('ptrowSection');
+    if (sec) sec.style.display = on ? 'block' : 'none';
+    if (doSave) saveDraft();
+}
+
+// ── Geogrid Auto-Calc ──────────────────────────────────────────────
+function autoCalcGeogridTop() {
+    const r = window._lastTankResult;
+    if (!r) { alert('Calculate this tank first to enable Auto-Calc.'); return; }
+    const geoWaste = parseFloat(document.getElementById('f_geoWaste').value) || 20;
+    const overlap  = 2.0;
+    const w = r.outer_width  + 2 * overlap;
+    const l = r.outer_length + 2 * overlap;
+    const yd2 = Math.ceil(w * l * (1 + geoWaste/100) / 9);
+    document.getElementById('f_geogrid_top_yd2').value = yd2;
+    saveDraft();
+}
+
+function autoCalcGeogridBottom() {
+    const r = window._lastTankResult;
+    if (!r) { alert('Calculate this tank first to enable Auto-Calc.'); return; }
+    const geoWaste = parseFloat(document.getElementById('f_geoWaste').value) || 20;
+    const yd2 = Math.ceil(r.tank_width * r.tank_length * (1 + geoWaste/100) / 9);
+    document.getElementById('f_geogrid_bottom_yd2').value = yd2;
+    saveDraft();
+}
+
+// ── PT-ROW Table ───────────────────────────────────────────────────
+window._ptrowAreas = [{label:'Area 1', wqv:0, pct:10}];
+
+function renderPtrowTable() {
+    const r   = window._lastTankResult;
+    const vol = r ? r.ptrow_crate_vol || 10.25 : 10.25;
+    const lh  = r ? r.ptrow_layer_ht  || 1.394 : 1.394;
+    const gw  = parseFloat(document.getElementById('f_geoWaste')?.value) || 20;
+
+    const tbody = document.getElementById('ptrowTableBody');
+    if (!tbody) return;
+
+    // Preserve row count — only rebuild on count change
+    while (tbody.children.length > window._ptrowAreas.length) tbody.removeChild(tbody.lastChild);
+    while (tbody.children.length < window._ptrowAreas.length) {
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+            '<td style="padding:3px 4px;"><input type="text" class="pt-lbl" style="width:72px;padding:3px 4px;border:1px solid var(--border);border-radius:3px;background:var(--card);color:var(--text);font-size:11px;"></td>' +
+            '<td style="padding:3px 4px;"><input type="text" inputmode="numeric" class="pt-wqv" style="width:68px;padding:3px 4px;border:1px solid var(--border);border-radius:3px;background:var(--card);color:var(--text);font-size:11px;text-align:right;"></td>' +
+            '<td style="padding:3px 4px;"><select class="pt-pct" style="padding:3px 4px;border:1px solid var(--border);border-radius:3px;background:var(--card);color:var(--text);font-size:11px;">' +
+            '<option value="10">10%</option><option value="15">15%</option><option value="12">12%</option><option value="20">20%</option></select></td>' +
+            '<td style="padding:3px 4px;text-align:right;font-size:11px;opacity:0.7;" class="pt-pvol">—</td>' +
+            '<td style="padding:3px 4px;text-align:right;font-size:11px;font-weight:bold;color:#7c3aed;" class="pt-nc">—</td>' +
+            '<td style="padding:3px 4px;text-align:center;"></td>';
+        tbody.appendChild(tr);
+    }
+
+    let totalCrates = 0;
+    window._ptrowAreas.forEach((area, i) => {
+        const tr    = tbody.children[i];
+        const lbl   = tr.querySelector('.pt-lbl');
+        const wqvEl = tr.querySelector('.pt-wqv');
+        const pctEl = tr.querySelector('.pt-pct');
+        const pvol  = tr.querySelector('.pt-pvol');
+        const nc    = tr.querySelector('.pt-nc');
+        const delTd = tr.children[5];
+
+        if (document.activeElement !== lbl)   lbl.value   = area.label;
+        if (document.activeElement !== wqvEl) wqvEl.value = area.wqv || '';
+        pctEl.value = [10,12,15,20].includes(area.pct) ? area.pct : 10;
+
+        const ptVol   = area.wqv * area.pct / 100;
+        const nCrates = vol > 0 ? Math.ceil(ptVol / vol) : 0;
+        totalCrates  += nCrates;
+        pvol.textContent = ptVol.toFixed(1);
+        nc.textContent   = nCrates;
+
+        lbl.oninput   = (idx => function() { window._ptrowAreas[idx].label = this.value; saveDraft(); })(i);
+        wqvEl.oninput = (idx => function() {
+            window._ptrowAreas[idx].wqv = parseFloat(this.value.replace(/[^0-9.]/g,'')) || 0;
+            updatePtrowOutputs();
+        })(i);
+        pctEl.onchange = (idx => function() {
+            window._ptrowAreas[idx].pct = parseFloat(this.value) || 10;
+            updatePtrowOutputs();
+        })(i);
+
+        delTd.innerHTML = window._ptrowAreas.length > 1
+            ? `<button type="button" onclick="removePtrowArea(${i})" style="background:#ef4444;color:#fff;border:none;border-radius:3px;padding:1px 5px;cursor:pointer;font-size:10px;">✕</button>`
+            : '';
+    });
+
+    updatePtrowOutputs(totalCrates);
+}
+
+function updatePtrowOutputs(knownTotal) {
+    const r   = window._lastTankResult;
+    const vol = r ? r.ptrow_crate_vol || 10.25 : 10.25;
+    const lh  = r ? r.ptrow_layer_ht  || 1.394 : 1.394;
+    const gw  = parseFloat(document.getElementById('f_geoWaste')?.value) || 20;
+
+    let total = 0;
+    if (knownTotal !== undefined) {
+        total = knownTotal;
+    } else {
+        window._ptrowAreas.forEach(a => {
+            total += vol > 0 ? Math.ceil(a.wqv * a.pct / 100 / vol) : 0;
+        });
+        // Update per-row outputs
+        const tbody = document.getElementById('ptrowTableBody');
+        if (tbody) window._ptrowAreas.forEach((a, i) => {
+            const tr = tbody.children[i];
+            if (!tr) return;
+            const ptv = a.wqv * a.pct / 100;
+            const nc  = vol > 0 ? Math.ceil(ptv / vol) : 0;
+            const pvEl = tr.querySelector('.pt-pvol');
+            const ncEl = tr.querySelector('.pt-nc');
+            if (pvEl) pvEl.textContent = ptv.toFixed(1);
+            if (ncEl) ncEl.textContent = nc;
+        });
+    }
+
+    setEl('ptrowTotalCratesEditor', total);
+
+    if (total > 0) {
+        const wrap  = 1.5;
+        const fabW  = MODULE_WID + 2*lh + 2*wrap;
+        const fabL  = total * MODULE_LEN + 2*wrap;
+        const fabYd2 = Math.ceil(fabW * fabL * (1 + gw/100) / 9);
+        const fabEl = document.getElementById('ptrowFabricInfo');
+        if (fabEl) {
+            fabEl.style.display = 'block';
+            setEl('ptrowFabWidth',  fabW.toFixed(2) + ' ft');
+            setEl('ptrowFabLength', fabL.toFixed(2) + ' ft');
+            setEl('ptrowFabYd2',    fabYd2.toLocaleString() + ' sq yd');
+        }
+    } else {
+        const fabEl = document.getElementById('ptrowFabricInfo');
+        if (fabEl) fabEl.style.display = 'none';
+    }
+    saveDraft();
+}
+
+function addPtrowArea() {
+    window._ptrowAreas.push({ label: `Area ${window._ptrowAreas.length + 1}`, wqv: 0, pct: 10 });
+    renderPtrowTable();
+}
+
+function removePtrowArea(i) {
+    window._ptrowAreas.splice(i, 1);
+    renderPtrowTable();
+}
+
+// ══════════════════════════════════════════════════════════════════
 //  COPY TO CLIPBOARD  —  Multi-Tank Summary
 // ══════════════════════════════════════════════════════════════════
 function copyToClipboard() {
@@ -1436,11 +1828,17 @@ function copyToClipboard() {
     const totPipe         = calcedResults.reduce((s, r) => s + r.pipe_connectors, 0);
     const totTop12        = calcedResults.reduce((s, r) => s + r.top_adapters_12, 0);
     const totTop16        = calcedResults.reduce((s, r) => s + r.top_adapters_16, 0);
-    const totGeoTank      = calcedResults.reduce((s, r) => s + r.geoTank,  0);
-    const totGeoStone     = calcedResults.reduce((s, r) => s + r.geoStone, 0);
-    const totGeoTotal     = calcedResults.reduce((s, r) => s + r.geoTotal, 0);
-    const totStoneYd3     = calcedResults.reduce((s, r) => s + r.stone_yd3, 0);
-    const contingency     = Math.max(0, Math.ceil(totBase / 56) * 56 - totBase);
+    const totGeoTankYd2  = Math.round(calcedResults.reduce((s,r) => s + r.geoTank,  0) / 9 * 10) / 10;
+    const totGeoStoneYd2 = Math.round(calcedResults.reduce((s,r) => s + r.geoStone, 0) / 9 * 10) / 10;
+    const totGeoTotalYd2 = Math.round(calcedResults.reduce((s,r) => s + r.geoTotal, 0) / 9 * 10) / 10;
+    const totStoneYd3    = calcedResults.reduce((s, r) => s + r.stone_yd3, 0);
+    const totPtrowCrates = calcedResults.reduce((s, r) => s + (r.ptrow_total_crates || 0), 0);
+    const totPtrowWoven  = calcedResults.reduce((s, r) => s + (r.ptrow_woven_yd2   || 0), 0);
+    const totGeogridTop  = calcedResults.reduce((s, r) => s + (r.geogrid_top_yd2   || 0), 0);
+    const totGeogridBot  = calcedResults.reduce((s, r) => s + (r.geogrid_bottom_yd2|| 0), 0);
+    const totLinerTotal  = calcedResults.reduce((s, r) => s + (r.liner_total_yd2   || 0), 0);
+    const totLargePipe   = calcedResults.reduce((s, r) => s + (r.large_pipe_qty    || 0), 0);
+    const contingency    = Math.max(0, Math.ceil(totBase / 56) * 56 - totBase);
 
     const fmt = v => parseFloat(v).toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1});
     const fmtI = v => Math.round(v).toLocaleString();
@@ -1476,10 +1874,15 @@ function copyToClipboard() {
         `12" Top Adapters (3085857) ea.:                    ${fmtI(totTop12)}`,
         `16" Top Adapters (2476842000) ea.:                 ${fmtI(totTop16)}`,
         `Contingency Base Units (pallet fill) ea.:          ${fmtI(contingency)}`,
+        `Large Diameter Pipe Connections (18"-36") ea.:     ${fmtI(totLargePipe)}`,
         '',
-        `AquaCell Tank Wrap Geotextile (ft²):               ${fmt(totGeoTank)}  (with 20% overage)`,
-        `Stone Backfill Envelope Geotextile (ft²):          ${fmt(totGeoStone)}  (with 20% overage)`,
-        `Total Non-Woven Geotextile (ft²):                  ${fmt(totGeoTotal)}  (with 20% overage)`,
+        `Non-Woven Geo — Tank Wrap (yd²):                  ${fmt(totGeoTankYd2)}`,
+        `Non-Woven Geo — Backfill Envelope (yd²):          ${fmt(totGeoStoneYd2)}`,
+        `Total Non-Woven Geotextile (yd²):                  ${fmt(totGeoTotalYd2)}`,
+        `PT-ROW™ Woven Fabric (yd²):                        ${fmtI(totPtrowWoven)}${totPtrowCrates > 0 ? '  (' + totPtrowCrates + ' crates)' : ''}`,
+        `Biaxial Geogrid — Top (yd²):                       ${fmtI(totGeogridTop)}`,
+        `Biaxial Geogrid — Bottom (yd²):                    ${fmtI(totGeogridBot)}`,
+        `Watertight Liner Total (yd²):                      ${fmtI(totLinerTotal)}`,
         `Total Estimated Stone Backfill Volume (with 10%):  ${fmt(totStoneYd3)} CU YD`,
     ];
 
