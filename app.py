@@ -2304,15 +2304,22 @@ def download_quote():
       _q_ptrow_vol = MODULE_WID * MODULE_LEN * _q_ptrow_ht * _q_void_ratio
 
       ptrow_enabled_q = request.form.get('ptrow_enabled', '0') == '1'
+      ptrow_method_q  = request.form.get('ptrow_method', 'volume')
       ptrow_total_q   = 0
-      idx = 0
-      while True:
-          if f'ptrow_wqv_{idx}' not in request.form:
-              break
-          wqv = float(request.form.get(f'ptrow_wqv_{idx}', 0) or 0)
-          pct = float(request.form.get(f'ptrow_pct_{idx}', 10) or 10)
-          ptrow_total_q += math.ceil((wqv * pct / 100.0) / _q_ptrow_vol) if _q_ptrow_vol > 0 else 0
-          idx += 1
+
+      if ptrow_method_q == 'flow':
+          fi = 0
+          while f'ptrow_flow_cfs_{fi}' in request.form:
+              cfs = float(request.form.get(f'ptrow_flow_cfs_{fi}', 0) or 0)
+              ptrow_total_q += math.ceil(cfs / 0.464) if cfs > 0 else 0
+              fi += 1
+      else:
+          idx = 0
+          while f'ptrow_wqv_{idx}' in request.form:
+              wqv = float(request.form.get(f'ptrow_wqv_{idx}', 0) or 0)
+              pct = float(request.form.get(f'ptrow_pct_{idx}', 10) or 10)
+              ptrow_total_q += math.ceil((wqv * pct / 100.0) / _q_ptrow_vol) if _q_ptrow_vol > 0 else 0
+              idx += 1
 
       _ptrow_fab_w   = MODULE_WID + 2*_q_ptrow_ht + 2*1.5
       _ptrow_fab_l   = (ptrow_total_q * MODULE_LEN) + 2*1.5
