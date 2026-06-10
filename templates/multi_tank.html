@@ -866,6 +866,10 @@
                         <span class="rl">Biaxial Geogrid</span>
                         <span class="rv" id="r_geogrid">—</span>
                     </div>
+                    <div class="result-row">
+                        <span class="rl">Watertight Liner (yd²)</span>
+                        <span class="rv" id="r_liner">—</span>
+                    </div>
                 </div>
             </div>
 
@@ -1341,6 +1345,20 @@ function showResults(r) {
         geogridEl.textContent = (gtop + gbot) > 0
             ? `Top: ${gtop} + Bottom: ${gbot} = ${gtop + gbot} sq yd`
             : '—';
+    }
+
+    // Liner display
+    const linerEl = document.getElementById('r_liner');
+    if (linerEl) {
+        const lt = r.liner_total_yd2 || 0;
+        if (lt > 0) {
+            let parts = [];
+            if (r.liner_tank_yd2  > 0) parts.push(`Tank: ${r.liner_tank_yd2} sy`);
+            if (r.liner_stone_yd2 > 0) parts.push(`Stone: ${r.liner_stone_yd2} sy`);
+            linerEl.textContent = lt.toLocaleString() + ' sq yd' + (parts.length ? '  (' + parts.join(' + ') + ')' : '');
+        } else {
+            linerEl.textContent = '—';
+        }
     }
 
     // Update liner qty displays in editor
