@@ -1374,6 +1374,7 @@ function clearResults() {
 //  CUMULATIVE BOM
 // ══════════════════════════════════════════════════════════════════
 async function rebuildCumulative() {
+    if (activeIdx !== null) saveDraft();  // persist active tank's current state before cumulative calc
     const calcedTanks = tanks.filter((_, i) => results[i] !== null);
     if (calcedTanks.length === 0) {
         clearCumulative();
@@ -1480,6 +1481,7 @@ function calcPrice() {
 //  QUOTE PDF DOWNLOAD
 // ══════════════════════════════════════════════════════════════════
 async function downloadQuote() {
+    saveDraft();  // ensure active tank's accessory fields are captured before building payload
     const calcedIdxs = results.reduce((acc, r, i) => { if (r) acc.push(i); return acc; }, []);
     if (calcedIdxs.length === 0) {
         alert('Please calculate at least one tank first.');
