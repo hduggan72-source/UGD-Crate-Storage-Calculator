@@ -16,6 +16,7 @@ Professional web-based calculator for designing and quoting underground stormwat
  - Move results board with past fail on storage and totals to the top header so it's always visible
  - Add add up and down toggle buttons for screen
  - ADD COMPLEX CALCULATOR (SIMPLE) TO MULTI TANK UI/UX
+ - STAGE STORAGE DOWNLOAD FOR EACH TANK (DOES NOT HAVE TO BE ON THE RESULTS CARDS)
 
 ##UPDATES FOR BOTH MULTI-TANK/SINGLE TANK CALCULATORS
 - ADD DISTANCE FROM BUILDING CALCULATOR (THAT AND BUOYANCY SHOULD BE SEPARATE BRANCHES SIMILAR TO MULTI-TANK)
