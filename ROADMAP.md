@@ -7,13 +7,16 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 ** ## Next Up (High Priority – Do These Next)**
 
-- ADD STORAGE PASS/FAIL TO LEFT SIDE PANEL "TANKS IN PROJECT" INPUTS FOR EACH TANK CARD
-- move calculate tank button to left panel bottom
-- Move results board with past fail on storage and totals to the top header so it's always visible
-- Add add up and down toggle buttons for screen
-- ADD DISTANCE FROM BUILDING CALCULATOR (THAT AND BUOYANCY SHOULD BE SEPARATE BRANCHES SIMILAR TO MULTI-TANK)
-- ADD COMPLEX CALCULATOR (SIMPLE) TO MULTI TANK UI/UX
+####MULTI-TANK CALCULATOR CHANGES
+ - CHANGE DECIMAL POINT TO HUNDRETHS IN SUMMARY RESULTS CARDS 
+ - ADD STORAGE PASS/FAIL TO LEFT SIDE PANEL "TANKS IN PROJECT" INPUTS FOR EACH TANK CARD
+ - move calculate tank button to left panel bottom
+ - Move results board with past fail on storage and totals to the top header so it's always visible
+ - Add add up and down toggle buttons for screen
+ - ADD COMPLEX CALCULATOR (SIMPLE) TO MULTI TANK UI/UX
 
+##UPDATES FOR BOTH MULTI-TANK/SINGLE TANK CALCULATORS
+- ADD DISTANCE FROM BUILDING CALCULATOR (THAT AND BUOYANCY SHOULD BE SEPARATE BRANCHES SIMILAR TO MULTI-TANK)
 - System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
 - command button to collapse all cards
 - TAKE PRICING OUT OF SEPARATE CALCULATIONS TOOL FOR CLIENT USE
@@ -22,12 +25,13 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 **##SYSTEM CHECKS TO VERIFY / CONFIRM**
 
-**## Backlog / Future Enhancements (Add here when ideas come up)**
 
-- Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed (added to excavation & dimensional summary card
-- bouyancy calculator
-- Metric toggle
-- Update font to Nunito (Wavin speciifc calculator ONLY)
+
+**## Backlog / Future Enhancements (Add here when ideas come up)**
+ - Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed (added to excavation & dimensional summary card
+ - bouyancy calculator
+ - Metric toggle
+ - Update font to Nunito (Wavin speciifc calculator ONLY)
 
 **Proposed Workflow & Calculator Evolution*
 [ ] Pricing_Engine_v1 → git checkout -b Client_Facing_v1 → strip pricing
