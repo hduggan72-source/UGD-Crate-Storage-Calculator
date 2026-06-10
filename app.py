@@ -709,6 +709,15 @@ def calc_tank(t):
     min_storage      = float(t.get('min_storage', 0) or 0)
     tank_label       = t.get('tank_label', 'Tank')
 
+    # ── Optional accessories ─────────────────────────────────────────
+    geogrid_top_yd2    = int(t.get('geogrid_top_yd2',    0) or 0)
+    geogrid_bottom_yd2 = int(t.get('geogrid_bottom_yd2', 0) or 0)
+    large_pipe_qty     = int(t.get('large_pipe_qty',     0) or 0)
+    liner_on_tank      = bool(t.get('liner_on_tank',  False))
+    liner_on_stone     = bool(t.get('liner_on_stone', False))
+    ptrow_enabled      = bool(t.get('ptrow_enabled', False))
+    ptrow_areas        = t.get('ptrow_areas', [])
+
     layer_heights   = cd['layer_heights']
     void_ratio      = cd['void_ratio']
     side_multiplier = cd['side_multiplier']
@@ -755,7 +764,36 @@ def calc_tank(t):
     geoStone = round((excav_area * 2 + outer_width * total_system_depth * 2 + outer_length * total_system_depth * 2) * (1 + geoWaste / 100.0), 1)
     geoTotal = round(geoTank + geoStone, 1)
 
-    # Stone backfill bulk
+    # ── Non-woven deduction: geogrid bottom substitutes tank floor fabric ──
+    geoTank_yd2     = round(geoTank  / 9, 1)
+    geoStone_yd2    = round(geoStone / 9, 1)
+    geoTotal_yd2    = round(geoTotal / 9, 1)
+    geoTank_yd2_adj = max(0, round(geoTank_yd2 - geogrid_bottom_yd2, 1))
+
+    # ── PT-ROW™ fabric (taco wrap: bottom + 2 long sides + back end) ──
+    _ptrow_layer_ht  = layer_heights[0]
+    _ptrow_wrap_ext  = 1.5
+    _ptrow_crate_vol = round(MODULE_WID * MODULE_LEN * _ptrow_layer_ht * void_ratio, 4)
+
+    ptrow_total_crates = 0
+    if ptrow_enabled and ptrow_areas:
+        for area in ptrow_areas:
+            wqv = float(area.get('wqv', 0) or 0)
+            pct = float(area.get('pct', 10) or 10)
+            pt_vol = wqv * pct / 100.0
+            ptrow_total_crates += math.ceil(pt_vol / _ptrow_crate_vol) if _ptrow_crate_vol > 0 else 0
+
+    if ptrow_enabled and ptrow_total_crates > 0:
+        _fab_w          = MODULE_WID + 2*_ptrow_layer_ht + 2*_ptrow_wrap_ext
+        _fab_l          = ptrow_total_crates * MODULE_LEN + 2*_ptrow_wrap_ext
+        ptrow_woven_yd2 = math.ceil(_fab_w * _fab_l * (1 + geoWaste/100.0) / 9)
+    else:
+        ptrow_woven_yd2 = 0
+
+    # ── PVC / Geomembrane liner ────────────────────────────────────────
+    liner_tank_yd2  = math.ceil(geoTank  * (1 + geoWaste/100.0) / 9) if liner_on_tank  else 0
+    liner_stone_yd2 = math.ceil(geoStone * (1 + geoWaste/100.0) / 9) if liner_on_stone else 0
+    liner_total_yd2 = liner_tank_yd2 + liner_stone_yd2
     stone_yd3  = round(stone_env_vol * 1.10 / 27, 1)
     stone_tons = round(stone_env_vol * 1.10 * 100 / 2000, 2)
 
@@ -824,10 +862,32 @@ def calc_tank(t):
         'top_adapters_16': top_adapters_16,
         'contingency':     contingency,
         # Geotextile
-        'geoTank':   geoTank,
-        'geoStone':  geoStone,
-        'geoTotal':  geoTotal,
-        'geoWaste':  geoWaste,
+        'geoTank':         geoTank,
+        'geoStone':        geoStone,
+        'geoTotal':        geoTotal,
+        'geoTank_yd2':     geoTank_yd2,
+        'geoStone_yd2':    geoStone_yd2,
+        'geoTotal_yd2':    geoTotal_yd2,
+        'geoTank_yd2_adj': geoTank_yd2_adj,
+        'geoWaste':        geoWaste,
+        # PT-ROW™
+        'ptrow_enabled':      ptrow_enabled,
+        'ptrow_areas':        ptrow_areas,
+        'ptrow_total_crates': ptrow_total_crates,
+        'ptrow_woven_yd2':    ptrow_woven_yd2,
+        'ptrow_crate_vol':    _ptrow_crate_vol,
+        'ptrow_layer_ht':     round(_ptrow_layer_ht, 4),
+        # Geogrid
+        'geogrid_top_yd2':    geogrid_top_yd2,
+        'geogrid_bottom_yd2': geogrid_bottom_yd2,
+        # Liner
+        'liner_on_tank':   liner_on_tank,
+        'liner_on_stone':  liner_on_stone,
+        'liner_tank_yd2':  liner_tank_yd2,
+        'liner_stone_yd2': liner_stone_yd2,
+        'liner_total_yd2': liner_total_yd2,
+        # Large pipe
+        'large_pipe_qty': large_pipe_qty,
         # Stone backfill
         'stone_yd3':       stone_yd3,
         'stone_tons':      stone_tons,
@@ -866,7 +926,13 @@ def cumulative_bom(tank_results):
         'contingency': 0,
         'tank_storage': 0.0, 'stone_storage': 0.0, 'total_storage': 0.0,
         'geoTank': 0.0, 'geoStone': 0.0, 'geoTotal': 0.0,
+        'geoTank_yd2': 0.0, 'geoStone_yd2': 0.0, 'geoTotal_yd2': 0.0,
+        'geoTank_yd2_adj': 0.0,
         'stone_yd3': 0.0, 'stone_tons': 0.0,
+        'ptrow_total_crates': 0, 'ptrow_woven_yd2': 0,
+        'geogrid_top_yd2': 0, 'geogrid_bottom_yd2': 0,
+        'liner_tank_yd2': 0, 'liner_stone_yd2': 0, 'liner_total_yd2': 0,
+        'large_pipe_qty': 0,
     }
     for r in tank_results:
         for k in bom:
@@ -1210,22 +1276,51 @@ def multi_download_quote():
         y -= 13
 
         # Cumulative geo conversion ft² → yd²
-        cum_geoTank_yd2  = int(round(cum['geoTank']  / 9, 0))
+        cum_geoTank_yd2_adj = int(cum.get('geoTank_yd2_adj', round(cum['geoTank'] / 9, 0)))
         cum_geoStone_yd2 = int(round(cum['geoStone'] / 9, 0))
         cum_stone_yd3    = int(cum['stone_yd3'])
         cum_adapters     = cum['top_adapters_12'] + cum['top_adapters_16']
-        geoWaste_pct     = 20  # standard waste assumption for multi-tank
+        geoWaste_pct     = tank_results[0]['geoWaste'] if tank_results else 20
+
+        # Geogrid combined
+        cum_geogrid_top  = int(cum.get('geogrid_top_yd2', 0))
+        cum_geogrid_bot  = int(cum.get('geogrid_bottom_yd2', 0))
+        cum_geogrid_total = cum_geogrid_top + cum_geogrid_bot
+        geogrid_desc = (
+            f'BIAXIAL GEOGRID (INTEGRALLY FORMED POLYPROPYLENE) + {geoWaste_pct}% WASTE'
+            + (f'  [TOP: {cum_geogrid_top} SY + BOTTOM: {cum_geogrid_bot} SY]'
+               if cum_geogrid_top > 0 and cum_geogrid_bot > 0 else '')
+        )
+
+        # Liner label
+        cum_liner_tank  = int(cum.get('liner_tank_yd2', 0))
+        cum_liner_stone = int(cum.get('liner_stone_yd2', 0))
+        cum_liner_total = int(cum.get('liner_total_yd2', 0))
+        any_liner_tank  = any(r.get('liner_on_tank',  False) for r in tank_results)
+        any_liner_stone = any(r.get('liner_on_stone', False) for r in tank_results)
+        if any_liner_tank and any_liner_stone:
+            liner_desc = (f'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 TANK + STONE ENVELOPE'
+                          f'  [{cum_liner_tank} SY TANK + {cum_liner_stone} SY STONE]')
+        elif any_liner_tank:
+            liner_desc = 'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 TANK ENVELOPE  (AQ-100-03.2)'
+        elif any_liner_stone:
+            liner_desc = 'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 STONE BACKFILL ENVELOPE  (AQ-100-03.4)'
+        else:
+            liner_desc = 'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 NOT SPECIFIED'
 
         others_rows_mt = [
-            ('A', f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD²) + {geoWaste_pct}% WASTE (TANK ONLY)',
-             cum_geoTank_yd2, 'SQ YD'),
-            ('B', f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD²) + {geoWaste_pct}% WASTE (BACKFILL ONLY)',
+            ('A', f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste_pct}% WASTE (TANK ONLY)',
+             cum_geoTank_yd2_adj, 'SQ YD'),
+            ('B', f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste_pct}% WASTE (BACKFILL ONLY)',
              cum_geoStone_yd2, 'SQ YD'),
-            ('C', 'WOVEN GEOTEXTILE + 20% WASTE (TANK ONLY)', 0, 'SQ YD'),
-            ('D', f'BIAXIAL GEOGRID (INTEGRALLY FORMED POLYPROPYLENE) + {geoWaste_pct}% WASTE', 0, 'SQ YD'),
+            ('C', f'WOVEN MONOFILAMENT GEOTEXTILE \u2014 PT-ROW\u2122 PRE-TREATMENT + {geoWaste_pct}% WASTE',
+             int(cum.get('ptrow_woven_yd2', 0)), 'SQ YD'),
+            ('D', geogrid_desc, cum_geogrid_total, 'SQ YD'),
             ('E', 'CASTINGS FOR VENTING / INSPECTION PORTS / INLETS', int(cum_adapters), 'EACH'),
-            ('F', 'LARGE DIAMETER PIPE CONNECTION (18\u201336\u2033) \u2014 GEOTEXTILE BOOT / ABUTMENT', 0, 'EACH'),
+            ('F', 'LARGE DIAMETER PIPE CONNECTION (18\u201336\u2033) \u2014 GEOTEXTILE BOOT / ABUTMENT',
+             int(cum.get('large_pipe_qty', 0)), 'EACH'),
             ('G', 'STONE BACKFILL OR SELECT BACKFILL ESTIMATED FOR UG SYSTEM', cum_stone_yd3, 'CU YD'),
+            ('H', liner_desc, cum_liner_total, 'SQ YD'),
         ]
 
         max_ds_chars = 90
