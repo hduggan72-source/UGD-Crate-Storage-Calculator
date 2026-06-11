@@ -554,14 +554,65 @@
 
             <!-- DIMENSIONS -->
             <div class="section-label">Tank Dimensions</div>
-            <div class="input-grid">
-                <div class="input-group">
-                    <label>Known Width (ft)</label>
-                    <input type="number" id="f_known_width" step="0.01" min="0" placeholder="e.g. 20" oninput="saveDraft()">
+
+            <!-- Shape mode toggle -->
+            <div style="margin-bottom:10px;">
+                <div style="display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;">
+                    <button type="button" id="mtShapeBtn_rect" onclick="setMtShapeMode('rectangle')"
+                        style="flex:1;padding:6px 4px;border:none;cursor:pointer;font-size:12px;font-weight:bold;background:#1e3a8a;color:#fff;">
+                        ▭ Rectangle
+                    </button>
+                    <button type="button" id="mtShapeBtn_complex" onclick="setMtShapeMode('complex')"
+                        style="flex:1;padding:6px 4px;border:none;cursor:pointer;font-size:12px;font-weight:bold;background:var(--card);color:var(--text);">
+                        ⬠ Complex Shape
+                    </button>
+                </div>
+            </div>
+
+            <!-- Rectangle inputs -->
+            <div id="mtRectInputs">
+                <div class="input-grid">
+                    <div class="input-group">
+                        <label>Known Width (ft)</label>
+                        <input type="number" id="f_known_width" step="0.01" min="0" placeholder="e.g. 20" oninput="saveDraft()">
+                    </div>
+                    <div class="input-group">
+                        <label>Known Length (ft)</label>
+                        <input type="number" id="f_known_length" step="0.01" min="0" placeholder="e.g. 40" oninput="saveDraft()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Complex shape inputs -->
+            <div id="mtComplexInputs" style="display:none;">
+                <div style="background:rgba(30,58,138,0.08);border:1px solid rgba(30,58,138,0.25);border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:11px;line-height:1.5;">
+                    <strong>Complex Shape</strong> — Enter scaled plan values. Tool derives second dimension from
+                    area ÷ known dim, snaps both to crate modules. Leave excavation fields blank to auto-estimate.
                 </div>
                 <div class="input-group">
-                    <label>Known Length (ft)</label>
-                    <input type="number" id="f_known_length" step="0.01" min="0" placeholder="e.g. 40" oninput="saveDraft()">
+                    <label>Scaled Tank Footprint Area (ft²)</label>
+                    <input type="number" step="0.001" id="f_complex_scaled_area" value="" min="0"
+                        oninput="saveDraft(); updateMtComplexCalc();">
+                </div>
+                <div class="input-group">
+                    <label>Known Width or Length (ft) — one dimension from plans</label>
+                    <input type="number" step="0.001" id="f_complex_known_dim" value="" min="0"
+                        oninput="saveDraft(); updateMtComplexCalc();">
+                </div>
+                <div id="mtComplexDerivedDim" style="font-size:11px;padding:5px 8px;background:rgba(30,58,138,0.06);border-radius:4px;margin-bottom:6px;display:none;"></div>
+                <div class="input-group">
+                    <label>Scaled Tank Perimeter (ft)</label>
+                    <input type="number" step="0.001" id="f_complex_tank_perim" value="" min="0" oninput="saveDraft()">
+                </div>
+                <div class="input-group">
+                    <label>Excavation Envelope Area (ft²) — optional</label>
+                    <input type="number" step="0.001" id="f_complex_excav_area" value="" min="0"
+                        placeholder="Leave blank to auto-estimate" oninput="saveDraft()">
+                </div>
+                <div class="input-group">
+                    <label>Excavation Envelope Perimeter (ft) — optional</label>
+                    <input type="number" step="0.001" id="f_complex_excav_perim" value="" min="0"
+                        placeholder="Leave blank to auto-estimate" oninput="saveDraft()">
                 </div>
             </div>
 
@@ -1095,6 +1146,9 @@ function addTank() {
         tank_label: label,
         config: 'SC', layers: '3', traffic_load: 'HS20',
         known_width: '', known_length: '',
+        shape_mode: 'rectangle',
+        complex_scaled_area: '', complex_known_dim: '',
+        complex_tank_perim: '', complex_excav_area: '', complex_excav_perim: '',
         surface_elev: '', tank_bottom_elev: '',
         cover_stone: '1.0', base_stone: '0.333',
         perimeter_stone_width: '1.0', stone_void: '0.40',
@@ -1202,6 +1256,8 @@ const FIELDS = [
     'perimeter_stone_width','stone_void','geoWaste','min_storage',
     'pipe_connectors','top_adapters_12','top_adapters_16',
     'geogrid_top_yd2','geogrid_bottom_yd2','large_pipe_qty',
+    'complex_scaled_area','complex_known_dim','complex_tank_perim',
+    'complex_excav_area','complex_excav_perim',
 ];
 // Non-scalar fields handled separately: ptrow_enabled, ptrow_areas, liner_on_tank, liner_on_stone
 
@@ -1215,6 +1271,10 @@ function loadEditor(idx) {
         const el = document.getElementById('f_' + f);
         if (el) el.value = tanks[idx][f] !== undefined ? tanks[idx][f] : '';
     });
+
+    // Restore shape mode
+    window._mtShapeMode = tanks[idx].shape_mode || 'rectangle';
+    setMtShapeMode(window._mtShapeMode, false);
 
     // Non-scalar: PT-ROW toggle & areas
     const ptToggle = document.getElementById('f_ptrow_enabled');
@@ -1241,6 +1301,8 @@ function saveDraft() {
         const el = document.getElementById('f_' + f);
         if (el) tanks[activeIdx][f] = el.value;
     });
+    // Persist shape mode
+    tanks[activeIdx].shape_mode = window._mtShapeMode || 'rectangle';
     // Non-scalar fields
     const ptToggle = document.getElementById('f_ptrow_enabled');
     if (ptToggle) tanks[activeIdx].ptrow_enabled = ptToggle.checked;
@@ -1762,6 +1824,51 @@ function autoCalcGeogridBottom() {
 window._ptrowAreas = [{label:'Area 1', wqv:0, pct:10}];
 window._ptrowFlowAreas = [{label:'Area 1', cfs:0}];
 window._mtPtrowMethod  = 'volume';
+window._mtShapeMode    = 'rectangle';
+
+function setMtShapeMode(mode, doSave) {
+    window._mtShapeMode = mode;
+    const rectBtn     = document.getElementById('mtShapeBtn_rect');
+    const complexBtn  = document.getElementById('mtShapeBtn_complex');
+    const rectInputs  = document.getElementById('mtRectInputs');
+    const complexInps = document.getElementById('mtComplexInputs');
+    if (!rectBtn) return;
+    if (mode === 'complex') {
+        complexBtn.style.background = '#1e3a8a'; complexBtn.style.color = '#fff';
+        rectBtn.style.background    = 'var(--card)'; rectBtn.style.color = 'var(--text)';
+        if (rectInputs)  rectInputs.style.display  = 'none';
+        if (complexInps) complexInps.style.display = 'block';
+        updateMtComplexCalc();
+    } else {
+        rectBtn.style.background    = '#1e3a8a'; rectBtn.style.color = '#fff';
+        complexBtn.style.background = 'var(--card)'; complexBtn.style.color = 'var(--text)';
+        if (rectInputs)  rectInputs.style.display  = 'block';
+        if (complexInps) complexInps.style.display = 'none';
+    }
+    if (doSave !== false) saveDraft();
+}
+
+function updateMtComplexCalc() {
+    const area     = parseFloat(document.getElementById('f_complex_scaled_area')?.value) || 0;
+    const knownDim = parseFloat(document.getElementById('f_complex_known_dim')?.value)   || 0;
+    const derived  = document.getElementById('mtComplexDerivedDim');
+    if (!derived) return;
+    if (area > 0 && knownDim > 0) {
+        const otherDim    = area / knownDim;
+        const cratesKnown = Math.floor(knownDim / 1.9685);
+        const cratesOther = Math.floor(otherDim  / 3.937);
+        const snappedK    = cratesKnown * 1.9685;
+        const snappedO    = cratesOther * 3.937;
+        const cratesTotal = cratesKnown * cratesOther;
+        derived.style.display = 'block';
+        derived.innerHTML = `Derived dim: <strong>${otherDim.toFixed(2)} ft</strong> → snapped <strong>${snappedO.toFixed(2)} ft</strong> &nbsp;|&nbsp; `
+                          + `Snapped known: <strong>${snappedK.toFixed(2)} ft</strong> &nbsp;|&nbsp; `
+                          + `Crates/layer ≈ <strong>${cratesTotal}</strong>`;
+    } else {
+        derived.style.display = 'none';
+    }
+}
+
 const MT_FLOW_COEFF = 0.464;
 
 function setMtPtrowMethod(m) {

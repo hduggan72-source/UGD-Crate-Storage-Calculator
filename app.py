@@ -739,25 +739,68 @@ def calc_tank(t):
     tank_height        = layer_heights[layers - 1] if layers <= len(layer_heights) else layer_heights[-1]
     total_system_depth = base_stone + tank_height + cover_stone
 
-    # Rectangle geometry
-    crates_wide    = math.floor(known_width / MODULE_WID)
-    crates_long    = math.floor(known_length / MODULE_LEN)
-    tank_width     = crates_wide * MODULE_WID
-    tank_length    = crates_long * MODULE_LEN
-    crates_layer   = crates_wide * crates_long
-    num_crates     = crates_layer * layers
-    gross_tank_vol = tank_width * tank_length * tank_height
-    tank_storage   = gross_tank_vol * void_ratio
+    shape_mode = t.get('shape_mode', 'rectangle')
 
-    outer_width    = tank_width + 2 * perimeter_stone_width
-    outer_length   = tank_length + 2 * perimeter_stone_width
-    total_excav_vol   = outer_width * outer_length * total_system_depth
-    stone_env_vol     = total_excav_vol - gross_tank_vol
-    total_stone_stor  = stone_env_vol * stone_void
-    total_storage     = tank_storage + total_stone_stor
+    if shape_mode == 'complex':
+        complex_scaled_area  = float(t.get('complex_scaled_area',  0) or 0)
+        complex_known_dim    = float(t.get('complex_known_dim',    0) or 0)
+        complex_tank_perim   = float(t.get('complex_tank_perim',   0) or 0)
+        complex_excav_area   = float(t.get('complex_excav_area',   0) or 0)
+        complex_excav_perim  = float(t.get('complex_excav_perim',  0) or 0)
 
-    used_perimeter = 2 * (tank_width + tank_length)
-    tank_perim     = used_perimeter
+        other_dim    = complex_scaled_area / complex_known_dim if complex_known_dim > 0 else 0
+        crates_known = math.floor(complex_known_dim / MODULE_WID) if complex_known_dim > 0 else 0
+        crates_other = math.floor(other_dim / MODULE_LEN) if other_dim > 0 else 0
+        snapped_known = crates_known * MODULE_WID
+        snapped_other = crates_other * MODULE_LEN
+
+        complex_tank_area  = snapped_known * snapped_other
+        gross_tank_vol     = complex_tank_area * tank_height
+        tank_storage       = gross_tank_vol * void_ratio
+        crates_layer       = crates_known * crates_other
+        num_crates         = crates_layer * layers
+
+        if complex_excav_area <= 0:
+            complex_excav_area = (snapped_known + 2*perimeter_stone_width) * (snapped_other + 2*perimeter_stone_width)
+        if complex_excav_perim <= 0:
+            complex_excav_perim = complex_tank_perim + 8*perimeter_stone_width
+
+        total_excav_vol  = complex_excav_area * total_system_depth
+        stone_env_vol    = total_excav_vol - gross_tank_vol
+        total_stone_stor = stone_env_vol * stone_void
+        total_storage    = tank_storage + total_stone_stor
+
+        used_perimeter   = round(complex_tank_perim, 2)
+        tank_width       = round(snapped_known, 2)
+        tank_length      = round(snapped_other, 2)
+        tank_perim       = complex_tank_perim
+        outer_width      = round(snapped_known + 2*perimeter_stone_width, 4)
+        outer_length     = round(snapped_other + 2*perimeter_stone_width, 4)
+
+    else:
+        # Rectangle geometry
+        crates_wide    = math.floor(known_width  / MODULE_WID)
+        crates_long    = math.floor(known_length / MODULE_LEN)
+        tank_width     = crates_wide * MODULE_WID
+        tank_length    = crates_long * MODULE_LEN
+        crates_layer   = crates_wide * crates_long
+        num_crates     = crates_layer * layers
+        gross_tank_vol = tank_width * tank_length * tank_height
+        tank_storage   = gross_tank_vol * void_ratio
+
+        outer_width    = tank_width  + 2 * perimeter_stone_width
+        outer_length   = tank_length + 2 * perimeter_stone_width
+        total_excav_vol   = outer_width * outer_length * total_system_depth
+        stone_env_vol     = total_excav_vol - gross_tank_vol
+        total_stone_stor  = stone_env_vol * stone_void
+        total_storage     = tank_storage + total_stone_stor
+
+        used_perimeter = 2 * (tank_width + tank_length)
+        tank_perim     = used_perimeter
+
+        complex_scaled_area = complex_known_dim = complex_tank_perim = None
+        complex_excav_area  = complex_excav_perim = None
+        complex_tank_area   = None
     side_plates    = round(tank_perim * (layers * side_multiplier) / 5.17)
 
     if config == 'SC':
@@ -771,11 +814,15 @@ def calc_tank(t):
     contingency = max(0, math.ceil(base_units / _MT_PALLETS['base']) * _MT_PALLETS['base'] - base_units)
 
     # Geotextile
-    tank_top_bottom = 2 * tank_width * tank_length
-    tank_sides      = used_perimeter * tank_height
-    excav_area      = outer_width * outer_length
-    geoTank  = round((tank_top_bottom + tank_sides) * (1 + geoWaste / 100.0), 1)
-    geoStone = round((excav_area * 2 + outer_width * total_system_depth * 2 + outer_length * total_system_depth * 2) * (1 + geoWaste / 100.0), 1)
+    excav_area = outer_width * outer_length if shape_mode != 'complex' else (complex_excav_area or 0)
+    if shape_mode == 'complex':
+        geoTank  = round((2*(complex_tank_area or 0) + (complex_tank_perim or 0)*tank_height) * (1 + geoWaste/100.0), 1)
+        geoStone = round((2*(complex_excav_area or 0) + (complex_excav_perim or 0)*total_system_depth) * (1 + geoWaste/100.0), 1)
+    else:
+        tank_top_bottom = 2 * tank_width * tank_length
+        tank_sides      = 2 * (tank_width + tank_length) * tank_height
+        geoTank  = round((tank_top_bottom + tank_sides) * (1 + geoWaste/100.0), 1)
+        geoStone = round((excav_area*2 + outer_width*total_system_depth*2 + outer_length*total_system_depth*2) * (1 + geoWaste/100.0), 1)
     geoTotal = round(geoTank + geoStone, 1)
 
     # ── Non-woven deduction: geogrid bottom substitutes tank floor fabric ──
@@ -852,6 +899,12 @@ def calc_tank(t):
         'tank_label':      tank_label,
         'config':          config,
         'layers':          layers,
+        'shape_mode':      shape_mode,
+        'complex_scaled_area':  complex_scaled_area  if shape_mode == 'complex' else None,
+        'complex_known_dim':    complex_known_dim     if shape_mode == 'complex' else None,
+        'complex_tank_perim':   complex_tank_perim    if shape_mode == 'complex' else None,
+        'complex_excav_area':   complex_excav_area    if shape_mode == 'complex' else None,
+        'complex_excav_perim':  complex_excav_perim   if shape_mode == 'complex' else None,
         'traffic_load':    traffic_load,
         # Geometry
         'tank_width':      round(tank_width, 2),
