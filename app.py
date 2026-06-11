@@ -759,6 +759,8 @@ def calc_tank(t):
         tank_storage       = gross_tank_vol * void_ratio
         crates_layer       = crates_known * crates_other
         num_crates         = crates_layer * layers
+        crates_wide        = crates_known   # alias for display consistency
+        crates_long        = crates_other   # alias for display consistency
 
         if complex_excav_area <= 0:
             complex_excav_area = (snapped_known + 2*perimeter_stone_width) * (snapped_other + 2*perimeter_stone_width)
