@@ -56,6 +56,115 @@ def calc_live_load_fos(traffic_load, cover_depth_ft, config):
     fos_dl = round(max_str / dl_psi, 2) if dl_psi > 0 else None
     return round(ll_psi, 3), round(dl_psi, 3), fos_ll, fos_dl
 
+# ══════════════════════════════════════════════════════════════════
+#  VOID SPACE ENTRY  (Complex Shape mode)
+#  Open areas inside the tank footprint (concrete islands, light
+#  poles, monuments, etc.) that the tank must form around.
+#    • Void dims snap UP to whole crate modules (must fully clear
+#      the obstruction) — the main footprint snaps DOWN.
+#    • Snapped void area is subtracted from the tank footprint.
+#    • Void perimeter is added to the tank perimeter (interior
+#      walls take side plates + tank-wrap fabric).
+#    • A ring of #57 stone (width = perimeter stone width, matching
+#      the outer perimeter detail) hugs the interior tank walls and
+#      keeps storage credit via the Perimeter stone layer.
+#    • The core inside the ring earns ZERO storage credit and is
+#      filled per the global core-fill choice:
+#        native → reported as Additional Backfill Required, plus a
+#                 vertical separation geotextile at the inner ring
+#                 face (stone↔soil; enables future re-excavation)
+#        stone  → core volume added to stone PURCHASE totals only
+#                 (no separation fabric — stone against stone)
+#  Core fill occupies the tank-height zone only — base stone and
+#  cover stone always run the full excavation footprint.
+# ══════════════════════════════════════════════════════════════════
+
+def parse_void_spaces(form, perimeter_stone_width, tank_height):
+    MODULE_WID = 1.9685
+    MODULE_LEN = 3.937
+    enabled   = form.get('void_enabled', '0') == '1'
+    core_fill = form.get('void_core_fill', 'native')
+    if core_fill not in ('native', 'stone'):
+        core_fill = 'native'
+
+    voids = []
+    total_area = total_perim = total_core_area = total_inner_perim = 0.0
+    total_crates_layer = 0
+    s = perimeter_stone_width
+
+    if enabled:
+        i = 0
+        while f'void_area_{i}' in form:
+            area_in  = float(form.get(f'void_area_{i}', 0) or 0)
+            dim_in   = float(form.get(f'void_dim_{i}', 0) or 0)
+            perim_in = float(form.get(f'void_perim_{i}', 0) or 0)
+            label    = (form.get(f'void_label_{i}', '') or '').strip() or f'Void {i+1}'
+            if area_in > 0 and dim_in > 0:
+                other_dim = area_in / dim_in
+                # Snap UP — a crate may not remain inside the obstruction.
+                # 1e-9 epsilon prevents float error bumping exact multiples.
+                crates_w  = math.ceil(dim_in    / MODULE_WID - 1e-9)
+                crates_l  = math.ceil(other_dim / MODULE_LEN - 1e-9)
+                snapped_w = crates_w * MODULE_WID
+                snapped_l = crates_l * MODULE_LEN
+                v_area    = snapped_w * snapped_l
+                v_perim   = perim_in if perim_in > 0 else 2 * (snapped_w + snapped_l)
+                core_w    = snapped_w - 2 * s
+                core_l    = snapped_l - 2 * s
+                if core_w > 0 and core_l > 0:
+                    core_area   = core_w * core_l
+                    inner_perim = max(0.0, v_perim - 8 * s)
+                else:
+                    core_area   = 0.0   # void too small for a full ring — all stone
+                    inner_perim = 0.0
+                voids.append({
+                    'label':        label,
+                    'area_in':      area_in,
+                    'dim_in':       dim_in,
+                    'perim_in':     perim_in,
+                    'other_dim':    round(other_dim, 3),
+                    'snapped_w':    round(snapped_w, 3),
+                    'snapped_l':    round(snapped_l, 3),
+                    'crates_w':     crates_w,
+                    'crates_l':     crates_l,
+                    'crates_layer': crates_w * crates_l,
+                    'snapped_area': round(v_area, 2),
+                    'perim_used':   round(v_perim, 2),
+                    'core_area':    round(core_area, 2),
+                    'inner_perim':  round(inner_perim, 2),
+                })
+                total_area         += v_area
+                total_perim        += v_perim
+                total_core_area    += core_area
+                total_inner_perim  += inner_perim
+                total_crates_layer += crates_w * crates_l
+            i += 1
+
+    active   = enabled and total_area > 0
+    core_vol = total_core_area * tank_height
+    ring_vol = max(0.0, total_area - total_core_area) * tank_height
+
+    return {
+        'enabled':            enabled,
+        'active':             active,
+        'core_fill':          core_fill,
+        'voids':              voids,
+        'total_area':         total_area,
+        'total_perim':        total_perim,
+        'total_core_area':    total_core_area,
+        'total_inner_perim':  total_inner_perim,
+        'total_crates_layer': total_crates_layer,
+        'core_vol':           core_vol,
+        'ring_vol':           ring_vol,
+    }
+
+_VOID_INERT = {
+    'enabled': False, 'active': False, 'core_fill': 'native', 'voids': [],
+    'total_area': 0.0, 'total_perim': 0.0, 'total_core_area': 0.0,
+    'total_inner_perim': 0.0, 'total_crates_layer': 0, 'core_vol': 0.0, 'ring_vol': 0.0,
+}
+
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     results = None
@@ -119,12 +228,18 @@ def index():
             crates_other = math.floor(other_dim / MODULE_LEN) if other_dim > 0 else 0
             snapped_known = crates_known * MODULE_WID
             snapped_other = crates_other * MODULE_LEN
-            complex_tank_area = snapped_known * snapped_other
-            crates_per_layer  = crates_known * crates_other
+            complex_gross_area = snapped_known * snapped_other
+
+            # ── Void Space Entry ──────────────────────────────────
+            vs = parse_void_spaces(request.form, perimeter_stone_width, tank_height)
+            complex_tank_area = max(0.0, complex_gross_area - vs['total_area'])
+            crates_per_layer  = max(0, crates_known * crates_other - vs['total_crates_layer'])
+            effective_perim   = complex_tank_perim + (vs['total_perim'] if vs['active'] else 0.0)
+
             num_crates        = crates_per_layer * layers
             gross_tank_vol    = complex_tank_area * tank_height
             tank_storage      = gross_tank_vol * void_ratio
-            tank_perim_calc   = complex_tank_perim
+            tank_perim_calc   = effective_perim
             side_plates       = round(tank_perim_calc * (layers * side_multiplier) / 5.17)
             if config == 'SC':
                 base_units    = num_crates
@@ -132,18 +247,31 @@ def index():
             else:
                 base_units    = num_crates * 2
                 bottom_plates = 0
+            # Excavation is FULL footprint — voids are dug and re-filled,
+            # so excavation area/perimeter never shrink for voids.
             if complex_excav_area <= 0:
                 complex_excav_area = (snapped_known + 2*perimeter_stone_width) * (snapped_other + 2*perimeter_stone_width)
             if complex_excav_perim <= 0:
                 complex_excav_perim = complex_tank_perim + 8*perimeter_stone_width
             total_excavation_vol  = complex_excav_area * total_system_depth
             stone_envelope_volume = total_excavation_vol - gross_tank_vol
-            total_stone_storage   = stone_envelope_volume * stone_void
+            # Void core NEVER earns storage credit. When core fill = native
+            # it is also excluded from the stone purchase volume.
+            void_core_vol      = vs['core_vol'] if vs['active'] else 0.0
+            stone_storage_env  = max(0.0, stone_envelope_volume - void_core_vol)
+            stone_purchase_env = stone_envelope_volume if (vs['active'] and vs['core_fill'] == 'stone') else stone_storage_env
+            total_stone_storage   = stone_storage_env * stone_void
             total_storage         = tank_storage + total_stone_storage
-            geoTank  = round((2*complex_tank_area + complex_tank_perim*tank_height) * (1 + geoWaste/100.0), 1)
-            geoStone = round((2*complex_excav_area + complex_excav_perim*total_system_depth) * (1 + geoWaste/100.0), 1)
+            # Separation fabric — native core only (stone↔soil interface at
+            # inner ring face; enables future re-excavation of the void core)
+            if vs['active'] and vs['core_fill'] == 'native':
+                void_sep_fabric_ft2 = round(vs['total_inner_perim'] * tank_height * (1 + geoWaste/100.0), 1)
+            else:
+                void_sep_fabric_ft2 = 0.0
+            geoTank  = round((2*complex_tank_area + effective_perim*tank_height) * (1 + geoWaste/100.0), 1)
+            geoStone = round((2*complex_excav_area + complex_excav_perim*total_system_depth) * (1 + geoWaste/100.0) + void_sep_fabric_ft2, 1)
             geoTotal = round(geoTank + geoStone, 1)
-            used_perimeter = round(complex_tank_perim, 2)
+            used_perimeter = round(effective_perim, 2)
             tank_width     = round(snapped_known, 2)
             tank_length    = round(snapped_other, 2)
         else:
@@ -175,8 +303,13 @@ def index():
             geoStone = round((outer_width*outer_length*2 + outer_width*total_system_depth*2 + outer_length*total_system_depth*2) * (1 + geoWaste/100.0), 1)
             geoTotal = round(geoTank + geoStone, 1)
             complex_tank_area = complex_tank_perim = complex_excav_area = complex_excav_perim = None
+            complex_gross_area  = None
+            vs                  = dict(_VOID_INERT)
+            void_core_vol       = 0.0
+            stone_purchase_env  = stone_envelope_volume
+            void_sep_fabric_ft2 = 0.0
 
-        stone_backfill_bulk_ft3  = round(stone_envelope_volume * 1.10, 1)
+        stone_backfill_bulk_ft3  = round(stone_purchase_env * 1.10, 1)
         stone_backfill_bulk_yd3  = round(stone_backfill_bulk_ft3 / 27, 2)
         stone_backfill_bulk_tons = round(stone_backfill_bulk_ft3 * 100 / 2000, 2)
 
@@ -187,13 +320,22 @@ def index():
             excav_area_for_layers = outer_width * outer_length
             tank_footprint        = tank_width * tank_length
 
+        # Void core area is excluded from the Perimeter stone layer — the
+        # ring around each void stays in (storage credit via Perimeter
+        # toggle); the core is tracked separately with NO storage credit.
+        _void_core_area_layers = vs['total_core_area'] if vs['active'] else 0.0
         stone_top_gross      = round(excav_area_for_layers * cover_stone, 1)
         stone_top_net        = round(stone_top_gross * stone_void, 1)
-        stone_perim_gross    = round((excav_area_for_layers - tank_footprint) * tank_height, 1)
+        stone_perim_gross    = round((excav_area_for_layers - tank_footprint - _void_core_area_layers) * tank_height, 1)
         stone_perim_net      = round(stone_perim_gross * stone_void, 1)
         stone_base_gross     = round(excav_area_for_layers * base_stone, 1)
         stone_base_net       = round(stone_base_gross * stone_void, 1)
-        stone_layer_total_gross = round(stone_top_gross + stone_perim_gross + stone_base_gross, 1)
+        # Void core stone (purchase only) appears in the gross total when
+        # the core-fill choice is #57 stone; its net contribution is 0.
+        void_core_stone_gross = round(void_core_vol, 1) if (vs['active'] and vs['core_fill'] == 'stone') else 0.0
+        void_add_backfill_ft3 = round(void_core_vol, 1) if (vs['active'] and vs['core_fill'] == 'native') else 0.0
+        void_add_backfill_yd3 = round(void_add_backfill_ft3 / 27, 2)
+        stone_layer_total_gross = round(stone_top_gross + stone_perim_gross + stone_base_gross + void_core_stone_gross, 1)
         stone_layer_total_net   = round(stone_top_net + stone_perim_net + stone_base_net, 1)
 
         # ── Geogrid default quantities ────────────────────────────────
@@ -337,6 +479,25 @@ def index():
             'complex_crates_other': crates_other         if shape_mode == 'complex' else None,
             'complex_excav_area':   round(complex_excav_area, 1)  if shape_mode == 'complex' else None,
             'complex_excav_perim':  round(complex_excav_perim, 1) if shape_mode == 'complex' else None,
+            'complex_gross_area':   round(complex_gross_area, 2)  if shape_mode == 'complex' else None,
+            'void_enabled':         vs['enabled'],
+            'void_active':          vs['active'],
+            'void_core_fill':       vs['core_fill'],
+            'void_spaces':          vs['voids'],
+            'void_total_area':      round(vs['total_area'], 1),
+            'void_total_perim':     round(vs['total_perim'], 1),
+            'void_total_crates':    vs['total_crates_layer'],
+            'void_core_area':       round(vs['total_core_area'], 1),
+            'void_core_vol_ft3':    round(void_core_vol, 1),
+            'void_core_vol_yd3':    round(void_core_vol / 27, 2),
+            'void_ring_vol_ft3':    round(vs['ring_vol'], 1) if vs['active'] else 0.0,
+            'void_sep_fabric_ft2':  void_sep_fabric_ft2,
+            'void_sep_fabric_yd2':  round(void_sep_fabric_ft2 / 9, 1),
+            'void_add_backfill_ft3': void_add_backfill_ft3,
+            'void_add_backfill_yd3': void_add_backfill_yd3,
+            'void_core_stone_ft3':  void_core_stone_gross,
+            'void_core_stone_yd3':  round(void_core_stone_gross * 1.10 / 27, 2),
+            'void_core_stone_tons': round(void_core_stone_gross * 1.10 * 100 / 2000, 2),
             'used_perimeter': round(used_perimeter, 2),
             'base_units': base_units, 'side_plates': side_plates,
             'bottom_plates': bottom_plates, 'pipe_connectors': pipe_connectors,
@@ -1634,24 +1795,37 @@ def download_pdf():
         crates_other = math.floor(other_dim / MODULE_LEN) if other_dim > 0 else 0
         snapped_known = crates_known * MODULE_WID
         snapped_other = crates_other * MODULE_LEN
-        complex_tank_area = snapped_known * snapped_other
-        crates_per_layer  = crates_known * crates_other
+        complex_gross_area = snapped_known * snapped_other
+
+        # ── Void Space Entry ──────────────────────────────────────
+        vs = parse_void_spaces(request.form, perimeter_stone_width, tank_height)
+        complex_tank_area = max(0.0, complex_gross_area - vs['total_area'])
+        crates_per_layer  = max(0, crates_known * crates_other - vs['total_crates_layer'])
+        effective_perim   = complex_tank_perim + (vs['total_perim'] if vs['active'] else 0.0)
+
         num_crates        = crates_per_layer * layers
         gross_tank_vol    = complex_tank_area * tank_height
         tank_storage      = gross_tank_vol * void_ratio
-        tank_perim_calc   = complex_tank_perim
+        tank_perim_calc   = effective_perim
         if complex_excav_area <= 0:
             complex_excav_area = (snapped_known + 2*perimeter_stone_width) * (snapped_other + 2*perimeter_stone_width)
         if complex_excav_perim <= 0:
             complex_excav_perim = complex_tank_perim + 8*perimeter_stone_width
         total_excavation_vol  = complex_excav_area * total_system_depth
         stone_envelope_volume = total_excavation_vol - gross_tank_vol
-        total_stone_storage   = stone_envelope_volume * stone_void
+        void_core_vol      = vs['core_vol'] if vs['active'] else 0.0
+        stone_storage_env  = max(0.0, stone_envelope_volume - void_core_vol)
+        stone_purchase_env = stone_envelope_volume if (vs['active'] and vs['core_fill'] == 'stone') else stone_storage_env
+        total_stone_storage   = stone_storage_env * stone_void
         total_storage         = tank_storage + total_stone_storage
-        geoTank  = round((2*complex_tank_area + complex_tank_perim*tank_height) * (1 + geoWaste/100.0), 1)
-        geoStone = round((2*complex_excav_area + complex_excav_perim*total_system_depth) * (1 + geoWaste/100.0), 1)
+        if vs['active'] and vs['core_fill'] == 'native':
+            void_sep_fabric_ft2 = round(vs['total_inner_perim'] * tank_height * (1 + geoWaste/100.0), 1)
+        else:
+            void_sep_fabric_ft2 = 0.0
+        geoTank  = round((2*complex_tank_area + effective_perim*tank_height) * (1 + geoWaste/100.0), 1)
+        geoStone = round((2*complex_excav_area + complex_excav_perim*total_system_depth) * (1 + geoWaste/100.0) + void_sep_fabric_ft2, 1)
         geoTotal = round(geoTank + geoStone, 1)
-        used_perimeter = complex_tank_perim
+        used_perimeter = effective_perim
         tank_width     = round(snapped_known, 2)
         tank_length    = round(snapped_other, 2)
     else:
@@ -1675,10 +1849,15 @@ def download_pdf():
         geoTotal = round(geoTank + geoStone, 1)
         complex_tank_area = complex_tank_perim = complex_excav_area = complex_excav_perim = None
         complex_scaled_area = complex_known_dim = 0.0
+        complex_gross_area  = None
         crates_known = crates_wide   # alias for display
         crates_other = crates_long   # alias for display
+        vs                  = dict(_VOID_INERT)
+        void_core_vol       = 0.0
+        stone_purchase_env  = stone_envelope_volume
+        void_sep_fabric_ft2 = 0.0
 
-    stone_envelope_with_overage = stone_envelope_volume * 1.10
+    stone_envelope_with_overage = stone_purchase_env * 1.10
 
     if shape_mode == 'complex':
         excav_area_for_layers = complex_excav_area
@@ -1687,12 +1866,18 @@ def download_pdf():
         excav_area_for_layers = outer_width * outer_length
         tank_footprint        = tank_width * tank_length
 
+    # Void core area excluded from Perimeter stone layer (ring stays in;
+    # core gets NO storage credit and is tracked separately)
+    _void_core_area_layers = vs['total_core_area'] if vs['active'] else 0.0
     stone_top_gross      = round(excav_area_for_layers * cover_stone, 1)
     stone_top_net        = round(stone_top_gross * stone_void, 1)
-    stone_perim_gross    = round((excav_area_for_layers - tank_footprint) * tank_height, 1)
+    stone_perim_gross    = round((excav_area_for_layers - tank_footprint - _void_core_area_layers) * tank_height, 1)
     stone_perim_net      = round(stone_perim_gross * stone_void, 1)
     stone_base_gross     = round(excav_area_for_layers * base_stone, 1)
     stone_base_net       = round(stone_base_gross * stone_void, 1)
+    void_core_stone_gross = round(void_core_vol, 1) if (vs['active'] and vs['core_fill'] == 'stone') else 0.0
+    void_add_backfill_ft3 = round(void_core_vol, 1) if (vs['active'] and vs['core_fill'] == 'native') else 0.0
+    void_add_backfill_yd3 = round(void_add_backfill_ft3 / 27, 2)
 
     # ── Stone layer net-storage inclusion toggles ──────────────────
     # JS sends '1' (included) or '0' (excluded) for each layer.
@@ -1809,10 +1994,23 @@ def download_pdf():
         y = _kv_row(c, y, 'Derived Dimension', f'{derived} ft', shade=False)
         y = _kv_row(c, y,
                     'Real-World Snapped Tank',
-                    f'{tank_width} ft × {tank_length} ft  (= {round(complex_tank_area,1)} ft²)',
+                    f'{tank_width} ft × {tank_length} ft  (= {round(complex_gross_area,1)} ft²)',
                     shade=True)
-        y = _kv_row(c, y, 'Excavation Envelope Area', f'{round(complex_excav_area,1)} ft²', shade=False)
-        y = _kv_row(c, y, 'Excavation Envelope Perimeter', f'{round(complex_excav_perim,1)} ft', shade=True)
+        if vs['active']:
+            _vfill = 'Native Backfill' if vs['core_fill'] == 'native' else '#57 Stone (purchase only)'
+            y = _kv_row(c, y,
+                        f"Void Spaces ({len(vs['voids'])} — snapped UP to whole crates)",
+                        f"−{round(vs['total_area'],1)} ft²  |  +{round(vs['total_perim'],1)} ft perimeter  |  −{vs['total_crates_layer']} crates/layer",
+                        val_color=AMBER, shade=False)
+            y = _kv_row(c, y, 'Net Tank Area (after voids)',
+                        f'{round(complex_tank_area,1)} ft²', shade=True)
+            y = _kv_row(c, y, 'Void Core Fill (no storage credit)', _vfill,
+                        val_color=AMBER, shade=False)
+            y = _kv_row(c, y, 'Excavation Envelope Area', f'{round(complex_excav_area,1)} ft²', shade=True)
+            y = _kv_row(c, y, 'Excavation Envelope Perimeter', f'{round(complex_excav_perim,1)} ft', shade=False)
+        else:
+            y = _kv_row(c, y, 'Excavation Envelope Area', f'{round(complex_excav_area,1)} ft²', shade=False)
+            y = _kv_row(c, y, 'Excavation Envelope Perimeter', f'{round(complex_excav_perim,1)} ft', shade=True)
     else:
         y = _kv_row(c, y, 'Shape Mode', 'Rectangle', shade=False)
         y = _kv_row(c, y,
@@ -1884,13 +2082,25 @@ def download_pdf():
     y = _stone_row(y, 'Cover / Top',     stone_top_gross,   stone_top_net,   stone_top_included,   shade=False)
     y = _stone_row(y, 'Perimeter / Sides', stone_perim_gross, stone_perim_net, stone_perim_included, shade=True)
     y = _stone_row(y, 'Base / Bottom',   stone_base_gross,  stone_base_net,  stone_base_included,  shade=False)
+    if vs['active'] and vs['core_fill'] == 'stone':
+        y = _table_row(c, y, [
+            ('Void Core (#57 stone — purchase only)', C_STN_LAYER,              160,       'left',  False, AMBER),
+            (f'{void_core_stone_gross:,.1f}',         C_STN_GROSS_R - COL_W_NUM, COL_W_NUM, 'right', False, AMBER),
+            ('0.0',                                   C_STN_NET_R   - COL_W_NUM, COL_W_NUM, 'right', False, AMBER),
+            ('—  NO CREDIT',                          C_STN_INC_R   - COL_W_INC, COL_W_INC, 'right', True,  AMBER),
+        ], shade=True)
     y = _table_total_row(c, y, [
         ('TOTAL NET STORAGE (INCLUDED LAYERS)',    C_STN_LAYER,              160,       'left'),
-        (f'{stone_top_gross + stone_perim_gross + stone_base_gross:,.1f}',
+        (f'{stone_top_gross + stone_perim_gross + stone_base_gross + void_core_stone_gross:,.1f}',
                                                    C_STN_GROSS_R - COL_W_NUM, COL_W_NUM, 'right'),
         (f'{stone_layer_total_net:,.1f} ft³',      C_STN_NET_R   - COL_W_NUM, COL_W_NUM, 'right'),
         ('',                                       C_STN_INC_R   - COL_W_INC, COL_W_INC, 'right'),
     ], bg=LTGRN, fg=GREEN)
+    if vs['active'] and vs['core_fill'] == 'native':
+        y = _kv_row(c, y,
+                    'ADDITIONAL BACKFILL REQUIRED — Void Core Fill (native/select, by others)',
+                    f'{void_add_backfill_ft3:,.1f} ft³  ({void_add_backfill_yd3:,.2f} yd³)',
+                    val_color=AMBER, shade=True)
     y -= 5
 
     # ── SECTION 5: Project Notes ──────────────────────────────
@@ -2091,11 +2301,15 @@ def download_stage_csv():
         crates_other  = math.floor(other_dim / MODULE_LEN) if other_dim > 0 else 0
         snapped_known = crates_known * MODULE_WID
         snapped_other = crates_other * MODULE_LEN
-        gross_vol     = snapped_known * snapped_other * tank_height
+        # ── Void Space Entry — net the tank, exclude core from storage ──
+        vs = parse_void_spaces(request.form, perimeter_stone_width, tank_height)
+        _net_tank_area = max(0.0, snapped_known * snapped_other - vs['total_area'])
+        gross_vol     = _net_tank_area * tank_height
         tank_storage  = gross_vol * void_ratio
         if complex_excav_area <= 0:
             complex_excav_area = (snapped_known + 2*perimeter_stone_width) * (snapped_other + 2*perimeter_stone_width)
-        stone_envelope_volume = complex_excav_area * total_system_depth - gross_vol
+        void_core_vol = vs['core_vol'] if vs['active'] else 0.0
+        stone_envelope_volume = max(0.0, complex_excav_area * total_system_depth - gross_vol - void_core_vol)
     else:
         crates_wide   = math.floor(known_width / MODULE_WID)
         crates_long   = math.floor(known_length / MODULE_LEN)
@@ -2106,6 +2320,8 @@ def download_stage_csv():
         outer_width   = tank_width + 2*perimeter_stone_width
         outer_length  = tank_length + 2*perimeter_stone_width
         stone_envelope_volume = outer_width * outer_length * total_system_depth - gross_vol
+        vs            = dict(_VOID_INERT)
+        void_core_vol = 0.0
 
     total_stone_storage = stone_envelope_volume * stone_void
 
@@ -2117,13 +2333,15 @@ def download_stage_csv():
     # Compute full net volumes by layer so we can apply the toggle ratio
     if shape_mode == 'complex':
         _excav_area = complex_excav_area
-        _tank_fp    = snapped_known * snapped_other
+        _tank_fp    = _net_tank_area
+        _core_area  = vs['total_core_area'] if vs['active'] else 0.0
     else:
         _excav_area = outer_width * outer_length
         _tank_fp    = tank_width * tank_length
+        _core_area  = 0.0
 
     _top_net   = round(_excav_area * cover_stone * stone_void, 4)
-    _perim_net = round((_excav_area - _tank_fp) * tank_height * stone_void, 4)
+    _perim_net = round((_excav_area - _tank_fp - _core_area) * tank_height * stone_void, 4)
     _base_net  = round(_excav_area * base_stone * stone_void, 4)
     _full_net  = _top_net + _perim_net + _base_net
 
@@ -2162,6 +2380,9 @@ def download_stage_csv():
     writer.writerow([f'# Configuration: {config}-{layers}  |  Stage Increment: {stage_increment_in} in'])
     writer.writerow([f'# Tank Bottom Elev: {tank_bottom_elev} ft  |  Surface Elev: {surface_elev} ft'])
     writer.writerow([f'# Stone Layers Included in Net Total: {incl_str}'])
+    if vs['active']:
+        _vfill = 'Native Backfill' if vs['core_fill'] == 'native' else '#57 Stone (purchase only)'
+        writer.writerow([f"# Void Spaces: {len(vs['voids'])}  |  -{round(vs['total_area'],1)} ft2 tank area  |  Core Fill: {_vfill} - NO storage credit"])
     writer.writerow([f'# Generated: {datetime.datetime.now().strftime("%m/%d/%Y %H:%M")}'])
     writer.writerow([])
     writer.writerow(['Elevation (ft)', 'Tank Storage (ft3)', 'Stone Storage (ft3)', 'Total Storage (ft3)'])
@@ -2257,12 +2478,18 @@ def download_quote():
           crates_other = math.floor(other_dim / MODULE_LEN) if other_dim > 0 else 0
           snapped_known = crates_known * MODULE_WID
           snapped_other = crates_other * MODULE_LEN
-          complex_tank_area = snapped_known * snapped_other
-          crates_per_layer  = crates_known * crates_other
+          complex_gross_area = snapped_known * snapped_other
+
+          # ── Void Space Entry ──────────────────────────────────
+          vs = parse_void_spaces(request.form, perimeter_stone_width, tank_height)
+          complex_tank_area = max(0.0, complex_gross_area - vs['total_area'])
+          crates_per_layer  = max(0, crates_known * crates_other - vs['total_crates_layer'])
+          effective_perim   = complex_tank_perim + (vs['total_perim'] if vs['active'] else 0.0)
+
           num_crates        = crates_per_layer * layers
           gross_tank_vol    = complex_tank_area * tank_height
           tank_storage      = gross_tank_vol * void_ratio
-          tank_perim_calc   = complex_tank_perim
+          tank_perim_calc   = effective_perim
           side_plates       = round(tank_perim_calc * (layers * side_multiplier) / 5.17)
           if config == 'SC':
               base_units    = num_crates
@@ -2276,11 +2503,18 @@ def download_quote():
               complex_excav_perim = complex_tank_perim + 8*perimeter_stone_width
           total_excavation_vol  = complex_excav_area * total_system_depth
           stone_envelope_volume = total_excavation_vol - gross_tank_vol
-          total_stone_storage   = stone_envelope_volume * stone_void
+          void_core_vol      = vs['core_vol'] if vs['active'] else 0.0
+          stone_storage_env  = max(0.0, stone_envelope_volume - void_core_vol)
+          stone_purchase_env = stone_envelope_volume if (vs['active'] and vs['core_fill'] == 'stone') else stone_storage_env
+          total_stone_storage   = stone_storage_env * stone_void
           total_storage         = tank_storage + total_stone_storage
-          geoTank  = round((2*complex_tank_area + complex_tank_perim*tank_height) * (1 + geoWaste/100.0), 1)
-          geoStone = round((2*complex_excav_area + complex_excav_perim*total_system_depth) * (1 + geoWaste/100.0), 1)
-          used_perimeter = complex_tank_perim
+          if vs['active'] and vs['core_fill'] == 'native':
+              void_sep_fabric_ft2 = round(vs['total_inner_perim'] * tank_height * (1 + geoWaste/100.0), 1)
+          else:
+              void_sep_fabric_ft2 = 0.0
+          geoTank  = round((2*complex_tank_area + effective_perim*tank_height) * (1 + geoWaste/100.0), 1)
+          geoStone = round((2*complex_excav_area + complex_excav_perim*total_system_depth) * (1 + geoWaste/100.0) + void_sep_fabric_ft2, 1)
+          used_perimeter = effective_perim
           tank_width     = round(snapped_known, 2)
           tank_length    = round(snapped_other, 2)
           tank_area      = round(complex_tank_area, 1)
@@ -2310,10 +2544,15 @@ def download_quote():
               bottom_plates = 0
           geoTank  = round((2*tank_width*tank_length + used_perimeter*tank_height) * (1 + geoWaste/100.0), 1)
           geoStone = round((outer_width*outer_length*2 + outer_width*total_system_depth*2 + outer_length*total_system_depth*2) * (1 + geoWaste/100.0), 1)
+          vs                  = dict(_VOID_INERT)
+          void_core_vol       = 0.0
+          stone_purchase_env  = stone_envelope_volume
+          void_sep_fabric_ft2 = 0.0
 
       geoTank_yd2  = round(geoTank  / 9, 0)
       geoStone_yd2 = round(geoStone / 9, 0)
-      stone_yd3    = round(stone_envelope_volume * 1.10 / 27, 0)
+      stone_yd3    = round(stone_purchase_env * 1.10 / 27, 0)
+      void_add_backfill_yd3 = round((void_core_vol if (vs['active'] and vs['core_fill'] == 'native') else 0.0) / 27, 1)
 
       # ── Geogrid quantities from UI inputs ──────────────────────────
       geogrid_top_yd2    = int(request.form.get('geogrid_top_yd2',    0) or 0)
@@ -2593,10 +2832,16 @@ def download_quote():
           q_text(x, y - 9, lbl, 'Helvetica-Bold', 7, WHITE)
       y -= 13
 
-      alpha = ['A','B','C','D','E','F','G','H','I']
+      alpha = ['A','B','C','D','E','F','G','H','I','J']
+      _stone_line_label = 'STONE BACKFILL OR SELECT BACKFILL ESTIMATED FOR UG SYSTEM'
+      if vs['active'] and vs['core_fill'] == 'stone':
+          _stone_line_label += '  (INCL. VOID CORE STONE \u2014 NO STORAGE CREDIT)'
+      _nw_stone_label = f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE (BACKFILL ONLY)'
+      if vs['active'] and vs['core_fill'] == 'native':
+          _nw_stone_label += '  [INCL. VOID CORE SEPARATION FABRIC]'
       others_rows = [
           (nw_tank_label, geoTank_yd2_adj, 'SQ YD'),
-          (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE (BACKFILL ONLY)',
+          (_nw_stone_label,
            int(geoStone_yd2), 'SQ YD'),
           (f'WOVEN MONOFILAMENT GEOTEXTILE \u2014 PT-ROW\u2122 PRE-TREATMENT + {geoWaste}% WASTE',
            int(ptrow_woven_q), 'SQ YD'),
@@ -2607,10 +2852,14 @@ def download_quote():
           ('CASTINGS FOR VENTING / INSPECTION PORTS / INLETS',
            top_adapters_12 + top_adapters_16, 'EACH'),
           (large_pipe_desc, large_pipe_qty, 'EACH'),
-          ('STONE BACKFILL OR SELECT BACKFILL ESTIMATED FOR UG SYSTEM',
+          (_stone_line_label,
            int(stone_yd3), 'CU YD'),
           (liner_label, liner_total_yd2, 'SQ YD'),
       ]
+      if vs['active'] and vs['core_fill'] == 'native':
+          others_rows.append((
+              'ADDITIONAL NATIVE/SELECT BACKFILL \u2014 VOID CORE FILL (NO STORAGE CREDIT)',
+              int(round(void_add_backfill_yd3)), 'CU YD'))
 
       for i, (ds, qt, un) in enumerate(others_rows):
           shade = QLGY if i % 2 == 0 else WHITE

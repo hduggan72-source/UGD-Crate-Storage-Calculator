@@ -577,7 +577,7 @@
 
     <!-- ── LEFT PANEL: all inputs ── -->
     <div class="left-panel" id="leftPanel">
-        <form id="mainForm" method="post" action="/" onsubmit="injectPtrowToForm()">
+        <form id="mainForm" method="post" action="/" onsubmit="injectPtrowToForm(); if(window.syncVoidHidden) syncVoidHidden();">
 
             <!-- Project Info -->
             <div class="section-card">
@@ -680,6 +680,80 @@
                             <span class="help-icon" data-tooltip="Outer perimeter of the full excavation. Leave blank to auto-estimate.">?</span>
                         </label>
                         <input type="number" step="0.001" name="complex_excav_perim" id="complexExcavPerim" min="0" placeholder="Leave blank to auto-estimate" value="{{ form_data.get('complex_excav_perim', '') }}">
+
+                        <!-- Void Space Entry -->
+                        <div style="margin-top:14px;padding-top:12px;border-top:1px dashed rgba(180,83,9,0.45);">
+                            <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:bold;cursor:pointer;margin-bottom:0;">
+                                <input type="checkbox" id="voidToggle"
+                                    style="width:15px;height:15px;accent-color:#b45309;cursor:pointer;"
+                                    onchange="toggleVoidSection(this.checked)"
+                                    {{ 'checked' if form_data.get('void_enabled') == '1' else '' }}>
+                                &#9638; Void Space Entry
+                                <span class="help-icon" data-tooltip="Open areas INSIDE the tank footprint (concrete islands, light poles, monuments) the tank must form around. Each void's area is subtracted from the tank footprint; its perimeter is ADDED to the tank perimeter (side plates + fabric). Voids snap UP to whole crates so the obstruction is fully cleared. Excavation stays full footprint - the void gets dug and re-filled.">?</span>
+                            </label>
+                            <!-- Hidden default ensures void_enabled posts '0' when unchecked -->
+                            <input type="hidden" name="void_enabled" value="0">
+                            <input type="hidden" name="void_enabled" id="voidEnabledInput" value="{{ form_data.get('void_enabled', '0') }}" disabled>
+
+                            <div id="voidSection" style="display:none;margin-top:10px;">
+                                <div style="background:rgba(180,83,9,0.08);border:1px solid rgba(180,83,9,0.3);border-radius:6px;padding:9px 10px;margin-bottom:10px;font-size:11px;line-height:1.5;color:var(--text);">
+                                    Each void: scaled area + ONE known dimension (other is derived) + optional scaled perimeter.
+                                    A <strong>#57 stone ring</strong> (width = perimeter stone width) wraps the interior tank
+                                    walls and keeps storage credit via the Perimeter stone layer; the
+                                    <strong>core inside the ring earns NO storage credit</strong> regardless of fill.
+                                </div>
+
+                                <!-- Global core-fill toggle -->
+                                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+                                    <span style="font-size:11px;font-weight:600;opacity:0.7;">VOID CORE FILL:</span>
+                                    <div style="display:inline-flex;border:1px solid rgba(180,83,9,0.5);border-radius:5px;overflow:hidden;">
+                                        <button type="button" id="voidFillNative" onclick="setVoidCoreFill('native')"
+                                            style="padding:4px 12px;border:none;cursor:pointer;background:rgba(180,83,9,0.85);color:#fff;font-size:11px;font-weight:bold;">
+                                            &#129002; Native Backfill
+                                        </button>
+                                        <button type="button" id="voidFillStone" onclick="setVoidCoreFill('stone')"
+                                            style="padding:4px 12px;border:none;cursor:pointer;background:transparent;color:rgba(180,83,9,0.9);font-size:11px;font-weight:bold;">
+                                            &#129704; #57 Stone
+                                        </button>
+                                    </div>
+                                    <span style="font-size:10px;opacity:0.55;" id="voidFillNote">Core = dirt (Additional Backfill Required + separation fabric)</span>
+                                </div>
+                                <input type="hidden" name="void_core_fill" id="voidCoreFillInput" value="{{ form_data.get('void_core_fill', 'native') }}">
+
+                                <table style="margin-top:0;font-size:12px;width:100%;">
+                                    <thead>
+                                        <tr style="background:rgba(180,83,9,0.12);">
+                                            <th style="text-align:left;padding:5px 6px;">Label</th>
+                                            <th style="text-align:right;padding:5px 6px;">Area (ft&#178;)</th>
+                                            <th style="text-align:right;padding:5px 6px;">Known Dim (ft)</th>
+                                            <th style="text-align:right;padding:5px 6px;">Perim (ft)</th>
+                                            <th style="text-align:right;padding:5px 6px;white-space:nowrap;">Snapped &#8593;</th>
+                                            <th style="width:26px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="voidRows"><!-- rows injected by JS --></tbody>
+                                    <tfoot>
+                                        <tr style="background:rgba(180,83,9,0.18);font-weight:bold;">
+                                            <td style="padding:5px 6px;">TOTALS</td>
+                                            <td style="text-align:right;padding:5px 6px;" id="voidTotArea">0.0</td>
+                                            <td style="text-align:right;padding:5px 6px;font-size:10px;opacity:0.75;white-space:nowrap;" id="voidTotCrates">0 crates/layer</td>
+                                            <td style="text-align:right;padding:5px 6px;" id="voidTotPerim">0.0</td>
+                                            <td colspan="2"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                                <button type="button" onclick="addVoidRow()"
+                                    style="margin-top:8px;padding:6px 14px;background:#b45309;color:white;border:none;border-radius:4px;font-size:12px;font-weight:bold;cursor:pointer;">
+                                    + Add Void Space
+                                </button>
+                                <div style="font-size:10px;opacity:0.55;margin-top:6px;line-height:1.5;">
+                                    Perimeter optional - leave blank to use the snapped rectangle perimeter.
+                                    Stone ring width matches your Perimeter Stone Width input.
+                                </div>
+                                <!-- Hidden inputs synced from the table; live inside the form so they POST -->
+                                <div id="voidHiddenInputs"></div>
+                            </div>
+                        </div>
                     </div>
 
                 </div>
@@ -811,6 +885,194 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             {% endif %}
 
         </form>
+
+        <script>
+        (function(){
+            var MOD_WID = 1.9685;
+            var MOD_LEN = 3.937;
+
+            // State: [{label, area, dim, perim}]
+            var rows = [];
+            {% for i in range(0, 40) %}{% if form_data.get('void_area_' ~ i) is not none %}
+            rows.push({
+                label: {{ form_data.get('void_label_' ~ i, '')|tojson }},
+                area:  {{ (form_data.get('void_area_'  ~ i, 0) or 0)|float }},
+                dim:   {{ (form_data.get('void_dim_'   ~ i, 0) or 0)|float }},
+                perim: {{ (form_data.get('void_perim_' ~ i, 0) or 0)|float }}
+            });
+            {% endif %}{% endfor %}
+            if (rows.length === 0) rows.push({ label: 'Island 1', area: 0, dim: 0, perim: 0 });
+            window._voidRows = rows;
+
+            var coreFill = '{{ form_data.get('void_core_fill', 'native') }}';
+            if (coreFill !== 'native' && coreFill !== 'stone') coreFill = 'native';
+
+            function perimWidth() {
+                var el = document.querySelector('[name="perimeter_stone_width"]');
+                return el ? (parseFloat(el.value) || 0) : 0;
+            }
+
+            // Snap UP to whole crate modules (epsilon guards exact multiples)
+            function computeVoid(r) {
+                var area = parseFloat(r.area) || 0;
+                var dim  = parseFloat(r.dim)  || 0;
+                if (area <= 0 || dim <= 0) {
+                    return { ok:false, cw:0, cl:0, sw:0, sl:0, sArea:0, perimUsed:0 };
+                }
+                var other = area / dim;
+                var cw = Math.ceil(dim   / MOD_WID - 1e-9);
+                var cl = Math.ceil(other / MOD_LEN - 1e-9);
+                var sw = cw * MOD_WID;
+                var sl = cl * MOD_LEN;
+                var sArea = sw * sl;
+                var perimUsed = (parseFloat(r.perim) || 0) > 0 ? parseFloat(r.perim) : 2 * (sw + sl);
+                return { ok:true, cw:cw, cl:cl, sw:sw, sl:sl, sArea:sArea, perimUsed:perimUsed };
+            }
+
+            window.setVoidCoreFill = function(mode) {
+                coreFill = (mode === 'stone') ? 'stone' : 'native';
+                document.getElementById('voidCoreFillInput').value = coreFill;
+                var nb = document.getElementById('voidFillNative');
+                var sb = document.getElementById('voidFillStone');
+                var note = document.getElementById('voidFillNote');
+                if (coreFill === 'native') {
+                    nb.style.background = 'rgba(180,83,9,0.85)'; nb.style.color = '#fff';
+                    sb.style.background = 'transparent';         sb.style.color = 'rgba(180,83,9,0.9)';
+                    if (note) note.textContent = 'Core = dirt (Additional Backfill Required + separation fabric)';
+                } else {
+                    sb.style.background = 'rgba(180,83,9,0.85)'; sb.style.color = '#fff';
+                    nb.style.background = 'transparent';         nb.style.color = 'rgba(180,83,9,0.9)';
+                    if (note) note.textContent = 'Core = #57 stone (purchase only, still NO storage credit)';
+                }
+            };
+
+            window.toggleVoidSection = function(on) {
+                var sec = document.getElementById('voidSection');
+                if (sec) sec.style.display = on ? 'block' : 'none';
+                if (on) renderVoidTable();
+                syncVoidHidden();
+            };
+
+            window.addVoidRow = function() {
+                rows.push({ label: 'Island ' + (rows.length + 1), area: 0, dim: 0, perim: 0 });
+                renderVoidTable();
+                syncVoidHidden();
+            };
+
+            window.removeVoidRow = function(i) {
+                rows.splice(i, 1);
+                if (rows.length === 0) rows.push({ label: 'Island 1', area: 0, dim: 0, perim: 0 });
+                renderVoidTable();
+                syncVoidHidden();
+            };
+
+            // DOM-preserving render: rebuild row scaffolding only when the
+            // row COUNT changes; otherwise update output-only cells in place
+            // (keeps focus/cursor while typing in area/dim/perim inputs).
+            function renderVoidTable() {
+                var tbody = document.getElementById('voidRows');
+                if (!tbody) return;
+
+                while (tbody.children.length > rows.length) tbody.removeChild(tbody.lastChild);
+                while (tbody.children.length < rows.length) {
+                    var idx = tbody.children.length;
+                    var tr = document.createElement('tr');
+                    tr.innerHTML =
+                        '<td style="padding:3px 4px;"><input type="text" data-vfield="label" data-vidx="' + idx + '" style="width:90px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;"></td>' +
+                        '<td style="padding:3px 4px;text-align:right;"><input type="number" step="0.01" min="0" data-vfield="area" data-vidx="' + idx + '" style="width:74px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;text-align:right;"></td>' +
+                        '<td style="padding:3px 4px;text-align:right;"><input type="number" step="0.01" min="0" data-vfield="dim" data-vidx="' + idx + '" style="width:74px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;text-align:right;"></td>' +
+                        '<td style="padding:3px 4px;text-align:right;"><input type="number" step="0.01" min="0" data-vfield="perim" data-vidx="' + idx + '" placeholder="auto" style="width:64px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:12px;text-align:right;"></td>' +
+                        '<td data-vsnap="' + idx + '" style="text-align:right;padding:3px 4px;font-size:10px;opacity:0.75;white-space:nowrap;">-</td>' +
+                        '<td style="text-align:center;padding:3px 2px;"><button type="button" data-vdel="' + idx + '" style="background:none;border:none;color:#dc2626;font-size:16px;cursor:pointer;line-height:1;">&times;</button></td>';
+                    tbody.appendChild(tr);
+                }
+
+                var totArea = 0, totPerim = 0, totCrates = 0;
+                for (var i = 0; i < rows.length; i++) {
+                    var tr = tbody.children[i];
+                    var r  = rows[i];
+                    tr.querySelectorAll('input').forEach(function(inp) { inp.setAttribute('data-vidx', i); });
+                    var delBtn = tr.querySelector('button'); if (delBtn) delBtn.setAttribute('data-vdel', i);
+                    var snapCell = tr.querySelector('td[data-vsnap]'); if (snapCell) snapCell.setAttribute('data-vsnap', i);
+
+                    var lblInp   = tr.querySelector('input[data-vfield="label"]');
+                    var areaInp  = tr.querySelector('input[data-vfield="area"]');
+                    var dimInp   = tr.querySelector('input[data-vfield="dim"]');
+                    var perimInp = tr.querySelector('input[data-vfield="perim"]');
+                    if (document.activeElement !== lblInp)   lblInp.value   = r.label;
+                    if (document.activeElement !== areaInp)  areaInp.value  = r.area  > 0 ? r.area  : '';
+                    if (document.activeElement !== dimInp)   dimInp.value   = r.dim   > 0 ? r.dim   : '';
+                    if (document.activeElement !== perimInp) perimInp.value = r.perim > 0 ? r.perim : '';
+
+                    var v = computeVoid(r);
+                    if (snapCell) {
+                        snapCell.textContent = v.ok
+                            ? (v.sw.toFixed(2) + ' x ' + v.sl.toFixed(2) + ' (' + (v.cw * v.cl) + ')')
+                            : '-';
+                    }
+                    if (v.ok) { totArea += v.sArea; totPerim += v.perimUsed; totCrates += v.cw * v.cl; }
+                }
+
+                var ta = document.getElementById('voidTotArea');
+                var tp = document.getElementById('voidTotPerim');
+                var tc = document.getElementById('voidTotCrates');
+                if (ta) ta.textContent = totArea.toFixed(1);
+                if (tp) tp.textContent = totPerim.toFixed(1);
+                if (tc) tc.textContent = totCrates + ' crates/layer';
+            }
+
+            // Event delegation (survives row rebuilds)
+            var tbodyEl = document.getElementById('voidRows');
+            if (tbodyEl) {
+                tbodyEl.addEventListener('input', function(e) {
+                    var f = e.target.getAttribute('data-vfield');
+                    var i = parseInt(e.target.getAttribute('data-vidx'));
+                    if (f == null || isNaN(i) || !rows[i]) return;
+                    if (f === 'label') rows[i].label = e.target.value;
+                    else rows[i][f] = parseFloat(e.target.value) || 0;
+                    renderVoidTable();
+                    syncVoidHidden();
+                });
+                tbodyEl.addEventListener('click', function(e) {
+                    var d = e.target.getAttribute('data-vdel');
+                    if (d != null) window.removeVoidRow(parseInt(d));
+                });
+            }
+
+            // Sync hidden form inputs (named void_*_N) so they POST on Calculate
+            window.syncVoidHidden = function() {
+                var box = document.getElementById('voidHiddenInputs');
+                if (!box) return;
+                box.innerHTML = '';
+                var enabled = document.getElementById('voidToggle') && document.getElementById('voidToggle').checked;
+                if (!enabled) return;
+                rows.forEach(function(r, i) {
+                    function add(name, val) {
+                        var inp = document.createElement('input');
+                        inp.type = 'hidden'; inp.name = name; inp.value = val;
+                        box.appendChild(inp);
+                    }
+                    add('void_label_' + i, r.label || ('Island ' + (i + 1)));
+                    add('void_area_'  + i, r.area  || 0);
+                    add('void_dim_'   + i, r.dim   || 0);
+                    add('void_perim_' + i, r.perim || 0);
+                });
+            };
+
+            // Recompute snapped previews when perimeter stone width changes
+            var psw = document.querySelector('[name="perimeter_stone_width"]');
+            if (psw) psw.addEventListener('input', renderVoidTable);
+
+            // Initial paint + restore toggle state on POST-back
+            window.addEventListener('load', function() {
+                setVoidCoreFill(coreFill);
+                var tg = document.getElementById('voidToggle');
+                if (tg && tg.checked) { document.getElementById('voidSection').style.display = 'block'; }
+                renderVoidTable();
+                syncVoidHidden();
+            });
+        })();
+        </script>
     </div><!-- /left-panel -->
 
     <!-- ── RIGHT PANEL: results + schematic ── -->
@@ -2097,12 +2359,34 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             <strong>{{ results.complex_known_dim }} ft</strong>
                             <strong>{{ (results.complex_scaled_area / results.complex_known_dim)|round(2) }} ft</strong>
                         </div>
-                        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(30,58,138,0.2);font-size:12px;opacity:0.7;">Real-World Snapped Tank</div>
+                        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(30,58,138,0.2);font-size:12px;opacity:0.7;">Real-World Snapped Tank (full grid)</div>
                         <strong style="font-size:14px;color:#1e3a8a;">
                             {{ results.tank_width }} ft × {{ results.tank_length }} ft
                             &nbsp;({{ results.complex_crates_known }} × {{ results.complex_crates_other }} crates/layer)
-                            &nbsp;= {{ results.complex_tank_area }} ft²
+                            &nbsp;= {{ results.complex_gross_area }} ft²
                         </strong>
+                        {% if results.void_active %}
+                        <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(180,83,9,0.4);">
+                            <div style="font-size:11px;font-weight:bold;color:#b45309;margin-bottom:4px;">&#9638; Void Spaces ({{ results.void_spaces|length }}) — core fill: {{ 'Native Backfill' if results.void_core_fill == 'native' else '#57 Stone' }}</div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;font-size:11px;">
+                                <span style="opacity:0.7;">Void Area Removed</span>
+                                <span style="opacity:0.7;">Void Perimeter Added</span>
+                                <strong style="color:#b45309;">− {{ results.void_total_area }} ft²</strong>
+                                <strong style="color:#b45309;">+ {{ results.void_total_perim }} ft</strong>
+                                <span style="opacity:0.7;">Crates Removed</span>
+                                <span style="opacity:0.7;">Void Core Area</span>
+                                <strong style="color:#b45309;">− {{ results.void_total_crates }}/layer</strong>
+                                <strong style="color:#b45309;">{{ results.void_core_area }} ft²</strong>
+                            </div>
+                            {% for v in results.void_spaces %}
+                            <div style="font-size:10px;opacity:0.65;margin-top:4px;">
+                                {{ v.label }}: {{ v.snapped_w }} × {{ v.snapped_l }} ft ({{ v.crates_w }}×{{ v.crates_l }}) = {{ v.snapped_area }} ft², perim {{ v.perim_used }} ft
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(30,58,138,0.2);font-size:12px;opacity:0.7;">Net Tank Area (after voids)</div>
+                        <strong style="font-size:15px;color:#15803d;">{{ results.complex_tank_area }} ft²</strong>
+                        {% endif %}
                     </div>
                     {% else %}
                     <div class="result-row">
@@ -2162,6 +2446,27 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             &nbsp;({{ ((results.tank_height + (form_data.get('base_stone',0.333)|float) + (form_data.get('cover_stone',1.0)|float)) * 12)|round(1) }} in)
                         </span>
                     </div>
+                    {% if results.void_active %}
+                    <div style="margin-top:10px;padding:10px 12px;background:rgba(180,83,9,0.08);border:1px solid rgba(180,83,9,0.3);border-radius:6px;">
+                        <div style="font-size:11px;font-weight:bold;color:#b45309;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">Void Core Fill — Provided by Others (No Storage Credit)</div>
+                        {% if results.void_core_fill == 'native' %}
+                        <div class="result-row" style="border:none;">
+                            <span class="result-label">Additional Backfill Required (native/select)</span>
+                            <span class="result-value" id="rv_void_backfill" style="color:#b45309;font-weight:bold;">{{ "{:,.1f}".format(results.void_add_backfill_ft3) }} ft³&nbsp; ({{ "{:,.2f}".format(results.void_add_backfill_yd3) }} yd³)</span>
+                        </div>
+                        <div class="result-row" style="border:none;">
+                            <span class="result-label">Void Core Separation Geotextile</span>
+                            <span class="result-value" style="color:#b45309;">{{ "{:,.1f}".format(results.void_sep_fabric_ft2) }} ft²&nbsp; ({{ "{:,.1f}".format(results.void_sep_fabric_yd2) }} yd²)</span>
+                        </div>
+                        {% else %}
+                        <div class="result-row" style="border:none;">
+                            <span class="result-label">Void Core #57 Stone (purchase only)</span>
+                            <span class="result-value" id="rv_void_corestone" style="color:#b45309;font-weight:bold;">{{ "{:,.1f}".format(results.void_core_stone_ft3) }} ft³&nbsp; ({{ "{:,.2f}".format(results.void_core_stone_yd3) }} yd³)</span>
+                        </div>
+                        <div style="font-size:10px;opacity:0.6;margin-top:2px;">Added to stone purchase total; excluded from stage-storage credit.</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
 
                     <!-- Elevations -->
                     <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin:10px 0 4px;">Elevation Reference</div>
@@ -2471,6 +2776,9 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         // PT-ROW™ data — inject from results card hidden inputs
         injectPtrowToFormData(formData);
 
+        // Void Space data — re-sync then append the indexed hidden inputs
+        injectVoidToFormData(formData);
+
         // Liner fields — outside the form, must be injected explicitly
         formData.set('liner_on_tank',   document.getElementById('formLinerOnTank')?.value   ?? '0');
         formData.set('liner_on_stone',  document.getElementById('formLinerOnStone')?.value  ?? '0');
@@ -2613,6 +2921,25 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         formData.set('ptrow_enabled', (toggle && toggle.checked) ? '1' : '0');
     }
 
+    function injectVoidToFormData(formData) {
+        // For fetch-based exports — re-sync the void hidden inputs, then append.
+        if (window.syncVoidHidden) window.syncVoidHidden();
+        var toggle = document.getElementById('voidToggle');
+        var enabled = !!(toggle && toggle.checked);
+        formData.set('void_enabled',   enabled ? '1' : '0');
+        formData.set('void_core_fill', document.getElementById('voidCoreFillInput')?.value || 'native');
+        // Clear any stale void_*_N already in formData (from the form snapshot)
+        Array.from(formData.keys()).forEach(function(k) {
+            if (/^void_(label|area|dim|perim)_\d+$/.test(k)) formData.delete(k);
+        });
+        var box = document.getElementById('voidHiddenInputs');
+        if (enabled && box) {
+            box.querySelectorAll('input').forEach(function(el) {
+                formData.set(el.name, el.value);
+            });
+        }
+    }
+
     function calculateAquaCellPrice() {
         // ── Hardcoded floor unit prices (update here on price increase) ──
         const UNIT_PRICES = {
@@ -2704,6 +3031,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         formData.set('project_num', document.getElementById('project_num')?.value || '');
         // PT-ROW™ data
         injectPtrowToFormData(formData);
+        // Void Space data
+        injectVoidToFormData(formData);
 
         // Liner fields — outside the form, must be injected explicitly
         formData.set('liner_on_tank',   document.getElementById('formLinerOnTank')?.value   ?? '0');
@@ -3054,6 +3383,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             btnComplex.style.color      = '#fff';
             btnRect.style.background    = 'var(--card)';
             btnRect.style.color         = 'var(--text)';
+            if (window.renderVoidTable) renderVoidTable();
         } else {
             rectInputs.style.display    = 'block';
             complexInputs.style.display = 'none';
@@ -3116,6 +3446,9 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         formData.set('stone_top_included',   document.getElementById('hiddenStoneTopIncl')?.value   ?? '1');
         formData.set('stone_perim_included', document.getElementById('hiddenStonePerimIncl')?.value ?? '1');
         formData.set('stone_base_included',  document.getElementById('hiddenStoneBaseIncl')?.value  ?? '1');
+
+        // Void Space data
+        injectVoidToFormData(formData);
 
         const projectName = (document.getElementById('project_name')?.value || 'Project').trim().replace(/[^a-zA-Z0-9\-_ ]/g,'_').replace(/\s+/g,'_');
         fetch('/download_stage_csv', { method: 'POST', body: formData })
@@ -3304,6 +3637,39 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 ptrowLines.push(`  Woven Monofilament Fabric (sq yd):             ${fabYd2El.textContent}`);
             }
             emailLines.push(...ptrowLines);
+        }
+
+        // Void Space Entry section — only if enabled in complex mode
+        var voidToggle = document.getElementById('voidToggle');
+        if (voidToggle && voidToggle.checked && window._voidRows && window._voidRows.length > 0) {
+            var MOD_WID_E = 1.9685, MOD_LEN_E = 3.937;
+            var vLines = ['\n--- Void Space Entry (Complex Shape) ---'];
+            var coreFillE = document.getElementById('voidCoreFillInput')?.value || 'native';
+            var vTotArea = 0, vTotPerim = 0, vTotCrates = 0;
+            window._voidRows.forEach(function(r) {
+                var area = parseFloat(r.area) || 0, dim = parseFloat(r.dim) || 0;
+                if (area <= 0 || dim <= 0) return;
+                var other = area / dim;
+                var cw = Math.ceil(dim / MOD_WID_E - 1e-9);
+                var cl = Math.ceil(other / MOD_LEN_E - 1e-9);
+                var sw = cw * MOD_WID_E, sl = cl * MOD_LEN_E;
+                var sArea = sw * sl;
+                var perimUsed = (parseFloat(r.perim) || 0) > 0 ? parseFloat(r.perim) : 2 * (sw + sl);
+                vTotArea += sArea; vTotPerim += perimUsed; vTotCrates += cw * cl;
+                vLines.push(`  ${r.label}: ${sw.toFixed(2)} x ${sl.toFixed(2)} ft (${cw}x${cl}) = ${sArea.toFixed(1)} ft2, perim ${perimUsed.toFixed(1)} ft`);
+            });
+            vLines.push(`  Total Void Area Removed (ft3 footprint):        -${vTotArea.toFixed(1)} ft2`);
+            vLines.push(`  Total Void Perimeter Added:                     +${vTotPerim.toFixed(1)} ft`);
+            vLines.push(`  Total Crates Removed:                           -${vTotCrates}/layer`);
+            vLines.push(`  Void Core Fill:                                 ${coreFillE === 'native' ? 'Native Backfill (no storage credit)' : '#57 Stone (purchase only, no storage credit)'}`);
+            var bkEl = document.getElementById('rv_void_backfill');
+            var csEl = document.getElementById('rv_void_corestone');
+            if (coreFillE === 'native' && bkEl) {
+                vLines.push(`  Additional Backfill Required:                   ${bkEl.textContent.trim()}`);
+            } else if (coreFillE === 'stone' && csEl) {
+                vLines.push(`  Void Core #57 Stone (purchase only):            ${csEl.textContent.trim()}`);
+            }
+            emailLines.push(...vLines);
         }
 
         const emailText = emailLines.join('\n');
