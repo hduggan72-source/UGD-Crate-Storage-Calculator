@@ -1608,11 +1608,21 @@ def multi_download_quote():
 
         # Per-tank detail pages
         for ti, r in enumerate(tank_results):
-            new_page_header(f"Tank Detail: {r['tank_label']}  ({r['config']}-{r['layers']})")
+            _pg_title = f"Tank Detail: {r['tank_label']}  ({r['config']}-{r['layers']})"
+            new_page_header(_pg_title)
             y = cur_y[0]
 
-            def detail_row_mt(label, value, shade=False):
+            def _ensure_space(px):
+                # Start a continuation page if the next block would run off the sheet.
                 nonlocal y
+                if y - px < 56:
+                    new_page_header(_pg_title + '  (cont.)')
+                    y = cur_y[0]
+
+            def detail_row_mt(label, value, shade=False, status=None):
+                # status: None | 'PASS' | 'FAIL' -> colors the status word green/red.
+                nonlocal y
+                _ensure_space(13)
                 rh = 13
                 if shade:
                     c.setFillColor(LGRAY)
@@ -1620,9 +1630,19 @@ def multi_download_quote():
                 c.setFillColor(GRAY)
                 c.setFont('Helvetica', 7.5)
                 c.drawString(LQ + 5, y - 3, label)
-                c.setFillColor(BLACK)
-                c.setFont('Helvetica-Bold', 7.5)
-                c.drawRightString(LQ + QW - 5, y - 3, str(value))
+                if status in ('PASS', 'FAIL'):
+                    scol = GREEN if status == 'PASS' else RED
+                    c.setFont('Helvetica-Bold', 7.5)
+                    sw = c.stringWidth(status, 'Helvetica-Bold', 7.5)
+                    c.setFillColor(scol)
+                    c.drawRightString(LQ + QW - 5, y - 3, status)
+                    if value:
+                        c.setFillColor(BLACK)
+                        c.drawRightString(LQ + QW - 5 - sw - 4, y - 3, str(value))
+                else:
+                    c.setFillColor(BLACK)
+                    c.setFont('Helvetica-Bold', 7.5)
+                    c.drawRightString(LQ + QW - 5, y - 3, str(value))
                 c.setStrokeColor(MGRAY)
                 c.setLineWidth(0.25)
                 c.line(LQ, y - rh + 3, LQ + QW, y - rh + 3)
@@ -1630,6 +1650,7 @@ def multi_download_quote():
 
             def section_hdr_mt(title):
                 nonlocal y
+                _ensure_space(15 + 13)   # header + at least one row
                 bh = 15
                 c.setFillColor(NAVY)
                 c.rect(LQ, y - bh + 4, QW, bh, fill=1, stroke=0)
@@ -1643,8 +1664,8 @@ def multi_download_quote():
             detail_row_mt('Stone Backfill Storage', f"{r['stone_storage']:,.1f} ft\u00b3", shade=True)
             detail_row_mt('Total System Storage', f"{r['total_storage']:,.1f} ft\u00b3", shade=False)
             if r['min_storage'] > 0:
-                status = 'PASS' if r['storage_ok'] else 'FAIL'
-                detail_row_mt(f"Min Required Storage ({r['min_storage']:,.0f} ft\u00b3)", status, shade=True)
+                detail_row_mt(f"Min Required Storage ({r['min_storage']:,.0f} ft\u00b3)", '',
+                              shade=True, status=('PASS' if r['storage_ok'] else 'FAIL'))
             y -= 5
 
             section_hdr_mt('\u25a0  GEOMETRY')
@@ -1660,19 +1681,58 @@ def multi_download_quote():
             detail_row_mt('Surface Elevation', f"{r['surface_elev']} ft", shade=False)
             detail_row_mt('Tank Bottom Elevation', f"{r['tank_bottom_elev']} ft", shade=True)
             detail_row_mt('Tank Top Elevation', f"{r['tank_top_elev']} ft", shade=False)
-            cov_val = f"{r['cover_depth']} ft \u2014 {'PASS' if r['cover_ok'] else 'FAIL'}"
-            detail_row_mt(f"Cover Depth (min {r['min_cover']} ft)", cov_val, shade=True)
+            detail_row_mt(f"Cover Depth (min {r['min_cover']} ft)", f"{r['cover_depth']} ft \u2014",
+                          shade=True, status=('PASS' if r['cover_ok'] else 'FAIL'))
             detail_row_mt('FoS \u2014 Dead Load', str(r['fos_dead'] or '\u2014'), shade=False)
             detail_row_mt('FoS \u2014 Live Load', str(r['fos_ll'] or '\u2014'), shade=True)
             y -= 5
 
-            section_hdr_mt('\u25a0  BILL OF MATERIALS (THIS TANK)')
+            section_hdr_mt('\u25a0  BILL OF MATERIALS \u2014 AQUACELL (THIS TANK)')
             detail_row_mt('Base Units (3091506)',          str(r['base_units']),       shade=False)
             detail_row_mt('Side Plates (2476600003)',      str(r['side_plates']),      shade=True)
             detail_row_mt('Bottom Plates (2476600001)',    str(r['bottom_plates']),    shade=False)
             detail_row_mt('8-12" Pipe Connectors (2476631200)', str(r['pipe_connectors']), shade=True)
             detail_row_mt('12" Top Adapters (3085857)',   str(r['top_adapters_12']),  shade=False)
             detail_row_mt('16" Top Adapters (2476842000)', str(r['top_adapters_16']), shade=True)
+            y -= 5
+
+            # ── Accessories / provided-by-others (this tank) — full one-sheet BOM ──
+            section_hdr_mt('\u25a0  ACCESSORIES & PROVIDED BY OTHERS (THIS TANK)')
+            _sh = [False]
+            def _acc(label, value):
+                detail_row_mt(label, value, shade=_sh[0])
+                _sh[0] = not _sh[0]
+            # Geotextile (always present)
+            _acc('Non-Woven Geotextile \u2014 Tank Wrap',
+                 f"{r['geoTank_yd2']:,.1f} yd\u00b2  ({r['geoTank']:,.1f} ft\u00b2)")
+            _acc('Non-Woven Geotextile \u2014 Stone / Backfill',
+                 f"{r['geoStone_yd2']:,.1f} yd\u00b2  ({r['geoStone']:,.1f} ft\u00b2)")
+            # Stone backfill (always present)
+            _acc('Stone Backfill (#57 or select)',
+                 f"{r['stone_yd3']:,.1f} cu yd  ({r['stone_tons']:,.1f} tons)")
+            # PT-ROW pre-treatment (if applicable)
+            if r.get('ptrow_enabled') and r.get('ptrow_total_crates', 0) > 0:
+                _acc('PT-ROW\u2122 Pre-Treatment Crates', f"{r['ptrow_total_crates']:,}")
+                if r.get('ptrow_woven_yd2', 0) > 0:
+                    _acc('PT-ROW\u2122 Woven Monofilament Geotextile', f"{r['ptrow_woven_yd2']:,.1f} yd\u00b2")
+            # Biaxial geogrid (if applicable)
+            _geogrid_total = (r.get('geogrid_top_yd2', 0) or 0) + (r.get('geogrid_bottom_yd2', 0) or 0)
+            if _geogrid_total > 0:
+                _detail = []
+                if r.get('geogrid_top_yd2', 0) > 0:    _detail.append(f"top {r['geogrid_top_yd2']:,.1f}")
+                if r.get('geogrid_bottom_yd2', 0) > 0: _detail.append(f"bot {r['geogrid_bottom_yd2']:,.1f}")
+                _suffix = f"  ({', '.join(_detail)})" if _detail else ''
+                _acc('Biaxial Geogrid', f"{_geogrid_total:,.1f} yd\u00b2{_suffix}")
+            # PVC / geomembrane liner (if applicable)
+            if (r.get('liner_total_yd2', 0) or 0) > 0:
+                _lscope = []
+                if r.get('liner_on_tank'):  _lscope.append('tank')
+                if r.get('liner_on_stone'): _lscope.append('stone')
+                _lsfx = f"  ({' + '.join(_lscope)})" if _lscope else ''
+                _acc('PVC / Geomembrane Liner', f"{r['liner_total_yd2']:,.1f} yd\u00b2{_lsfx}")
+            # Large diameter pipe connections (if applicable)
+            if (r.get('large_pipe_qty', 0) or 0) > 0:
+                _acc('Large Diameter Pipe Connections (18\u201336\u2033)', f"{r['large_pipe_qty']:,} ea")
 
         c.save()
         buffer.seek(0)
