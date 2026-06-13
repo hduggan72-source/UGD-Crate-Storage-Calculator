@@ -1201,18 +1201,21 @@ def multi_download_quote():
         estimator       = data.get('estimator', '')
         estimator_email = data.get('estimator_email', '')
         project_notes   = data.get('project_notes', '')
-        cost_per_ft3    = float(data.get('cost_per_ft3', 0) or 0)
         freight_pct     = float(data.get('freight_pct', 10) or 10)
+        markup_pct      = float(data.get('markup_pct', 0) or 0)
 
         tanks_in     = data.get('tanks', [])
         tank_results = [calc_tank(t) for t in tanks_in]
         cum          = cumulative_bom(tank_results)
 
-        # Pricing
+        # Pricing — component-based, computed client-side (mirrors single-tank).
+        # JS is the source of truth for UNIT_PRICES; backend displays the sent values.
         tank_storage_total = cum['tank_storage']
-        subtotal       = round(cost_per_ft3 * tank_storage_total, 2) if cost_per_ft3 > 0 else 0
-        freight_cost   = round(subtotal * freight_pct / 100, 2)
-        total_w_freight = round(subtotal + freight_cost, 2)
+        floor_cost     = float(data.get('floor_cost', 0) or 0)
+        subtotal       = float(data.get('subtotal', 0) or 0)          # selling price (after markup)
+        freight_cost   = float(data.get('freight_cost', 0) or 0)
+        total_w_freight = float(data.get('total_with_freight', 0) or (subtotal + freight_cost))
+        cost_per_ft3   = float(data.get('cost_per_ft3', 0) or 0)      # selling ÷ tank ft³ (display only)
 
         def money(v):
             return f'${v:,.2f}'
@@ -1533,11 +1536,14 @@ def multi_download_quote():
         y -= 8
 
         # Pricing block
-        if cost_per_ft3 > 0:
+        if subtotal > 0:
+            _basis = f'Selling price = floor cost'
+            if markup_pct > 0:
+                _basis += f' \u00f7 (1 \u2212 {markup_pct:.1f}% markup)'
+            if cost_per_ft3 > 0:
+                _basis += f'   |   ${cost_per_ft3:.4f}/ft\u00b3 \u00d7 {tank_storage_total:,.1f} ft\u00b3 tank storage'
             q_rect(LQ, y - 13, QW - 120, 13, QLGY)
-            q_text(LQ + 4, y - 9,
-                   f'Pricing: ${cost_per_ft3:.4f}/ft\u00b3 \u00d7 {tank_storage_total:,.1f} ft\u00b3 combined AquaCell storage',
-                   'Helvetica-Oblique', 7, GRAY)
+            q_text(LQ + 4, y - 9, _basis, 'Helvetica-Oblique', 7, GRAY)
             q_rect(LQ + QW - 120, y - 13, 120, 13, QNY)
             q_text(LQ + QW - 4, y - 9, 'AQUACELL SUB-TOTAL', 'Helvetica-Bold', 7, WHITE, 'right')
             y -= 13
@@ -1680,6 +1686,103 @@ def multi_download_quote():
             mimetype='application/pdf'
         )
 
+    except Exception as exc:
+        import traceback
+        return jsonify({'error': str(exc), 'trace': traceback.format_exc()}), 500
+
+
+# ══════════════════════════════════════════════════════════════════
+#  ROUTE: /multi/download_stage_csvs  —  per-tank stage-storage CSVs (ZIP)
+#  One CSV per calculated tank, bundled into a single ZIP. Uses each
+#  tank's own config/depths. Not shown on the dashboard or in the PDF.
+# ══════════════════════════════════════════════════════════════════
+@app.route('/multi/download_stage_csvs', methods=['POST'])
+def multi_download_stage_csvs():
+    import csv
+    import io as _io
+    import zipfile
+    import re as _re
+    try:
+        data = request.get_json(force=True)
+        tanks_in = data.get('tanks', [])
+        if not tanks_in:
+            return jsonify({'error': 'No tanks provided'}), 400
+
+        project_name = (data.get('project_name', '') or 'Project').strip()
+        try:
+            stage_increment_in = int(data.get('stage_increment_in', 12) or 12)
+        except (TypeError, ValueError):
+            stage_increment_in = 12
+        if stage_increment_in <= 0:
+            stage_increment_in = 12
+        increment_ft = stage_increment_in / 12.0
+
+        def _safe(s, fallback):
+            s = _re.sub(r'[^A-Za-z0-9\-_]+', '_', (str(s) or '').strip()).strip('_')
+            return s or fallback
+
+        zip_buf = _io.BytesIO()
+        used_names = set()
+        with zipfile.ZipFile(zip_buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for idx, t in enumerate(tanks_in):
+                calc = calc_tank(t)
+                tank_height        = calc['tank_height']
+                total_system_depth = calc['total_system_depth']
+                tank_bottom_elev   = calc['tank_bottom_elev']
+                base_stone         = calc['base_stone']
+                cover_stone        = calc['cover_stone']
+                tank_storage       = calc['tank_storage']
+                stone_storage      = calc['stone_storage']
+                config             = calc['config']
+                layers             = calc['layers']
+                label              = calc.get('tank_label', '') or f'Tank {idx + 1}'
+
+                # Build the stage table (proportional fill across elevation)
+                rows = []
+                top_of_stone = tank_bottom_elev + tank_height + cover_stone
+                current_elev = tank_bottom_elev - base_stone
+                while current_elev <= top_of_stone + 0.01:
+                    depth_tank  = max(0, min(tank_height, current_elev - tank_bottom_elev))
+                    tank_vol    = (depth_tank / tank_height) * tank_storage if tank_height > 0 else 0
+                    depth_stone = max(0, min(total_system_depth, current_elev - (tank_bottom_elev - base_stone)))
+                    stone_vol   = (depth_stone / total_system_depth) * stone_storage if total_system_depth > 0 else 0
+                    rows.append((round(current_elev, 4), round(tank_vol, 2),
+                                 round(stone_vol, 2), round(tank_vol + stone_vol, 2)))
+                    current_elev += increment_ft
+
+                out = _io.StringIO()
+                writer = csv.writer(out)
+                writer.writerow(['# AquaCell Stage-Storage Table'])
+                writer.writerow([f'# Project: {project_name}'])
+                writer.writerow([f'# Tank: {label}'])
+                writer.writerow([f'# Configuration: {config}-{layers}  |  Stage Increment: {stage_increment_in} in'])
+                writer.writerow([f'# Tank Bottom Elev: {tank_bottom_elev} ft  |  Tank Height: {tank_height} ft'
+                                 f'  |  Base Stone: {base_stone} ft  |  Cover Stone: {cover_stone} ft'])
+                writer.writerow([f'# AquaCell Tank Storage: {tank_storage} ft3  |  Stone Storage: {stone_storage} ft3'])
+                writer.writerow([f'# Generated: {datetime.datetime.now().strftime("%m/%d/%Y %H:%M")}'])
+                writer.writerow([])
+                writer.writerow(['Elevation (ft)', 'Tank Storage (ft3)', 'Stone Storage (ft3)', 'Total Storage (ft3)'])
+                for row in rows:
+                    writer.writerow(row)
+
+                # Unique per-tank filename inside the zip
+                base = f'{idx + 1:02d}_{_safe(label, "Tank")}_StageStorage'
+                name = base + '.csv'
+                dup = 2
+                while name in used_names:
+                    name = f'{base}_{dup}.csv'
+                    dup += 1
+                used_names.add(name)
+                zf.writestr(name, out.getvalue())
+
+        zip_buf.seek(0)
+        proj = _safe(project_name, 'Project')
+        return send_file(
+            zip_buf,
+            as_attachment=True,
+            download_name=f'AquaCell_MultiTank_StageStorage_{proj}_{datetime.datetime.now().strftime("%m%d%Y")}.zip',
+            mimetype='application/zip'
+        )
     except Exception as exc:
         import traceback
         return jsonify({'error': str(exc), 'trace': traceback.format_exc()}), 500

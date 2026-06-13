@@ -461,6 +461,14 @@
     </div>
     <div class="topbar-actions">
         <a href="/" class="back-link">← Single Tank</a>
+        <select id="stageIncrementIn" title="Stage-storage increment for the per-tank CSVs"
+            style="background:#0d2438;color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:5px 6px;font-size:12px;cursor:pointer;">
+            <option value="1">1 in</option>
+            <option value="3">3 in</option>
+            <option value="6">6 in</option>
+            <option value="12" selected>12 in (1 ft)</option>
+        </select>
+        <button class="topbar-btn" onclick="downloadStageCSVs()" style="background:#16a34a;color:#fff;" title="Download a stage-storage CSV for each calculated tank (bundled as a ZIP)">📊 Stage CSVs</button>
         <button class="topbar-btn" onclick="copyToClipboard()" style="background:#6f42c1;color:#fff;">📋 Copy</button>
         <button class="topbar-btn" onclick="exportJSON()" style="background:#0891b2;color:#fff;">⬇ Export JSON</button>
         <button class="topbar-btn" onclick="importJSON()" style="background:#ffc107;color:#212529;">Import JSON</button>
@@ -1636,6 +1644,49 @@ function calcPrice() {
     setEl('priceFreight',    fmt(freight) + (fPct > 0 ? '  (' + fPct + '%)' : ''));
     setEl('priceTotal',      fmt(total));
     setEl('priceCostPerFt3', tankFt3 > 0 ? fmtF3(cpf3) : '— (calculate first)');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  PER-TANK STAGE-STORAGE CSVs  (ZIP)
+// ══════════════════════════════════════════════════════════════════
+async function downloadStageCSVs() {
+    saveDraft();  // capture the active tank's latest edits
+    const calcedIdxs = results.reduce((acc, r, i) => { if (r) acc.push(i); return acc; }, []);
+    if (calcedIdxs.length === 0) {
+        alert('Calculate at least one tank first.');
+        return;
+    }
+    const incEl = document.getElementById('stageIncrementIn');
+    const payload = {
+        project_name:       document.getElementById('q_project_name').value || 'Project',
+        stage_increment_in: parseInt(incEl ? incEl.value : '12') || 12,
+        tanks:              calcedIdxs.map(i => tanks[i]),
+    };
+    try {
+        const resp = await fetch('/multi/download_stage_csvs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!resp.ok) {
+            let msg = 'Unknown error';
+            try { msg = (await resp.json()).error || msg; } catch (e) {}
+            alert('Stage CSV error: ' + msg);
+            return;
+        }
+        const blob = await resp.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url;
+        const proj = (payload.project_name || 'Project').replace(/[^a-zA-Z0-9\-_ ]/g,'_').replace(/\s+/g,'_');
+        const dt   = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'');
+        a.download = `AquaCell_MultiTank_StageStorage_${proj}_${dt}.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('✓ Stage CSVs downloaded (' + calcedIdxs.length + ' tank' + (calcedIdxs.length > 1 ? 's' : '') + ')');
+    } catch (err) {
+        alert('Network error: ' + err.message);
+    }
 }
 
 // ══════════════════════════════════════════════════════════════════
