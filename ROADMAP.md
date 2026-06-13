@@ -20,8 +20,7 @@ Professional web-based calculator for designing and quoting underground stormwat
  - move calculate tank button to left panel bottom
  - Move results board with past fail on storage and totals to the top header so it's always visible
  - Add add up and down toggle buttons for screen
- - ADD COMPLEX CALCULATOR (SIMPLE) TO MULTI TANK UI/UX
-   -ADD TOGGLE FOR VOID SPACE ENTRY 
+
  
 
 ##UPDATES FOR BOTH MULTI-TANK/SINGLE TANK CALCULATORS
@@ -31,10 +30,6 @@ Professional web-based calculator for designing and quoting underground stormwat
 - TAKE PRICING OUT OF SEPARATE CALCULATIONS TOOL FOR CLIENT USE
 - toggle DISTRIBUTOR, MARKET,  BUDGET ESTIMATE PRICING for quote page export (HEADER TITLE)
 - ONE BUTTON THAT TAKES YOU TO "TOOLS" WHERE MULTIPLE CALCULATORS LIVE AND EXPORT TO THEIR OWN PAGE WITH GRAPHICS
-
-**##SYSTEM CHECKS TO VERIFY / CONFIRM**
-
-
 
 **## Backlog / Future Enhancements (Add here when ideas come up)**
  - Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed (added to excavation & dimensional summary card
@@ -48,14 +43,18 @@ Professional web-based calculator for designing and quoting underground stormwat
 [ ] Client_Facing_v1  → git checkout -b MTC_Client → strip MTC pricing
 
 **Future Version Releases**
-
 - (v16) UPLOAD PLAN SHEET AND CREATE AN OVERLAY OF TANK (RECTANGLE/SQUARE ONLY); OR CRATE BUILDER FOR COMPLEX (ENTER ROW BY ROW, THEN DESIGNATE HOW MANY CRATES IN THE ROW)
 - (v17) USE CANVAS TO BUILD A CONCEPTUAL TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
 - (v18) Optional 3D isometric view of the crate layout
-- (v19) SEPARATE CALCULATOR TOOL WITH NO PRICING; 
+- (v19) SEPARATE CALCULATOR TOOL WITH NO PRICING;
+
+- **##SYSTEM CHECKS TO VERIFY / CONFIRM**
+- 
 
 **## PREVIOUS Version (v12-v14) — v15 Completed**
 
+-  [X] ADD COMPLEX CALCULATOR (SIMPLE) TO MULTI TANK UI/UX
+-  [X] ADD TOGGLE FOR VOID SPACE ENTRY 
 -  [X] ADDED FLOW RATE SIZING TO THE PT-ROW™ CARD
 -  [X] ADD FABRIC AND ACCESSORY AMOUNTS TO THE MULTI-TANK QUOTE
 -  [X] add place for Large Diameter Pipe Connections on quote sheet
