@@ -1081,18 +1081,22 @@
             <span class="cum-bom-val" id="cum_stone_yd3">—</span>
         </div>
 
-        <!-- ── Pricing ── -->
+        <!-- ── Pricing (hard-coded component costing — mirrors single-tank) ── -->
         <div style="font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;opacity:0.65;margin:14px 0 6px;">💲 Price Estimation</div>
         <div class="price-box">
-            <label>Cost per ft³ (USD $)</label>
-            <input type="number" id="costPerFt3" step="0.01" placeholder="e.g. 5.19" oninput="calcPrice()">
-            <label>Freight % of AquaCell Cost</label>
+            <label>Markup % <span style="font-weight:normal;opacity:0.6;">(÷ method: 10% agent · 20% market)</span></label>
+            <input type="number" id="markupPct" step="0.1" value="10" oninput="calcPrice()">
+            <label>Freight % of Selling Price</label>
             <input type="number" id="freightPct" step="0.1" value="10" oninput="calcPrice()">
-            <div class="price-row"><span>AquaCell Subtotal</span><strong id="priceSubtotal">—</strong></div>
+            <div class="price-row"><span>Calculated Cost (floor)</span><strong id="priceFloorCost" style="color:#00b0ff;">—</strong></div>
+            <div class="price-row"><span>Selling Price (w/ markup)</span><strong id="priceSubtotal" style="color:#2ecc71;">—</strong></div>
             <div class="price-row"><span>Est. Freight</span><strong id="priceFreight" style="color:#e67e22;">—</strong></div>
             <div class="price-total">
-                <span>Est. Total</span>
+                <span>Total to Customer</span>
                 <span id="priceTotal">—</span>
+            </div>
+            <div class="price-row" style="margin-top:6px;border-top:1px dashed var(--border);padding-top:8px;">
+                <span>Selling Price / ft³ tank storage</span><strong id="priceCostPerFt3" style="color:#00b0ff;">—</strong>
             </div>
         </div>
 
@@ -1358,6 +1362,8 @@ async function calculateCurrentTank() {
 // ══════════════════════════════════════════════════════════════════
 //  SHOW RESULTS
 // ══════════════════════════════════════════════════════════════════
+// ── Hard-coded floor unit prices (update here + index.html on a price increase) ──
+const UNIT_PRICES = { base:42.47, side:21.31, bottom:18.71, pipe:28.53, adapter12:96.54, adapter16:170.60 };
 const UNIT_WEIGHTS = { base_units:25.18, side_plates:4.91, bottom_plates:7.86,
                         pipe_connectors:2.70, top_adapters_12:11.02, top_adapters_16:22.00, contingency:25.18 };
 const PALLET_COUNTS = { base_units:56, side_plates:120, bottom_plates:120,
@@ -1587,31 +1593,49 @@ function clearCumulative() {
      'cum_contingency','cum_weight','cum_pallets',
      'cum_geo_tank_yd2','cum_geo_stone_yd2','cum_geo',
      'cum_ptrow_woven_yd2','cum_geogrid_total','cum_liner_total','cum_large_pipe',
-     'cum_stone_yd3'].forEach(id => setEl(id, '—'));
+     'cum_stone_yd3','priceFloorCost','priceSubtotal','priceFreight','priceTotal',
+     'priceCostPerFt3'].forEach(id => setEl(id, '—'));
     document.getElementById('cum_tank_summary').innerHTML = '<span style="font-size:11px;opacity:0.5;">No tanks calculated yet.</span>';
 }
 
 // ══════════════════════════════════════════════════════════════════
 //  PRICE CALCULATION
 // ══════════════════════════════════════════════════════════════════
+// Floor cost from cumulative BOM x hard-coded UNIT_PRICES (incl. contingency at base rate)
+function cumFloorCost() {
+    if (!cumBOM) return 0;
+    const c = cumBOM.cumulative;
+    return (c.base_units      * UNIT_PRICES.base)
+         + (c.side_plates     * UNIT_PRICES.side)
+         + (c.bottom_plates   * UNIT_PRICES.bottom)
+         + (c.pipe_connectors * UNIT_PRICES.pipe)
+         + (c.top_adapters_12 * UNIT_PRICES.adapter12)
+         + (c.top_adapters_16 * UNIT_PRICES.adapter16)
+         + (c.contingency     * UNIT_PRICES.base);
+}
+
 function calcPrice() {
     if (!cumBOM) return;
-    const cpp = parseFloat(document.getElementById('costPerFt3').value) || 0;
-    const fPct = parseFloat(document.getElementById('freightPct').value) || 0;
-    if (cpp <= 0) {
-        setEl('priceSubtotal', '—');
-        setEl('priceFreight', '—');
-        setEl('priceTotal', '—');
+    const markupPct = parseFloat(document.getElementById('markupPct').value) || 0;
+    const fPct      = parseFloat(document.getElementById('freightPct').value) || 0;
+    const floorCost = cumFloorCost();
+    if (floorCost <= 0) {
+        ['priceFloorCost','priceSubtotal','priceFreight','priceTotal','priceCostPerFt3'].forEach(id => setEl(id, '—'));
         return;
     }
-    const storage  = cumBOM.cumulative.tank_storage;
-    const subtotal = cpp * storage;
-    const freight  = subtotal * fPct / 100;
-    const total    = subtotal + freight;
-    const fmt = v => '$' + v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
-    setEl('priceSubtotal', fmt(subtotal));
-    setEl('priceFreight',  fmt(freight));
-    setEl('priceTotal',    fmt(total));
+    const divisor  = markupPct > 0 ? (1 - markupPct / 100) : 1;
+    const selling  = divisor > 0 ? floorCost / divisor : floorCost;
+    const freight  = selling * fPct / 100;
+    const total    = selling + freight;
+    const tankFt3  = cumBOM.cumulative.tank_storage || 0;
+    const cpf3     = tankFt3 > 0 ? selling / tankFt3 : 0;
+    const fmt    = v => '$' + v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+    const fmtF3  = v => '$' + v.toLocaleString(undefined,{minimumFractionDigits:4,maximumFractionDigits:4}) + ' /ft³';
+    setEl('priceFloorCost',  fmt(floorCost));
+    setEl('priceSubtotal',   fmt(selling) + (markupPct > 0 ? '  (' + markupPct + '% markup)' : ''));
+    setEl('priceFreight',    fmt(freight) + (fPct > 0 ? '  (' + fPct + '%)' : ''));
+    setEl('priceTotal',      fmt(total));
+    setEl('priceCostPerFt3', tankFt3 > 0 ? fmtF3(cpf3) : '— (calculate first)');
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1625,6 +1649,17 @@ async function downloadQuote() {
         return;
     }
 
+    // Component-based pricing (mirrors the on-screen estimate)
+    const _markupPct = parseFloat(document.getElementById('markupPct').value) || 0;
+    const _freightPct = parseFloat(document.getElementById('freightPct').value) || 10;
+    const _qfloor   = cumFloorCost();
+    const _qdiv     = _markupPct > 0 ? (1 - _markupPct / 100) : 1;
+    const _qselling = _qdiv > 0 ? _qfloor / _qdiv : _qfloor;
+    const _qfreight = _qselling * _freightPct / 100;
+    const _qtotal   = _qselling + _qfreight;
+    const _qtankFt3 = (cumBOM && cumBOM.cumulative.tank_storage) || 0;
+    const _qcpf3    = _qtankFt3 > 0 ? _qselling / _qtankFt3 : 0;
+
     const payload = {
         project_name:    document.getElementById('q_project_name').value,
         project_num:     document.getElementById('q_project_num').value,
@@ -1633,8 +1668,13 @@ async function downloadQuote() {
         estimator:       document.getElementById('q_estimator').value,
         estimator_email: document.getElementById('q_estimator_email').value,
         project_notes:   document.getElementById('q_notes').value,
-        cost_per_ft3:    parseFloat(document.getElementById('costPerFt3').value) || 0,
+        markup_pct:      parseFloat(document.getElementById('markupPct').value) || 0,
         freight_pct:     parseFloat(document.getElementById('freightPct').value) || 10,
+        floor_cost:        _qfloor,
+        subtotal:          _qselling,
+        freight_cost:      _qfreight,
+        total_with_freight:_qtotal,
+        cost_per_ft3:      _qcpf3,
         tanks:           calcedIdxs.map(i => tanks[i]),
     };
 
@@ -1681,8 +1721,8 @@ function exportJSON() {
             notes:          document.getElementById('q_notes').value,
         },
         pricing: {
-            cost_per_ft3: parseFloat(document.getElementById('costPerFt3').value) || 0,
-            freight_pct:  parseFloat(document.getElementById('freightPct').value) || 10,
+            markup_pct:  parseFloat(document.getElementById('markupPct').value) || 0,
+            freight_pct: parseFloat(document.getElementById('freightPct').value) || 10,
         },
         tanks: tanks,
         results: results,
@@ -1721,8 +1761,8 @@ function handleImport(ev) {
                 document.getElementById('q_notes').value           = data.project.notes || '';
             }
             if (data.pricing) {
-                document.getElementById('costPerFt3').value = data.pricing.cost_per_ft3 || '';
-                document.getElementById('freightPct').value = data.pricing.freight_pct  || 10;
+                document.getElementById('markupPct').value  = (data.pricing.markup_pct != null ? data.pricing.markup_pct : 10);
+                document.getElementById('freightPct').value = (data.pricing.freight_pct != null ? data.pricing.freight_pct : 10);
             }
             renderSidebar();
             if (tanks.length > 0) selectTank(0);
