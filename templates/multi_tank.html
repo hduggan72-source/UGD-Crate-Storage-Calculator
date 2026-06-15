@@ -703,6 +703,17 @@
                 </div>
             </div>
 
+            <!-- TANK NOTES -->
+            <div class="section-label">Tank Notes</div>
+            <div class="input-grid">
+                <div class="input-group" style="grid-column:1 / -1;">
+                    <label>Notes for this tank <span style="font-weight:normal;opacity:0.6;">(prints only on this tank's page in the quote PDF)</span></label>
+                    <textarea id="f_tank_notes" rows="3" placeholder="e.g. Coordinate inlet invert with site civil. Verify cover over north end."
+                        oninput="saveDraft()"
+                        style="width:100%;resize:vertical;padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--card);color:var(--text);font-size:13px;font-family:inherit;"></textarea>
+                </div>
+            </div>
+
             <!-- BIAXIAL GEOGRID -->
             <div class="section-label" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleSection('geogridSection',this)">
                 <span>Biaxial Geogrid — Optional</span>
@@ -1186,6 +1197,7 @@ function addTank() {
         perimeter_stone_width: '1.0', stone_void: '0.40',
         geoWaste: '20', min_storage: '0',
         stone_top_included: true, stone_perim_included: true, stone_base_included: true,
+        tank_notes: '',
         pipe_connectors: '0', top_adapters_12: '0', top_adapters_16: '0',
         // Optional accessories
         geogrid_top_yd2: 0, geogrid_bottom_yd2: 0,
@@ -1245,7 +1257,15 @@ function renderSidebar() {
         let storageHtml = '';
         if (r) {
             const covCls = r.cover_ok ? 'tank-status-pass' : 'tank-status-fail';
+            // Storage PASS/FAIL — only when a minimum required storage is set
+            // (storage_ok is null when no minimum was entered).
+            let volHtml = '';
+            if (r.storage_ok !== null && r.storage_ok !== undefined) {
+                const volCls = r.storage_ok ? 'tank-status-pass' : 'tank-status-fail';
+                volHtml = `<span class="${volCls}" style="font-size:10px;">${r.storage_ok ? '✓ Volume OK' : '✗ Volume FAIL'}</span>`;
+            }
             storageHtml = `<span class="tank-storage-badge">${r.tank_storage.toLocaleString()} ft³</span>
+                           ${volHtml}
                            <span class="${covCls}" style="font-size:10px;">${r.cover_ok ? '✓ Cover OK' : '✗ Cover FAIL'}</span>`;
         } else {
             storageHtml = `<span style="font-size:10px;opacity:0.5;font-style:italic;">Not calculated</span>`;
@@ -1288,7 +1308,7 @@ const FIELDS = [
     'surface_elev','tank_bottom_elev','cover_stone','base_stone',
     'perimeter_stone_width','stone_void','geoWaste','min_storage',
     'pipe_connectors','top_adapters_12','top_adapters_16',
-    'geogrid_top_yd2','geogrid_bottom_yd2','large_pipe_qty',
+    'geogrid_top_yd2','geogrid_bottom_yd2','large_pipe_qty','tank_notes',
     'complex_scaled_area','complex_known_dim','complex_tank_perim',
     'complex_excav_area','complex_excav_perim',
 ];
@@ -1479,24 +1499,24 @@ function showResults(r) {
     const covEl = document.getElementById('r_cover_status');
     covEl.textContent = r.cover_ok ? `✓ PASS (min ${r.min_cover} ft)` : `✗ FAIL (min ${r.min_cover} ft required)`;
     covEl.className = 'rv ' + (r.cover_ok ? 'pass' : 'fail');
-    setEl('r_dl_psi', (r.dead_load_psi || '—') + ' psi');
+    setEl('r_dl_psi', r.dead_load_psi ? fmtNum(r.dead_load_psi, 2) + ' psi' : '—');
 
     const fosDeadEl = document.getElementById('r_fos_dead');
-    fosDeadEl.textContent = r.fos_dead ? r.fos_dead : '—';
+    fosDeadEl.textContent = r.fos_dead ? fmtNum(r.fos_dead, 2) : '—';
     fosDeadEl.className = 'rv ' + (r.fos_dead && r.fos_dead >= 1.95 ? 'pass' : 'fail');
 
-    setEl('r_ll_psi', r.ll_psi ? r.ll_psi + ' psi' : '—');
+    setEl('r_ll_psi', r.ll_psi ? fmtNum(r.ll_psi, 2) + ' psi' : '—');
     const fosLLEl = document.getElementById('r_fos_ll');
-    fosLLEl.textContent = r.fos_ll ? r.fos_ll : '—';
+    fosLLEl.textContent = r.fos_ll ? fmtNum(r.fos_ll, 2) : '—';
     fosLLEl.className = 'rv ' + (r.fos_ll && r.fos_ll >= 1.75 ? 'pass' : 'fail');
 
     // Dimensions
-    setEl('r_dims',      `${r.tank_width} ft × ${r.tank_length} ft`);
+    setEl('r_dims',      `${fmtNum(r.tank_width, 2)} ft × ${fmtNum(r.tank_length, 2)} ft`);
     setEl('r_crates',    `${r.crates_wide} × ${r.crates_long} = ${r.crates_layer}/layer`);
-    setEl('r_ht',        `${r.tank_height} ft`);
-    setEl('r_sys_depth', `${r.total_system_depth} ft`);
-    setEl('r_perim',     `${r.used_perimeter} ft`);
-    setEl('r_excav',     `${r.outer_width} ft × ${r.outer_length} ft`);
+    setEl('r_ht',        `${fmtNum(r.tank_height, 2)} ft`);
+    setEl('r_sys_depth', `${fmtNum(r.total_system_depth, 2)} ft`);
+    setEl('r_perim',     `${fmtNum(r.used_perimeter, 2)} ft`);
+    setEl('r_excav',     `${fmtNum(r.outer_width, 2)} ft × ${fmtNum(r.outer_length, 2)} ft`);
 
     // Geotextile — show in sq yd consistent with quote
     const geoWaste = r.geoWaste || 20;

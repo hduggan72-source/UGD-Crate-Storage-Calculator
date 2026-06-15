@@ -831,6 +831,7 @@ def calc_tank(t):
     top_adapters_16  = int(t.get('top_adapters_16', 0) or 0)
     min_storage      = float(t.get('min_storage', 0) or 0)
     tank_label       = t.get('tank_label', 'Tank')
+    tank_notes       = (t.get('tank_notes', '') or '').strip()
 
     # ── Optional accessories ─────────────────────────────────────────
     geogrid_top_yd2    = int(t.get('geogrid_top_yd2',    0) or 0)
@@ -1030,6 +1031,7 @@ def calc_tank(t):
     return {
         # Identity
         'tank_label':      tank_label,
+        'tank_notes':      tank_notes,
         'config':          config,
         'layers':          layers,
         'shape_mode':      shape_mode,
@@ -1821,6 +1823,37 @@ def multi_download_quote():
             # Large diameter pipe connections (if applicable)
             if (r.get('large_pipe_qty', 0) or 0) > 0:
                 _acc('Large Diameter Pipe Connections (18\u201336\u2033)', f"{r['large_pipe_qty']:,} ea")
+
+            # ── Tank notes (this tank only) ──
+            _tnotes = (r.get('tank_notes', '') or '').strip()
+            if _tnotes:
+                y -= 5
+                section_hdr_mt('\u25a0  TANK NOTES')
+                _ensure_space(13)
+                c.setFillColor(BLACK)
+                c.setFont('Helvetica', 8)
+                _max_w = QW - 12
+                for _para in _tnotes.split('\n'):
+                    _para = _para.rstrip()
+                    if not _para:
+                        y -= 6
+                        continue
+                    _line = ''
+                    for _word in _para.split():
+                        _test = (_line + ' ' + _word).strip()
+                        if c.stringWidth(_test, 'Helvetica', 8) <= _max_w:
+                            _line = _test
+                        else:
+                            _ensure_space(12)
+                            c.setFillColor(BLACK); c.setFont('Helvetica', 8)
+                            c.drawString(LQ + 6, y - 3, _line)
+                            y -= 12
+                            _line = _word
+                    if _line:
+                        _ensure_space(12)
+                        c.setFillColor(BLACK); c.setFont('Helvetica', 8)
+                        c.drawString(LQ + 6, y - 3, _line)
+                        y -= 12
 
         c.save()
         buffer.seek(0)
