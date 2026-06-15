@@ -9,22 +9,16 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 ####MULTI-TANK CALCULATOR CHANGES####
 
-
-
- - ADD ALL ELEVATION LEVELS (TANK AND STONE) TO COVER & LOAD SECTION IN MULTI-TANK SUMMARY
- - ALSO ADD BREAKDOWN OF STONE VOLUME IN EACH ELEVATION
  - CHANGE DECIMAL POINT TO HUNDRETHS IN SUMMARY RESULTS CARDS
-
  - ADD STORAGE PASS/FAIL TO LEFT SIDE PANEL "TANKS IN PROJECT" INPUTS FOR EACH TANK CARD
  - move calculate tank button to left panel bottom
  - Move results board with past fail on storage and totals to the top header so it's always visible
  - Add add up and down toggle buttons for screen
 
- 
 
 ##UPDATES FOR BOTH MULTI-TANK/SINGLE TANK CALCULATORS
 - ADD DISTANCE FROM BUILDING CALCULATOR (THAT AND BUOYANCY SHOULD BE SEPARATE BRANCHES SIMILAR TO MULTI-TANK)
-- System type selector (Retention / Detention / Infiltration) → auto-adjust geotextile, underdrain, liner options
+
 - command button to collapse all cards
 - TAKE PRICING OUT OF SEPARATE CALCULATIONS TOOL FOR CLIENT USE
 - toggle DISTRIBUTOR, MARKET,  BUDGET ESTIMATE PRICING for quote page export (HEADER TITLE)
@@ -53,6 +47,8 @@ Professional web-based calculator for designing and quoting underground stormwat
 **## PREVIOUS Version (v12-v14) — v15 Completed**
 
 -  [X] ON MUTLI-TANK QUOTE SUMMARY, UPDATE PASS/FAIL FONTS TO RED/GREEN
+-  [X] ADD ALL ELEVATION LEVELS (TANK AND STONE) TO COVER & LOAD SECTION IN MULTI-TANK SUMMARY
+-  [X] ADD BREAKDOWN OF STONE VOLUME IN EACH ELEVATION
 -  [X] ALSO ADD THE FABRIC, GRID, STONE ACCESSORY BOM AMOUNTS TO (THIS TANK) PAGES APPENDED TO THE QUOTE 
 -  [X] STAGE STORAGE DOWNLOAD FOR EACH TANK (DOES NOT HAVE TO BE ON THE RESULTS CARDS)
 -  [X] ADD COMPLEX CALCULATOR (SIMPLE) TO MULTI TANK UI/UX
