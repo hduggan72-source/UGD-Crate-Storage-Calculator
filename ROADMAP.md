@@ -9,11 +9,10 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 ####MULTI-TANK CALCULATOR CHANGES####
 
- - CHANGE DECIMAL POINT TO HUNDRETHS IN SUMMARY RESULTS CARDS
- - ADD STORAGE PASS/FAIL TO LEFT SIDE PANEL "TANKS IN PROJECT" INPUTS FOR EACH TANK CARD
- - move calculate tank button to left panel bottom
- - Move results board with past fail on storage and totals to the top header so it's always visible
- - Add add up and down toggle buttons for screen
+- ADD STORAGE PASS/FAIL TO LEFT SIDE PANEL "TANKS IN PROJECT" INPUTS FOR EACH TANK CARD
+- move calculate tank button to left panel bottom
+- Move results board with past fail on storage and totals to the top header so it's always visible
+- Add add up and down toggle buttons for screen
 
 
 ##UPDATES FOR BOTH MULTI-TANK/SINGLE TANK CALCULATORS
