@@ -2073,7 +2073,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                                 }
                                 var isCustom = r.isCustom || !standardPcts.includes(r.pct);
                                 sel.value = isCustom ? 'custom' : String(r.pct);
-                                sel.oninput = (function(idx){ return function(){
+                                sel.onchange = (function(idx){ return function(){
                                     if (this.value === 'custom') {
                                         window._ptrowRows[idx].isCustom = true;
                                     } else {
