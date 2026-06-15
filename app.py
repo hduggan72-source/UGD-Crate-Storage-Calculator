@@ -985,6 +985,25 @@ def calc_tank(t):
     stone_base_gross  = round(excav_area * base_stone, 1)
     stone_base_net    = round(stone_base_gross * stone_void, 1)
 
+    # Per-layer net-storage inclusion toggles (default = included). The
+    # included-layer net sum is the authoritative stone storage (matches the
+    # single-tank model). Excluding a layer drops its storage CREDIT only —
+    # the stone is still placed, so stone_yd3 / stone_tons stay gross-based.
+    def _inc(key):
+        v = t.get(key, True)
+        if isinstance(v, str):
+            return v == '1' or v.lower() == 'true'
+        return bool(v)
+    stone_top_included   = _inc('stone_top_included')
+    stone_perim_included = _inc('stone_perim_included')
+    stone_base_included  = _inc('stone_base_included')
+    stone_layer_total_net = round(
+        (stone_top_net   if stone_top_included   else 0.0) +
+        (stone_perim_net if stone_perim_included else 0.0) +
+        (stone_base_net  if stone_base_included  else 0.0), 1)
+    total_stone_stor = stone_layer_total_net
+    total_storage    = round(tank_storage + total_stone_stor, 1)
+
     # Cover / load
     cover_depth = round(surface_elev - (tank_bottom_elev + tank_height), 2)
     min_cover   = cd['min_cover'].get(traffic_load, 1.0)
@@ -1082,6 +1101,10 @@ def calc_tank(t):
         'stone_top_gross': stone_top_gross,  'stone_top_net':   stone_top_net,
         'stone_perim_gross': stone_perim_gross, 'stone_perim_net': stone_perim_net,
         'stone_base_gross': stone_base_gross,  'stone_base_net':  stone_base_net,
+        'stone_top_included':   stone_top_included,
+        'stone_perim_included': stone_perim_included,
+        'stone_base_included':  stone_base_included,
+        'stone_layer_total_net': stone_layer_total_net,
         # Elevations
         'surface_elev':    surface_elev,
         'tank_bottom_elev': tank_bottom_elev,
@@ -1686,6 +1709,71 @@ def multi_download_quote():
             detail_row_mt('FoS \u2014 Dead Load', str(r['fos_dead'] or '\u2014'), shade=False)
             detail_row_mt('FoS \u2014 Live Load', str(r['fos_ll'] or '\u2014'), shade=True)
             y -= 5
+
+            # ── Stone backfill (this tank) — per-layer net w/ inclusion ──
+            section_hdr_mt('\u25a0  STONE BACKFILL  (provided by others \u2014 coordination estimates only)')
+            _ensure_space(11)
+            _sv_pct = int(round(r['stone_void'] * 100))
+            c.setFillColor(GRAY)
+            c.setFont('Helvetica-Oblique', 6.5)
+            c.drawString(LQ + 5, y - 3,
+                f"Storage by layer  (stone void ratio = {_sv_pct}%  |  net = gross \u00d7 void ratio  |  \u2713 = included in Total System Storage)")
+            y -= 11
+
+            _cs_g = LQ + QW - 250   # gross value right edge
+            _cs_n = LQ + QW - 125   # net value right edge
+            _cs_i = LQ + QW - 5     # included flag right edge
+
+            # Header row
+            _ensure_space(13)
+            c.setFillColor(MGRAY)
+            c.rect(LQ, y - 13 + 3, QW, 13, fill=1, stroke=0)
+            c.setFillColor(NAVY)
+            c.setFont('Helvetica-Bold', 6.8)
+            c.drawString(LQ + 5, y - 3, 'Layer')
+            c.drawRightString(_cs_g, y - 3, 'Gross (ft\u00b3)')
+            c.drawRightString(_cs_n, y - 3, 'Net (ft\u00b3)')
+            c.drawRightString(_cs_i, y - 3, 'In Net Total')
+            y -= 13
+
+            def stone_row_mt(label, gross, net, included, shade):
+                nonlocal y
+                _ensure_space(13)
+                rh = 13
+                if shade:
+                    c.setFillColor(LGRAY)
+                    c.rect(LQ, y - rh + 3, QW, rh, fill=1, stroke=0)
+                c.setFillColor(GRAY)
+                c.setFont('Helvetica', 7.5)
+                c.drawString(LQ + 5, y - 3, label)
+                c.setFillColor(GRAY)
+                c.drawRightString(_cs_g, y - 3, f'{gross:,.1f}')
+                c.setFillColor(BLACK)
+                c.setFont('Helvetica-Bold', 7.5)
+                c.drawRightString(_cs_n, y - 3, f'{net:,.1f}')
+                c.setFont('Helvetica-Bold', 7)
+                c.setFillColor(GREEN if included else RED)
+                c.drawRightString(_cs_i, y - 3, '\u2713  INCLUDED' if included else '\u2014  EXCLUDED')
+                c.setStrokeColor(MGRAY)
+                c.setLineWidth(0.25)
+                c.line(LQ, y - rh + 3, LQ + QW, y - rh + 3)
+                y -= rh
+
+            stone_row_mt('Cover / Top',       r['stone_top_gross'],   r['stone_top_net'],   r['stone_top_included'],   shade=False)
+            stone_row_mt('Perimeter / Sides', r['stone_perim_gross'], r['stone_perim_net'], r['stone_perim_included'], shade=True)
+            stone_row_mt('Base / Bottom',     r['stone_base_gross'],  r['stone_base_net'],  r['stone_base_included'],  shade=False)
+
+            # Total (included layers) row
+            _ensure_space(14)
+            _gross_sum = r['stone_top_gross'] + r['stone_perim_gross'] + r['stone_base_gross']
+            c.setFillColor(LTGRN)
+            c.rect(LQ, y - 14 + 3, QW, 14, fill=1, stroke=0)
+            c.setFillColor(GREEN)
+            c.setFont('Helvetica-Bold', 7.5)
+            c.drawString(LQ + 5, y - 4, 'TOTAL NET STORAGE (INCLUDED LAYERS)')
+            c.drawRightString(_cs_g, y - 4, f'{_gross_sum:,.1f}')
+            c.drawRightString(_cs_n, y - 4, f"{r['stone_layer_total_net']:,.1f} ft\u00b3")
+            y -= 14 + 4
 
             section_hdr_mt('\u25a0  BILL OF MATERIALS \u2014 AQUACELL (THIS TANK)')
             detail_row_mt('Base Units (3091506)',          str(r['base_units']),       shade=False)

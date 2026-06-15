@@ -660,6 +660,26 @@
                     <label>Geotextile Waste %</label>
                     <input type="number" id="f_geoWaste" value="20" min="0" oninput="saveDraft()">
                 </div>
+                <div class="input-group" style="grid-column:1 / -1;">
+                    <label>Include Stone Net Storage in Total System Storage</label>
+                    <div style="display:flex;gap:16px;flex-wrap:wrap;padding:4px 2px;">
+                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:normal;cursor:pointer;">
+                            <input type="checkbox" id="f_stone_top_included" checked
+                                style="width:14px;height:14px;accent-color:#16a34a;" onchange="saveDraft(); recalcIfReady();">
+                            Cover / Top
+                        </label>
+                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:normal;cursor:pointer;">
+                            <input type="checkbox" id="f_stone_perim_included" checked
+                                style="width:14px;height:14px;accent-color:#16a34a;" onchange="saveDraft(); recalcIfReady();">
+                            Perimeter / Sides
+                        </label>
+                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:normal;cursor:pointer;">
+                            <input type="checkbox" id="f_stone_base_included" checked
+                                style="width:14px;height:14px;accent-color:#16a34a;" onchange="saveDraft(); recalcIfReady();">
+                            Base / Bottom
+                        </label>
+                    </div>
+                </div>
             </div>
 
             <!-- ACCESSORIES -->
@@ -1165,6 +1185,7 @@ function addTank() {
         cover_stone: '1.0', base_stone: '0.333',
         perimeter_stone_width: '1.0', stone_void: '0.40',
         geoWaste: '20', min_storage: '0',
+        stone_top_included: true, stone_perim_included: true, stone_base_included: true,
         pipe_connectors: '0', top_adapters_12: '0', top_adapters_16: '0',
         // Optional accessories
         geogrid_top_yd2: 0, geogrid_bottom_yd2: 0,
@@ -1305,6 +1326,15 @@ function loadEditor(idx) {
     const lnkStone = document.getElementById('f_liner_on_stone');
     if (lnkTank)  lnkTank.checked  = !!tanks[idx].liner_on_tank;
     if (lnkStone) lnkStone.checked = !!tanks[idx].liner_on_stone;
+
+    // Stone-layer inclusion toggles (default included for legacy tanks)
+    ['top','perim','base'].forEach(function(seg) {
+        const el = document.getElementById('f_stone_' + seg + '_included');
+        if (el) {
+            const v = tanks[idx]['stone_' + seg + '_included'];
+            el.checked = (v === undefined ? true : !!v);
+        }
+    });
 }
 
 function saveDraft() {
@@ -1325,6 +1355,10 @@ function saveDraft() {
     const lnkStone = document.getElementById('f_liner_on_stone');
     if (lnkTank)  tanks[activeIdx].liner_on_tank  = lnkTank.checked;
     if (lnkStone) tanks[activeIdx].liner_on_stone = lnkStone.checked;
+    ['top','perim','base'].forEach(function(seg) {
+        const el = document.getElementById('f_stone_' + seg + '_included');
+        if (el) tanks[activeIdx]['stone_' + seg + '_included'] = el.checked;
+    });
 
     document.getElementById('editorTankTitle').textContent = tanks[activeIdx].tank_label || `Tank ${activeIdx + 1}`;
     renderSidebar();
@@ -1339,6 +1373,14 @@ function showEmpty() {
 // ══════════════════════════════════════════════════════════════════
 //  CALCULATION
 // ══════════════════════════════════════════════════════════════════
+// Re-run the calc only if this tank already has results, so toggling the
+// stone-layer inclusion checkboxes updates storage live without erroring on
+// a half-filled tank.
+function recalcIfReady() {
+    if (activeIdx === null) return;
+    if (results[activeIdx]) calculateCurrentTank();
+}
+
 async function calculateCurrentTank() {
     if (activeIdx === null) return;
     saveDraft();
