@@ -7,10 +7,6 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 ** ## Next Up (High Priority – Do These Next)**
 
-####MULTI-TANK CALCULATOR CHANGES####
-
-- move calculate tank button to left panel bottom
-
 ##UPDATES FOR BOTH MULTI-TANK/SINGLE TANK CALCULATORS
 
 - ADD DISTANCE FROM BUILDING CALCULATOR (THAT AND BUOYANCY SHOULD BE SEPARATE BRANCHES SIMILAR TO MULTI-TANK)
@@ -41,6 +37,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 **## PREVIOUS Version (v12-v14) — v15 Completed**
 
+-  [X] ADD COMMAND BUTTON TO GITHUB LOCATION "DETAILS" SO PDF FOR THE PROJECT CAN BE COMPILED IN EACH INDIVIDUAL UI/UX
 -  [X] ON MUTLI-TANK QUOTE SUMMARY, UPDATE PASS/FAIL FONTS TO RED/GREEN
 -  [X] ADD STORAGE PASS/FAIL TO LEFT SIDE PANEL "TANKS IN PROJECT" INPUTS FOR EACH TANK CARD
 -  [X] ADD PROJECT NOTES FOR EACH TANK TO ADD TO TANK SUMMARY PDF ONLY 
