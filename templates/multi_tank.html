@@ -443,6 +443,87 @@
             transition: background 0.15s;
         }
         .back-link:hover { background: rgba(147,197,253,0.1); }
+
+        /* ── DETAIL SHEET EXPORTER (shared with single-tank) ── */
+        .details-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.65); z-index: 9999;
+            align-items: center; justify-content: center;
+        }
+        .details-overlay.open { display: flex; }
+        .details-modal {
+            background: #0f1e3c; color: #e2e8f0; border-radius: 10px;
+            width: 680px; max-width: 95vw; max-height: 88vh;
+            display: flex; flex-direction: column;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.6); border: 1px solid #1e3a8a;
+        }
+        .details-modal-header {
+            background: #1e3a8a; padding: 14px 20px; border-radius: 10px 10px 0 0;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .details-modal-header h3 { margin: 0; font-size: 15px; color: #fff; }
+        .details-modal-header .details-close {
+            background: none; border: none; color: #fff;
+            font-size: 22px; cursor: pointer; line-height: 1; padding: 0 4px;
+        }
+        .details-modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+        .details-group { margin-bottom: 14px; }
+        .details-group-header {
+            display: flex; align-items: center; justify-content: space-between;
+            background: #1a2f5e; border-radius: 5px; padding: 7px 12px; margin-bottom: 6px;
+        }
+        .details-group-label {
+            font-size: 12px; font-weight: bold; color: #93c5fd;
+            text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .details-group-toggle {
+            font-size: 11px; color: #60a5fa; cursor: pointer; background: none;
+            border: none; padding: 0; text-decoration: underline;
+        }
+        .details-file-list {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; padding: 0 4px;
+        }
+        .details-file-item {
+            display: flex; align-items: flex-start; gap: 6px; font-size: 11.5px;
+            color: #cbd5e1; padding: 3px 0; cursor: pointer; line-height: 1.4;
+        }
+        .details-file-item:hover { color: #fff; }
+        .details-file-item input[type=checkbox] {
+            margin-top: 2px; flex-shrink: 0; accent-color: #3b82f6; width: 14px; height: 14px;
+        }
+        .details-modal-footer {
+            padding: 12px 20px; border-top: 1px solid #1e3a8a;
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        }
+        .details-count { flex: 1; font-size: 12px; color: #94a3b8; }
+        .details-btn {
+            padding: 8px 18px; border: none; border-radius: 5px;
+            font-size: 13px; font-weight: bold; cursor: pointer;
+        }
+        .details-btn-primary { background: #2563eb; color: #fff; }
+        .details-btn-primary:hover { background: #1d4ed8; }
+        .details-btn-primary:disabled { background: #475569; cursor: not-allowed; }
+        .details-btn-secondary { background: #334155; color: #e2e8f0; }
+        .details-btn-secondary:hover { background: #475569; }
+        .details-spinner { display: none; align-items: center; gap: 8px; font-size: 12px; color: #60a5fa; }
+        .details-spinner.active { display: flex; }
+        .details-spinner-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #3b82f6; animation: detailPulse 1s infinite;
+        }
+        @keyframes detailPulse {
+            0%,100% { opacity: 0.3; transform: scale(0.8); }
+            50%      { opacity: 1;   transform: scale(1.2); }
+        }
+        .details-error {
+            background: #450a0a; color: #fca5a5; border-radius: 5px;
+            padding: 10px 14px; font-size: 12px; display: none;
+        }
+        .details-error.visible { display: block; }
+        .details-select-all {
+            font-size: 11px; color: #60a5fa; cursor: pointer; background: none;
+            border: none; padding: 0 0 8px 0; text-decoration: underline; display: block;
+        }
     </style>
 </head>
 <body>
@@ -469,6 +550,7 @@
             <option value="12" selected>12 in (1 ft)</option>
         </select>
         <button class="topbar-btn" onclick="downloadStageCSVs()" style="background:#16a34a;color:#fff;" title="Download a stage-storage CSV for each calculated tank (bundled as a ZIP)">📊 Stage CSVs</button>
+        <button class="topbar-btn" onclick="openDetailsModal()" style="background:#0f4c81;color:white;border:1px solid #3b82f6;" title="Browse and export AquaCell detail sheets from the GitHub repository">📋 Details</button>
         <button class="topbar-btn" onclick="copyToClipboard()" style="background:#6f42c1;color:#fff;">📋 Copy</button>
         <button class="topbar-btn" onclick="exportJSON()" style="background:#0891b2;color:#fff;">⬇ Export JSON</button>
         <button class="topbar-btn" onclick="importJSON()" style="background:#ffc107;color:#212529;">Import JSON</button>
@@ -2328,8 +2410,204 @@ function copyToClipboard() {
     });
 }
 
+// ══════════════════════════════════════════════════════════════════
+//  DETAIL SHEET EXPORTER  (shared GitHub source with single-tank)
+//  Fetches the AquaCell detail PDFs via /api/details and bundles the
+//  selected sheets into one PDF via /download_details_pdf.
+// ══════════════════════════════════════════════════════════════════
+const DETAIL_GROUPS = [
+    { label: 'Installation Details',
+      test: n => /^AQ-100-0[1-9]|^AQ-100-10[ .]|^AQ-100-19|^AQ-100-2[0-6]/.test(n) },
+    { label: 'Cross Sections',
+      test: n => /^AQ-100-1[1-8]/.test(n) },
+    { label: 'Component Details',
+      test: n => /^AQ-300/.test(n) },
+    { label: 'Volume & Connections',
+      test: n => /^AQ-200/.test(n) },
+    { label: 'Technical Bulletins',
+      test: n => /^TB|^Report on|^TRI |^WAVIN/.test(n) },
+    { label: 'Guides & Marketing',
+      test: n => /^WA_/.test(n) },
+    { label: 'Other', test: () => true }
+];
+
+function categorizeFiles(files) {
+    const groups = DETAIL_GROUPS.map(g => ({ label: g.label, files: [] }));
+    files.forEach(f => {
+        for (let i = 0; i < DETAIL_GROUPS.length; i++) {
+            if (DETAIL_GROUPS[i].test(f)) { groups[i].files.push(f); break; }
+        }
+    });
+    return groups.filter(g => g.files.length > 0);
+}
+
+function friendlyName(filename) {
+    return filename
+        .replace(/\.pdf$/i, '')
+        .replace(/-Layout\d*(\s*\(\d+\))?$/i, '')
+        .replace(/Layout\d*(\s*\(\d+\))?$/i, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+}
+
+function renderDetailsGroups(groups) {
+    const container = document.getElementById('detailsGroups');
+    container.innerHTML = '';
+    if (groups.length === 0) {
+        container.innerHTML = '<p style="color:#94a3b8;font-size:13px;">No PDF files found in repository.</p>';
+        return;
+    }
+    const selAll = document.createElement('button');
+    selAll.className = 'details-select-all';
+    selAll.textContent = 'Select All Files';
+    selAll.onclick = () => {
+        document.querySelectorAll('#detailsGroups input[type=checkbox]').forEach(cb => cb.checked = true);
+        updateDetailsCount();
+    };
+    container.appendChild(selAll);
+    groups.forEach((group, gi) => {
+        const div = document.createElement('div');
+        div.className = 'details-group';
+        const header = document.createElement('div');
+        header.className = 'details-group-header';
+        header.innerHTML = `
+            <span class="details-group-label">${group.label} <span style="color:#64748b;font-weight:normal;">(${group.files.length})</span></span>
+            <button class="details-group-toggle" data-gi="${gi}">Select all</button>
+        `;
+        header.querySelector('.details-group-toggle').addEventListener('click', (e) => {
+            const gIndex = e.target.dataset.gi;
+            const cbs = document.querySelectorAll('[data-group="' + gIndex + '"]');
+            const allChecked = [...cbs].every(cb => cb.checked);
+            cbs.forEach(cb => cb.checked = !allChecked);
+            e.target.textContent = allChecked ? 'Select all' : 'Deselect all';
+            updateDetailsCount();
+        });
+        div.appendChild(header);
+        const list = document.createElement('div');
+        list.className = 'details-file-list';
+        group.files.forEach(f => {
+            const item = document.createElement('label');
+            item.className = 'details-file-item';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox'; cb.value = f; cb.dataset.group = gi;
+            cb.addEventListener('change', updateDetailsCount);
+            const span = document.createElement('span');
+            span.textContent = friendlyName(f); span.title = f;
+            item.appendChild(cb); item.appendChild(span);
+            list.appendChild(item);
+        });
+        div.appendChild(list);
+        container.appendChild(div);
+    });
+    updateDetailsCount();
+}
+
+function updateDetailsCount() {
+    const checked = document.querySelectorAll('#detailsGroups input[type=checkbox]:checked').length;
+    document.getElementById('detailsCount').textContent = checked + ' file' + (checked !== 1 ? 's' : '') + ' selected';
+    document.getElementById('detailsGenBtn').disabled = checked === 0;
+}
+
+var _detailsLoaded = false;
+
+function openDetailsModal() {
+    document.getElementById('detailsOverlay').classList.add('open');
+    if (_detailsLoaded) return;
+    var spinner = document.getElementById('detailsSpinner');
+    var errDiv  = document.getElementById('detailsError');
+    spinner.classList.add('active');
+    errDiv.classList.remove('visible');
+    fetch('/api/details')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            spinner.classList.remove('active');
+            if (data.error) {
+                errDiv.textContent = '⚠ ' + data.error;
+                errDiv.classList.add('visible');
+                return;
+            }
+            _detailsLoaded = true;
+            renderDetailsGroups(categorizeFiles(data.files));
+        })
+        .catch(function(err) {
+            spinner.classList.remove('active');
+            errDiv.textContent = '⚠ Could not reach server: ' + err.message;
+            errDiv.classList.add('visible');
+        });
+}
+
+function closeDetailsModal() {
+    document.getElementById('detailsOverlay').classList.remove('open');
+}
+
+function closeDetailsIfBg(e) {
+    if (e.target === document.getElementById('detailsOverlay')) closeDetailsModal();
+}
+
+function generateDetailsPDF() {
+    var selected = Array.from(document.querySelectorAll('#detailsGroups input[type=checkbox]:checked'))
+                       .map(function(cb) { return cb.value; });
+    if (selected.length === 0) return;
+    var btn = document.getElementById('detailsGenBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Generating…';
+    fetch('/download_details_pdf', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ files: selected })
+    })
+    .then(function(r) {
+        if (!r.ok) return r.json().then(function(d) { return Promise.reject(d.error || 'Server error'); });
+        return r.blob();
+    })
+    .then(function(blob) {
+        var url = URL.createObjectURL(blob);
+        var a   = document.createElement('a');
+        a.href  = url;
+        var d   = new Date();
+        var dt  = (d.getMonth()+1).toString().padStart(2,'0') +
+                  d.getDate().toString().padStart(2,'0') +
+                  d.getFullYear();
+        var detailName = (document.getElementById('q_project_name')?.value || '').trim()
+                         .replace(/[^a-zA-Z0-9\-_ ]/g,'_').replace(/\s+/g,'_');
+        var detailParts = ['AquaCell_Details', detailName, dt].filter(Boolean).join('_');
+        a.download = detailParts + '.pdf';
+        a.click();
+        URL.revokeObjectURL(url);
+    })
+    .catch(function(err) {
+        alert('PDF generation failed: ' + err);
+    })
+    .finally(function() {
+        btn.disabled = false;
+        btn.textContent = '⬇ Generate PDF';
+    });
+}
+
 // Init
 renderSidebar();
 </script>
+<div class="details-overlay" id="detailsOverlay" onclick="closeDetailsIfBg(event)">
+  <div class="details-modal">
+    <div class="details-modal-header">
+      <h3>📋 AquaCell Detail Sheet Exporter</h3>
+      <button class="details-close" onclick="closeDetailsModal()" title="Close">✕</button>
+    </div>
+    <div class="details-modal-body" id="detailsBody">
+      <div class="details-spinner active" id="detailsSpinner">
+        <div class="details-spinner-dot"></div>
+        Loading detail sheets from GitHub…
+      </div>
+      <div class="details-error" id="detailsError"></div>
+      <div id="detailsGroups"></div>
+    </div>
+    <div class="details-modal-footer">
+      <span class="details-count" id="detailsCount">0 files selected</span>
+      <button class="details-btn details-btn-secondary" onclick="closeDetailsModal()">Cancel</button>
+      <button class="details-btn details-btn-primary" id="detailsGenBtn"
+              onclick="generateDetailsPDF()" disabled>⬇ Generate PDF</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
