@@ -2071,16 +2071,21 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                                     pctCell.innerHTML = '';
                                     pctCell.appendChild(sel);
                                 }
-                                sel.value = standardPcts.includes(r.pct) ? String(r.pct) : 'custom';
+                                var isCustom = r.isCustom || !standardPcts.includes(r.pct);
+                                sel.value = isCustom ? 'custom' : String(r.pct);
                                 sel.oninput = (function(idx){ return function(){
-                                    if (this.value === 'custom') return;
-                                    window._ptrowRows[idx].pct = parseFloat(this.value) || 10;
+                                    if (this.value === 'custom') {
+                                        window._ptrowRows[idx].isCustom = true;
+                                    } else {
+                                        window._ptrowRows[idx].isCustom = false;
+                                        window._ptrowRows[idx].pct = parseFloat(this.value) || 10;
+                                    }
                                     window.updateOutputs();
                                 }; })(i);
 
                                 // Custom % text input
                                 var custInp = pctCell.querySelector('.ptrow-custom-pct');
-                                if (!standardPcts.includes(r.pct)) {
+                                if (isCustom) {
                                     if (!custInp) {
                                         custInp = document.createElement('input');
                                         custInp.type = 'number'; custInp.min = 1; custInp.max = 100; custInp.step = 1;
