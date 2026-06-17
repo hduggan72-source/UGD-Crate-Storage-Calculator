@@ -1629,6 +1629,84 @@ def multi_download_quote():
             c.drawString(LQ, y, dl)
             y -= 9
 
+        # ── Quote page only — save and return ───────────────────────
+        c.save()
+        buffer.seek(0)
+
+        safe_name = (project_name or 'Project').strip().replace(' ', '_')
+        safe_num  = (project_num or '').strip().replace(' ', '_')
+        name_part = '_'.join(filter(None, [safe_num, safe_name]))
+        return send_file(
+            buffer, as_attachment=True,
+            download_name=f'AquaCell_MultiTank_Quote_{name_part}_{datetime.datetime.now().strftime("%m%d%Y")}.pdf',
+            mimetype='application/pdf'
+        )
+
+    except Exception as exc:
+        import traceback
+        return jsonify({'error': str(exc), 'trace': traceback.format_exc()}), 500
+
+
+# ══════════════════════════════════════════════════════════════════
+#  ROUTE: /multi/download_tank_summary  —  per-tank detail pages only
+#  Separated from the quote so pricing is never accidentally shared.
+# ══════════════════════════════════════════════════════════════════
+@app.route('/multi/download_tank_summary', methods=['POST'])
+def multi_download_tank_summary():
+    try:
+        data = request.get_json(force=True)
+
+        project_name    = data.get('project_name', 'Project')
+        project_num     = data.get('project_num', '')
+        generated_str   = datetime.datetime.now().strftime('%m/%d/%Y')
+
+        tanks_in     = data.get('tanks', [])
+        tank_results = [calc_tank(t) for t in tanks_in]
+
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=letter)
+        W, H = letter
+
+        QNY  = colors.HexColor('#003366')
+        QLGY = colors.HexColor('#f2f2f2')
+        QMGY = colors.HexColor('#d0d0d0')
+
+        LQ = 28
+        RQ = 28
+        QW = W - LQ - RQ
+
+        def q_rect(x, y, w, h, fill, stroke=None, stroke_clr=None):
+            c.setFillColor(fill)
+            if stroke and stroke_clr:
+                c.setStrokeColor(stroke_clr)
+                c.setLineWidth(stroke)
+            c.rect(x, y, w, h, fill=1, stroke=1 if stroke else 0)
+
+        def q_text(x, y, text, font='Helvetica', size=8, color=BLACK, align='left'):
+            c.setFont(font, size)
+            c.setFillColor(color)
+            if align == 'right':
+                c.drawRightString(x, y, str(text))
+            elif align == 'center':
+                c.drawCentredString(x, y, str(text))
+            else:
+                c.drawString(x, y, str(text))
+
+        cur_y = [H - 28]
+        first_page = [True]
+
+        def new_page_header(title):
+            if first_page[0]:
+                first_page[0] = False
+            else:
+                c.showPage()
+            cur_y[0] = H - 28
+            q_rect(LQ, cur_y[0] - 30, QW, 30, QNY)
+            q_text(W / 2, cur_y[0] - 20, title, 'Helvetica-Bold', 10, WHITE, 'center')
+            q_text(LQ + 4, cur_y[0] - 20, project_name or '—', 'Helvetica', 8, colors.HexColor('#93c5fd'))
+            q_text(LQ + QW - 4, cur_y[0] - 20, generated_str, 'Helvetica', 8, colors.HexColor('#94a3b8'), 'right')
+            cur_y[0] -= 38
+
         # Per-tank detail pages
         for ti, r in enumerate(tank_results):
             _pg_title = f"Tank Detail: {r['tank_label']}  ({r['config']}-{r['layers']})"
@@ -1861,7 +1939,7 @@ def multi_download_quote():
         name_part = '_'.join(filter(None, [safe_num, safe_name]))
         return send_file(
             buffer, as_attachment=True,
-            download_name=f'AquaCell_MultiTank_Quote_{name_part}_{datetime.datetime.now().strftime("%m%d%Y")}.pdf',
+            download_name=f'AquaCell_MultiTank_TankSummary_{name_part}_{datetime.datetime.now().strftime("%m%d%Y")}.pdf',
             mimetype='application/pdf'
         )
 

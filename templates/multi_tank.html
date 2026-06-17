@@ -1240,7 +1240,8 @@
             <input type="text" id="q_notes" placeholder="Optional notes for header">
         </div>
 
-        <button class="btn-quote" onclick="downloadQuote()">📄 Download Multi-Tank Quote PDF</button>
+        <button class="btn-quote" onclick="downloadQuote()">📄 Download Quote PDF</button>
+                <button class="btn-quote" onclick="downloadTankSummary()" style="margin-left:8px;background:#1a7a3a;">📋 Download Tank Summary PDF</button>
         <button class="btn-json" onclick="exportJSON()">⬇ Export Project JSON</button>
     </div>
 
@@ -1889,11 +1890,55 @@ async function downloadQuote() {
         const a    = document.createElement('a');
         a.href = url;
         const proj = (payload.project_name || 'Project').replace(/[^a-zA-Z0-9\-_ ]/g,'_').replace(/\s+/g,'_');
+        const num  = (payload.project_num || '').replace(/[^a-zA-Z0-9\-_]/g,'_');
+        const namePart = [num, proj].filter(Boolean).join('_');
         const dt   = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'');
-        a.download = `AquaCell_MultiTank_Quote_${proj}_${dt}.pdf`;
+        a.download = `AquaCell_MultiTank_Quote_${namePart}_${dt}.pdf`;
         a.click();
         URL.revokeObjectURL(url);
         showToast('✓ Quote downloaded');
+    } catch (err) {
+        alert('Download failed: ' + err.message);
+    }
+}
+
+async function downloadTankSummary() {
+    saveDraft();
+    const calcedIdxs = results.reduce((acc, r, i) => { if (r) acc.push(i); return acc; }, []);
+    if (calcedIdxs.length === 0) {
+        alert('Please calculate at least one tank first.');
+        return;
+    }
+
+    const payload = {
+        project_name: document.getElementById('q_project_name').value,
+        project_num:  document.getElementById('q_project_num').value,
+        tanks:        calcedIdxs.map(i => tanks[i]),
+    };
+
+    try {
+        const resp = await fetch('/multi/download_tank_summary', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            alert('Tank summary error: ' + (err.error || 'Unknown'));
+            return;
+        }
+        const blob = await resp.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url;
+        const proj = (payload.project_name || 'Project').replace(/[^a-zA-Z0-9\-_ ]/g,'_').replace(/\s+/g,'_');
+        const num  = (payload.project_num || '').replace(/[^a-zA-Z0-9\-_]/g,'_');
+        const namePart = [num, proj].filter(Boolean).join('_');
+        const dt   = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'');
+        a.download = `AquaCell_MultiTank_TankSummary_${namePart}_${dt}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('✓ Tank summary downloaded');
     } catch (err) {
         alert('Download failed: ' + err.message);
     }
