@@ -1893,7 +1893,7 @@ async function downloadQuote() {
         const num  = (payload.project_num || '').replace(/[^a-zA-Z0-9\-_]/g,'_');
         const namePart = [num, proj].filter(Boolean).join('_');
         const dt   = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'');
-        a.download = `AquaCell_MultiTank_Quote_${namePart}_${dt}.pdf`;
+        a.download = `${namePart}_AquaCell_MultiTank_Quote_${dt}.pdf`;
         a.click();
         URL.revokeObjectURL(url);
         showToast('✓ Quote downloaded');
@@ -1935,7 +1935,7 @@ async function downloadTankSummary() {
         const num  = (payload.project_num || '').replace(/[^a-zA-Z0-9\-_]/g,'_');
         const namePart = [num, proj].filter(Boolean).join('_');
         const dt   = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'');
-        a.download = `AquaCell_MultiTank_TankSummary_${namePart}_${dt}.pdf`;
+        a.download = `${namePart}_AquaCell_Summary_${dt}.pdf`;
         a.click();
         URL.revokeObjectURL(url);
         showToast('✓ Tank summary downloaded');

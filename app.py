@@ -1939,7 +1939,7 @@ def multi_download_tank_summary():
         name_part = '_'.join(filter(None, [safe_num, safe_name]))
         return send_file(
             buffer, as_attachment=True,
-            download_name=f'AquaCell_MultiTank_TankSummary_{name_part}_{datetime.datetime.now().strftime("%m%d%Y")}.pdf',
+            download_name=f'AquaCell_MultiTank_Summary_{name_part}_{datetime.datetime.now().strftime("%m%d%Y")}.pdf',
             mimetype='application/pdf'
         )
 
