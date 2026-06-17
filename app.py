@@ -1562,11 +1562,9 @@ def multi_download_quote():
 
         # Pricing block
         if subtotal > 0:
-            _basis = f'Selling price = floor cost'
-            if markup_pct > 0:
-                _basis += f' \u00f7 (1 \u2212 {markup_pct:.1f}% markup)'
+            _basis = ''
             if cost_per_ft3 > 0:
-                _basis += f'   |   ${cost_per_ft3:.4f}/ft\u00b3 \u00d7 {tank_storage_total:,.1f} ft\u00b3 tank storage'
+                _basis = f'${cost_per_ft3:.4f}/ft\u00b3 \u00d7 {tank_storage_total:,.1f} ft\u00b3 tank storage'
             q_rect(LQ, y - 13, QW - 120, 13, QLGY)
             q_text(LQ + 4, y - 9, _basis, 'Helvetica-Oblique', 7, GRAY)
             q_rect(LQ + QW - 120, y - 13, 120, 13, QNY)

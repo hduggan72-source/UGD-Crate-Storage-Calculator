@@ -2207,8 +2207,8 @@ function renderPtrowTable() {
         tr.innerHTML =
             '<td style="padding:3px 4px;"><input type="text" class="pt-lbl" style="width:72px;padding:3px 4px;border:1px solid var(--border);border-radius:3px;background:var(--card);color:var(--text);font-size:11px;"></td>' +
             '<td style="padding:3px 4px;"><input type="text" inputmode="numeric" class="pt-wqv" style="width:68px;padding:3px 4px;border:1px solid var(--border);border-radius:3px;background:var(--card);color:var(--text);font-size:11px;text-align:right;"></td>' +
-            '<td style="padding:3px 4px;"><select class="pt-pct" style="padding:3px 4px;border:1px solid var(--border);border-radius:3px;background:var(--card);color:var(--text);font-size:11px;">' +
-            '<option value="10">10%</option><option value="15">15%</option><option value="12">12%</option><option value="20">20%</option></select></td>' +
+            '<td style="padding:3px 4px;" class="pt-pct-cell"><select class="pt-pct" style="padding:3px 4px;border:1px solid var(--border);border-radius:3px;background:var(--card);color:var(--text);font-size:11px;">' +
+            '<option value="10">10%</option><option value="15">15%</option><option value="12">12%</option><option value="20">20%</option><option value="custom">Custom</option></select></td>' +
             '<td style="padding:3px 4px;text-align:right;font-size:11px;opacity:0.7;" class="pt-pvol">—</td>' +
             '<td style="padding:3px 4px;text-align:right;font-size:11px;font-weight:bold;color:#7c3aed;" class="pt-nc">—</td>' +
             '<td style="padding:3px 4px;text-align:center;"></td>';
@@ -2220,6 +2220,7 @@ function renderPtrowTable() {
         const tr    = tbody.children[i];
         const lbl   = tr.querySelector('.pt-lbl');
         const wqvEl = tr.querySelector('.pt-wqv');
+        const pctCell = tr.querySelector('.pt-pct-cell');
         const pctEl = tr.querySelector('.pt-pct');
         const pvol  = tr.querySelector('.pt-pvol');
         const nc    = tr.querySelector('.pt-nc');
@@ -2227,7 +2228,29 @@ function renderPtrowTable() {
 
         if (document.activeElement !== lbl)   lbl.value   = area.label;
         if (document.activeElement !== wqvEl) wqvEl.value = area.wqv || '';
-        pctEl.value = [10,12,15,20].includes(area.pct) ? area.pct : 10;
+
+        const stdPcts = [10, 12, 15, 20];
+        const isCustom = area.isCustom || !stdPcts.includes(area.pct);
+        pctEl.value = isCustom ? 'custom' : String(area.pct);
+
+        // Custom number input — add/remove as needed
+        let custInp = pctCell.querySelector('.pt-custom-pct');
+        if (isCustom) {
+            if (!custInp) {
+                custInp = document.createElement('input');
+                custInp.type = 'number'; custInp.min = 1; custInp.max = 100; custInp.step = 1;
+                custInp.className = 'pt-custom-pct';
+                custInp.style.cssText = 'width:40px;margin-left:3px;padding:3px 4px;border:1px solid var(--border);border-radius:3px;background:var(--card);color:var(--text);font-size:11px;';
+                pctCell.appendChild(custInp);
+            }
+            if (document.activeElement !== custInp) custInp.value = area.pct;
+            custInp.oninput = (idx => function() {
+                window._ptrowAreas[idx].pct = parseFloat(this.value) || 10;
+                updatePtrowOutputs();
+            })(i);
+        } else if (custInp) {
+            custInp.remove();
+        }
 
         const ptVol   = area.wqv * area.pct / 100;
         const nCrates = vol > 0 ? Math.ceil(ptVol / vol) : 0;
@@ -2241,8 +2264,13 @@ function renderPtrowTable() {
             updatePtrowOutputs();
         })(i);
         pctEl.onchange = (idx => function() {
-            window._ptrowAreas[idx].pct = parseFloat(this.value) || 10;
-            updatePtrowOutputs();
+            if (this.value === 'custom') {
+                window._ptrowAreas[idx].isCustom = true;
+            } else {
+                window._ptrowAreas[idx].isCustom = false;
+                window._ptrowAreas[idx].pct = parseFloat(this.value) || 10;
+            }
+            renderPtrowTable();
         })(i);
 
         delTd.innerHTML = window._ptrowAreas.length > 1
