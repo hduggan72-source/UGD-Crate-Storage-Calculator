@@ -3535,7 +3535,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const geoStone = txt('geoStoneCell');
         const geoTotal = txt('geoTotalCell');
         const geoWastePct = (document.querySelector('input[name="geoWaste"]')?.value || '0').trim();
-        const geoWasteLabel = geoWastePct !== '0' ? `  *+${geoWastePct}% waste` : '';
+        const geoWasteLabel = geoWastePct !== '0' ? `  (w/ ${geoWastePct}% overlap)` : '';
 
         // --- Geogrid ---
         const geogridTop    = document.getElementById('geogridTopQty')?.value    || '0';
@@ -3573,7 +3573,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             `Total Geotextile (${geoUnit}):                           ${geoTotal}${geoWasteLabel}`,
             ...(parseFloat(geogridTop)    > 0 ? [`Biaxial Geogrid - Top/Cover (sq yd):              ${geogridTop}${geoWasteLabel}`]    : []),
             ...(parseFloat(geogridBottom) > 0 ? [`Biaxial Geogrid - Bottom/Tank Base (sq yd):       ${geogridBottom}${geoWasteLabel}`] : []),
-            `Total Estimated Stone Backfill Volume (with ${geoWastePct !== '0' ? geoWastePct : '10'}%): ${stoneBulkDisplay}`,
+            `Total Estimated Stone Backfill Volume (with 10%): ${stoneBulkDisplay}`,
             ...(linerOnTank  ? [`WT Liner on Tank Envelope (sq yd):                ${linerTankQty}${geoWasteLabel}`]  : []),
             ...(linerOnStone ? [`WT Liner on Stone Envelope (sq yd):               ${linerStoneQty}${geoWasteLabel}`] : []),
         ];
