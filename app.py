@@ -1245,8 +1245,12 @@ def multi_download_quote():
         def money(v):
             return f'${v:,.2f}'
 
-        contingency_all = max(0,
-            math.ceil(cum['base_units'] / _MT_PALLETS['base']) * _MT_PALLETS['base'] - cum['base_units'])
+        contingency_override = data.get('contingency_override', None)
+        if contingency_override is not None:
+            contingency_all = max(0, int(contingency_override))
+        else:
+            contingency_all = max(0,
+                math.ceil(cum['base_units'] / _MT_PALLETS['base']) * _MT_PALLETS['base'] - cum['base_units'])
 
         generated_str = datetime.datetime.now().strftime('%m/%d/%Y')
         logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
@@ -3345,4 +3349,6 @@ def download_details_pdf():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+
 
