@@ -3535,7 +3535,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const geoStone = txt('geoStoneCell');
         const geoTotal = txt('geoTotalCell');
         const geoWastePct = (document.querySelector('input[name="geoWaste"]')?.value || '0').trim();
-        const geoWasteLabel = geoWastePct !== '0' ? `  (w/ ${geoWastePct}% overlap)` : '';
+        const geoWasteLabel = geoWastePct !== '0' ? `  *+${geoWastePct}% waste` : '';
 
         // --- Geogrid ---
         const geogridTop    = document.getElementById('geogridTopQty')?.value    || '0';
@@ -3567,15 +3567,15 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             `8-12" Pipe Connectors (2476631200) ea.:           ${pipeConnectors}`,
             `12" Top Adapters (3085857) ea.:                   ${topAdapters12}`,
             `16" Top Adapters (2476842000) ea.:                ${topAdapters16}`,
-            `Large Diameter Pipe Connection (18"–36") ea.:    ${largePipeQty}`,
+            ...(parseFloat(largePipeQty) > 0 ? [`Large Diameter Pipe Connection (18"–36") ea.:    ${largePipeQty}`] : []),
             `AquaCell Tank Wrap Geotextile (${geoUnit}):              ${geoTank}${geoWasteLabel}`,
             `Stone Backfill Envelope Geotextile (${geoUnit}):         ${geoStone}${geoWasteLabel}`,
             `Total Geotextile (${geoUnit}):                           ${geoTotal}${geoWasteLabel}`,
-            `Biaxial Geogrid - Top/Cover (sq yd):              ${geogridTop}`,
-            `Biaxial Geogrid - Bottom/Tank Base (sq yd):       ${geogridBottom}`,
-            `Total Estimated Stone Backfill Volume (with 10%): ${stoneBulkDisplay}`,
-            `WT Liner on Tank Envelope (sq yd):                ${linerOnTank  ? linerTankQty  : '0 (not specified)'}`,
-            `WT Liner on Stone Envelope (sq yd):               ${linerOnStone ? linerStoneQty : '0 (not specified)'}`,
+            ...(parseFloat(geogridTop)    > 0 ? [`Biaxial Geogrid - Top/Cover (sq yd):              ${geogridTop}${geoWasteLabel}`]    : []),
+            ...(parseFloat(geogridBottom) > 0 ? [`Biaxial Geogrid - Bottom/Tank Base (sq yd):       ${geogridBottom}${geoWasteLabel}`] : []),
+            `Total Estimated Stone Backfill Volume (with ${geoWastePct !== '0' ? geoWastePct : '10'}%): ${stoneBulkDisplay}`,
+            ...(linerOnTank  ? [`WT Liner on Tank Envelope (sq yd):                ${linerTankQty}${geoWasteLabel}`]  : []),
+            ...(linerOnStone ? [`WT Liner on Stone Envelope (sq yd):               ${linerStoneQty}${geoWasteLabel}`] : []),
         ];
 
         // PT-ROW™ section — only if enabled
