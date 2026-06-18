@@ -1910,6 +1910,8 @@ async function downloadQuote() {
         freight_cost:      _qfreight,
         total_with_freight:_qtotal,
         cost_per_ft3:      _qcpf3,
+        contingency_override: (window._contingencyOverride !== null && window._contingencyOverride !== undefined)
+            ? window._contingencyOverride : null,
         tanks:           calcedIdxs.map(i => tanks[i]),
     };
 
