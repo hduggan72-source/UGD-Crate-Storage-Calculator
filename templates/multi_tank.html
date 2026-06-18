@@ -1154,9 +1154,15 @@
             <span class="cum-bom-label">16" Top Adapters (2476842000)</span>
             <span class="cum-bom-val" id="cum_top_adapters_16">—</span>
         </div>
-        <div class="cum-bom-row">
-            <span class="cum-bom-label">Contingency Units (pallet fill)</span>
-            <span class="cum-bom-val" id="cum_contingency">—</span>
+        <div class="cum-bom-row" style="align-items:center;">
+            <span class="cum-bom-label">Contingency Units (pallet fill)
+                <a id="cum_contingency_auto_link" href="#" onclick="resetContingencyAuto(event)"
+                   style="display:none;margin-left:5px;font-size:9px;color:var(--accent);text-decoration:underline;">auto</a>
+            </span>
+            <input id="cum_contingency" type="number" min="0" step="1" value="—"
+                   style="width:64px;text-align:right;padding:2px 4px;border:1px solid var(--border);border-radius:3px;
+                          background:var(--card);color:var(--text);font-size:12px;font-weight:bold;"
+                   oninput="onContingencyOverride(this)">
         </div>
         <div class="cum-bom-row" style="border-top:2px solid var(--accent);margin-top:4px;padding-top:6px;">
             <span class="cum-bom-label" style="font-weight:bold;">Est. Total Weight</span>
@@ -1704,7 +1710,14 @@ function renderCumulative(data) {
     setEl('cum_pipe_connectors',cum.pipe_connectors.toLocaleString());
     setEl('cum_top_adapters_12',cum.top_adapters_12.toLocaleString());
     setEl('cum_top_adapters_16',cum.top_adapters_16.toLocaleString());
-    setEl('cum_contingency',    cum.contingency.toLocaleString());
+    // Contingency override: populate input only if user hasn't manually set it
+    const contInput = document.getElementById('cum_contingency');
+    if (window._contingencyOverride === null || window._contingencyOverride === undefined) {
+        contInput.value = cum.contingency;
+        contInput.style.color = '';
+        document.getElementById('cum_contingency_auto_link').style.display = 'none';
+    }
+    // If override is active, leave input alone — user's value stays
     setEl('cum_weight',         data.total_weight.toLocaleString(undefined,{minimumFractionDigits:1}) + ' lbs');
     setEl('cum_pallets',        data.total_pallets.toLocaleString() + ' pallets');
 
@@ -1743,11 +1756,14 @@ function renderCumulative(data) {
 function clearCumulative() {
     ['cum_tank_storage','cum_total_storage','cum_base_units','cum_side_plates',
      'cum_bottom_plates','cum_pipe_connectors','cum_top_adapters_12','cum_top_adapters_16',
-     'cum_contingency','cum_weight','cum_pallets',
+     'cum_weight','cum_pallets',
      'cum_geo_tank_yd2','cum_geo_stone_yd2','cum_geo',
      'cum_ptrow_woven_yd2','cum_geogrid_total','cum_liner_total','cum_large_pipe',
      'cum_stone_yd3','priceFloorCost','priceSubtotal','priceFreight','priceTotal',
      'priceCostPerFt3'].forEach(id => setEl(id, '—'));
+    document.getElementById('cum_contingency').value = '';
+    window._contingencyOverride = null;
+    document.getElementById('cum_contingency_auto_link').style.display = 'none';
     document.getElementById('cum_tank_summary').innerHTML = '<span style="font-size:11px;opacity:0.5;">No tanks calculated yet.</span>';
 }
 
@@ -1758,13 +1774,36 @@ function clearCumulative() {
 function cumFloorCost() {
     if (!cumBOM) return 0;
     const c = cumBOM.cumulative;
+    const contingencyQty = (window._contingencyOverride !== null && window._contingencyOverride !== undefined)
+        ? window._contingencyOverride
+        : c.contingency;
     return (c.base_units      * UNIT_PRICES.base)
          + (c.side_plates     * UNIT_PRICES.side)
          + (c.bottom_plates   * UNIT_PRICES.bottom)
          + (c.pipe_connectors * UNIT_PRICES.pipe)
          + (c.top_adapters_12 * UNIT_PRICES.adapter12)
          + (c.top_adapters_16 * UNIT_PRICES.adapter16)
-         + (c.contingency     * UNIT_PRICES.base);
+         + (contingencyQty    * UNIT_PRICES.base);
+}
+
+function onContingencyOverride(input) {
+    const val = parseInt(input.value, 10);
+    window._contingencyOverride = (!input.value || isNaN(val)) ? null : Math.max(0, val);
+    input.style.color = (window._contingencyOverride !== null) ? 'var(--amber)' : '';
+    document.getElementById('cum_contingency_auto_link').style.display =
+        (window._contingencyOverride !== null) ? 'inline' : 'none';
+    calcPrice();
+}
+
+function resetContingencyAuto(e) {
+    e.preventDefault();
+    window._contingencyOverride = null;
+    if (cumBOM) {
+        document.getElementById('cum_contingency').value = cumBOM.cumulative.contingency;
+    }
+    document.getElementById('cum_contingency').style.color = '';
+    document.getElementById('cum_contingency_auto_link').style.display = 'none';
+    calcPrice();
 }
 
 function calcPrice() {
