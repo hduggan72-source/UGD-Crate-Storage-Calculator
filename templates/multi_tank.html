@@ -1973,10 +1973,8 @@ async function downloadTankSummary() {
         const a    = document.createElement('a');
         a.href = url;
         const proj = (payload.project_name || 'Project').replace(/[^a-zA-Z0-9\-_ ]/g,'_').replace(/\s+/g,'_');
-        const num  = (payload.project_num || '').replace(/[^a-zA-Z0-9\-_]/g,'_');
-        const namePart = [num, proj].filter(Boolean).join('_');
         const dt   = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'');
-        a.download = `${namePart}_AquaCell_Summary_${dt}.pdf`;
+        a.download = `AquaCell_Summary_${proj}_${dt}.pdf`;
         a.click();
         URL.revokeObjectURL(url);
         showToast('✓ Tank summary downloaded');
@@ -2459,10 +2457,15 @@ function copyToClipboard() {
     const totGeogridBot  = calcedResults.reduce((s, r) => s + (r.geogrid_bottom_yd2|| 0), 0);
     const totLinerTotal  = calcedResults.reduce((s, r) => s + (r.liner_total_yd2   || 0), 0);
     const totLargePipe   = calcedResults.reduce((s, r) => s + (r.large_pipe_qty    || 0), 0);
-    const contingency    = Math.max(0, Math.ceil(totBase / 56) * 56 - totBase);
+    const contingency = (window._contingencyOverride !== null && window._contingencyOverride !== undefined)
+        ? window._contingencyOverride
+        : Math.max(0, Math.ceil(totBase / 56) * 56 - totBase);
 
     const fmt = v => parseFloat(v).toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1});
     const fmtI = v => Math.round(v).toLocaleString();
+
+    // Waste label — matches single-tank format
+    const wasteLabel = '  *+10% waste';
 
     // Per-tank breakdown lines
     const divider = '-'.repeat(70);
@@ -2495,15 +2498,15 @@ function copyToClipboard() {
         `12" Top Adapters (3085857) ea.:                    ${fmtI(totTop12)}`,
         `16" Top Adapters (2476842000) ea.:                 ${fmtI(totTop16)}`,
         `Contingency Base Units (pallet fill) ea.:          ${fmtI(contingency)}`,
-        `Large Diameter Pipe Connections (18"-36") ea.:     ${fmtI(totLargePipe)}`,
+        ...(totLargePipe > 0 ? [`Large Diameter Pipe Connections (18"-36") ea.:     ${fmtI(totLargePipe)}`] : []),
         '',
-        `Non-Woven Geo — Tank Wrap (yd²):                  ${fmt(totGeoTankYd2)}`,
-        `Non-Woven Geo — Backfill Envelope (yd²):          ${fmt(totGeoStoneYd2)}`,
-        `Total Non-Woven Geotextile (yd²):                  ${fmt(totGeoTotalYd2)}`,
-        `PT-ROW™ Woven Fabric (yd²):                        ${fmtI(totPtrowWoven)}${totPtrowCrates > 0 ? '  (' + totPtrowCrates + ' crates)' : ''}`,
-        `Biaxial Geogrid — Top (yd²):                       ${fmtI(totGeogridTop)}`,
-        `Biaxial Geogrid — Bottom (yd²):                    ${fmtI(totGeogridBot)}`,
-        `Watertight Liner Total (yd²):                      ${fmtI(totLinerTotal)}`,
+        `Non-Woven Geo — Tank Wrap (yd²):                  ${fmt(totGeoTankYd2)}${wasteLabel}`,
+        `Non-Woven Geo — Backfill Envelope (yd²):          ${fmt(totGeoStoneYd2)}${wasteLabel}`,
+        `Total Non-Woven Geotextile (yd²):                  ${fmt(totGeoTotalYd2)}${wasteLabel}`,
+        ...(totPtrowWoven > 0 ? [`PT-ROW™ Woven Fabric (yd²):                        ${fmtI(totPtrowWoven)}${wasteLabel}${totPtrowCrates > 0 ? '  (' + totPtrowCrates + ' crates)' : ''}`] : []),
+        ...(totGeogridTop > 0  ? [`Biaxial Geogrid — Top (yd²):                       ${fmtI(totGeogridTop)}${wasteLabel}`]  : []),
+        ...(totGeogridBot > 0  ? [`Biaxial Geogrid — Bottom (yd²):                    ${fmtI(totGeogridBot)}${wasteLabel}`]  : []),
+        ...(totLinerTotal > 0  ? [`Watertight Liner Total (yd²):                      ${fmtI(totLinerTotal)}${wasteLabel}`]  : []),
         `Total Estimated Stone Backfill Volume (with 10%):  ${fmt(totStoneYd3)} CU YD`,
     ];
 
