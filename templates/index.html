@@ -1541,7 +1541,6 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         };
                     })();
                     </script>
-                </div>
 
                 <!-- ── PVC Liner section ── -->
                 <div style="margin:0 12px 12px;padding-top:10px;border-top:1px solid var(--border);">
@@ -1637,6 +1636,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         window.calcLiner();
                     })();
                     </script>
+                </div>
                 </div>
                 <script>
                     (function(){
@@ -2681,6 +2681,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         <button class="float-btn" onclick="document.getElementById('rightPanel').scrollTo({top:99999,behavior:'smooth'})" title="Bottom of results">▼</button>
     </div>
 
+    <!-- ── Floating nav: COLLAPSE / EXPAND ALL CARDS ── -->
+    <div class="float-nav" id="floatNavCollapse" style="left:50%;transform:translateX(-50%);bottom:24px;">
+        <button class="float-btn" onclick="collapseAllCards()" title="Collapse all cards" style="background:#b91c1c;">▬</button>
+        <button class="float-btn" onclick="expandAllCards()" title="Expand all cards" style="background:#15803d;">▭</button>
+    </div>
+
 </div><!-- /split-layout -->
 
 <script>
@@ -2959,8 +2965,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const fmtFt3 = (v) => '$' + v.toLocaleString(undefined, {minimumFractionDigits:4, maximumFractionDigits:4}) + ' /ft³';
 
         document.getElementById('priceFloorCost').textContent  = fmt(floorCost);
-        document.getElementById('priceSubtotal').textContent   = fmt(sellingPrice)
-            + (markupPct > 0 ? '  (' + markupPct + '% markup)' : '');
+        document.getElementById('priceSubtotal').textContent   = fmt(sellingPrice);
         document.getElementById('priceFreight').textContent    = fmt(freightCost)
             + (freightPct > 0 ? '  (' + freightPct + '%)' : '');
         document.getElementById('priceTotalCost').textContent  = fmt(totalToCustomer);
@@ -3307,6 +3312,39 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             header.classList.add('collapsed');
             body.classList.add('hidden');
         }
+    }
+
+    // ── BULK COLLAPSE / EXPAND ALL CARDS (left section-cards + right result-cards) ──
+    function collapseAllCards() {
+        document.querySelectorAll('.section-card-header').forEach(header => {
+            const body = header.nextElementSibling;
+            header.classList.add('collapsed');
+            if (body) body.classList.add('hidden');
+        });
+        document.querySelectorAll('.result-card-header').forEach(header => {
+            let body = header.nextElementSibling;
+            while (body && !body.classList.contains('result-card-body')) {
+                body = body.nextElementSibling;
+            }
+            header.classList.add('collapsed');
+            if (body) body.classList.add('hidden');
+        });
+    }
+
+    function expandAllCards() {
+        document.querySelectorAll('.section-card-header').forEach(header => {
+            const body = header.nextElementSibling;
+            header.classList.remove('collapsed');
+            if (body) body.classList.remove('hidden');
+        });
+        document.querySelectorAll('.result-card-header').forEach(header => {
+            let body = header.nextElementSibling;
+            while (body && !body.classList.contains('result-card-body')) {
+                body = body.nextElementSibling;
+            }
+            header.classList.remove('collapsed');
+            if (body) body.classList.remove('hidden');
+        });
     }
 
     // ── FLOATING NAV: show when panel has scrollable content ──
