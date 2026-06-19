@@ -555,9 +555,6 @@
         </div>
     </div>
     <div class="topbar-actions">
-        <a href="/multi" class="topbar-btn" style="background:#0891b2;color:white;text-decoration:none;">
-            🏗️ Multi-Tank
-        </a>
         <button class="topbar-btn" onclick="downloadPDF()" style="background:#28a745;color:white;">⬇ Report</button>
         <button class="topbar-btn" onclick="downloadQuote()" style="background:#e67e22;color:white;">📄 Quote</button>
         <button class="topbar-btn" onclick="downloadStageCSV()" style="background:#0891b2;color:white;">📊 Stage CSV</button>
@@ -567,6 +564,10 @@
         <button class="topbar-btn" onclick="exportProject()" style="background:#17a2b8;color:white;">Export</button>
         <button class="topbar-btn" onclick="document.getElementById('importFile').click()" style="background:#ffc107;color:#212529;">Import</button>
         <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importProject(event)">
+        <a href="/multi" class="topbar-btn" style="background:#0891b2;color:white;text-decoration:none;"
+           onclick="return confirm('Heads up: switching to Multi-Tank will leave this single-tank session. Any unsaved entries here will be lost unless you\'ve exported. Continue?');">
+            🏗️ Multi-Tank
+        </a>
         <button id="themeToggle" class="topbar-btn" title="Toggle Theme" style="background:transparent;color:white;font-size:20px;padding:4px 10px;">☀️</button>
     </div>
 </div>
@@ -1271,11 +1272,11 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     </div>
                     <div class="result-grid2" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
                         <div class="result-stat">
-                            <div class="result-stat-label">Calculated Cost (floor)</div>
+                            <div class="result-stat-label">Calculated Cost</div>
                             <div id="priceFloorCost" class="result-stat-value" style="color:#00b0ff;">—</div>
                         </div>
                         <div class="result-stat">
-                            <div class="result-stat-label">Selling Price (w/ markup)</div>
+                            <div class="result-stat-label">Selling Price</div>
                             <div id="priceSubtotal" class="result-stat-value" style="color:#2ecc71;">—</div>
                         </div>
                         <div class="result-stat">
