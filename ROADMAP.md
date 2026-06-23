@@ -9,6 +9,9 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 ##UPDATES FOR BOTH MULTI-TANK/SINGLE TANK CALCULATORS
 
+ - EXPORT CSV PRICE SHEET WITH COMPONENT PRICING FOR CUSTOMER SERVICE
+ - ADD ADDITIONAL ACCESSORY FIELD FOR 18-36" GEO BOOTS. ENTER QUANTITY PASSES TO QUOTE SHEET
+
 
 **## Backlog / Future Enhancements (Add here when ideas come up)**
  - Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed (added to excavation & dimensional summary card
