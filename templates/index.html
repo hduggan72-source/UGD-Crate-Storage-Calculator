@@ -557,6 +557,7 @@
     <div class="topbar-actions">
         <button class="topbar-btn" onclick="downloadPDF()" style="background:#28a745;color:white;">⬇ Report</button>
         <button class="topbar-btn" onclick="downloadQuote()" style="background:#e67e22;color:white;">📄 Quote</button>
+        <button class="topbar-btn" onclick="downloadPriceCSV()" style="background:#0d9488;color:white;">💲 CS Export</button>
         <button class="topbar-btn" onclick="downloadStageCSV()" style="background:#0891b2;color:white;">📊 Stage CSV</button>
         <button class="topbar-btn" onclick="downloadStagePNG()" style="background:#28a745;color:white;">📈 Stage PNG</button>
         <button class="topbar-btn" onclick="openDetailsModal()" style="background:#0f4c81;color:white;border:1px solid #3b82f6;">📋 Details</button>
@@ -3442,7 +3443,46 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     document.getElementById('base_stone').addEventListener('input', renderSheet);
 
     // ====================== COPY TO EMAIL ======================
-    function downloadStagePNG() {
+    function downloadPriceCSV() {
+        const UNIT_PRICES = { base:42.47, side:21.31, bottom:18.71, pipe:28.53, adapter12:96.54, adapter16:170.60 };
+        const form = document.getElementById('calcForm');
+        if (!form) { alert('Please calculate first.'); return; }
+        const fd = new FormData(form);
+        // Inject BOM quantities from rendered results
+        const getQty = id => parseInt((document.getElementById(id)||{}).textContent||'0') || 0;
+        fd.set('bom_base_units',    getQty('bom_base_units'));
+        fd.set('bom_side_plates',   getQty('bom_side_plates'));
+        fd.set('bom_bottom_plates', getQty('bom_bottom_plates'));
+        fd.set('bom_pipe_conn',     getQty('bom_pipe_connectors'));
+        fd.set('bom_top12',         getQty('bom_top_adapters_12'));
+        fd.set('bom_top16',         getQty('bom_top_adapters_16'));
+        fd.set('markup_pct',        document.getElementById('markupPct')?.value || '0');
+        // Unit prices
+        fd.set('up_base',      UNIT_PRICES.base);
+        fd.set('up_side',      UNIT_PRICES.side);
+        fd.set('up_bottom',    UNIT_PRICES.bottom);
+        fd.set('up_pipe',      UNIT_PRICES.pipe);
+        fd.set('up_adapter12', UNIT_PRICES.adapter12);
+        fd.set('up_adapter16', UNIT_PRICES.adapter16);
+
+        fetch('/download_price_csv', { method:'POST', body: fd })
+            .then(r => r.ok ? r.blob() : r.text().then(t => { throw new Error(t); }))
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                const a   = document.createElement('a');
+                a.href    = url;
+                const proj = (fd.get('project_name')||'Project').replace(/[^a-zA-Z0-9\-_ ]/g,'_').replace(/\s+/g,'_');
+                const num  = (fd.get('project_num')||'').replace(/[^a-zA-Z0-9\-_]/g,'_');
+                const np   = [num, proj].filter(Boolean).join('_');
+                const dt   = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'');
+                a.download = `AquaCell_PriceExport_${np}_${dt}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+            })
+            .catch(err => alert('CSV export failed: ' + err.message));
+    }
+
+    // ====================== STAGE PNG/CSV ======================
         var canvas = document.getElementById('stageCurveChart');
         if (!canvas) {
             alert('Stage Storage chart not found. Run Calculate System with Stage Storage enabled first.');

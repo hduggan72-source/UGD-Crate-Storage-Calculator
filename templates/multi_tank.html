@@ -1271,6 +1271,7 @@
 
         <button class="btn-quote" onclick="downloadQuote()">📄 Download Quote PDF</button>
                 <button class="btn-quote" onclick="downloadTankSummary()" style="margin-left:8px;background:#1a7a3a;">📋 Download Tank Summary PDF</button>
+                <button class="btn-quote" onclick="downloadPriceCSV()" style="margin-left:8px;background:#0d9488;">💲 CS Export CSV</button>
         <button class="btn-json" onclick="exportJSON()">⬇ Export Project JSON</button>
     </div>
 
@@ -2009,6 +2010,58 @@ async function downloadTankSummary() {
         a.click();
         URL.revokeObjectURL(url);
         showToast('✓ Tank summary downloaded');
+    } catch (err) {
+        alert('Download failed: ' + err.message);
+    }
+}
+
+async function downloadPriceCSV() {
+    saveDraft();
+    const calcedIdxs = results.reduce((acc, r, i) => { if (r) acc.push(i); return acc; }, []);
+    if (calcedIdxs.length === 0) {
+        alert('Please calculate at least one tank first.');
+        return;
+    }
+
+    const UNIT_PRICES = { base:42.47, side:21.31, bottom:18.71, pipe:28.53, adapter12:96.54, adapter16:170.60 };
+
+    const payload = {
+        project_name:    document.getElementById('q_project_name').value,
+        project_num:     document.getElementById('q_project_num').value,
+        client:          document.getElementById('q_client').value,
+        location:        document.getElementById('q_location').value,
+        estimator:       document.getElementById('q_estimator').value,
+        estimator_email: document.getElementById('q_estimator_email').value,
+        markup_pct:      parseFloat(document.getElementById('markupPct').value) || 0,
+        unit_prices:     UNIT_PRICES,
+        contingency_override: (window._contingencyOverride !== null && window._contingencyOverride !== undefined)
+            ? window._contingencyOverride : null,
+        tanks: calcedIdxs.map(i => tanks[i]),
+    };
+
+    try {
+        const resp = await fetch('/multi/download_price_csv', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            alert('CSV export error: ' + (err.error || 'Unknown'));
+            return;
+        }
+        const blob = await resp.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url;
+        const proj = (payload.project_name || 'Project').replace(/[^a-zA-Z0-9\-_ ]/g,'_').replace(/\s+/g,'_');
+        const num  = (payload.project_num || '').replace(/[^a-zA-Z0-9\-_]/g,'_');
+        const np   = [num, proj].filter(Boolean).join('_');
+        const dt   = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'');
+        a.download = `AquaCell_PriceExport_${np}_${dt}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('✓ CS Price Export downloaded');
     } catch (err) {
         alert('Download failed: ' + err.message);
     }

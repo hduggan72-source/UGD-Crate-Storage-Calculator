@@ -1656,6 +1656,107 @@ def multi_download_quote():
 
 
 # ══════════════════════════════════════════════════════════════════
+#  ROUTE: /multi/download_price_csv  —  line-item pricing CSV for CS
+# ══════════════════════════════════════════════════════════════════
+@app.route('/multi/download_price_csv', methods=['POST'])
+def multi_download_price_csv():
+    try:
+        import csv, io as _io
+        data = request.get_json(force=True)
+
+        project_name    = data.get('project_name', '')
+        project_num     = data.get('project_num', '')
+        client          = data.get('client', '')
+        location        = data.get('location', '')
+        estimator       = data.get('estimator', '')
+        estimator_email = data.get('estimator_email', '')
+        generated_str   = datetime.datetime.now().strftime('%m/%d/%Y')
+
+        tanks_in     = data.get('tanks', [])
+        tank_results = [calc_tank(t) for t in tanks_in]
+        cum          = cumulative_bom(tank_results)
+
+        unit_prices  = data.get('unit_prices', {})
+        p_base       = float(unit_prices.get('base',      42.47))
+        p_side       = float(unit_prices.get('side',      21.31))
+        p_bottom     = float(unit_prices.get('bottom',    18.71))
+        p_pipe       = float(unit_prices.get('pipe',      28.53))
+        p_adapter12  = float(unit_prices.get('adapter12', 96.54))
+        p_adapter16  = float(unit_prices.get('adapter16', 170.60))
+
+        markup_pct   = float(data.get('markup_pct', 0) or 0)
+        markup_mult  = 1 / (1 - markup_pct / 100) if markup_pct < 100 else 1
+
+        contingency_override = data.get('contingency_override', None)
+        if contingency_override is not None:
+            contingency_all = max(0, int(contingency_override))
+        else:
+            contingency_all = max(0,
+                math.ceil(cum['base_units'] / _MT_PALLETS['base']) * _MT_PALLETS['base'] - cum['base_units'])
+
+        def sell_price(floor_unit):
+            return floor_unit * markup_mult
+
+        rows = [
+            ('1', '3091506',    'AquaCell Base Unit',                   cum['base_units'],      'EACH', p_base),
+            ('2', '2476600003', 'AquaCell Side Plate',                  cum['side_plates'],     'EACH', p_side),
+            ('3', '2476600001', 'AquaCell Bottom Plate',                cum['bottom_plates'],   'EACH', p_bottom),
+            ('4', '2476631200', 'AquaCell 8-12" Pipe Connector',        cum['pipe_connectors'], 'EACH', p_pipe),
+            ('5', '3085857',    'AquaCell Top Connector (12")',         cum['top_adapters_12'], 'EACH', p_adapter12),
+            ('5', '2476842000', 'AquaCell Top Connector (16")',         cum['top_adapters_16'], 'EACH', p_adapter16),
+            ('6', '3091506',    'AquaCell Base Unit - Contingency',     contingency_all,        'EACH', p_base),
+        ]
+
+        out = _io.StringIO()
+        w   = csv.writer(out)
+
+        # Project header block
+        w.writerow(['AquaCell Order Pricing Export'])
+        w.writerow(['Generated', generated_str])
+        w.writerow(['Project Name', project_name])
+        w.writerow(['Project #',    project_num])
+        w.writerow(['Client',       client])
+        w.writerow(['Location',     location])
+        w.writerow(['Estimator',    estimator])
+        w.writerow(['Email',        estimator_email])
+        w.writerow([])
+
+        # Column headers
+        w.writerow(['Line', 'Part #', 'Description', 'Qty', 'Unit',
+                    'Floor Unit Price', 'Sell Unit Price', 'Extended Floor', 'Extended Sell'])
+
+        for ln, part, desc, qty, unit, unit_floor in rows:
+            if qty == 0:
+                continue
+            unit_sell    = sell_price(unit_floor)
+            ext_floor    = qty * unit_floor
+            ext_sell     = qty * unit_sell
+            w.writerow([ln, part, desc, qty, unit,
+                        f'${unit_floor:,.2f}', f'${unit_sell:,.2f}',
+                        f'${ext_floor:,.2f}',  f'${ext_sell:,.2f}'])
+
+        # Totals
+        total_floor = sum(r[5] * r[3] for r in rows if r[3] > 0)
+        total_sell  = sum(sell_price(r[5]) * r[3] for r in rows if r[3] > 0)
+        w.writerow([])
+        w.writerow(['', '', '', '', 'TOTAL FLOOR COST', '', '', f'${total_floor:,.2f}', ''])
+        w.writerow(['', '', '', '', 'TOTAL SELL PRICE', '', '', '', f'${total_sell:,.2f}'])
+
+        out.seek(0)
+        buf = io.BytesIO(out.getvalue().encode('utf-8'))
+        safe_name = (project_name or 'Project').strip().replace(' ', '_')
+        safe_num  = (project_num or '').strip().replace(' ', '_')
+        name_part = '_'.join(filter(None, [safe_num, safe_name]))
+        return send_file(buf, as_attachment=True,
+                         download_name=f'AquaCell_PriceExport_{name_part}_{datetime.datetime.now().strftime("%m%d%Y")}.csv',
+                         mimetype='text/csv')
+
+    except Exception as exc:
+        import traceback
+        return jsonify({'error': str(exc), 'trace': traceback.format_exc()}), 500
+
+
+# ══════════════════════════════════════════════════════════════════
 #  ROUTE: /multi/download_tank_summary  —  per-tank detail pages only
 #  Separated from the quote so pricing is never accidentally shared.
 # ══════════════════════════════════════════════════════════════════
@@ -3262,6 +3363,94 @@ def download_quote():
       import traceback
       tb = traceback.format_exc()
       return f'<pre style="color:red;padding:20px">{tb}</pre>', 500
+
+
+# ══════════════════════════════════════════════════════════════════
+#  ROUTE: /download_price_csv  —  single-tank line-item pricing CSV
+# ══════════════════════════════════════════════════════════════════
+@app.route('/download_price_csv', methods=['POST'])
+def download_price_csv():
+    try:
+        import csv, io as _io
+
+        project_name    = request.form.get('project_name', '')
+        project_num     = request.form.get('project_num', '')
+        client          = request.form.get('client', '')
+        location        = request.form.get('location', '')
+        estimator       = request.form.get('estimator', '')
+        estimator_email = request.form.get('estimator_email', '')
+        generated_str   = datetime.datetime.now().strftime('%m/%d/%Y')
+
+        p_base      = float(request.form.get('up_base',      42.47))
+        p_side      = float(request.form.get('up_side',      21.31))
+        p_bottom    = float(request.form.get('up_bottom',    18.71))
+        p_pipe      = float(request.form.get('up_pipe',      28.53))
+        p_adapter12 = float(request.form.get('up_adapter12', 96.54))
+        p_adapter16 = float(request.form.get('up_adapter16', 170.60))
+        markup_pct  = float(request.form.get('markup_pct', 0) or 0)
+        markup_mult = 1 / (1 - markup_pct / 100) if markup_pct < 100 else 1
+
+        base_units       = int(request.form.get('bom_base_units',    0) or 0)
+        side_plates      = int(request.form.get('bom_side_plates',   0) or 0)
+        bottom_plates    = int(request.form.get('bom_bottom_plates', 0) or 0)
+        pipe_connectors  = int(request.form.get('bom_pipe_conn',     0) or 0)
+        top_adapters_12  = int(request.form.get('bom_top12',         0) or 0)
+        top_adapters_16  = int(request.form.get('bom_top16',         0) or 0)
+        contingency_units= int(request.form.get('contingency_units', 0) or 0)
+
+        def sell(u): return u * markup_mult
+
+        rows = [
+            ('1', '3091506',    'AquaCell Base Unit',               base_units,       'EACH', p_base),
+            ('2', '2476600003', 'AquaCell Side Plate',              side_plates,      'EACH', p_side),
+            ('3', '2476600001', 'AquaCell Bottom Plate',            bottom_plates,    'EACH', p_bottom),
+            ('4', '2476631200', 'AquaCell 8-12" Pipe Connector',   pipe_connectors,  'EACH', p_pipe),
+            ('5', '3085857',    'AquaCell Top Connector (12")',    top_adapters_12,  'EACH', p_adapter12),
+            ('5', '2476842000', 'AquaCell Top Connector (16")',    top_adapters_16,  'EACH', p_adapter16),
+            ('6', '3091506',    'AquaCell Base Unit - Contingency', contingency_units,'EACH', p_base),
+        ]
+
+        out = _io.StringIO()
+        w   = csv.writer(out)
+
+        w.writerow(['AquaCell Order Pricing Export'])
+        w.writerow(['Generated', generated_str])
+        w.writerow(['Project Name', project_name])
+        w.writerow(['Project #',    project_num])
+        w.writerow(['Client',       client])
+        w.writerow(['Location',     location])
+        w.writerow(['Estimator',    estimator])
+        w.writerow(['Email',        estimator_email])
+        w.writerow([])
+        w.writerow(['Line', 'Part #', 'Description', 'Qty', 'Unit',
+                    'Floor Unit Price', 'Sell Unit Price', 'Extended Floor', 'Extended Sell'])
+
+        for ln, part, desc, qty, unit, unit_floor in rows:
+            if qty == 0:
+                continue
+            unit_sell = sell(unit_floor)
+            w.writerow([ln, part, desc, qty, unit,
+                        f'${unit_floor:,.2f}', f'${unit_sell:,.2f}',
+                        f'${qty * unit_floor:,.2f}', f'${qty * unit_sell:,.2f}'])
+
+        total_floor = sum(r[5] * r[3] for r in rows if r[3] > 0)
+        total_sell  = sum(sell(r[5]) * r[3] for r in rows if r[3] > 0)
+        w.writerow([])
+        w.writerow(['', '', '', '', 'TOTAL FLOOR COST', '', '', f'${total_floor:,.2f}', ''])
+        w.writerow(['', '', '', '', 'TOTAL SELL PRICE', '', '', '', f'${total_sell:,.2f}'])
+
+        out.seek(0)
+        buf = io.BytesIO(out.getvalue().encode('utf-8'))
+        safe_name  = (project_name or 'Quote').strip().replace(' ', '_')
+        safe_num   = (project_num or '').strip().replace(' ', '_')
+        name_parts = '_'.join(filter(None, [safe_num, safe_name]))
+        return send_file(buf, as_attachment=True,
+                         download_name=f'AquaCell_PriceExport_{name_parts}_{datetime.datetime.now().strftime("%m%d%Y")}.csv',
+                         mimetype='text/csv')
+
+    except Exception as e:
+        import traceback
+        return f'<pre style="color:red;padding:20px">{traceback.format_exc()}</pre>', 500
 
 
 # ══════════════════════════════════════════════════════════════════
