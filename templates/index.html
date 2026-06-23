@@ -3442,10 +3442,10 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     document.getElementById('tank_bottom_elev').addEventListener('input', renderSheet);
     document.getElementById('base_stone').addEventListener('input', renderSheet);
 
-    // ====================== COPY TO EMAIL ======================
+    // ====================== CS PRICE CSV EXPORT ======================
     function downloadPriceCSV() {
         const UNIT_PRICES = { base:42.47, side:21.31, bottom:18.71, pipe:28.53, adapter12:96.54, adapter16:170.60 };
-        const form = document.getElementById('calcForm');
+        const form = document.getElementById('mainForm');
         if (!form) { alert('Please calculate first.'); return; }
         const fd = new FormData(form);
         // Inject BOM quantities from rendered results
@@ -3457,7 +3457,6 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         fd.set('bom_top12',         getQty('bom_top_adapters_12'));
         fd.set('bom_top16',         getQty('bom_top_adapters_16'));
         fd.set('markup_pct',        document.getElementById('markupPct')?.value || '0');
-        // Unit prices
         fd.set('up_base',      UNIT_PRICES.base);
         fd.set('up_side',      UNIT_PRICES.side);
         fd.set('up_bottom',    UNIT_PRICES.bottom);
@@ -3483,6 +3482,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     }
 
     // ====================== STAGE PNG/CSV ======================
+    function downloadStagePNG() {
         var canvas = document.getElementById('stageCurveChart');
         if (!canvas) {
             alert('Stage Storage chart not found. Run Calculate System with Stage Storage enabled first.');
