@@ -804,9 +804,35 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     <label>16" Top Adapter (2476842000)</label>
                     <input type="number" name="top_adapters_16" id="top_adapters_16" min="0" value="{{ form_data.get('top_adapters_16', '') }}">
                     <label style="margin-top:10px;">Large Diameter Pipe Connection
-                        <span style="font-size:11px;opacity:0.65;font-weight:normal;"> — geotextile boot / abutment (18"–36", no Wavin adapter)</span>
+                        <span style="font-size:11px;opacity:0.65;font-weight:normal;"> — geotextile boot / abutment (No Wavin adapter &gt; 18" available)</span>
                     </label>
-                    <input type="number" name="large_pipe_qty" id="large_pipe_qty" min="0"
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-top:4px;">
+                        <div>
+                            <div style="font-size:10px;opacity:0.6;margin-bottom:2px;text-align:center;">18"</div>
+                            <input type="number" name="large_pipe_18" id="large_pipe_18" min="0"
+                                value="{{ form_data.get('large_pipe_18', 0) }}"
+                                oninput="updateLargePipeTotal()" style="text-align:center;">
+                        </div>
+                        <div>
+                            <div style="font-size:10px;opacity:0.6;margin-bottom:2px;text-align:center;">24"</div>
+                            <input type="number" name="large_pipe_24" id="large_pipe_24" min="0"
+                                value="{{ form_data.get('large_pipe_24', 0) }}"
+                                oninput="updateLargePipeTotal()" style="text-align:center;">
+                        </div>
+                        <div>
+                            <div style="font-size:10px;opacity:0.6;margin-bottom:2px;text-align:center;">36"</div>
+                            <input type="number" name="large_pipe_36" id="large_pipe_36" min="0"
+                                value="{{ form_data.get('large_pipe_36', 0) }}"
+                                oninput="updateLargePipeTotal()" style="text-align:center;">
+                        </div>
+                        <div>
+                            <div style="font-size:10px;opacity:0.6;margin-bottom:2px;text-align:center;">&gt;36"</div>
+                            <input type="number" name="large_pipe_gt36" id="large_pipe_gt36" min="0"
+                                value="{{ form_data.get('large_pipe_gt36', 0) }}"
+                                oninput="updateLargePipeTotal()" style="text-align:center;">
+                        </div>
+                    </div>
+                    <input type="hidden" name="large_pipe_qty" id="large_pipe_qty"
                         value="{{ form_data.get('large_pipe_qty', 0) }}">
                     <label style="margin-top:10px;">Contingency Base Units (3091506)
                         <span style="font-size:11px;opacity:0.65;font-weight:normal;"> — extra crates for jobsite breakage</span>
@@ -3295,6 +3321,16 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             body.classList.add('hidden');
         }
     }
+
+    function updateLargePipeTotal() {
+        const v18   = parseInt(document.getElementById('large_pipe_18')?.value)    || 0;
+        const v24   = parseInt(document.getElementById('large_pipe_24')?.value)    || 0;
+        const v36   = parseInt(document.getElementById('large_pipe_36')?.value)    || 0;
+        const vgt36 = parseInt(document.getElementById('large_pipe_gt36')?.value)  || 0;
+        document.getElementById('large_pipe_qty').value = v18 + v24 + v36 + vgt36;
+    }
+    // Initialise total on page load from server-restored values
+    document.addEventListener('DOMContentLoaded', updateLargePipeTotal);
 
     // ── COLLAPSIBLE RESULT CARDS ──
     function toggleResultCard(header) {

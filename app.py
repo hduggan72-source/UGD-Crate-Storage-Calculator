@@ -836,7 +836,11 @@ def calc_tank(t):
     # ── Optional accessories ─────────────────────────────────────────
     geogrid_top_yd2    = int(t.get('geogrid_top_yd2',    0) or 0)
     geogrid_bottom_yd2 = int(t.get('geogrid_bottom_yd2', 0) or 0)
-    large_pipe_qty     = int(t.get('large_pipe_qty',     0) or 0)
+    large_pipe_18   = int(t.get('large_pipe_18',   0) or 0)
+    large_pipe_24   = int(t.get('large_pipe_24',   0) or 0)
+    large_pipe_36   = int(t.get('large_pipe_36',   0) or 0)
+    large_pipe_gt36 = int(t.get('large_pipe_gt36', 0) or 0)
+    large_pipe_qty  = large_pipe_18 + large_pipe_24 + large_pipe_36 + large_pipe_gt36 or int(t.get('large_pipe_qty', 0) or 0)
     liner_on_tank      = bool(t.get('liner_on_tank',  False))
     liner_on_stone     = bool(t.get('liner_on_stone', False))
     ptrow_enabled      = bool(t.get('ptrow_enabled', False))
@@ -2877,7 +2881,11 @@ def download_quote():
           liner_label = 'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 NOT SPECIFIED'
 
       # ── Large diameter pipe connection (line F) ────────────────────
-      large_pipe_qty  = int(request.form.get('large_pipe_qty', 0) or 0)
+      _lp18   = int(request.form.get('large_pipe_18',   0) or 0)
+      _lp24   = int(request.form.get('large_pipe_24',   0) or 0)
+      _lp36   = int(request.form.get('large_pipe_36',   0) or 0)
+      _lpgt36 = int(request.form.get('large_pipe_gt36', 0) or 0)
+      large_pipe_qty  = _lp18 + _lp24 + _lp36 + _lpgt36 or int(request.form.get('large_pipe_qty', 0) or 0)
       large_pipe_desc = 'LARGE DIAMETER PIPE CONNECTION (18\u201336\u2033) \u2014 GEOTEXTILE BOOT / ABUTMENT'
       if config == 'SC':
           _q_layer_heights = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]

@@ -780,8 +780,31 @@
                     <input type="number" id="f_top_adapters_16" value="0" min="0" oninput="saveDraft()">
                 </div>
                 <div class="input-group">
-                    <label>Large Diameter Pipe Connection (18"–36")</label>
-                    <input type="number" id="f_large_pipe_qty" value="0" min="0" oninput="saveDraft()">
+                    <label>Large Diameter Pipe Connection
+                        <span style="font-size:10px;opacity:0.65;font-weight:normal;"> — geotextile boot / abutment (No Wavin adapter &gt; 18" available)</span>
+                    </label>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-top:4px;">
+                        <div>
+                            <div style="font-size:10px;opacity:0.6;margin-bottom:2px;text-align:center;">18"</div>
+                            <input type="number" id="f_large_pipe_18" value="0" min="0"
+                                oninput="saveDraft()" style="text-align:center;">
+                        </div>
+                        <div>
+                            <div style="font-size:10px;opacity:0.6;margin-bottom:2px;text-align:center;">24"</div>
+                            <input type="number" id="f_large_pipe_24" value="0" min="0"
+                                oninput="saveDraft()" style="text-align:center;">
+                        </div>
+                        <div>
+                            <div style="font-size:10px;opacity:0.6;margin-bottom:2px;text-align:center;">36"</div>
+                            <input type="number" id="f_large_pipe_36" value="0" min="0"
+                                oninput="saveDraft()" style="text-align:center;">
+                        </div>
+                        <div>
+                            <div style="font-size:10px;opacity:0.6;margin-bottom:2px;text-align:center;">&gt;36"</div>
+                            <input type="number" id="f_large_pipe_gt36" value="0" min="0"
+                                oninput="saveDraft()" style="text-align:center;">
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1290,7 +1313,7 @@ function addTank() {
         pipe_connectors: '0', top_adapters_12: '0', top_adapters_16: '0',
         // Optional accessories
         geogrid_top_yd2: 0, geogrid_bottom_yd2: 0,
-        large_pipe_qty: 0,
+        large_pipe_qty: 0, large_pipe_18: 0, large_pipe_24: 0, large_pipe_36: 0, large_pipe_gt36: 0,
         ptrow_enabled: false, ptrow_areas: [{label:'Area 1', wqv:0, pct:10}],
         ptrow_flow_areas: [{label:'Area 1', cfs:0}], ptrow_method: 'volume',
         liner_on_tank: false, liner_on_stone: false,
@@ -1397,7 +1420,9 @@ const FIELDS = [
     'surface_elev','tank_bottom_elev','cover_stone','base_stone',
     'perimeter_stone_width','stone_void','geoWaste','min_storage',
     'pipe_connectors','top_adapters_12','top_adapters_16',
-    'geogrid_top_yd2','geogrid_bottom_yd2','large_pipe_qty','tank_notes',
+    'geogrid_top_yd2','geogrid_bottom_yd2',
+    'large_pipe_18','large_pipe_24','large_pipe_36','large_pipe_gt36',
+    'tank_notes',
     'complex_scaled_area','complex_known_dim','complex_tank_perim',
     'complex_excav_area','complex_excav_perim',
 ];
@@ -1452,6 +1477,12 @@ function saveDraft() {
         const el = document.getElementById('f_' + f);
         if (el) tanks[activeIdx][f] = el.value;
     });
+    // Sum large pipe size fields into total for calc_tank
+    const _lp18   = parseInt(document.getElementById('f_large_pipe_18')?.value)   || 0;
+    const _lp24   = parseInt(document.getElementById('f_large_pipe_24')?.value)   || 0;
+    const _lp36   = parseInt(document.getElementById('f_large_pipe_36')?.value)   || 0;
+    const _lpgt36 = parseInt(document.getElementById('f_large_pipe_gt36')?.value) || 0;
+    tanks[activeIdx].large_pipe_qty = _lp18 + _lp24 + _lp36 + _lpgt36;
     // Persist shape mode
     tanks[activeIdx].shape_mode = window._mtShapeMode || 'rectangle';
     // Non-scalar fields
