@@ -2550,7 +2550,7 @@ function copyToClipboard() {
 
     // Waste label — matches single-tank format
     const wastePct  = parseFloat(document.getElementById('f_geoWaste')?.value) || 20;
-    const wasteLabel = `  *+${wastePct}% waste`;
+    const wasteLabel = `  (+${wastePct}% waste)`;
 
     // Per-tank breakdown lines
     const divider = '-'.repeat(70);
