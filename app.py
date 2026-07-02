@@ -849,23 +849,26 @@ def _draw_subsequent_header(c, logo_path, project_name, generated_str, section_t
     return PH - band_h - 12
 
 
-def _draw_disclaimer_block(c, y_bottom):
+def _draw_disclaimer_block(c, y_bottom, disclaimer_lines_raw=None, bold_triggers=None):
     """
     Render the full disclaimer box so its BOTTOM edge sits at y_bottom.
     Returns the y of the top of the box (useful if you need to know how much space it took).
     """
-    disclaimer_lines_raw = (
-        "DISCLAIMER: This calculator provides preliminary, conceptual estimates only and is not a "
-        "stamped engineering design. Wavin's assistance in sizing or product selection is advisory "
-        "and does not constitute design responsibility or guarantee system performance. The Engineer "
-        "of Record (EoR) is solely responsible for verifying all design parameters and site "
-        "conditions, including hydrology, structural requirements, soils, environmental factors, and "
-        "integration with the overall stormwater system. AquaCell dimensions and assumptions "
-        "(including usable storage and unit base areas) follow published product data. "
-        "FINAL LAYOUTS, CAPACITIES, AND INSTALLATION DEPTHS MUST BE CONFIRMED BY A LICENSED "
-        "PROFESSIONAL ENGINEER using project-specific plans (grading, pipe sizes and materials, "
-        "invert elevations, loading conditions, and applicable codes/standards)."
-    )
+    if disclaimer_lines_raw is None:
+        disclaimer_lines_raw = (
+            "DISCLAIMER: This calculator provides preliminary, conceptual estimates only and is not a "
+            "stamped engineering design. Wavin's assistance in sizing or product selection is advisory "
+            "and does not constitute design responsibility or guarantee system performance. The Engineer "
+            "of Record (EoR) is solely responsible for verifying all design parameters and site "
+            "conditions, including hydrology, structural requirements, soils, environmental factors, and "
+            "integration with the overall stormwater system. AquaCell dimensions and assumptions "
+            "(including usable storage and unit base areas) follow published product data. "
+            "FINAL LAYOUTS, CAPACITIES, AND INSTALLATION DEPTHS MUST BE CONFIRMED BY A LICENSED "
+            "PROFESSIONAL ENGINEER using project-specific plans (grading, pipe sizes and materials, "
+            "invert elevations, loading conditions, and applicable codes/standards)."
+        )
+    if bold_triggers is None:
+        bold_triggers = ('FINAL LAYOUTS', 'LICENSED PROFESSIONAL', 'INSTALLATION DEPTHS')
     font_sz  = 6.5
     line_h   = 9
     pad      = 7
@@ -911,7 +914,7 @@ def _draw_disclaimer_block(c, y_bottom):
             c.setFont('Helvetica', font_sz)
             c.setFillColor(BLACK)
             c.drawString(LM + pad + prefix_w, ty, rest)
-        elif 'FINAL LAYOUTS' in line or 'LICENSED PROFESSIONAL' in line or 'INSTALLATION DEPTHS' in line:
+        elif any(trig in line for trig in bold_triggers):
             c.setFont('Helvetica-Bold', font_sz)
             c.setFillColor(BLACK)
             c.drawString(LM + pad, ty, line)
@@ -923,10 +926,175 @@ def _draw_disclaimer_block(c, y_bottom):
 
     return box_top
 
+
 # ══════════════════════════════════════════════════════════════════
-#  CALC ENGINE  —  single-tank calculation (returns dict)
+#  PDF BUILDER  —  Design Verification Dashboard: Buoyancy / Uplift
 # ══════════════════════════════════════════════════════════════════
-def calc_tank(t):
+_BUOYANCY_DISCLAIMER_TEXT = (
+    "DISCLAIMER: No verified Wavin source exists for this buoyancy/uplift check. This is a "
+    "first-principles geotechnical/structural calculation (empty tank vs. saturated soil at the "
+    "design high groundwater elevation) and is not a stamped engineering design. Soil moist and "
+    "saturated unit weights shown on this sheet must come from the project's geotechnical report "
+    "(soil borings / lab testing by the geotechnical engineer of record) — they are not defaulted "
+    "or verified by this tool. Tank self-weight shown is a rough approximation (Base Unit count only) "
+    "and does not reflect a full bill of materials. THE ENGINEER OF RECORD IS SOLELY RESPONSIBLE FOR "
+    "VERIFYING ALL SOIL PARAMETERS, GROUNDWATER ELEVATIONS, AND THE FINAL BUOYANCY DESIGN using "
+    "project-specific geotechnical data and applicable codes/standards."
+)
+_BUOYANCY_BOLD_TRIGGERS = ('THE ENGINEER OF RECORD', 'VERIFYING ALL SOIL')
+
+
+def build_buoyancy_pdf(inputs, results, project_name=None):
+    """
+    Single-page submittal-ready PDF summarizing a buoyancy/uplift calculation.
+    inputs:  the raw payload dict sent to calc_buoyancy()
+    results: the dict returned by calc_buoyancy()
+    Returns a BytesIO buffer positioned at 0.
+    """
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
+
+    # ── Header band ──
+    band_h = 64
+    c.setFillColor(NAVY)
+    c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
+    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    if logo_path and os.path.exists(logo_path):
+        try:
+            img = ImageReader(logo_path)
+            c.drawImage(img, LM, PH - band_h + 8, width=160, height=46,
+                        preserveAspectRatio=True, mask='auto')
+        except Exception:
+            pass
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 14)
+    c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
+    c.setFont('Helvetica', 9)
+    c.setFillColor(colors.HexColor('#93c5fd'))
+    c.drawRightString(PW - RM, PH - 37, 'Buoyancy / Uplift Check — Preliminary, Non-Stamped Calculation')
+    c.setFont('Helvetica', 7)
+    c.setFillColor(colors.HexColor('#94a3b8'))
+    c.drawRightString(PW - RM, PH - 50, generated_str)
+
+    y = PH - band_h - 10
+
+    if project_name:
+        c.setFillColor(GRAY)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM, y, f'Project: {project_name}')
+        y -= 16
+
+    def draw_section(y_top, title, rows, ncols=2):
+        bar_h = 16
+        c.setFillColor(BLUE)
+        c.rect(LM, y_top - bar_h, CW, bar_h, fill=1, stroke=0)
+        c.setFillColor(WHITE)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM + 8, y_top - bar_h + 4, title)
+
+        n = len(rows)
+        nrows = math.ceil(n / ncols)
+        row_h = 20
+        body_h = nrows * row_h + 12
+        box_top = y_top - bar_h
+        box_bottom = box_top - body_h
+        c.setFillColor(LGRAY)
+        c.setStrokeColor(MGRAY)
+        c.setLineWidth(0.5)
+        c.rect(LM, box_bottom, CW, body_h, fill=1, stroke=1)
+
+        col_w = CW / ncols
+        for i, (lbl, val) in enumerate(rows):
+            col = i % ncols
+            row_idx = i // ncols
+            x = LM + 10 + col * col_w
+            ry = box_top - 14 - row_idx * row_h
+            c.setFillColor(GRAY)
+            c.setFont('Helvetica', 7)
+            c.drawString(x, ry, str(lbl).upper())
+            c.setFillColor(BLACK)
+            c.setFont('Helvetica-Bold', 8.5)
+            c.drawString(x, ry - 11, str(val))
+        return box_bottom - 8
+
+    config_label = 'SC — Standard Capacity' if results.get('config') == 'SC' else 'EX — Extra Strong'
+    soil_note    = '(buoyant/effective)' if results.get('use_buoyant_soil') else '(full/saturated)'
+    footprint_sf = results.get('footprint_area_sf') or 0
+    surcharge_psf = (results.get('w_surcharge_lbs', 0) / footprint_sf) if footprint_sf else 0
+
+    input_rows = [
+        ('Configuration',                    config_label),
+        ('Footprint (W × L)',                 f"{inputs.get('width_ft')} ft × {inputs.get('length_ft')} ft"),
+        ('Layers',                            inputs.get('layers')),
+        ('Tank Height',                       f"{results['tank_height_ft']} ft"),
+        ('Cover Depth',                       f"{inputs.get('cover_ft')} ft"),
+        ('Design High Groundwater Depth',     f"{results['gw_depth_ft']} ft below grade"),
+        ('Soil Moist Unit Weight',            f"{inputs.get('moist_pcf')} pcf"),
+        ('Soil Saturated Unit Weight',        f"{inputs.get('sat_pcf')} pcf {soil_note}"),
+        ('Surcharge Dead Load',                f"{surcharge_psf:.1f} psf"),
+    ]
+    y = draw_section(y, 'DESIGN INPUTS', input_rows, ncols=2)
+
+    uplift_rows = [
+        ('Submerged Tank Height',   f"{results['submerged_height_ft']} ft"),
+        ('Submerged Volume',        f"{results['v_submerged_cf']:,.1f} ft³"),
+        ('Water Unit Weight',       '62.4 pcf'),
+        ('Uplift Force (F_up)',     f"{results['f_up_lbs']:,.1f} lb"),
+    ]
+    y = draw_section(y, 'UPLIFT FORCE', uplift_rows, ncols=2)
+
+    resist_rows = [
+        ('Dry Soil Depth',                  f"{results['dry_soil_depth_ft']} ft"),
+        ('Submerged Soil Depth',            f"{results['submerged_soil_depth_ft']} ft"),
+        ('Soil Weight (W_soil)',            f"{results['w_soil_lbs']:,.1f} lb"),
+        ('Approx. Crate Count',             f"{results['crate_count_approx']:,} ({results['crates_wide']} × {results['crates_long']}/layer)"),
+        ('Tank Self-Weight (approx.)',      f"{results['w_tank_lbs']:,.1f} lb"),
+        ('Surcharge Dead Load',             f"{results['w_surcharge_lbs']:,.1f} lb"),
+        ('Total Resisting Force (F_resist)', f"{results['f_resist_lbs']:,.1f} lb"),
+    ]
+    y = draw_section(y, 'RESISTING FORCE', resist_rows, ncols=2)
+
+    # ── FoS hero box ──
+    fos    = results.get('fos')
+    status = results.get('status', 'N/A')
+    fos_display = f"{fos:.2f}" if fos is not None else '—'
+
+    if status == 'PASS':
+        hero_bg, hero_border, hero_txt = LTGRN, GREEN, GREEN
+    elif status == 'FAIL':
+        hero_bg, hero_border, hero_txt = colors.HexColor('#fee2e2'), RED, RED
+    else:
+        hero_bg, hero_border, hero_txt = LGRAY, GRAY, GRAY
+
+    hero_h = 74
+    hero_bottom = y - hero_h
+    c.setFillColor(hero_bg)
+    c.setStrokeColor(hero_border)
+    c.setLineWidth(1)
+    c.rect(LM, hero_bottom, CW, hero_h, fill=1, stroke=1)
+    c.setFillColor(BLACK)
+    c.setFont('Helvetica-Bold', 30)
+    c.drawCentredString(PW / 2, hero_bottom + 40, fos_display)
+    c.setFillColor(GRAY)
+    c.setFont('Helvetica', 8)
+    c.drawCentredString(PW / 2, hero_bottom + 26, f"Factor of Safety  (min. required: {results.get('min_fos')})")
+    c.setFillColor(hero_txt)
+    c.setFont('Helvetica-Bold', 12)
+    c.drawCentredString(PW / 2, hero_bottom + 8, status)
+
+    y = hero_bottom - 10
+
+    # ── Disclaimer (anchored at bottom margin) ──
+    _draw_disclaimer_block(c, 40, disclaimer_lines_raw=_BUOYANCY_DISCLAIMER_TEXT,
+                            bold_triggers=_BUOYANCY_BOLD_TRIGGERS)
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
     """
     t: dict with keys matching the multi-tank form field names.
     Returns a results dict with all derived quantities.
@@ -1364,6 +1532,36 @@ def design_tools_calculate():
             return jsonify(result), 400
 
         return jsonify(result)
+    except Exception as exc:
+        import traceback
+        return jsonify({'error': str(exc), 'trace': traceback.format_exc()}), 500
+
+
+# ══════════════════════════════════════════════════════════════════
+#  ROUTE: /design-tools/download_pdf  —  single-page submittal PDF
+# ══════════════════════════════════════════════════════════════════
+@app.route('/design-tools/download_pdf', methods=['POST'])
+def design_tools_download_pdf():
+    try:
+        data      = request.get_json(force=True)
+        calc_type = data.get('calc_type', '')
+        payload   = data.get('inputs', {})
+        project_name = data.get('project_name') or None
+
+        if calc_type == 'buoyancy':
+            result = calc_buoyancy(payload)
+            if 'error' in result:
+                return jsonify(result), 400
+            buffer = build_buoyancy_pdf(payload, result, project_name=project_name)
+        else:
+            return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
+
+        return send_file(
+            buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name='AquaCell_Buoyancy_Check.pdf'
+        )
     except Exception as exc:
         import traceback
         return jsonify({'error': str(exc), 'trace': traceback.format_exc()}), 500

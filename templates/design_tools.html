@@ -221,6 +221,15 @@
         }
         .calc-btn:hover { background: #6d28d9; }
 
+        .calc-btn.secondary {
+            background: #0f4c81;
+        }
+        .calc-btn.secondary:hover { background: #0d3f6b; }
+        .calc-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+
         .disclaimer-box {
             background: #fef3c7;
             border: 1px solid #f59e0b;
@@ -235,6 +244,42 @@
             background: #422006;
             border-color: #b45309;
             color: #fde68a;
+        }
+
+        /* ── RESULTS LAYOUT: data column + diagram column ── */
+        .results-flex {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+        .results-data {
+            flex: 1 1 320px;
+            min-width: 300px;
+        }
+        .results-diagram-col {
+            flex: 0 0 300px;
+            width: 300px;
+        }
+        .diagram-box {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+        }
+        .diagram-box h3 {
+            margin: 0 0 10px;
+            font-size: 13px;
+            color: var(--accent);
+        }
+        .diagram-caption {
+            font-size: 10.5px;
+            color: #6b7280;
+            margin-top: 8px;
+            line-height: 1.4;
         }
 
         /* ── RESULTS ── */
@@ -445,7 +490,18 @@
                     </div>
                 </div>
 
+                <div class="section-card">
+                    <div class="section-card-header">Project (optional — for PDF header)</div>
+                    <div class="section-card-body">
+                        <label>Project Name</label>
+                        <input type="text" id="bq_project_name" placeholder="e.g. Maple Ridge Retail Site">
+                    </div>
+                </div>
+
                 <button class="calc-btn" onclick="runBuoyancy()">Calculate Buoyancy / Uplift</button>
+                <button class="calc-btn secondary" id="bq_pdf_btn" onclick="downloadBuoyancyPDF()" disabled>
+                    ⬇ Download Submittal PDF
+                </button>
             </div>
 
             <div class="calc-results" id="bq_results">
@@ -487,8 +543,13 @@
     }
 
     // ── Buoyancy calculator ──
+    let bqLastInputs  = null;
+    let bqLastResults = null;
+
     async function runBuoyancy() {
         const resultsDiv = document.getElementById('bq_results');
+        const pdfBtn = document.getElementById('bq_pdf_btn');
+        pdfBtn.disabled = true;
 
         const inputs = {
             config:           document.getElementById('bq_config').value,
@@ -515,12 +576,19 @@
 
             if (!resp.ok || data.error) {
                 resultsDiv.innerHTML = `<div class="error-box">${data.error || 'Calculation failed.'}</div>`;
+                bqLastInputs = null;
+                bqLastResults = null;
                 return;
             }
 
+            bqLastInputs  = inputs;
+            bqLastResults = data;
+            pdfBtn.disabled = false;
             renderBuoyancyResults(data);
         } catch (err) {
             resultsDiv.innerHTML = `<div class="error-box">Request failed: ${err.message}</div>`;
+            bqLastInputs = null;
+            bqLastResults = null;
         }
     }
 
@@ -535,39 +603,200 @@
         const fosDisplay = (d.fos === null || d.fos === undefined) ? '—' : d.fos.toFixed(2);
 
         resultsDiv.innerHTML = `
-            <div class="result-card">
-                <div class="fos-hero">
-                    <div class="fos-value">${fosDisplay}</div>
-                    <div class="fos-label">Factor of Safety (min required: ${d.min_fos})</div>
-                    <div style="margin-top:10px;"><span class="badge ${badgeClass}">${badgeText}</span></div>
+            <div class="results-flex">
+                <div class="results-data">
+                    <div class="result-card">
+                        <div class="fos-hero">
+                            <div class="fos-value">${fosDisplay}</div>
+                            <div class="fos-label">Factor of Safety (min required: ${d.min_fos})</div>
+                            <div style="margin-top:10px;"><span class="badge ${badgeClass}">${badgeText}</span></div>
+                        </div>
+                    </div>
+
+                    <div class="result-card">
+                        <h3>Uplift Force</h3>
+                        <div class="result-row"><span>Tank Height</span><span class="val">${d.tank_height_ft} ft</span></div>
+                        <div class="result-row"><span>Top of Tank Depth</span><span class="val">${d.top_of_tank_depth_ft} ft</span></div>
+                        <div class="result-row"><span>Bottom of Tank Depth</span><span class="val">${d.bottom_of_tank_depth_ft} ft</span></div>
+                        <div class="result-row"><span>Groundwater Depth Used</span><span class="val">${d.gw_depth_ft} ft</span></div>
+                        <div class="result-row"><span>Submerged Tank Height</span><span class="val">${d.submerged_height_ft} ft</span></div>
+                        <div class="result-row"><span>Submerged Volume</span><span class="val">${d.v_submerged_cf.toLocaleString()} ft³</span></div>
+                        <div class="result-row"><span><strong>Uplift Force (F_up)</strong></span><span class="val">${d.f_up_lbs.toLocaleString()} lb</span></div>
+                    </div>
+
+                    <div class="result-card">
+                        <h3>Resisting Force</h3>
+                        <div class="result-row"><span>Dry Soil Depth</span><span class="val">${d.dry_soil_depth_ft} ft</span></div>
+                        <div class="result-row"><span>Submerged Soil Depth</span><span class="val">${d.submerged_soil_depth_ft} ft</span></div>
+                        <div class="result-row"><span>Submerged Soil Weight Used</span><span class="val">${d.soil_weight_used_pcf} pcf ${d.use_buoyant_soil ? '(buoyant/effective)' : '(full/saturated)'}</span></div>
+                        <div class="result-row"><span>Soil Weight (W_soil)</span><span class="val">${d.w_soil_lbs.toLocaleString()} lb</span></div>
+                        <div class="result-row"><span>Approx. Crate Count</span><span class="val">${d.crate_count_approx.toLocaleString()} (${d.crates_wide} × ${d.crates_long} per layer)</span></div>
+                        <div class="result-row"><span>Tank Self-Weight (W_tank, approx.)</span><span class="val">${d.w_tank_lbs.toLocaleString()} lb</span></div>
+                        <div class="result-row"><span>Surcharge Dead Load (W_surcharge)</span><span class="val">${d.w_surcharge_lbs.toLocaleString()} lb</span></div>
+                        <div class="result-row"><span><strong>Total Resisting Force (F_resist)</strong></span><span class="val">${d.f_resist_lbs.toLocaleString()} lb</span></div>
+                    </div>
+                </div>
+
+                <div class="results-diagram-col">
+                    <div class="diagram-box">
+                        <h3>Cross-Section (Not to Scale)</h3>
+                        ${buildCrossSectionSVG(d)}
+                        <div class="diagram-caption">
+                            Illustrative schematic generated from your entered depths. Horizontal
+                            proportions are not to scale — use for visualization only, not for
+                            construction drawings.
+                        </div>
+                    </div>
                 </div>
             </div>
-
-            <div class="result-card">
-                <h3>Uplift Force</h3>
-                <div class="result-row"><span>Tank Height</span><span class="val">${d.tank_height_ft} ft</span></div>
-                <div class="result-row"><span>Top of Tank Depth</span><span class="val">${d.top_of_tank_depth_ft} ft</span></div>
-                <div class="result-row"><span>Bottom of Tank Depth</span><span class="val">${d.bottom_of_tank_depth_ft} ft</span></div>
-                <div class="result-row"><span>Groundwater Depth Used</span><span class="val">${d.gw_depth_ft} ft</span></div>
-                <div class="result-row"><span>Submerged Tank Height</span><span class="val">${d.submerged_height_ft} ft</span></div>
-                <div class="result-row"><span>Submerged Volume</span><span class="val">${d.v_submerged_cf.toLocaleString()} ft³</span></div>
-                <div class="result-row"><span><strong>Uplift Force (F_up)</strong></span><span class="val">${d.f_up_lbs.toLocaleString()} lb</span></div>
-            </div>
-
-            <div class="result-card">
-                <h3>Resisting Force</h3>
-                <div class="result-row"><span>Dry Soil Depth</span><span class="val">${d.dry_soil_depth_ft} ft</span></div>
-                <div class="result-row"><span>Submerged Soil Depth</span><span class="val">${d.submerged_soil_depth_ft} ft</span></div>
-                <div class="result-row"><span>Submerged Soil Weight Used</span><span class="val">${d.soil_weight_used_pcf} pcf ${d.use_buoyant_soil ? '(buoyant/effective)' : '(full/saturated)'}</span></div>
-                <div class="result-row"><span>Soil Weight (W_soil)</span><span class="val">${d.w_soil_lbs.toLocaleString()} lb</span></div>
-                <div class="result-row"><span>Approx. Crate Count</span><span class="val">${d.crate_count_approx.toLocaleString()} (${d.crates_wide} × ${d.crates_long} per layer)</span></div>
-                <div class="result-row"><span>Tank Self-Weight (W_tank, approx.)</span><span class="val">${d.w_tank_lbs.toLocaleString()} lb</span></div>
-                <div class="result-row"><span>Surcharge Dead Load (W_surcharge)</span><span class="val">${d.w_surcharge_lbs.toLocaleString()} lb</span></div>
-                <div class="result-row"><span><strong>Total Resisting Force (F_resist)</strong></span><span class="val">${d.f_resist_lbs.toLocaleString()} lb</span></div>
-            </div>
         `;
+    }
+
+    // ── Dynamic cross-section SVG, built from the calc result depths ──
+    function buildCrossSectionSVG(d) {
+        const topTank = d.top_of_tank_depth_ft;
+        const botTank = d.bottom_of_tank_depth_ft;
+        const gw      = d.gw_depth_ft;
+
+        const maxRef  = Math.max(botTank, gw, 1);
+        const totalDepthShown = maxRef * 1.2;
+
+        const svgW = 300, svgH = 400;
+        const topMargin = 30, bottomMargin = 20;
+        const usableH = svgH - topMargin - bottomMargin;
+        const pxPerFt = usableH / totalDepthShown;
+
+        const yAt = (depthFt) => topMargin + depthFt * pxPerFt;
+
+        const boxLeft = 75, boxRight = 225;
+        const boxW = boxRight - boxLeft;
+
+        const gradeY   = yAt(0);
+        const topTankY = yAt(topTank);
+        const botTankY = yAt(botTank);
+        const gwShown  = Math.min(gw, totalDepthShown);
+        const gwY      = yAt(gwShown);
+
+        const soilDryBottomDepth = Math.min(gw, topTank);
+        const soilDryBottomY = yAt(soilDryBottomDepth);
+        const hasSoilSubmerged = gw < topTank;
+
+        let parts = [];
+        parts.push(`<svg viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:280px;">`);
+
+        // sky
+        parts.push(`<rect x="0" y="0" width="${svgW}" height="${gradeY}" fill="#eff6ff"/>`);
+
+        // dry soil band
+        parts.push(`<rect x="${boxLeft}" y="${gradeY}" width="${boxW}" height="${Math.max(0, soilDryBottomY - gradeY)}" fill="#d6c9a8"/>`);
+
+        // submerged soil band (if groundwater is above top of tank)
+        if (hasSoilSubmerged) {
+            parts.push(`<rect x="${boxLeft}" y="${soilDryBottomY}" width="${boxW}" height="${Math.max(0, topTankY - soilDryBottomY)}" fill="#a8967a"/>`);
+        }
+
+        // tank rectangle (crate mass)
+        parts.push(`<rect x="${boxLeft}" y="${topTankY}" width="${boxW}" height="${Math.max(0, botTankY - topTankY)}" fill="#cbd5e1" stroke="#0f1e3c" stroke-width="1.5"/>`);
+
+        // illustrative crate grid lines
+        const gridCols = 4;
+        for (let i = 1; i < gridCols; i++) {
+            const gx = boxLeft + (boxW / gridCols) * i;
+            parts.push(`<line x1="${gx}" y1="${topTankY}" x2="${gx}" y2="${botTankY}" stroke="#94a3b8" stroke-width="0.75"/>`);
+        }
+
+        // submerged portion of tank — blue tint overlay
+        if (d.submerged_height_ft > 0) {
+            const subTopDepth = Math.max(gw, topTank);
+            const subTopY = yAt(subTopDepth);
+            parts.push(`<rect x="${boxLeft}" y="${subTopY}" width="${boxW}" height="${Math.max(0, botTankY - subTopY)}" fill="#3b82f6" opacity="0.28"/>`);
+        }
+
+        // groundwater dashed line + label
+        if (gw <= totalDepthShown) {
+            parts.push(`<line x1="${boxLeft - 15}" y1="${gwY}" x2="${boxRight + 15}" y2="${gwY}" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="5,3"/>`);
+            parts.push(`<text x="${boxLeft - 18}" y="${gwY + 3}" font-size="9" fill="#2563eb" text-anchor="end">GW ▽</text>`);
+        }
+
+        // grade line + label
+        parts.push(`<line x1="${boxLeft - 20}" y1="${gradeY}" x2="${boxRight + 20}" y2="${gradeY}" stroke="#1e293b" stroke-width="2"/>`);
+        parts.push(`<text x="${boxLeft - 23}" y="${gradeY - 4}" font-size="9" fill="#1e293b" text-anchor="end">GRADE</text>`);
+
+        // resisting force arrows (downward, into top of tank)
+        const arrowXs = [boxLeft + boxW * 0.25, boxLeft + boxW * 0.5, boxLeft + boxW * 0.75];
+        arrowXs.forEach(x => {
+            const y1 = topTankY - 20, y2 = topTankY - 2;
+            parts.push(`<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2 - 5}" stroke="#15803d" stroke-width="2"/>`);
+            parts.push(`<polygon points="${x-4},${y2-5} ${x+4},${y2-5} ${x},${y2}" fill="#15803d"/>`);
+        });
+        parts.push(`<text x="${boxLeft}" y="${topTankY - 24}" font-size="9" fill="#15803d" font-weight="bold">F_resist ▼</text>`);
+
+        // uplift force arrows (upward, into bottom of tank) — only if submerged
+        if (d.f_up_lbs > 0) {
+            arrowXs.forEach(x => {
+                const y1 = botTankY + 20, y2 = botTankY + 2;
+                parts.push(`<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2 + 5}" stroke="#2563eb" stroke-width="2"/>`);
+                parts.push(`<polygon points="${x-4},${y2+5} ${x+4},${y2+5} ${x},${y2}" fill="#2563eb"/>`);
+            });
+            parts.push(`<text x="${boxLeft}" y="${botTankY + 34}" font-size="9" fill="#2563eb" font-weight="bold">F_up ▲</text>`);
+        }
+
+        // dimension labels (right side)
+        parts.push(`<text x="${boxRight + 26}" y="${(gradeY + topTankY) / 2 - 2}" font-size="8" fill="#475569">Cover</text>`);
+        parts.push(`<text x="${boxRight + 26}" y="${(gradeY + topTankY) / 2 + 8}" font-size="8" fill="#475569">${topTank.toFixed(2)} ft</text>`);
+
+        parts.push(`<text x="${boxRight + 26}" y="${(topTankY + botTankY) / 2 - 2}" font-size="8" fill="#475569">Tank Ht.</text>`);
+        parts.push(`<text x="${boxRight + 26}" y="${(topTankY + botTankY) / 2 + 8}" font-size="8" fill="#475569">${(botTank - topTank).toFixed(2)} ft</text>`);
+
+        parts.push(`</svg>`);
+        return parts.join('');
+    }
+
+    // ── PDF export ──
+    async function downloadBuoyancyPDF() {
+        if (!bqLastInputs || !bqLastResults) return;
+
+        const projectName = document.getElementById('bq_project_name').value || null;
+        const pdfBtn = document.getElementById('bq_pdf_btn');
+        const originalText = pdfBtn.textContent;
+        pdfBtn.disabled = true;
+        pdfBtn.textContent = 'Generating…';
+
+        try {
+            const resp = await fetch('/design-tools/download_pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    calc_type: 'buoyancy',
+                    inputs: bqLastInputs,
+                    project_name: projectName
+                })
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                alert(err.error || 'PDF generation failed.');
+                return;
+            }
+
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'AquaCell_Buoyancy_Check.pdf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('PDF request failed: ' + err.message);
+        } finally {
+            pdfBtn.disabled = false;
+            pdfBtn.textContent = originalText;
+        }
     }
 </script>
 
 </body>
 </html>
+
