@@ -411,17 +411,25 @@
                 <div class="section-card">
                     <div class="section-card-header">Groundwater &amp; Soil</div>
                     <div class="section-card-body">
+                        <div class="disclaimer-box" style="margin-bottom:12px;">
+                            <strong>Soil unit weights are geotechnical parameters, not defaults.</strong>
+                            Get moist &amp; saturated unit weight from the project's geotechnical report
+                            (soil borings / lab testing done by the geotechnical engineer of record).
+                            Do not estimate these for a final design — if an accurate buoyancy FoS is
+                            needed, get the geotech report first.
+                        </div>
+
                         <label>Design High Groundwater Depth (ft below grade)</label>
                         <span class="field-hint">Leave blank to default to 0 ft (groundwater at grade — most conservative)</span>
                         <input type="number" id="bq_gw_depth_ft" step="0.01" placeholder="0 if blank">
 
                         <label>Soil Moist Unit Weight (pcf)</label>
-                        <span class="field-hint">Used for soil above the groundwater table</span>
-                        <input type="number" id="bq_moist_pcf" step="0.1" placeholder="e.g. 115">
+                        <span class="field-hint">Source: project geotechnical report. Used for soil above the groundwater table.</span>
+                        <input type="number" id="bq_moist_pcf" step="0.1" placeholder="from geotech report">
 
                         <label>Soil Saturated Unit Weight (pcf)</label>
-                        <span class="field-hint">Used for soil at/below the groundwater table</span>
-                        <input type="number" id="bq_sat_pcf" step="0.1" placeholder="e.g. 125">
+                        <span class="field-hint">Source: project geotechnical report. Used for soil at/below the groundwater table.</span>
+                        <input type="number" id="bq_sat_pcf" step="0.1" placeholder="from geotech report">
 
                         <div class="checkbox-row">
                             <input type="checkbox" id="bq_use_buoyant">
