@@ -532,6 +532,125 @@ _MT_PALLETS = { 'base':56, 'side':120, 'bottom':120, 'pipe':60, 'adapter12':20, 
 _MT_WEIGHTS = { 'base':25.18, 'side':4.91, 'bottom':7.86, 'pipe':2.70, 'adapter12':11.02, 'adapter16':22.00 }
 
 
+# ======================================================================
+#  DESIGN VERIFICATION DASHBOARD -- Buoyancy / Uplift Calculator
+#
+#  Built from first-principles geotechnical/structural buoyancy
+#  checking. NO verified Wavin-specific source exists for this
+#  calculation -- every assumption below was explicitly signed off
+#  by James on 2026-07-02:
+#    - Critical case = tank EMPTY of stored water while soil is
+#      saturated up to the design high groundwater depth.
+#    - Soil resisting weight above the tank: user-toggleable between
+#      full/saturated unit weight and buoyant/effective unit weight
+#      (saturated - 62.4 pcf) for the submerged portion of the soil
+#      column. Dry (above-groundwater) soil always uses moist weight.
+#    - Minimum required Factor of Safety = 1.25.
+#    - Side-wall soil friction is excluded (conservative).
+#    - Tank self-weight is a ROUGH APPROXIMATION: crate count (footprint
+#      floor-snapped to module grid x layers) x Base Unit weight only.
+#      Side/bottom/pipe/adapter weights are NOT included -- self-weight
+#      is a minor contributor to resisting force, and this was accepted
+#      as a v1 simplification rather than a full BOM port.
+#    - Groundwater depth left blank on the frontend is sent as 0 ft
+#      (most conservative -- groundwater at grade).
+# ======================================================================
+_WATER_UNIT_WEIGHT = 62.4   # lb/ft3, fresh water
+_BUOYANCY_MIN_FOS   = 1.25
+
+def calc_buoyancy(payload):
+    config        = payload.get('config', 'SC')
+    width_ft      = float(payload.get('width_ft', 0) or 0)
+    length_ft     = float(payload.get('length_ft', 0) or 0)
+    layers        = int(float(payload.get('layers', 1) or 1))
+    cover_ft      = float(payload.get('cover_ft', 0) or 0)
+    gw_depth_ft   = float(payload.get('gw_depth_ft', 0) or 0)
+    moist_pcf     = float(payload.get('moist_pcf', 0) or 0)
+    sat_pcf       = float(payload.get('sat_pcf', 0) or 0)
+    use_buoyant   = bool(payload.get('use_buoyant_soil', False))
+    surcharge_psf = float(payload.get('surcharge_psf', 0) or 0)
+
+    cd = CONFIG_DATA.get(config, CONFIG_DATA['SC'])
+    layer_heights = cd['layer_heights']
+    layers = max(1, min(layers, len(layer_heights)))
+    tank_height_ft = layer_heights[layers - 1]
+
+    footprint_area = width_ft * length_ft
+    if footprint_area <= 0 or tank_height_ft <= 0:
+        return {'error': 'Enter a valid tank footprint (width & length) and layer count.'}
+    if moist_pcf <= 0 or sat_pcf <= 0:
+        return {'error': 'Enter both a soil moist unit weight and a soil saturated unit weight (pcf).'}
+
+    top_of_tank_depth    = cover_ft
+    bottom_of_tank_depth = cover_ft + tank_height_ft
+
+    # -- Submerged height of tank --
+    if gw_depth_ft >= bottom_of_tank_depth:
+        submerged_height_ft = 0.0
+    elif gw_depth_ft <= top_of_tank_depth:
+        submerged_height_ft = tank_height_ft
+    else:
+        submerged_height_ft = bottom_of_tank_depth - gw_depth_ft
+
+    v_submerged = footprint_area * submerged_height_ft
+    f_up = _WATER_UNIT_WEIGHT * v_submerged
+
+    # -- Soil column above tank: split dry vs. submerged --
+    dry_soil_depth_ft       = max(0.0, min(gw_depth_ft, cover_ft))
+    submerged_soil_depth_ft = max(0.0, cover_ft - dry_soil_depth_ft)
+
+    soil_weight_used_pcf = (sat_pcf - _WATER_UNIT_WEIGHT) if use_buoyant else sat_pcf
+    soil_weight_used_pcf = max(0.0, soil_weight_used_pcf)
+
+    w_soil_dry       = footprint_area * dry_soil_depth_ft * moist_pcf
+    w_soil_submerged = footprint_area * submerged_soil_depth_ft * soil_weight_used_pcf
+    w_soil = w_soil_dry + w_soil_submerged
+
+    # -- Tank self-weight (rough approximation -- Base Unit count only) --
+    crates_wide = math.floor(width_ft  / MODULE_WID)
+    crates_long = math.floor(length_ft / MODULE_LEN)
+    crate_count = crates_wide * crates_long * layers
+    w_tank = crate_count * _MT_WEIGHTS['base']
+
+    # -- Surcharge (dead load only -- no live/vehicle load) --
+    w_surcharge = surcharge_psf * footprint_area
+
+    f_resist = w_soil + w_tank + w_surcharge
+
+    if f_up <= 0:
+        fos = None
+        status = 'N/A - NOT SUBMERGED'
+    else:
+        fos = round(f_resist / f_up, 2)
+        status = 'PASS' if fos >= _BUOYANCY_MIN_FOS else 'FAIL'
+
+    return {
+        'config':                   config,
+        'footprint_area_sf':        round(footprint_area, 1),
+        'crates_wide':              crates_wide,
+        'crates_long':              crates_long,
+        'tank_height_ft':           round(tank_height_ft, 3),
+        'top_of_tank_depth_ft':     round(top_of_tank_depth, 2),
+        'bottom_of_tank_depth_ft':  round(bottom_of_tank_depth, 2),
+        'gw_depth_ft':              round(gw_depth_ft, 2),
+        'submerged_height_ft':      round(submerged_height_ft, 3),
+        'v_submerged_cf':           round(v_submerged, 1),
+        'f_up_lbs':                 round(f_up, 1),
+        'dry_soil_depth_ft':        round(dry_soil_depth_ft, 2),
+        'submerged_soil_depth_ft':  round(submerged_soil_depth_ft, 2),
+        'soil_weight_used_pcf':     round(soil_weight_used_pcf, 1),
+        'use_buoyant_soil':         use_buoyant,
+        'w_soil_lbs':               round(w_soil, 1),
+        'crate_count_approx':       crate_count,
+        'w_tank_lbs':               round(w_tank, 1),
+        'w_surcharge_lbs':          round(w_surcharge, 1),
+        'f_resist_lbs':             round(f_resist, 1),
+        'fos':                      fos,
+        'min_fos':                  _BUOYANCY_MIN_FOS,
+        'status':                   status,
+    }
+
+
 # ══════════════════════════════════════════════════════════════════
 #  PDF DRAWING HELPERS
 # ══════════════════════════════════════════════════════════════════
@@ -1210,6 +1329,41 @@ def multi_calculate():
             'total_weight': round(total_weight, 1),
             'total_pallets': total_pallets,
         })
+    except Exception as exc:
+        import traceback
+        return jsonify({'error': str(exc), 'trace': traceback.format_exc()}), 500
+
+
+# ══════════════════════════════════════════════════════════════════
+#  ROUTE: /design-tools  —  Design Verification Dashboard (page)
+# ══════════════════════════════════════════════════════════════════
+@app.route('/design-tools', methods=['GET'])
+def design_tools_index():
+    return render_template('design_tools.html')
+
+
+# ══════════════════════════════════════════════════════════════════
+#  ROUTE: /design-tools/calculate  —  JSON API called by JS.
+#  Single dispatcher endpoint so future calculators (loading, min
+#  cover, manhole distance, etc.) can be added without new routes —
+#  just a new calc_type branch and a new calc_* function.
+# ══════════════════════════════════════════════════════════════════
+@app.route('/design-tools/calculate', methods=['POST'])
+def design_tools_calculate():
+    try:
+        data      = request.get_json(force=True)
+        calc_type = data.get('calc_type', '')
+        payload   = data.get('inputs', {})
+
+        if calc_type == 'buoyancy':
+            result = calc_buoyancy(payload)
+        else:
+            return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
+
+        if 'error' in result:
+            return jsonify(result), 400
+
+        return jsonify(result)
     except Exception as exc:
         import traceback
         return jsonify({'error': str(exc), 'trace': traceback.format_exc()}), 500

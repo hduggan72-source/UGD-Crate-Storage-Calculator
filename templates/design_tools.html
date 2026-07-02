@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AquaCell Design Verification Dashboard</title>
+    <style>
+        :root {
+            --bg: #f8f9fa;
+            --card: white;
+            --text: #212529;
+            --accent: #007bff;
+            --border: #dee2e6;
+            --highlight: #e7f3ff;
+        }
+        [data-theme="dark"] {
+            --bg: #0f172a;
+            --card: #1e2937;
+            --text: #e2e8f0;
+            --accent: #60a5fa;
+            --border: #334155;
+            --highlight: #1e3a8a;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            transition: all 0.3s;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── TOP BAR ── */
+        .topbar {
+            background: #0f1e3c;
+            color: #fff;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 60px;
+            flex-shrink: 0;
+            border-bottom: 2px solid #1a3260;
+            z-index: 100;
+        }
+        .topbar-left { display: flex; align-items: center; gap: 14px; }
+        .topbar-left img { height: 38px; }
+        .topbar-title { font-size: 17px; font-weight: bold; color: #a78bfa; }
+        .topbar-sub { font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 2px; }
+        .topbar-actions { display: flex; gap: 8px; align-items: center; }
+        .topbar-btn {
+            padding: 7px 14px; border: none; border-radius: 4px;
+            cursor: pointer; font-size: 13px; font-weight: bold;
+            text-decoration: none; display: inline-block;
+        }
+        .back-link { color: #cbd5e1; text-decoration: none; font-size: 13px; margin-right: 6px; }
+        .back-link:hover { color: #fff; }
+
+        /* ── APP BODY: nav sidebar + main content ── */
+        .app-body {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* ── CALCULATOR PICKER SIDEBAR ── */
+        .calc-nav {
+            width: 220px;
+            min-width: 200px;
+            flex-shrink: 0;
+            background: var(--card);
+            border-right: 2px solid var(--border);
+            overflow-y: auto;
+            padding: 16px 0;
+        }
+        .calc-nav-heading {
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--accent);
+            padding: 4px 16px 8px;
+        }
+        .calc-nav-item {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 10px 16px;
+            border: none;
+            background: transparent;
+            color: var(--text);
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+        }
+        .calc-nav-item:hover { background: var(--highlight); }
+        .calc-nav-item.active {
+            background: var(--highlight);
+            border-left: 3px solid var(--accent);
+            color: var(--accent);
+        }
+        .calc-nav-item.disabled {
+            color: #9ca3af;
+            cursor: default;
+            font-weight: normal;
+        }
+        .calc-nav-item.disabled:hover { background: transparent; }
+        .calc-nav-item .soon-tag {
+            display: inline-block;
+            font-size: 9px;
+            font-weight: bold;
+            background: var(--border);
+            color: var(--text);
+            padding: 1px 5px;
+            border-radius: 3px;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
+        /* ── MAIN CONTENT AREA ── */
+        .calc-main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* ── LEFT: shared geometry + calc-specific inputs ── */
+        .calc-inputs {
+            width: 400px;
+            min-width: 340px;
+            flex-shrink: 0;
+            background: var(--card);
+            border-right: 2px solid var(--border);
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        /* ── RIGHT: results ── */
+        .calc-results {
+            flex: 1;
+            overflow-y: auto;
+            background: var(--bg);
+            padding: 20px;
+        }
+
+        /* ── SECTION CARDS (match main calculator style) ── */
+        .section-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 14px;
+            overflow: hidden;
+        }
+        .section-card-header {
+            background: #4c1d95;
+            color: #fff;
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 0.02em;
+        }
+        [data-theme="dark"] .section-card-header { background: #3b1a78; }
+        .section-card-body { padding: 12px 14px; }
+
+        label {
+            display: block;
+            margin: 8px 0 4px;
+            font-weight: bold;
+            font-size: 13px;
+        }
+        .field-hint {
+            font-size: 11px;
+            font-weight: normal;
+            color: #6b7280;
+            display: block;
+            margin-top: -2px;
+            margin-bottom: 4px;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 7px 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--card);
+            color: var(--text);
+            font-size: 13px;
+        }
+        .checkbox-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin: 10px 0;
+        }
+        .checkbox-row input[type="checkbox"] {
+            width: auto;
+            margin-top: 2px;
+        }
+        .checkbox-row label {
+            margin: 0;
+            font-weight: normal;
+            font-size: 12.5px;
+        }
+
+        .calc-btn {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 6px;
+            background: #7c3aed;
+            color: #fff;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .calc-btn:hover { background: #6d28d9; }
+
+        .disclaimer-box {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 11.5px;
+            color: #92400e;
+            margin-bottom: 14px;
+            line-height: 1.4;
+        }
+        [data-theme="dark"] .disclaimer-box {
+            background: #422006;
+            border-color: #b45309;
+            color: #fde68a;
+        }
+
+        /* ── RESULTS ── */
+        .result-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 14px;
+        }
+        .result-card h3 {
+            margin: 0 0 10px;
+            font-size: 14px;
+            color: var(--accent);
+        }
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+        }
+        .result-row:last-child { border-bottom: none; }
+        .result-row .val { font-weight: bold; }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .badge-pass { background: #dcfce7; color: #15803d; }
+        .badge-fail { background: #fee2e2; color: #b91c1c; }
+        .badge-na   { background: #e2e8f0; color: #475569; }
+        [data-theme="dark"] .badge-pass { background: #14532d; color: #86efac; }
+        [data-theme="dark"] .badge-fail { background: #7f1d1d; color: #fca5a5; }
+        [data-theme="dark"] .badge-na   { background: #334155; color: #cbd5e1; }
+
+        .fos-hero {
+            text-align: center;
+            padding: 20px 0 14px;
+        }
+        .fos-hero .fos-value {
+            font-size: 40px;
+            font-weight: bold;
+            color: var(--text);
+        }
+        .fos-hero .fos-label {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #6b7280;
+            padding: 60px 20px;
+            font-size: 14px;
+        }
+
+        .placeholder-panel {
+            text-align: center;
+            color: #6b7280;
+            padding: 80px 20px;
+        }
+        .placeholder-panel h2 { color: var(--text); }
+
+        .error-box {
+            background: #fee2e2;
+            border: 1px solid #dc2626;
+            color: #991b1b;
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 13px;
+            margin-bottom: 14px;
+        }
+        [data-theme="dark"] .error-box {
+            background: #450a0a;
+            border-color: #b91c1c;
+            color: #fca5a5;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ══════════════ TOP BAR ══════════════ -->
+<div class="topbar">
+    <div class="topbar-left">
+        <div>
+            <div class="topbar-title">AquaCell Design Verification Dashboard</div>
+            <div class="topbar-sub">Preliminary design checks only. The Engineer of Record is responsible for final design and verification.</div>
+        </div>
+    </div>
+    <div class="topbar-actions">
+        <a href="/" class="back-link">← Single Tank</a>
+        <a href="/multi" class="topbar-btn" style="background:#0891b2;color:white;text-decoration:none;">🏗️ Multi-Tank</a>
+        <button id="themeToggle" class="topbar-btn" title="Toggle Theme" style="background:transparent;color:white;font-size:20px;padding:4px 10px;">☀️</button>
+    </div>
+</div>
+
+<div class="app-body">
+
+    <!-- ══════════════ CALCULATOR PICKER SIDEBAR ══════════════ -->
+    <div class="calc-nav">
+        <div class="calc-nav-heading">Calculators</div>
+        <button class="calc-nav-item active" data-calc="buoyancy" onclick="selectCalc('buoyancy')">
+            Buoyancy / Uplift
+        </button>
+        <button class="calc-nav-item disabled" disabled>
+            Loading Model (ASTM F2787) <span class="soon-tag">SOON</span>
+        </button>
+        <button class="calc-nav-item disabled" disabled>
+            Min Cover / Burial Depth <span class="soon-tag">SOON</span>
+        </button>
+        <button class="calc-nav-item disabled" disabled>
+            Min Distance from Manhole <span class="soon-tag">SOON</span>
+        </button>
+        <button class="calc-nav-item disabled" disabled>
+            Min Distance from Structure <span class="soon-tag">SOON</span>
+        </button>
+        <button class="calc-nav-item disabled" disabled>
+            Excavation Slope <span class="soon-tag">SOON</span>
+        </button>
+    </div>
+
+    <!-- ══════════════ MAIN: inputs + results, per calculator ══════════════ -->
+    <div class="calc-main" id="calcMain">
+
+        <!-- ── BUOYANCY CALCULATOR ── -->
+        <div id="panel-buoyancy" class="calc-panel">
+            <div class="calc-inputs">
+
+                <div class="disclaimer-box">
+                    <strong>No verified Wavin source exists for this check.</strong> This is a first-principles
+                    geotechnical/structural buoyancy calculation (empty tank vs. saturated soil at design high
+                    groundwater). Verify all soil unit weights and the groundwater elevation against your
+                    project's geotechnical report before relying on these results.
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Shared Tank Geometry</div>
+                    <div class="section-card-body">
+                        <label>Configuration</label>
+                        <select id="bq_config">
+                            <option value="SC">SC — Standard Capacity</option>
+                            <option value="EX">EX — Extra Strong</option>
+                        </select>
+
+                        <label>Tank Width (ft)</label>
+                        <input type="number" id="bq_width_ft" step="0.01" placeholder="e.g. 20">
+
+                        <label>Tank Length (ft)</label>
+                        <input type="number" id="bq_length_ft" step="0.01" placeholder="e.g. 40">
+
+                        <label>Number of Layers</label>
+                        <select id="bq_layers">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8" selected>8</option>
+                        </select>
+
+                        <label>Cover Depth (ft)</label>
+                        <span class="field-hint">Depth from finish grade to top of tank</span>
+                        <input type="number" id="bq_cover_ft" step="0.01" placeholder="e.g. 2.5">
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Groundwater &amp; Soil</div>
+                    <div class="section-card-body">
+                        <label>Design High Groundwater Depth (ft below grade)</label>
+                        <span class="field-hint">Leave blank to default to 0 ft (groundwater at grade — most conservative)</span>
+                        <input type="number" id="bq_gw_depth_ft" step="0.01" placeholder="0 if blank">
+
+                        <label>Soil Moist Unit Weight (pcf)</label>
+                        <span class="field-hint">Used for soil above the groundwater table</span>
+                        <input type="number" id="bq_moist_pcf" step="0.1" placeholder="e.g. 115">
+
+                        <label>Soil Saturated Unit Weight (pcf)</label>
+                        <span class="field-hint">Used for soil at/below the groundwater table</span>
+                        <input type="number" id="bq_sat_pcf" step="0.1" placeholder="e.g. 125">
+
+                        <div class="checkbox-row">
+                            <input type="checkbox" id="bq_use_buoyant">
+                            <label for="bq_use_buoyant">
+                                Use buoyant/effective weight (saturated − 62.4 pcf) for submerged soil
+                                — more conservative. Leave unchecked to use full saturated weight.
+                            </label>
+                        </div>
+
+                        <label>Surcharge Dead Load (psf)</label>
+                        <span class="field-hint">Pavement section dead load only — exclude live/vehicle load. Leave blank for 0.</span>
+                        <input type="number" id="bq_surcharge_psf" step="1" placeholder="0 if blank">
+                    </div>
+                </div>
+
+                <button class="calc-btn" onclick="runBuoyancy()">Calculate Buoyancy / Uplift</button>
+            </div>
+
+            <div class="calc-results" id="bq_results">
+                <div class="empty-state">Enter tank geometry and soil parameters, then click Calculate.</div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // ── Theme Toggle ──
+    const toggleBtn = document.getElementById('themeToggle');
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    if (savedTheme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        toggleBtn.textContent = '🌙';
+    }
+    toggleBtn.addEventListener('click', () => {
+        if (document.documentElement.getAttribute('data-theme') === 'dark') {
+            document.documentElement.removeAttribute('data-theme');
+            toggleBtn.textContent = '☀️';
+            localStorage.setItem('theme', 'light');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            toggleBtn.textContent = '🌙';
+            localStorage.setItem('theme', 'dark');
+        }
+    });
+
+    // ── Calculator picker (only 'buoyancy' is live for now) ──
+    function selectCalc(name) {
+        document.querySelectorAll('.calc-nav-item').forEach(btn => btn.classList.remove('active'));
+        const target = document.querySelector(`.calc-nav-item[data-calc="${name}"]`);
+        if (target) target.classList.add('active');
+        document.querySelectorAll('.calc-panel').forEach(p => p.style.display = 'none');
+        const panel = document.getElementById('panel-' + name);
+        if (panel) panel.style.display = 'flex';
+    }
+
+    // ── Buoyancy calculator ──
+    async function runBuoyancy() {
+        const resultsDiv = document.getElementById('bq_results');
+
+        const inputs = {
+            config:           document.getElementById('bq_config').value,
+            width_ft:         document.getElementById('bq_width_ft').value || 0,
+            length_ft:        document.getElementById('bq_length_ft').value || 0,
+            layers:           document.getElementById('bq_layers').value || 1,
+            cover_ft:         document.getElementById('bq_cover_ft').value || 0,
+            gw_depth_ft:      document.getElementById('bq_gw_depth_ft').value || 0,
+            moist_pcf:        document.getElementById('bq_moist_pcf').value || 0,
+            sat_pcf:          document.getElementById('bq_sat_pcf').value || 0,
+            use_buoyant_soil: document.getElementById('bq_use_buoyant').checked,
+            surcharge_psf:    document.getElementById('bq_surcharge_psf').value || 0,
+        };
+
+        resultsDiv.innerHTML = '<div class="empty-state">Calculating…</div>';
+
+        try {
+            const resp = await fetch('/design-tools/calculate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calc_type: 'buoyancy', inputs: inputs })
+            });
+            const data = await resp.json();
+
+            if (!resp.ok || data.error) {
+                resultsDiv.innerHTML = `<div class="error-box">${data.error || 'Calculation failed.'}</div>`;
+                return;
+            }
+
+            renderBuoyancyResults(data);
+        } catch (err) {
+            resultsDiv.innerHTML = `<div class="error-box">Request failed: ${err.message}</div>`;
+        }
+    }
+
+    function renderBuoyancyResults(d) {
+        const resultsDiv = document.getElementById('bq_results');
+
+        let badgeClass = 'badge-na';
+        let badgeText  = d.status;
+        if (d.status === 'PASS') badgeClass = 'badge-pass';
+        else if (d.status === 'FAIL') badgeClass = 'badge-fail';
+
+        const fosDisplay = (d.fos === null || d.fos === undefined) ? '—' : d.fos.toFixed(2);
+
+        resultsDiv.innerHTML = `
+            <div class="result-card">
+                <div class="fos-hero">
+                    <div class="fos-value">${fosDisplay}</div>
+                    <div class="fos-label">Factor of Safety (min required: ${d.min_fos})</div>
+                    <div style="margin-top:10px;"><span class="badge ${badgeClass}">${badgeText}</span></div>
+                </div>
+            </div>
+
+            <div class="result-card">
+                <h3>Uplift Force</h3>
+                <div class="result-row"><span>Tank Height</span><span class="val">${d.tank_height_ft} ft</span></div>
+                <div class="result-row"><span>Top of Tank Depth</span><span class="val">${d.top_of_tank_depth_ft} ft</span></div>
+                <div class="result-row"><span>Bottom of Tank Depth</span><span class="val">${d.bottom_of_tank_depth_ft} ft</span></div>
+                <div class="result-row"><span>Groundwater Depth Used</span><span class="val">${d.gw_depth_ft} ft</span></div>
+                <div class="result-row"><span>Submerged Tank Height</span><span class="val">${d.submerged_height_ft} ft</span></div>
+                <div class="result-row"><span>Submerged Volume</span><span class="val">${d.v_submerged_cf.toLocaleString()} ft³</span></div>
+                <div class="result-row"><span><strong>Uplift Force (F_up)</strong></span><span class="val">${d.f_up_lbs.toLocaleString()} lb</span></div>
+            </div>
+
+            <div class="result-card">
+                <h3>Resisting Force</h3>
+                <div class="result-row"><span>Dry Soil Depth</span><span class="val">${d.dry_soil_depth_ft} ft</span></div>
+                <div class="result-row"><span>Submerged Soil Depth</span><span class="val">${d.submerged_soil_depth_ft} ft</span></div>
+                <div class="result-row"><span>Submerged Soil Weight Used</span><span class="val">${d.soil_weight_used_pcf} pcf ${d.use_buoyant_soil ? '(buoyant/effective)' : '(full/saturated)'}</span></div>
+                <div class="result-row"><span>Soil Weight (W_soil)</span><span class="val">${d.w_soil_lbs.toLocaleString()} lb</span></div>
+                <div class="result-row"><span>Approx. Crate Count</span><span class="val">${d.crate_count_approx.toLocaleString()} (${d.crates_wide} × ${d.crates_long} per layer)</span></div>
+                <div class="result-row"><span>Tank Self-Weight (W_tank, approx.)</span><span class="val">${d.w_tank_lbs.toLocaleString()} lb</span></div>
+                <div class="result-row"><span>Surcharge Dead Load (W_surcharge)</span><span class="val">${d.w_surcharge_lbs.toLocaleString()} lb</span></div>
+                <div class="result-row"><span><strong>Total Resisting Force (F_resist)</strong></span><span class="val">${d.f_resist_lbs.toLocaleString()} lb</span></div>
+            </div>
+        `;
+    }
+</script>
+
+</body>
+</html>
