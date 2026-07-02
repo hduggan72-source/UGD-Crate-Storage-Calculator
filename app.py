@@ -35,26 +35,221 @@ _details_cache_time = 0.0         # epoch timestamp of last fetch
 _CACHE_TTL_SECONDS  = 600         # refresh every 10 minutes
 
 # ── ASTM F2787 Live Load Model constants ──
-_LL_m    = 1.2
-_LL_IM   = 0.2475
-_LL_LLDF = 1.15
+# Faithful port of the verified "AQUACELL Loading Model_AquaCell_v1.xlsx" workbook
+# (AquaCell Model - Truck / AquaCell Model - Outrigger / Data & Calculations sheets).
+# Read cell-by-cell (formulas, not just values) on 2026-07-02. Two things this
+# fixes vs. the old hardcoded version:
+#   1. IM (Dynamic Allowance Factor) is NOT a fixed 24.75% — it's a formula
+#      that depends on cover depth: IM(%) = 33*(1-0.125*depth_ft) for depth_ft
+#      <= 8 ft, else 0%. 24.75% was only ever correct at exactly 24 in cover.
+#   2. The projected-area spread and the "LLl" term now match the workbook's
+#      three-tier depth model (< 18 in / 18 in-to-overlap / > overlap) with
+#      per-truck-type transverse (wo) / longitudinal (lo) spread dimensions,
+#      instead of a single symmetric (tire + cover*LLDF) approximation.
+_LL_m    = 1.2      # Multiple Presence Factor, ASTM F2787 Section A1.2.1 (fixed)
+_LL_LLDF = 1.15      # Live Load Distribution Factor, granular fill, Section A1.3.1 (fixed)
+_LL_gLL  = 1.75      # Live load minimum FoS, Section A1.3 (fixed)
+_LL_gDL  = 1.95      # Dead load minimum FoS, Section 7.3 (fixed)
+_LL_FILL_PCF_DEFAULT = 120.0   # workbook's default unit weight of fill above AquaCell
 
-def _ll_wheel(traffic_load):
-    return {'H10': (8000, 10, 10), 'HS20': (16000, 10, 20), 'HS25': (20000, 10, 20)}.get(traffic_load, (16000, 10, 20))
+
+def _ll_dynamic_allowance_pct(cover_in):
+    """IM (%), Section A1.2.2 — depth-dependent, capped at 0 beyond 8 ft cover."""
+    cover_ft = cover_in / 12.0
+    if cover_ft > 8.0:
+        return 0.0
+    return 33.0 * (1.0 - 0.125 * cover_ft)
+
+
+def _ll_wo_single_tire(cover_in):
+    """Transverse (wo) spread, single-tire wheel — H-10."""
+    if cover_in <= 18.0:
+        return cover_in + 10.0
+    elif cover_in <= 62.0:
+        return _LL_LLDF * cover_in + 10.0
+    else:
+        return _LL_LLDF * (cover_in + 10.0 - (cover_in - 62.0) / 2.0)
+
+
+def _ll_wo_dual_tire(cover_in):
+    """Transverse (wo) spread, dual-tire wheel — HS-20 / HS-25."""
+    if cover_in <= 18.0:
+        return cover_in + 20.0
+    elif cover_in <= 52.0:
+        return _LL_LLDF * cover_in + 20.0
+    else:
+        return _LL_LLDF * (cover_in + 20.0 - (cover_in - 52.0) / 2.0)
+
+
+def _ll_lo_tandem(cover_in):
+    """Longitudinal (lo) spread, tandem-axle configuration."""
+    if cover_in <= 18.0:
+        return cover_in + 10.0
+    elif cover_in <= 38.0:
+        return _LL_LLDF * cover_in + 10.0
+    else:
+        return _LL_LLDF * (cover_in + 10.0 - (cover_in - 38.0) / 2.0)
+
+
+def _ll_lo_not_tandem(cover_in):
+    """Longitudinal (lo) spread, single/non-tandem axle configuration (no overlap cap in source)."""
+    if cover_in <= 18.0:
+        return cover_in + 10.0
+    else:
+        return _LL_LLDF * cover_in + 10.0
+
+
+def calc_astm_f2787_truck(traffic_load, cover_depth_ft, config, fill_pcf=_LL_FILL_PCF_DEFAULT):
+    """
+    Full ASTM F2787 Truck Load Model — faithful port of the verified workbook.
+    Returns a detail dict with every intermediate value shown in the workbook,
+    or None if cover_depth_ft is invalid.
+    """
+    if cover_depth_ft is None or cover_depth_ft <= 0:
+        return None
+
+    cover_in = cover_depth_ft * 12.0
+    im_pct   = _ll_dynamic_allowance_pct(cover_in)
+
+    if traffic_load == 'H10':
+        axle_lbs    = 16000.0
+        tire_dims   = '10" x 10"'
+        tire_area   = 100.0
+        axle_config = 'Single Axle'
+        wo_spread   = _ll_wo_single_tire(cover_in)
+        lo_spread   = _ll_lo_not_tandem(cover_in)
+    elif traffic_load == 'HS25':
+        axle_lbs    = 40000.0
+        tire_dims   = '10" x 20"'
+        tire_area   = 200.0
+        axle_config = 'Single Axle'
+        wo_spread   = _ll_wo_dual_tire(cover_in)
+        lo_spread   = _ll_lo_not_tandem(cover_in)
+    else:  # HS20 (default) — switches to a tandem-axle model above 38 in of cover
+        traffic_load = 'HS20'
+        tandem       = cover_in > 38.0
+        axle_lbs     = 25000.0 if tandem else 32000.0
+        tire_dims    = '10" x 20"'
+        tire_area    = 200.0
+        axle_config  = 'Tandem Axle' if tandem else 'Single Axle'
+        wo_spread    = _ll_wo_dual_tire(cover_in)
+        lo_spread    = _ll_lo_tandem(cover_in) if tandem else _ll_lo_not_tandem(cover_in)
+
+    wheel_lbs = axle_lbs / 2.0
+    proj_area = wo_spread * lo_spread
+
+    ll_local_lbs    = 64.0 * tire_area / 144.0
+    ll_trans_lbs    = wheel_lbs * _LL_m * (1.0 + im_pct / 100.0)
+    factored_ll_lbs = ll_local_lbs + ll_trans_lbs
+    ll_psi = (factored_ll_lbs / proj_area) if proj_area > 0 else None
+
+    dl_psi       = (fill_pcf / 1728.0) * cover_in
+    max_str      = 70.0 if config == 'SC' else 100.0
+    max_cover_ft = 20.0 if config == 'SC' else 30.0
+
+    total_press = (ll_psi or 0.0) + dl_psi
+    fos_live = round(max_str / total_press, 2) if total_press > 0 else None
+    fos_dead = round(max_str / dl_psi, 2) if dl_psi > 0 else None
+
+    return {
+        'traffic_load':     traffic_load,
+        'axle_lbs':         round(axle_lbs, 1),
+        'axle_config':      axle_config,
+        'wheel_lbs':        round(wheel_lbs, 1),
+        'tire_dims':        tire_dims,
+        'tire_area_in2':    round(tire_area, 1),
+        'cover_in':         round(cover_in, 2),
+        'cover_ft':         round(cover_depth_ft, 3),
+        'fill_pcf':         fill_pcf,
+        'im_pct':           round(im_pct, 3),
+        'wo_spread_in':     round(wo_spread, 3),
+        'lo_spread_in':     round(lo_spread, 3),
+        'proj_area_in2':    round(proj_area, 2),
+        'll_local_lbs':     round(ll_local_lbs, 2),
+        'll_trans_lbs':     round(ll_trans_lbs, 2),
+        'factored_ll_lbs':  round(factored_ll_lbs, 2),
+        'll_psi':           round(ll_psi, 3) if ll_psi is not None else None,
+        'dl_psi':           round(dl_psi, 3),
+        'config':           config,
+        'max_strength_psi': max_str,
+        'max_cover_ft':     max_cover_ft,
+        'fos_live':         fos_live,
+        'fos_dead':         fos_dead,
+        'min_fos_live':     _LL_gLL,
+        'min_fos_dead':     _LL_gDL,
+        'status_live':      ('PASS' if (fos_live is not None and fos_live >= _LL_gLL) else ('FAIL' if fos_live is not None else 'N/A')),
+        'status_dead':      ('PASS' if (fos_dead is not None and fos_dead >= _LL_gDL) else ('FAIL' if fos_dead is not None else 'N/A')),
+    }
+
 
 def calc_live_load_fos(traffic_load, cover_depth_ft, config):
-    if cover_depth_ft <= 0:
+    """
+    Thin wrapper preserving the original 4-tuple return shape
+    (ll_psi, dl_psi, fos_live_load, fos_dead_load) used by the existing
+    single-tank and multi-tank routes. All logic now lives in
+    calc_astm_f2787_truck(); this just unpacks it.
+    """
+    d = calc_astm_f2787_truck(traffic_load, cover_depth_ft, config)
+    if d is None:
         return None, None, None, None
-    cover_in = cover_depth_ft * 12
-    wl, tire_L, tire_W = _ll_wheel(traffic_load)
-    proj_area_in2 = (tire_L + cover_in * _LL_LLDF) * (tire_W + cover_in * _LL_LLDF)
-    ll_lbs = wl * _LL_m * (1 + _LL_IM) + wl / 180.0
-    ll_psi = ll_lbs / proj_area_in2
-    dl_psi = (cover_in / 12.0) * 120 / 144
-    max_str = 70 if config == 'SC' else 100
-    fos_ll = round(max_str / (ll_psi + dl_psi), 2) if (ll_psi + dl_psi) > 0 else None
-    fos_dl = round(max_str / dl_psi, 2) if dl_psi > 0 else None
-    return round(ll_psi, 3), round(dl_psi, 3), fos_ll, fos_dl
+    return d['ll_psi'], d['dl_psi'], d['fos_live'], d['fos_dead']
+
+
+def calc_outrigger_load(total_weight_lbs, pad_shape, pad_length_in, pad_width_in, pad_diameter_in,
+                         cover_depth_ft, fill_pcf, load_factor_pct, config):
+    """
+    AquaCell Outrigger Load Model — faithful port of the verified workbook
+    (AquaCell Model - Outrigger / Data & Calculations sheets).
+
+    Note: the source workbook computes a Safety Factor for the outrigger
+    load but does NOT state a minimum required value anywhere on any sheet
+    (unlike the Truck model's explicit gammaLL=1.75 / gammaDL=1.95). This
+    function therefore returns the calculated FoS with no PASS/FAIL judgment
+    baked in — that threshold should come from you, not be invented here.
+    """
+    if cover_depth_ft is None or cover_depth_ft <= 0:
+        return {'error': 'Enter a valid cover depth.'}
+    if total_weight_lbs is None or total_weight_lbs <= 0:
+        return {'error': 'Enter a valid total vehicle/equipment weight.'}
+
+    cover_in = cover_depth_ft * 12.0
+
+    if pad_shape == 'Circular':
+        if not pad_diameter_in or pad_diameter_in <= 0:
+            return {'error': 'Enter a valid outrigger pad diameter.'}
+        contact_area = math.pi * (pad_diameter_in ** 2) / 4.0
+        proj_area    = math.pi * ((pad_diameter_in + cover_in) ** 2) / 4.0
+    else:
+        pad_shape = 'Rectangular'
+        if not pad_length_in or not pad_width_in or pad_length_in <= 0 or pad_width_in <= 0:
+            return {'error': 'Enter valid outrigger pad length and width.'}
+        contact_area = pad_length_in * pad_width_in
+        proj_area    = (pad_length_in + cover_in) * (pad_width_in + cover_in)
+
+    factored_psi = (total_weight_lbs * (load_factor_pct / 100.0) / proj_area) if proj_area > 0 else None
+    dl_psi       = (fill_pcf / 1728.0) * cover_in
+    max_str      = 70.0 if config == 'SC' else 100.0
+    max_cover_ft = 20.0 if config == 'SC' else 30.0
+
+    total_press = (factored_psi or 0.0) + dl_psi
+    fos = round(max_str / total_press, 2) if total_press > 0 else None
+
+    return {
+        'pad_shape':        pad_shape,
+        'contact_area_in2': round(contact_area, 2),
+        'proj_area_in2':    round(proj_area, 2),
+        'cover_in':         round(cover_in, 2),
+        'cover_ft':         round(cover_depth_ft, 3),
+        'fill_pcf':         fill_pcf,
+        'load_factor_pct':  load_factor_pct,
+        'factored_psi':     round(factored_psi, 3) if factored_psi is not None else None,
+        'dl_psi':           round(dl_psi, 3),
+        'config':           config,
+        'max_strength_psi': max_str,
+        'max_cover_ft':     max_cover_ft,
+        'fos':              fos,
+        'min_fos':          None,
+    }
 
 # ══════════════════════════════════════════════════════════════════
 #  VOID SPACE ENTRY  (Complex Shape mode)
@@ -1095,6 +1290,10 @@ def build_buoyancy_pdf(inputs, results, project_name=None):
     return buffer
 
 
+# ══════════════════════════════════════════════════════════════════
+#  CALC ENGINE  —  single-tank calculation (returns dict)
+# ══════════════════════════════════════════════════════════════════
+def calc_tank(t):
     """
     t: dict with keys matching the multi-tank form field names.
     Returns a results dict with all derived quantities.
@@ -1307,13 +1506,13 @@ def build_buoyancy_pdf(inputs, results, project_name=None):
     max_str         = cd['max_strength']
     fos_dead        = round(max_str / dead_load_psi, 2) if dead_load_psi > 0 else None
 
-    # ASTM F2787 live load
-    wl_map = {'H10': (8000, 10, 10), 'HS20': (16000, 10, 20), 'HS25': (20000, 10, 20)}
-    wl, tire_L, tire_W = wl_map.get(traffic_load, (16000, 10, 20))
-    cover_in = cover_depth * 12 if cover_depth > 0 else 0
-    proj_area = (tire_L + cover_in * _LL_LLDF) * (tire_W + cover_in * _LL_LLDF)
-    ll_lbs = wl * _LL_m * (1 + _LL_IM) + wl / 180.0
-    ll_psi = round(ll_lbs / proj_area, 3) if proj_area > 0 and cover_depth > 0 else None
+    # ASTM F2787 live load — uses the verified calc_astm_f2787_truck() formulas
+    # (fixes the IM-depth-dependency + spread-formula bugs from the old inline
+    # copy), while preserving this function's existing split of cover_stone
+    # (dead load, above) vs. cover_depth (live load, below) exactly as before —
+    # only the live-load FORMULA changed, not which cover variable feeds which output.
+    _ll_detail = calc_astm_f2787_truck(traffic_load, cover_depth, config) if cover_depth > 0 else None
+    ll_psi = _ll_detail['ll_psi'] if _ll_detail else None
     total_press = round((ll_psi or 0) + dead_load_psi, 3)
     fos_ll = round(max_str / total_press, 2) if total_press > 0 else None
 
@@ -1525,6 +1724,28 @@ def design_tools_calculate():
 
         if calc_type == 'buoyancy':
             result = calc_buoyancy(payload)
+        elif calc_type == 'loading_truck':
+            traffic_load  = payload.get('traffic_load', 'HS20')
+            cover_ft      = float(payload.get('cover_ft', 0) or 0)
+            config        = payload.get('config', 'SC')
+            fill_pcf      = float(payload.get('fill_pcf', _LL_FILL_PCF_DEFAULT) or _LL_FILL_PCF_DEFAULT)
+            if cover_ft <= 0:
+                return jsonify({'error': 'Enter a valid cover depth.'}), 400
+            result = calc_astm_f2787_truck(traffic_load, cover_ft, config, fill_pcf)
+            if result is None:
+                return jsonify({'error': 'Enter a valid cover depth.'}), 400
+        elif calc_type == 'loading_outrigger':
+            total_weight_lbs = float(payload.get('total_weight_lbs', 0) or 0)
+            pad_shape        = payload.get('pad_shape', 'Rectangular')
+            pad_length_in    = float(payload.get('pad_length_in', 0) or 0)
+            pad_width_in     = float(payload.get('pad_width_in', 0) or 0)
+            pad_diameter_in  = float(payload.get('pad_diameter_in', 0) or 0)
+            cover_ft         = float(payload.get('cover_ft', 0) or 0)
+            fill_pcf         = float(payload.get('fill_pcf', _LL_FILL_PCF_DEFAULT) or _LL_FILL_PCF_DEFAULT)
+            load_factor_pct  = float(payload.get('load_factor_pct', 75.0) or 75.0)
+            config           = payload.get('config', 'SC')
+            result = calc_outrigger_load(total_weight_lbs, pad_shape, pad_length_in, pad_width_in,
+                                          pad_diameter_in, cover_ft, fill_pcf, load_factor_pct, config)
         else:
             return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
 

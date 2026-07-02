@@ -400,8 +400,11 @@
         <button class="calc-nav-item active" data-calc="buoyancy" onclick="selectCalc('buoyancy')">
             Buoyancy / Uplift
         </button>
-        <button class="calc-nav-item disabled" disabled>
-            Loading Model (ASTM F2787) <span class="soon-tag">SOON</span>
+        <button class="calc-nav-item" data-calc="loading_truck" onclick="selectCalc('loading_truck')">
+            Loading Model — Truck (ASTM F2787)
+        </button>
+        <button class="calc-nav-item" data-calc="loading_outrigger" onclick="selectCalc('loading_outrigger')">
+            Loading Model — Outrigger
         </button>
         <button class="calc-nav-item disabled" disabled>
             Min Cover / Burial Depth <span class="soon-tag">SOON</span>
@@ -517,6 +520,107 @@
 
             <div class="calc-results" id="bq_results">
                 <div class="empty-state">Enter tank geometry and soil parameters, then click Calculate.</div>
+            </div>
+        </div>
+
+        <!-- ── LOADING MODEL: TRUCK (ASTM F2787) ── -->
+        <div id="panel-loading_truck" class="calc-panel" style="display:none;">
+            <div class="calc-inputs">
+
+                <div class="section-card">
+                    <div class="section-card-header">Design Truck</div>
+                    <div class="section-card-body">
+                        <label>Design Truck</label>
+                        <select id="lt_traffic_load">
+                            <option value="H10">H-10</option>
+                            <option value="HS20" selected>HS-20</option>
+                            <option value="HS25">HS-25</option>
+                        </select>
+                        <span class="field-hint">HS-20 automatically switches to a tandem-axle model above 38 in of cover.</span>
+
+                        <label>Configuration</label>
+                        <select id="lt_config">
+                            <option value="SC">SC — Standard (70 psi max, 20 ft max cover)</option>
+                            <option value="EX">EX — Extra Strong (100 psi max, 30 ft max cover)</option>
+                        </select>
+
+                        <label>Cover Depth (ft)</label>
+                        <span class="field-hint">Top of pavement to top of AquaCell</span>
+                        <input type="number" id="lt_cover_ft" step="0.01" placeholder="e.g. 2.0">
+
+                        <label>Unit Weight of Fill Above AquaCell (pcf)</label>
+                        <span class="field-hint">Workbook default is 120 pcf — adjust if your project's fill differs.</span>
+                        <input type="number" id="lt_fill_pcf" step="1" value="120">
+                    </div>
+                </div>
+
+                <button class="calc-btn" onclick="runLoadingTruck()">Calculate Truck Load</button>
+            </div>
+
+            <div class="calc-results" id="lt_results">
+                <div class="empty-state">Enter design truck and cover depth, then click Calculate.</div>
+            </div>
+        </div>
+
+        <!-- ── LOADING MODEL: OUTRIGGER ── -->
+        <div id="panel-loading_outrigger" class="calc-panel" style="display:none;">
+            <div class="calc-inputs">
+
+                <div class="disclaimer-box">
+                    <strong>No minimum Factor of Safety is specified anywhere in the source workbook for the
+                    Outrigger model</strong> (unlike the Truck model's explicit 1.75 / 1.95 minimums). The FoS
+                    below is calculated but shown without a PASS/FAIL judgment — you decide what threshold
+                    applies for your project.
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Outrigger / Crane Pad Load</div>
+                    <div class="section-card-body">
+                        <label>Total Vehicle / Equipment Weight (lbs)</label>
+                        <input type="number" id="lo_total_weight" step="1" placeholder="e.g. 80000">
+
+                        <label>Outrigger Pad Shape</label>
+                        <select id="lo_pad_shape" onchange="toggleOutriggerPadFields()">
+                            <option value="Rectangular" selected>Rectangular</option>
+                            <option value="Circular">Circular</option>
+                        </select>
+
+                        <div id="lo_rect_fields">
+                            <label>Length of Single Outrigger Pad (in)</label>
+                            <input type="number" id="lo_pad_length" step="0.1" placeholder="e.g. 24">
+                            <label>Width of Single Outrigger Pad (in)</label>
+                            <input type="number" id="lo_pad_width" step="0.1" placeholder="e.g. 24">
+                        </div>
+                        <div id="lo_circ_fields" style="display:none;">
+                            <label>Diameter of Single Outrigger Pad (in)</label>
+                            <input type="number" id="lo_pad_diameter" step="0.1" placeholder="e.g. 14">
+                        </div>
+
+                        <label>Outrigger Load Factor (%)</label>
+                        <span class="field-hint">Workbook default is 75%.</span>
+                        <input type="number" id="lo_load_factor" step="1" value="75">
+
+                        <label>Configuration</label>
+                        <select id="lo_config">
+                            <option value="SC">SC — Standard (70 psi max, 20 ft max cover)</option>
+                            <option value="EX">EX — Extra Strong (100 psi max, 30 ft max cover)</option>
+                        </select>
+
+                        <label>Cover Depth (ft)</label>
+                        <span class="field-hint">Top of pavement to top of AquaCell</span>
+                        <input type="number" id="lo_cover_ft" step="0.01" placeholder="e.g. 2.0">
+
+                        <label>Unit Weight of Fill Above AquaCell (pcf)</label>
+                        <span class="field-hint">Workbook default is 120 pcf.</span>
+                        <input type="number" id="lo_fill_pcf" step="1" value="120">
+                    </div>
+                </div>
+
+                <button class="calc-btn" onclick="runLoadingOutrigger()">Calculate Outrigger Load</button>
+            </div>
+
+            <div class="calc-results" id="lo_results">
+                <div class="empty-state">Enter outrigger load and cover depth, then click Calculate.</div>
             </div>
         </div>
 
@@ -805,6 +909,169 @@
             pdfBtn.disabled = false;
             pdfBtn.textContent = originalText;
         }
+    }
+
+    // ══════════════════ LOADING MODEL — TRUCK (ASTM F2787) ══════════════════
+    async function runLoadingTruck() {
+        const resultsDiv = document.getElementById('lt_results');
+
+        const inputs = {
+            traffic_load: document.getElementById('lt_traffic_load').value,
+            cover_ft:     document.getElementById('lt_cover_ft').value || 0,
+            config:       document.getElementById('lt_config').value,
+            fill_pcf:     document.getElementById('lt_fill_pcf').value || 120,
+        };
+
+        resultsDiv.innerHTML = '<div class="empty-state">Calculating…</div>';
+
+        try {
+            const resp = await fetch('/design-tools/calculate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calc_type: 'loading_truck', inputs: inputs })
+            });
+            const data = await resp.json();
+
+            if (!resp.ok || data.error) {
+                resultsDiv.innerHTML = `<div class="error-box">${data.error || 'Calculation failed.'}</div>`;
+                return;
+            }
+
+            renderLoadingTruckResults(data);
+        } catch (err) {
+            resultsDiv.innerHTML = `<div class="error-box">Request failed: ${err.message}</div>`;
+        }
+    }
+
+    function renderLoadingTruckResults(d) {
+        const resultsDiv = document.getElementById('lt_results');
+
+        function badgeHtml(status) {
+            let cls = 'badge-na';
+            if (status === 'PASS') cls = 'badge-pass';
+            else if (status === 'FAIL') cls = 'badge-fail';
+            return `<span class="badge ${cls}">${status}</span>`;
+        }
+
+        resultsDiv.innerHTML = `
+            <div class="result-card">
+                <div class="fos-hero">
+                    <div class="fos-value">${d.fos_live !== null ? d.fos_live.toFixed(2) : '—'}</div>
+                    <div class="fos-label">Live Load Factor of Safety (min required: ${d.min_fos_live})</div>
+                    <div style="margin-top:10px;">${badgeHtml(d.status_live)}</div>
+                </div>
+            </div>
+
+            <div class="result-card">
+                <div class="fos-hero">
+                    <div class="fos-value" style="font-size:28px;">${d.fos_dead !== null ? d.fos_dead.toFixed(2) : '—'}</div>
+                    <div class="fos-label">Dead Load Factor of Safety (min required: ${d.min_fos_dead})</div>
+                    <div style="margin-top:10px;">${badgeHtml(d.status_dead)}</div>
+                </div>
+            </div>
+
+            <div class="result-card">
+                <h3>Design Truck</h3>
+                <div class="result-row"><span>Traffic Load</span><span class="val">${d.traffic_load}</span></div>
+                <div class="result-row"><span>Axle Load</span><span class="val">${d.axle_lbs.toLocaleString()} lb (${d.axle_config})</span></div>
+                <div class="result-row"><span>Wheel Load</span><span class="val">${d.wheel_lbs.toLocaleString()} lb</span></div>
+                <div class="result-row"><span>Tire Contact Dimensions</span><span class="val">${d.tire_dims}</span></div>
+                <div class="result-row"><span>Tire Contact Area</span><span class="val">${d.tire_area_in2} in²</span></div>
+                <div class="result-row"><span>Cover Depth</span><span class="val">${d.cover_ft} ft (${d.cover_in} in)</span></div>
+                <div class="result-row"><span>Unit Weight of Fill</span><span class="val">${d.fill_pcf} pcf</span></div>
+            </div>
+
+            <div class="result-card">
+                <h3>Live Load Calculation</h3>
+                <div class="result-row"><span>Dynamic Allowance Factor, IM</span><span class="val">${d.im_pct}%</span></div>
+                <div class="result-row"><span>Multiple Presence Factor, m</span><span class="val">1.2</span></div>
+                <div class="result-row"><span>Transverse Spread (wo)</span><span class="val">${d.wo_spread_in} in</span></div>
+                <div class="result-row"><span>Longitudinal Spread (lo)</span><span class="val">${d.lo_spread_in} in</span></div>
+                <div class="result-row"><span>Projected Area</span><span class="val">${d.proj_area_in2.toLocaleString()} in²</span></div>
+                <div class="result-row"><span>LLl (local)</span><span class="val">${d.ll_local_lbs} lb</span></div>
+                <div class="result-row"><span>LLt (transverse)</span><span class="val">${d.ll_trans_lbs.toLocaleString()} lb</span></div>
+                <div class="result-row"><span><strong>Factored Live Load</strong></span><span class="val">${d.factored_ll_lbs.toLocaleString()} lb</span></div>
+                <div class="result-row"><span><strong>Factored Live Load Pressure</strong></span><span class="val">${d.ll_psi} psi</span></div>
+                <div class="result-row"><span>Dead Load Pressure</span><span class="val">${d.dl_psi} psi</span></div>
+                <div class="result-row"><span>Max. Compressive Strength (${d.config})</span><span class="val">${d.max_strength_psi} psi</span></div>
+                <div class="result-row"><span>Max. Cover Depth (${d.config})</span><span class="val">${d.max_cover_ft} ft</span></div>
+            </div>
+        `;
+    }
+
+    // ══════════════════ LOADING MODEL — OUTRIGGER ══════════════════
+    function toggleOutriggerPadFields() {
+        const shape = document.getElementById('lo_pad_shape').value;
+        document.getElementById('lo_rect_fields').style.display = (shape === 'Rectangular') ? 'block' : 'none';
+        document.getElementById('lo_circ_fields').style.display = (shape === 'Circular') ? 'block' : 'none';
+    }
+
+    async function runLoadingOutrigger() {
+        const resultsDiv = document.getElementById('lo_results');
+
+        const inputs = {
+            total_weight_lbs: document.getElementById('lo_total_weight').value || 0,
+            pad_shape:        document.getElementById('lo_pad_shape').value,
+            pad_length_in:    document.getElementById('lo_pad_length').value || 0,
+            pad_width_in:     document.getElementById('lo_pad_width').value || 0,
+            pad_diameter_in:  document.getElementById('lo_pad_diameter').value || 0,
+            cover_ft:         document.getElementById('lo_cover_ft').value || 0,
+            fill_pcf:         document.getElementById('lo_fill_pcf').value || 120,
+            load_factor_pct:  document.getElementById('lo_load_factor').value || 75,
+            config:           document.getElementById('lo_config').value,
+        };
+
+        resultsDiv.innerHTML = '<div class="empty-state">Calculating…</div>';
+
+        try {
+            const resp = await fetch('/design-tools/calculate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calc_type: 'loading_outrigger', inputs: inputs })
+            });
+            const data = await resp.json();
+
+            if (!resp.ok || data.error) {
+                resultsDiv.innerHTML = `<div class="error-box">${data.error || 'Calculation failed.'}</div>`;
+                return;
+            }
+
+            renderLoadingOutriggerResults(data);
+        } catch (err) {
+            resultsDiv.innerHTML = `<div class="error-box">Request failed: ${err.message}</div>`;
+        }
+    }
+
+    function renderLoadingOutriggerResults(d) {
+        const resultsDiv = document.getElementById('lo_results');
+
+        resultsDiv.innerHTML = `
+            <div class="result-card">
+                <div class="fos-hero">
+                    <div class="fos-value">${d.fos !== null ? d.fos.toFixed(2) : '—'}</div>
+                    <div class="fos-label">Factor of Safety — no minimum specified in source workbook</div>
+                    <div style="margin-top:10px;"><span class="badge badge-na">INFORMATIONAL ONLY</span></div>
+                </div>
+            </div>
+
+            <div class="result-card">
+                <h3>Outrigger Pad</h3>
+                <div class="result-row"><span>Pad Shape</span><span class="val">${d.pad_shape}</span></div>
+                <div class="result-row"><span>Contact Area</span><span class="val">${d.contact_area_in2.toLocaleString()} in²</span></div>
+                <div class="result-row"><span>Cover Depth</span><span class="val">${d.cover_ft} ft (${d.cover_in} in)</span></div>
+                <div class="result-row"><span>Unit Weight of Fill</span><span class="val">${d.fill_pcf} pcf</span></div>
+                <div class="result-row"><span>Outrigger Load Factor</span><span class="val">${d.load_factor_pct}%</span></div>
+            </div>
+
+            <div class="result-card">
+                <h3>Pressure &amp; Safety Factor</h3>
+                <div class="result-row"><span>Projected Area (spread at AquaCell)</span><span class="val">${d.proj_area_in2.toLocaleString()} in²</span></div>
+                <div class="result-row"><span><strong>Factored Pressure from Outrigger</strong></span><span class="val">${d.factored_psi} psi</span></div>
+                <div class="result-row"><span>Dead Load Pressure</span><span class="val">${d.dl_psi} psi</span></div>
+                <div class="result-row"><span>Max. Compressive Strength (${d.config})</span><span class="val">${d.max_strength_psi} psi</span></div>
+                <div class="result-row"><span>Max. Cover Depth (${d.config})</span><span class="val">${d.max_cover_ft} ft</span></div>
+            </div>
+        `;
     }
 </script>
 
