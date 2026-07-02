@@ -1291,6 +1291,277 @@ def build_buoyancy_pdf(inputs, results, project_name=None):
 
 
 # ══════════════════════════════════════════════════════════════════
+#  PDF BUILDER  —  Design Verification Dashboard: Loading Model (Truck)
+# ══════════════════════════════════════════════════════════════════
+_LOADING_TRUCK_DISCLAIMER_TEXT = (
+    "DISCLAIMER: This is a faithful port of Wavin's verified AquaCell Loading Model workbook "
+    "(ASTM F2787 Truck Load Model), read cell-by-cell and cross-checked against the workbook's own "
+    "example values. It is a preliminary design check, not a stamped engineering design. Assumptions "
+    "carried over from the source workbook: only vertical pressure is considered (no side thrust or "
+    "moments); creep is not considered; 6 ft between wheels on an axle and 4 ft between tandem axles "
+    "(center to center); projected area is based on 2V:1H stress distribution with overlap areas "
+    "distributed evenly. THE ENGINEER OF RECORD IS SOLELY RESPONSIBLE FOR VERIFYING ALL LOADING "
+    "CONDITIONS, COVER DEPTHS, AND THE FINAL STRUCTURAL DESIGN using project-specific plans and "
+    "applicable codes/standards."
+)
+_LOADING_BOLD_TRIGGERS = ('THE ENGINEER OF RECORD',)
+
+
+def _draw_section_kv(c, y_top, title, rows, ncols=2):
+    """Shared section-table drawer used by the loading-model PDFs (same visual
+    language as build_buoyancy_pdf's inline draw_section, factored out here
+    since two PDF builders need it)."""
+    bar_h = 16
+    c.setFillColor(BLUE)
+    c.rect(LM, y_top - bar_h, CW, bar_h, fill=1, stroke=0)
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 9)
+    c.drawString(LM + 8, y_top - bar_h + 4, title)
+
+    n = len(rows)
+    nrows = math.ceil(n / ncols)
+    row_h = 20
+    body_h = nrows * row_h + 12
+    box_top = y_top - bar_h
+    box_bottom = box_top - body_h
+    c.setFillColor(LGRAY)
+    c.setStrokeColor(MGRAY)
+    c.setLineWidth(0.5)
+    c.rect(LM, box_bottom, CW, body_h, fill=1, stroke=1)
+
+    col_w = CW / ncols
+    for i, (lbl, val) in enumerate(rows):
+        col = i % ncols
+        row_idx = i // ncols
+        x = LM + 10 + col * col_w
+        ry = box_top - 14 - row_idx * row_h
+        c.setFillColor(GRAY)
+        c.setFont('Helvetica', 7)
+        c.drawString(x, ry, str(lbl).upper())
+        c.setFillColor(BLACK)
+        c.setFont('Helvetica-Bold', 8.5)
+        c.drawString(x, ry - 11, str(val))
+    return box_bottom - 8
+
+
+def _draw_fos_hero(c, y_top, value_display, sub_label, status, hero_h=64):
+    """Shared FoS hero box drawer used by the loading-model PDFs."""
+    if status == 'PASS':
+        bg, border, txt = LTGRN, GREEN, GREEN
+    elif status == 'FAIL':
+        bg, border, txt = colors.HexColor('#fee2e2'), RED, RED
+    else:
+        bg, border, txt = LGRAY, GRAY, GRAY
+
+    hero_bottom = y_top - hero_h
+    c.setFillColor(bg)
+    c.setStrokeColor(border)
+    c.setLineWidth(1)
+    c.rect(LM, hero_bottom, CW, hero_h, fill=1, stroke=1)
+    c.setFillColor(BLACK)
+    c.setFont('Helvetica-Bold', 24)
+    c.drawCentredString(PW / 2, hero_bottom + hero_h - 26, value_display)
+    c.setFillColor(GRAY)
+    c.setFont('Helvetica', 7.5)
+    c.drawCentredString(PW / 2, hero_bottom + hero_h - 40, sub_label)
+    c.setFillColor(txt)
+    c.setFont('Helvetica-Bold', 11)
+    c.drawCentredString(PW / 2, hero_bottom + 8, status)
+    return hero_bottom - 8
+
+
+def build_loading_truck_pdf(inputs, results, project_name=None):
+    """Single-page submittal-ready PDF for the ASTM F2787 Truck Load Model."""
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
+
+    band_h = 64
+    c.setFillColor(NAVY)
+    c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
+    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    if logo_path and os.path.exists(logo_path):
+        try:
+            img = ImageReader(logo_path)
+            c.drawImage(img, LM, PH - band_h + 8, width=160, height=46,
+                        preserveAspectRatio=True, mask='auto')
+        except Exception:
+            pass
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 14)
+    c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
+    c.setFont('Helvetica', 9)
+    c.setFillColor(colors.HexColor('#93c5fd'))
+    c.drawRightString(PW - RM, PH - 37, f"Loading Model — Truck ({results['traffic_load']}), ASTM F2787")
+    c.setFont('Helvetica', 7)
+    c.setFillColor(colors.HexColor('#94a3b8'))
+    c.drawRightString(PW - RM, PH - 50, generated_str)
+
+    y = PH - band_h - 10
+    if project_name:
+        c.setFillColor(GRAY)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM, y, f'Project: {project_name}')
+        y -= 16
+
+    design_rows = [
+        ('Traffic Load',           results['traffic_load']),
+        ('Axle Load',              f"{results['axle_lbs']:,.0f} lb ({results['axle_config']})"),
+        ('Wheel Load',             f"{results['wheel_lbs']:,.0f} lb"),
+        ('Tire Contact Dimensions', results['tire_dims']),
+        ('Tire Contact Area',      f"{results['tire_area_in2']:,.1f} in²"),
+        ('Configuration',          'SC — Standard' if results['config'] == 'SC' else 'EX — Extra Strong'),
+        ('Cover Depth',            f"{results['cover_ft']} ft ({results['cover_in']} in)"),
+        ('Unit Weight of Fill',    f"{results['fill_pcf']} pcf"),
+    ]
+    y = _draw_section_kv(c, y, 'DESIGN TRUCK', design_rows, ncols=2)
+
+    live_rows = [
+        ('Dynamic Allowance Factor, IM', f"{results['im_pct']}%"),
+        ('Multiple Presence Factor, m',  '1.2'),
+        ('Transverse Spread (wo)',       f"{results['wo_spread_in']} in"),
+        ('Longitudinal Spread (lo)',     f"{results['lo_spread_in']} in"),
+        ('Projected Area',               f"{results['proj_area_in2']:,.1f} in²"),
+        ('LLl (local)',                  f"{results['ll_local_lbs']:,.2f} lb"),
+        ('LLt (transverse)',             f"{results['ll_trans_lbs']:,.1f} lb"),
+        ('Factored Live Load',           f"{results['factored_ll_lbs']:,.1f} lb"),
+        ('Factored Live Load Pressure',  f"{results['ll_psi']} psi"),
+        ('Dead Load Pressure',           f"{results['dl_psi']} psi"),
+        ('Max. Compressive Strength',    f"{results['max_strength_psi']} psi"),
+        ('Max. Cover Depth',             f"{results['max_cover_ft']} ft"),
+    ]
+    y = _draw_section_kv(c, y, 'LIVE LOAD CALCULATION', live_rows, ncols=2)
+
+    fos_live_disp = f"{results['fos_live']:.2f}" if results['fos_live'] is not None else '—'
+    fos_dead_disp = f"{results['fos_dead']:.2f}" if results['fos_dead'] is not None else '—'
+
+    hero_w = (CW - 10) / 2.0
+    y_before_heroes = y
+    # Two side-by-side hero boxes: live (left), dead (right)
+    hero_h = 64
+    hero_bottom = y_before_heroes - hero_h
+
+    for i, (label, val, status) in enumerate([
+        (f"Live Load FoS (min {results['min_fos_live']})", fos_live_disp, results['status_live']),
+        (f"Dead Load FoS (min {results['min_fos_dead']})", fos_dead_disp, results['status_dead']),
+    ]):
+        box_x = LM + i * (hero_w + 10)
+        if status == 'PASS':
+            bg, border, txt = LTGRN, GREEN, GREEN
+        elif status == 'FAIL':
+            bg, border, txt = colors.HexColor('#fee2e2'), RED, RED
+        else:
+            bg, border, txt = LGRAY, GRAY, GRAY
+        c.setFillColor(bg)
+        c.setStrokeColor(border)
+        c.setLineWidth(1)
+        c.rect(box_x, hero_bottom, hero_w, hero_h, fill=1, stroke=1)
+        c.setFillColor(BLACK)
+        c.setFont('Helvetica-Bold', 22)
+        c.drawCentredString(box_x + hero_w / 2, hero_bottom + hero_h - 26, val)
+        c.setFillColor(GRAY)
+        c.setFont('Helvetica', 7)
+        c.drawCentredString(box_x + hero_w / 2, hero_bottom + hero_h - 39, label)
+        c.setFillColor(txt)
+        c.setFont('Helvetica-Bold', 10)
+        c.drawCentredString(box_x + hero_w / 2, hero_bottom + 8, status)
+
+    y = hero_bottom - 10
+
+    _draw_disclaimer_block(c, 40, disclaimer_lines_raw=_LOADING_TRUCK_DISCLAIMER_TEXT,
+                            bold_triggers=_LOADING_BOLD_TRIGGERS)
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
+# ══════════════════════════════════════════════════════════════════
+#  PDF BUILDER  —  Design Verification Dashboard: Loading Model (Outrigger)
+# ══════════════════════════════════════════════════════════════════
+_LOADING_OUTRIGGER_DISCLAIMER_TEXT = (
+    "DISCLAIMER: This is a faithful port of Wavin's verified AquaCell Loading Model workbook "
+    "(AquaCell Outrigger Load Model), read cell-by-cell and cross-checked against the workbook's own "
+    "example values. It is a preliminary design check, not a stamped engineering design. The source "
+    "workbook does NOT state a minimum required Factor of Safety for this outrigger check anywhere — "
+    "unlike the Truck model's explicit 1.75/1.95 minimums — so the Factor of Safety on this sheet is "
+    "shown as a calculated value only, with no PASS/FAIL judgment applied. Projected area is based on "
+    "simple 2V:1H stress distribution; only vertical pressure is considered (no side thrust or moments); "
+    "creep is not considered. THE ENGINEER OF RECORD IS SOLELY RESPONSIBLE FOR VERIFYING ALL LOADING "
+    "CONDITIONS, COVER DEPTHS, THE APPLICABLE MINIMUM FACTOR OF SAFETY, AND THE FINAL STRUCTURAL DESIGN "
+    "using project-specific plans and applicable codes/standards."
+)
+_LOADING_OUTRIGGER_BOLD_TRIGGERS = ('THE ENGINEER OF RECORD',)
+
+
+def build_loading_outrigger_pdf(inputs, results, project_name=None):
+    """Single-page submittal-ready PDF for the AquaCell Outrigger Load Model."""
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
+
+    band_h = 64
+    c.setFillColor(NAVY)
+    c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
+    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    if logo_path and os.path.exists(logo_path):
+        try:
+            img = ImageReader(logo_path)
+            c.drawImage(img, LM, PH - band_h + 8, width=160, height=46,
+                        preserveAspectRatio=True, mask='auto')
+        except Exception:
+            pass
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 14)
+    c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
+    c.setFont('Helvetica', 9)
+    c.setFillColor(colors.HexColor('#93c5fd'))
+    c.drawRightString(PW - RM, PH - 37, 'Loading Model — Outrigger / Crane Pad')
+    c.setFont('Helvetica', 7)
+    c.setFillColor(colors.HexColor('#94a3b8'))
+    c.drawRightString(PW - RM, PH - 50, generated_str)
+
+    y = PH - band_h - 10
+    if project_name:
+        c.setFillColor(GRAY)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM, y, f'Project: {project_name}')
+        y -= 16
+
+    pad_rows = [
+        ('Pad Shape',              results['pad_shape']),
+        ('Contact Area',           f"{results['contact_area_in2']:,.1f} in²"),
+        ('Configuration',          'SC — Standard' if results['config'] == 'SC' else 'EX — Extra Strong'),
+        ('Cover Depth',            f"{results['cover_ft']} ft ({results['cover_in']} in)"),
+        ('Unit Weight of Fill',    f"{results['fill_pcf']} pcf"),
+        ('Outrigger Load Factor',  f"{results['load_factor_pct']}%"),
+    ]
+    y = _draw_section_kv(c, y, 'OUTRIGGER PAD', pad_rows, ncols=2)
+
+    press_rows = [
+        ('Projected Area (spread at AquaCell)', f"{results['proj_area_in2']:,.1f} in²"),
+        ('Factored Pressure from Outrigger',    f"{results['factored_psi']} psi"),
+        ('Dead Load Pressure',                  f"{results['dl_psi']} psi"),
+        ('Max. Compressive Strength',           f"{results['max_strength_psi']} psi"),
+        ('Max. Cover Depth',                    f"{results['max_cover_ft']} ft"),
+    ]
+    y = _draw_section_kv(c, y, 'PRESSURE & SAFETY FACTOR', press_rows, ncols=2)
+
+    fos_disp = f"{results['fos']:.2f}" if results['fos'] is not None else '—'
+    y = _draw_fos_hero(c, y, fos_disp, 'Factor of Safety — no minimum specified in source workbook',
+                        'INFORMATIONAL ONLY', hero_h=64)
+
+    _draw_disclaimer_block(c, 40, disclaimer_lines_raw=_LOADING_OUTRIGGER_DISCLAIMER_TEXT,
+                            bold_triggers=_LOADING_OUTRIGGER_BOLD_TRIGGERS)
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
+# ══════════════════════════════════════════════════════════════════
 #  CALC ENGINE  —  single-tank calculation (returns dict)
 # ══════════════════════════════════════════════════════════════════
 def calc_tank(t):
@@ -1774,6 +2045,35 @@ def design_tools_download_pdf():
             if 'error' in result:
                 return jsonify(result), 400
             buffer = build_buoyancy_pdf(payload, result, project_name=project_name)
+            download_name = 'AquaCell_Buoyancy_Check.pdf'
+        elif calc_type == 'loading_truck':
+            traffic_load = payload.get('traffic_load', 'HS20')
+            cover_ft     = float(payload.get('cover_ft', 0) or 0)
+            config       = payload.get('config', 'SC')
+            fill_pcf     = float(payload.get('fill_pcf', _LL_FILL_PCF_DEFAULT) or _LL_FILL_PCF_DEFAULT)
+            if cover_ft <= 0:
+                return jsonify({'error': 'Enter a valid cover depth.'}), 400
+            result = calc_astm_f2787_truck(traffic_load, cover_ft, config, fill_pcf)
+            if result is None:
+                return jsonify({'error': 'Enter a valid cover depth.'}), 400
+            buffer = build_loading_truck_pdf(payload, result, project_name=project_name)
+            download_name = f"AquaCell_Loading_Truck_{result['traffic_load']}.pdf"
+        elif calc_type == 'loading_outrigger':
+            total_weight_lbs = float(payload.get('total_weight_lbs', 0) or 0)
+            pad_shape        = payload.get('pad_shape', 'Rectangular')
+            pad_length_in    = float(payload.get('pad_length_in', 0) or 0)
+            pad_width_in     = float(payload.get('pad_width_in', 0) or 0)
+            pad_diameter_in  = float(payload.get('pad_diameter_in', 0) or 0)
+            cover_ft         = float(payload.get('cover_ft', 0) or 0)
+            fill_pcf         = float(payload.get('fill_pcf', _LL_FILL_PCF_DEFAULT) or _LL_FILL_PCF_DEFAULT)
+            load_factor_pct  = float(payload.get('load_factor_pct', 75.0) or 75.0)
+            config           = payload.get('config', 'SC')
+            result = calc_outrigger_load(total_weight_lbs, pad_shape, pad_length_in, pad_width_in,
+                                          pad_diameter_in, cover_ft, fill_pcf, load_factor_pct, config)
+            if 'error' in result:
+                return jsonify(result), 400
+            buffer = build_loading_outrigger_pdf(payload, result, project_name=project_name)
+            download_name = 'AquaCell_Loading_Outrigger.pdf'
         else:
             return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
 
@@ -1781,7 +2081,7 @@ def design_tools_download_pdf():
             buffer,
             mimetype='application/pdf',
             as_attachment=True,
-            download_name='AquaCell_Buoyancy_Check.pdf'
+            download_name=download_name
         )
     except Exception as exc:
         import traceback

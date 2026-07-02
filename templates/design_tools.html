@@ -554,7 +554,18 @@
                     </div>
                 </div>
 
+                <div class="section-card">
+                    <div class="section-card-header">Project (optional — for PDF header)</div>
+                    <div class="section-card-body">
+                        <label>Project Name</label>
+                        <input type="text" id="lt_project_name" placeholder="e.g. Maple Ridge Retail Site">
+                    </div>
+                </div>
+
                 <button class="calc-btn" onclick="runLoadingTruck()">Calculate Truck Load</button>
+                <button class="calc-btn secondary" id="lt_pdf_btn" onclick="downloadLoadingTruckPDF()" disabled>
+                    ⬇ Download Submittal PDF
+                </button>
             </div>
 
             <div class="calc-results" id="lt_results">
@@ -616,7 +627,18 @@
                     </div>
                 </div>
 
+                <div class="section-card">
+                    <div class="section-card-header">Project (optional — for PDF header)</div>
+                    <div class="section-card-body">
+                        <label>Project Name</label>
+                        <input type="text" id="lo_project_name" placeholder="e.g. Maple Ridge Retail Site">
+                    </div>
+                </div>
+
                 <button class="calc-btn" onclick="runLoadingOutrigger()">Calculate Outrigger Load</button>
+                <button class="calc-btn secondary" id="lo_pdf_btn" onclick="downloadLoadingOutriggerPDF()" disabled>
+                    ⬇ Download Submittal PDF
+                </button>
             </div>
 
             <div class="calc-results" id="lo_results">
@@ -911,9 +933,83 @@
         }
     }
 
+    // ══════════════════ SHARED: Load-Spread Cross-Section Diagram ══════════════════
+    // Used by both the Truck and Outrigger loading models. Shows the small
+    // contact footprint (tire or pad) at grade spreading down through cover
+    // soil to the wider computed footprint at the top of the AquaCell, via
+    // 2V:1H distribution. This is a ONE-DIRECTION slice (illustrative), not
+    // a full 3D or to-scale rendering — both models produce a rectangular
+    // (or circular) footprint from two dimensions; this shows one of them.
+    function buildLoadSpreadSVG(topWidthIn, coverIn, bottomWidthIn, dimLabel) {
+        const svgW = 300, svgH = 340;
+        const topMargin = 50, bottomMargin = 40;
+        const usableH = svgH - topMargin - bottomMargin;
+
+        const maxHalfWidth = Math.max(topWidthIn, bottomWidthIn) / 2;
+        const usableHalfW = 110;
+        const scale = usableHalfW / Math.max(maxHalfWidth, 1);
+
+        const cx = svgW / 2;
+        const gradeY = topMargin;
+        const tankY  = topMargin + usableH;
+
+        const topHalfPx    = (topWidthIn / 2) * scale;
+        const bottomHalfPx = (bottomWidthIn / 2) * scale;
+
+        let parts = [];
+        parts.push(`<svg viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:280px;">`);
+
+        // sky
+        parts.push(`<rect x="0" y="0" width="${svgW}" height="${gradeY}" fill="#eff6ff"/>`);
+        // soil column
+        parts.push(`<rect x="0" y="${gradeY}" width="${svgW}" height="${tankY-gradeY}" fill="#d6c9a8"/>`);
+
+        // spread cone (dashed) from tire/pad edges down to tank-top edges
+        parts.push(`<line x1="${cx-topHalfPx}" y1="${gradeY}" x2="${cx-bottomHalfPx}" y2="${tankY}" stroke="#334155" stroke-width="1.25" stroke-dasharray="4,3"/>`);
+        parts.push(`<line x1="${cx+topHalfPx}" y1="${gradeY}" x2="${cx+bottomHalfPx}" y2="${tankY}" stroke="#334155" stroke-width="1.25" stroke-dasharray="4,3"/>`);
+
+        // tire / pad contact footprint at grade
+        parts.push(`<rect x="${cx-topHalfPx}" y="${gradeY-8}" width="${topHalfPx*2}" height="8" fill="#0f1e3c"/>`);
+        // downward load arrow into the contact footprint
+        parts.push(`<line x1="${cx}" y1="${gradeY-28}" x2="${cx}" y2="${gradeY-10}" stroke="#b91c1c" stroke-width="2.5"/>`);
+        parts.push(`<polygon points="${cx-5},${gradeY-10} ${cx+5},${gradeY-10} ${cx},${gradeY-2}" fill="#b91c1c"/>`);
+
+        // AquaCell band at tank-top depth
+        parts.push(`<rect x="${cx-bottomHalfPx}" y="${tankY}" width="${bottomHalfPx*2}" height="14" fill="#cbd5e1" stroke="#0f1e3c" stroke-width="1.5"/>`);
+        for (let i = 1; i < 4; i++) {
+            const gx = cx - bottomHalfPx + (bottomHalfPx*2/4)*i;
+            parts.push(`<line x1="${gx}" y1="${tankY}" x2="${gx}" y2="${tankY+14}" stroke="#94a3b8" stroke-width="0.75"/>`);
+        }
+        // downward pressure arrows into the AquaCell band
+        [0.3, 0.5, 0.7].forEach(f => {
+            const ax = cx - bottomHalfPx + bottomHalfPx*2*f;
+            parts.push(`<line x1="${ax}" y1="${tankY-16}" x2="${ax}" y2="${tankY-3}" stroke="#15803d" stroke-width="1.75"/>`);
+            parts.push(`<polygon points="${ax-3},${tankY-3} ${ax+3},${tankY-3} ${ax},${tankY+1}" fill="#15803d"/>`);
+        });
+
+        // grade line + label
+        parts.push(`<line x1="10" y1="${gradeY}" x2="${svgW-10}" y2="${gradeY}" stroke="#1e293b" stroke-width="2"/>`);
+        parts.push(`<text x="14" y="${gradeY-4}" font-size="9" fill="#1e293b">GRADE</text>`);
+
+        // dimension labels
+        parts.push(`<text x="${cx}" y="${gradeY-34}" font-size="8.5" fill="#0f1e3c" text-anchor="middle" font-weight="bold">${topWidthIn.toFixed(1)} in</text>`);
+        parts.push(`<text x="${cx}" y="${tankY+30}" font-size="8.5" fill="#0f1e3c" text-anchor="middle" font-weight="bold">${bottomWidthIn.toFixed(1)} in</text>`);
+        parts.push(`<text x="${cx}" y="${tankY+42}" font-size="8" fill="#6b7280" text-anchor="middle">${dimLabel} spread at AquaCell</text>`);
+        parts.push(`<text x="${svgW-14}" y="${(gradeY+tankY)/2}" font-size="8" fill="#475569" text-anchor="end">Cover</text>`);
+        parts.push(`<text x="${svgW-14}" y="${(gradeY+tankY)/2+10}" font-size="8" fill="#475569" text-anchor="end">${(coverIn/12).toFixed(2)} ft</text>`);
+
+        parts.push(`</svg>`);
+        return parts.join('');
+    }
+
     // ══════════════════ LOADING MODEL — TRUCK (ASTM F2787) ══════════════════
+    let ltLastInputs  = null;
+    let ltLastResults = null;
+
     async function runLoadingTruck() {
         const resultsDiv = document.getElementById('lt_results');
+        const pdfBtn = document.getElementById('lt_pdf_btn');
+        pdfBtn.disabled = true;
 
         const inputs = {
             traffic_load: document.getElementById('lt_traffic_load').value,
@@ -934,12 +1030,17 @@
 
             if (!resp.ok || data.error) {
                 resultsDiv.innerHTML = `<div class="error-box">${data.error || 'Calculation failed.'}</div>`;
+                ltLastInputs = null; ltLastResults = null;
                 return;
             }
 
+            ltLastInputs  = inputs;
+            ltLastResults = data;
+            pdfBtn.disabled = false;
             renderLoadingTruckResults(data);
         } catch (err) {
             resultsDiv.innerHTML = `<div class="error-box">Request failed: ${err.message}</div>`;
+            ltLastInputs = null; ltLastResults = null;
         }
     }
 
@@ -953,53 +1054,119 @@
             return `<span class="badge ${cls}">${status}</span>`;
         }
 
+        const diagramSvg = buildLoadSpreadSVG(
+            parseFloat(d.tire_dims.split('x')[1]) || (d.tire_area_in2 / (parseFloat(d.tire_dims) || 10)),
+            d.cover_in,
+            d.wo_spread_in,
+            'Transverse (wo)'
+        );
+
         resultsDiv.innerHTML = `
-            <div class="result-card">
-                <div class="fos-hero">
-                    <div class="fos-value">${d.fos_live !== null ? d.fos_live.toFixed(2) : '—'}</div>
-                    <div class="fos-label">Live Load Factor of Safety (min required: ${d.min_fos_live})</div>
-                    <div style="margin-top:10px;">${badgeHtml(d.status_live)}</div>
+            <div class="results-flex">
+                <div class="results-data">
+                    <div class="result-card">
+                        <div class="fos-hero">
+                            <div class="fos-value">${d.fos_live !== null ? d.fos_live.toFixed(2) : '—'}</div>
+                            <div class="fos-label">Live Load Factor of Safety (min required: ${d.min_fos_live})</div>
+                            <div style="margin-top:10px;">${badgeHtml(d.status_live)}</div>
+                        </div>
+                    </div>
+
+                    <div class="result-card">
+                        <div class="fos-hero">
+                            <div class="fos-value" style="font-size:28px;">${d.fos_dead !== null ? d.fos_dead.toFixed(2) : '—'}</div>
+                            <div class="fos-label">Dead Load Factor of Safety (min required: ${d.min_fos_dead})</div>
+                            <div style="margin-top:10px;">${badgeHtml(d.status_dead)}</div>
+                        </div>
+                    </div>
+
+                    <div class="result-card">
+                        <h3>Design Truck</h3>
+                        <div class="result-row"><span>Traffic Load</span><span class="val">${d.traffic_load}</span></div>
+                        <div class="result-row"><span>Axle Load</span><span class="val">${d.axle_lbs.toLocaleString()} lb (${d.axle_config})</span></div>
+                        <div class="result-row"><span>Wheel Load</span><span class="val">${d.wheel_lbs.toLocaleString()} lb</span></div>
+                        <div class="result-row"><span>Tire Contact Dimensions</span><span class="val">${d.tire_dims}</span></div>
+                        <div class="result-row"><span>Tire Contact Area</span><span class="val">${d.tire_area_in2} in²</span></div>
+                        <div class="result-row"><span>Cover Depth</span><span class="val">${d.cover_ft} ft (${d.cover_in} in)</span></div>
+                        <div class="result-row"><span>Unit Weight of Fill</span><span class="val">${d.fill_pcf} pcf</span></div>
+                    </div>
+
+                    <div class="result-card">
+                        <h3>Live Load Calculation</h3>
+                        <div class="result-row"><span>Dynamic Allowance Factor, IM</span><span class="val">${d.im_pct}%</span></div>
+                        <div class="result-row"><span>Multiple Presence Factor, m</span><span class="val">1.2</span></div>
+                        <div class="result-row"><span>Transverse Spread (wo)</span><span class="val">${d.wo_spread_in} in</span></div>
+                        <div class="result-row"><span>Longitudinal Spread (lo)</span><span class="val">${d.lo_spread_in} in</span></div>
+                        <div class="result-row"><span>Projected Area</span><span class="val">${d.proj_area_in2.toLocaleString()} in²</span></div>
+                        <div class="result-row"><span>LLl (local)</span><span class="val">${d.ll_local_lbs} lb</span></div>
+                        <div class="result-row"><span>LLt (transverse)</span><span class="val">${d.ll_trans_lbs.toLocaleString()} lb</span></div>
+                        <div class="result-row"><span><strong>Factored Live Load</strong></span><span class="val">${d.factored_ll_lbs.toLocaleString()} lb</span></div>
+                        <div class="result-row"><span><strong>Factored Live Load Pressure</strong></span><span class="val">${d.ll_psi} psi</span></div>
+                        <div class="result-row"><span>Dead Load Pressure</span><span class="val">${d.dl_psi} psi</span></div>
+                        <div class="result-row"><span>Max. Compressive Strength (${d.config})</span><span class="val">${d.max_strength_psi} psi</span></div>
+                        <div class="result-row"><span>Max. Cover Depth (${d.config})</span><span class="val">${d.max_cover_ft} ft</span></div>
+                    </div>
                 </div>
-            </div>
 
-            <div class="result-card">
-                <div class="fos-hero">
-                    <div class="fos-value" style="font-size:28px;">${d.fos_dead !== null ? d.fos_dead.toFixed(2) : '—'}</div>
-                    <div class="fos-label">Dead Load Factor of Safety (min required: ${d.min_fos_dead})</div>
-                    <div style="margin-top:10px;">${badgeHtml(d.status_dead)}</div>
+                <div class="results-diagram-col">
+                    <div class="diagram-box">
+                        <h3>Load Spread (Not to Scale)</h3>
+                        ${diagramSvg}
+                        <div class="diagram-caption">
+                            Illustrative — shows the transverse (wo) direction only. The tire spreads
+                            through the fill via 2V:1H distribution to the projected width shown above
+                            the AquaCell. The longitudinal (lo) spread is a separate dimension, shown
+                            numerically in the results.
+                        </div>
+                    </div>
                 </div>
-            </div>
-
-            <div class="result-card">
-                <h3>Design Truck</h3>
-                <div class="result-row"><span>Traffic Load</span><span class="val">${d.traffic_load}</span></div>
-                <div class="result-row"><span>Axle Load</span><span class="val">${d.axle_lbs.toLocaleString()} lb (${d.axle_config})</span></div>
-                <div class="result-row"><span>Wheel Load</span><span class="val">${d.wheel_lbs.toLocaleString()} lb</span></div>
-                <div class="result-row"><span>Tire Contact Dimensions</span><span class="val">${d.tire_dims}</span></div>
-                <div class="result-row"><span>Tire Contact Area</span><span class="val">${d.tire_area_in2} in²</span></div>
-                <div class="result-row"><span>Cover Depth</span><span class="val">${d.cover_ft} ft (${d.cover_in} in)</span></div>
-                <div class="result-row"><span>Unit Weight of Fill</span><span class="val">${d.fill_pcf} pcf</span></div>
-            </div>
-
-            <div class="result-card">
-                <h3>Live Load Calculation</h3>
-                <div class="result-row"><span>Dynamic Allowance Factor, IM</span><span class="val">${d.im_pct}%</span></div>
-                <div class="result-row"><span>Multiple Presence Factor, m</span><span class="val">1.2</span></div>
-                <div class="result-row"><span>Transverse Spread (wo)</span><span class="val">${d.wo_spread_in} in</span></div>
-                <div class="result-row"><span>Longitudinal Spread (lo)</span><span class="val">${d.lo_spread_in} in</span></div>
-                <div class="result-row"><span>Projected Area</span><span class="val">${d.proj_area_in2.toLocaleString()} in²</span></div>
-                <div class="result-row"><span>LLl (local)</span><span class="val">${d.ll_local_lbs} lb</span></div>
-                <div class="result-row"><span>LLt (transverse)</span><span class="val">${d.ll_trans_lbs.toLocaleString()} lb</span></div>
-                <div class="result-row"><span><strong>Factored Live Load</strong></span><span class="val">${d.factored_ll_lbs.toLocaleString()} lb</span></div>
-                <div class="result-row"><span><strong>Factored Live Load Pressure</strong></span><span class="val">${d.ll_psi} psi</span></div>
-                <div class="result-row"><span>Dead Load Pressure</span><span class="val">${d.dl_psi} psi</span></div>
-                <div class="result-row"><span>Max. Compressive Strength (${d.config})</span><span class="val">${d.max_strength_psi} psi</span></div>
-                <div class="result-row"><span>Max. Cover Depth (${d.config})</span><span class="val">${d.max_cover_ft} ft</span></div>
             </div>
         `;
     }
 
+    async function downloadLoadingTruckPDF() {
+        if (!ltLastInputs || !ltLastResults) return;
+
+        const projectName = document.getElementById('lt_project_name').value || null;
+        const pdfBtn = document.getElementById('lt_pdf_btn');
+        const originalText = pdfBtn.textContent;
+        pdfBtn.disabled = true;
+        pdfBtn.textContent = 'Generating…';
+
+        try {
+            const resp = await fetch('/design-tools/download_pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calc_type: 'loading_truck', inputs: ltLastInputs, project_name: projectName })
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                alert(err.error || 'PDF generation failed.');
+                return;
+            }
+
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `AquaCell_Loading_Truck_${ltLastResults.traffic_load}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('PDF request failed: ' + err.message);
+        } finally {
+            pdfBtn.disabled = false;
+            pdfBtn.textContent = originalText;
+        }
+    }
+
     // ══════════════════ LOADING MODEL — OUTRIGGER ══════════════════
+    let loLastInputs  = null;
+    let loLastResults = null;
+
     function toggleOutriggerPadFields() {
         const shape = document.getElementById('lo_pad_shape').value;
         document.getElementById('lo_rect_fields').style.display = (shape === 'Rectangular') ? 'block' : 'none';
@@ -1008,6 +1175,8 @@
 
     async function runLoadingOutrigger() {
         const resultsDiv = document.getElementById('lo_results');
+        const pdfBtn = document.getElementById('lo_pdf_btn');
+        pdfBtn.disabled = true;
 
         const inputs = {
             total_weight_lbs: document.getElementById('lo_total_weight').value || 0,
@@ -1033,48 +1202,124 @@
 
             if (!resp.ok || data.error) {
                 resultsDiv.innerHTML = `<div class="error-box">${data.error || 'Calculation failed.'}</div>`;
+                loLastInputs = null; loLastResults = null;
                 return;
             }
 
+            loLastInputs  = inputs;
+            loLastResults = data;
+            pdfBtn.disabled = false;
             renderLoadingOutriggerResults(data);
         } catch (err) {
             resultsDiv.innerHTML = `<div class="error-box">Request failed: ${err.message}</div>`;
+            loLastInputs = null; loLastResults = null;
         }
     }
 
     function renderLoadingOutriggerResults(d) {
         const resultsDiv = document.getElementById('lo_results');
 
+        let topWidthIn, dimLabel;
+        if (d.pad_shape === 'Circular') {
+            topWidthIn = Math.sqrt(d.contact_area_in2 * 4 / Math.PI);
+            dimLabel = 'Diameter';
+        } else {
+            topWidthIn = document.getElementById('lo_pad_length').value ?
+                parseFloat(document.getElementById('lo_pad_length').value) :
+                Math.sqrt(d.contact_area_in2);
+            dimLabel = 'Length';
+        }
+        // 2V:1H distribution grows this dimension by exactly cover_in
+        // (matches the workbook's O5/O6 projected-area formulas exactly).
+        const bottomWidthExact = topWidthIn + d.cover_in;
+
+        const diagramSvg = buildLoadSpreadSVG(topWidthIn, d.cover_in, bottomWidthExact, dimLabel);
+
         resultsDiv.innerHTML = `
-            <div class="result-card">
-                <div class="fos-hero">
-                    <div class="fos-value">${d.fos !== null ? d.fos.toFixed(2) : '—'}</div>
-                    <div class="fos-label">Factor of Safety — no minimum specified in source workbook</div>
-                    <div style="margin-top:10px;"><span class="badge badge-na">INFORMATIONAL ONLY</span></div>
+            <div class="results-flex">
+                <div class="results-data">
+                    <div class="result-card">
+                        <div class="fos-hero">
+                            <div class="fos-value">${d.fos !== null ? d.fos.toFixed(2) : '—'}</div>
+                            <div class="fos-label">Factor of Safety — no minimum specified in source workbook</div>
+                            <div style="margin-top:10px;"><span class="badge badge-na">INFORMATIONAL ONLY</span></div>
+                        </div>
+                    </div>
+
+                    <div class="result-card">
+                        <h3>Outrigger Pad</h3>
+                        <div class="result-row"><span>Pad Shape</span><span class="val">${d.pad_shape}</span></div>
+                        <div class="result-row"><span>Contact Area</span><span class="val">${d.contact_area_in2.toLocaleString()} in²</span></div>
+                        <div class="result-row"><span>Cover Depth</span><span class="val">${d.cover_ft} ft (${d.cover_in} in)</span></div>
+                        <div class="result-row"><span>Unit Weight of Fill</span><span class="val">${d.fill_pcf} pcf</span></div>
+                        <div class="result-row"><span>Outrigger Load Factor</span><span class="val">${d.load_factor_pct}%</span></div>
+                    </div>
+
+                    <div class="result-card">
+                        <h3>Pressure &amp; Safety Factor</h3>
+                        <div class="result-row"><span>Projected Area (spread at AquaCell)</span><span class="val">${d.proj_area_in2.toLocaleString()} in²</span></div>
+                        <div class="result-row"><span><strong>Factored Pressure from Outrigger</strong></span><span class="val">${d.factored_psi} psi</span></div>
+                        <div class="result-row"><span>Dead Load Pressure</span><span class="val">${d.dl_psi} psi</span></div>
+                        <div class="result-row"><span>Max. Compressive Strength (${d.config})</span><span class="val">${d.max_strength_psi} psi</span></div>
+                        <div class="result-row"><span>Max. Cover Depth (${d.config})</span><span class="val">${d.max_cover_ft} ft</span></div>
+                    </div>
+                </div>
+
+                <div class="results-diagram-col">
+                    <div class="diagram-box">
+                        <h3>Load Spread (Not to Scale)</h3>
+                        ${diagramSvg}
+                        <div class="diagram-caption">
+                            Illustrative — shows one dimension of the pad spreading through the fill
+                            via 2V:1H distribution to the projected width shown above the AquaCell.
+                        </div>
+                    </div>
                 </div>
             </div>
-
-            <div class="result-card">
-                <h3>Outrigger Pad</h3>
-                <div class="result-row"><span>Pad Shape</span><span class="val">${d.pad_shape}</span></div>
-                <div class="result-row"><span>Contact Area</span><span class="val">${d.contact_area_in2.toLocaleString()} in²</span></div>
-                <div class="result-row"><span>Cover Depth</span><span class="val">${d.cover_ft} ft (${d.cover_in} in)</span></div>
-                <div class="result-row"><span>Unit Weight of Fill</span><span class="val">${d.fill_pcf} pcf</span></div>
-                <div class="result-row"><span>Outrigger Load Factor</span><span class="val">${d.load_factor_pct}%</span></div>
-            </div>
-
-            <div class="result-card">
-                <h3>Pressure &amp; Safety Factor</h3>
-                <div class="result-row"><span>Projected Area (spread at AquaCell)</span><span class="val">${d.proj_area_in2.toLocaleString()} in²</span></div>
-                <div class="result-row"><span><strong>Factored Pressure from Outrigger</strong></span><span class="val">${d.factored_psi} psi</span></div>
-                <div class="result-row"><span>Dead Load Pressure</span><span class="val">${d.dl_psi} psi</span></div>
-                <div class="result-row"><span>Max. Compressive Strength (${d.config})</span><span class="val">${d.max_strength_psi} psi</span></div>
-                <div class="result-row"><span>Max. Cover Depth (${d.config})</span><span class="val">${d.max_cover_ft} ft</span></div>
-            </div>
         `;
+    }
+
+    async function downloadLoadingOutriggerPDF() {
+        if (!loLastInputs || !loLastResults) return;
+
+        const projectName = document.getElementById('lo_project_name').value || null;
+        const pdfBtn = document.getElementById('lo_pdf_btn');
+        const originalText = pdfBtn.textContent;
+        pdfBtn.disabled = true;
+        pdfBtn.textContent = 'Generating…';
+
+        try {
+            const resp = await fetch('/design-tools/download_pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calc_type: 'loading_outrigger', inputs: loLastInputs, project_name: projectName })
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                alert(err.error || 'PDF generation failed.');
+                return;
+            }
+
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'AquaCell_Loading_Outrigger.pdf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('PDF request failed: ' + err.message);
+        } finally {
+            pdfBtn.disabled = false;
+            pdfBtn.textContent = originalText;
+        }
     }
 </script>
 
 </body>
 </html>
+
 
