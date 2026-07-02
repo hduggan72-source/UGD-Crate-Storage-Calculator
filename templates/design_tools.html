@@ -940,8 +940,9 @@
     // 2V:1H distribution. This is a ONE-DIRECTION slice (illustrative), not
     // a full 3D or to-scale rendering — both models produce a rectangular
     // (or circular) footprint from two dimensions; this shows one of them.
-    function buildLoadSpreadSVG(topWidthIn, coverIn, bottomWidthIn, dimLabel) {
-        const svgW = 300, svgH = 340;
+    function buildLoadSpreadSVG(topWidthIn, coverIn, bottomWidthIn, dimLabel, svgH) {
+        const svgW = 300;
+        svgH = svgH || 340;
         const topMargin = 50, bottomMargin = 40;
         const usableH = svgH - topMargin - bottomMargin;
 
@@ -1054,12 +1055,12 @@
             return `<span class="badge ${cls}">${status}</span>`;
         }
 
-        const diagramSvg = buildLoadSpreadSVG(
-            parseFloat(d.tire_dims.split('x')[1]) || (d.tire_area_in2 / (parseFloat(d.tire_dims) || 10)),
-            d.cover_in,
-            d.wo_spread_in,
-            'Transverse (wo)'
-        );
+        const dimsParts = d.tire_dims.replace(/"/g, '').split('x').map(s => parseFloat(s.trim()));
+        const loTopIn = dimsParts[0];
+        const woTopIn = dimsParts.length > 1 ? dimsParts[1] : dimsParts[0];
+
+        const diagramSvgWo = buildLoadSpreadSVG(woTopIn, d.cover_in, d.wo_spread_in, 'Transverse (wo)', 230);
+        const diagramSvgLo = buildLoadSpreadSVG(loTopIn, d.cover_in, d.lo_spread_in, 'Longitudinal (lo)', 230);
 
         resultsDiv.innerHTML = `
             <div class="results-flex">
@@ -1111,12 +1112,12 @@
                 <div class="results-diagram-col">
                     <div class="diagram-box">
                         <h3>Load Spread (Not to Scale)</h3>
-                        ${diagramSvg}
+                        ${diagramSvgWo}
+                        <div class="diagram-caption" style="margin-bottom:14px;">Transverse (wo)</div>
+                        ${diagramSvgLo}
                         <div class="diagram-caption">
-                            Illustrative — shows the transverse (wo) direction only. The tire spreads
-                            through the fill via 2V:1H distribution to the projected width shown above
-                            the AquaCell. The longitudinal (lo) spread is a separate dimension, shown
-                            numerically in the results.
+                            Longitudinal (lo). Both directions spread through the fill via 2V:1H
+                            distribution to the projected widths shown above the AquaCell.
                         </div>
                     </div>
                 </div>
@@ -1219,21 +1220,25 @@
     function renderLoadingOutriggerResults(d) {
         const resultsDiv = document.getElementById('lo_results');
 
-        let topWidthIn, dimLabel;
+        // Use the actual submitted inputs (loLastInputs), not whatever's
+        // currently sitting in the form fields — those could have been
+        // edited since the last calculation ran.
+        let diagramsHtml, captionHtml;
         if (d.pad_shape === 'Circular') {
-            topWidthIn = Math.sqrt(d.contact_area_in2 * 4 / Math.PI);
-            dimLabel = 'Diameter';
+            const diamIn = parseFloat(loLastInputs.pad_diameter_in) || Math.sqrt(d.contact_area_in2 * 4 / Math.PI);
+            const bottomIn = diamIn + d.cover_in;
+            diagramsHtml = buildLoadSpreadSVG(diamIn, d.cover_in, bottomIn, 'Diameter');
+            captionHtml = 'A circular pad spreads identically in every direction, so only one cross-section is shown.';
         } else {
-            topWidthIn = document.getElementById('lo_pad_length').value ?
-                parseFloat(document.getElementById('lo_pad_length').value) :
-                Math.sqrt(d.contact_area_in2);
-            dimLabel = 'Length';
+            const lengthIn = parseFloat(loLastInputs.pad_length_in) || Math.sqrt(d.contact_area_in2);
+            const widthIn  = parseFloat(loLastInputs.pad_width_in)  || Math.sqrt(d.contact_area_in2);
+            const bottomLengthIn = lengthIn + d.cover_in;
+            const bottomWidthIn  = widthIn + d.cover_in;
+            diagramsHtml = buildLoadSpreadSVG(lengthIn, d.cover_in, bottomLengthIn, 'Length', 230) +
+                '<div class="diagram-caption" style="margin-bottom:14px;">Length</div>' +
+                buildLoadSpreadSVG(widthIn, d.cover_in, bottomWidthIn, 'Width', 230);
+            captionHtml = 'Width. Both directions spread through the fill via 2V:1H distribution to the projected widths shown above the AquaCell.';
         }
-        // 2V:1H distribution grows this dimension by exactly cover_in
-        // (matches the workbook's O5/O6 projected-area formulas exactly).
-        const bottomWidthExact = topWidthIn + d.cover_in;
-
-        const diagramSvg = buildLoadSpreadSVG(topWidthIn, d.cover_in, bottomWidthExact, dimLabel);
 
         resultsDiv.innerHTML = `
             <div class="results-flex">
@@ -1268,10 +1273,9 @@
                 <div class="results-diagram-col">
                     <div class="diagram-box">
                         <h3>Load Spread (Not to Scale)</h3>
-                        ${diagramSvg}
+                        ${diagramsHtml}
                         <div class="diagram-caption">
-                            Illustrative — shows one dimension of the pad spreading through the fill
-                            via 2V:1H distribution to the projected width shown above the AquaCell.
+                            ${captionHtml}
                         </div>
                     </div>
                 </div>

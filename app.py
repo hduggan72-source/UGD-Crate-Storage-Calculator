@@ -1044,6 +1044,32 @@ def _draw_subsequent_header(c, logo_path, project_name, generated_str, section_t
     return PH - band_h - 12
 
 
+def _wrap_disclaimer_lines(text, font_sz=6.5):
+    """Word-wrap disclaimer text to CW - 14pt, using pdfmetrics (no canvas needed)."""
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+    max_w = CW - 14
+    words = text.split()
+    lines = []
+    cur = ''
+    for w in words:
+        test = (cur + ' ' + w).strip()
+        if stringWidth(test, 'Helvetica', font_sz) <= max_w:
+            cur = test
+        else:
+            if cur:
+                lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    return lines
+
+
+def _disclaimer_box_height(text, font_sz=6.5, line_h=9, pad=7):
+    """Height the disclaimer box will occupy, without drawing anything —
+    lets PDF builders reserve exactly the right amount of space above it."""
+    return len(_wrap_disclaimer_lines(text, font_sz)) * line_h + pad * 2
+
+
 def _draw_disclaimer_block(c, y_bottom, disclaimer_lines_raw=None, bold_triggers=None):
     """
     Render the full disclaimer box so its BOTTOM edge sits at y_bottom.
@@ -1067,24 +1093,8 @@ def _draw_disclaimer_block(c, y_bottom, disclaimer_lines_raw=None, bold_triggers
     font_sz  = 6.5
     line_h   = 9
     pad      = 7
-    max_w    = CW - pad * 2
 
-    # Word-wrap
-    c.setFont('Helvetica', font_sz)
-    words = disclaimer_lines_raw.split()
-    lines = []
-    cur   = ''
-    for w in words:
-        test = (cur + ' ' + w).strip()
-        if c.stringWidth(test, 'Helvetica', font_sz) <= max_w:
-            cur = test
-        else:
-            if cur:
-                lines.append(cur)
-            cur = w
-    if cur:
-        lines.append(cur)
-
+    lines   = _wrap_disclaimer_lines(disclaimer_lines_raw, font_sz)
     box_h   = len(lines) * line_h + pad * 2
     box_top = y_bottom + box_h
 
@@ -1137,6 +1147,204 @@ _BUOYANCY_DISCLAIMER_TEXT = (
     "project-specific geotechnical data and applicable codes/standards."
 )
 _BUOYANCY_BOLD_TRIGGERS = ('THE ENGINEER OF RECORD', 'VERIFYING ALL SOIL')
+
+
+def _draw_load_spread_diagram_pdf(c, x, y_top, w, h, top_width_in, cover_in, bottom_width_in, dim_label):
+    """
+    ReportLab canvas version of the web buildLoadSpreadSVG() diagram — a tire/pad
+    contact footprint at grade spreading via 2V:1H distribution through cover
+    soil to the wider projected footprint at the AquaCell. Drawn inside the
+    box [x, y_top-h, x+w, y_top]. Illustrative, one dimension at a time.
+    """
+    top_margin = 22
+    bottom_margin = 30
+    usable_h = h - top_margin - bottom_margin
+    grade_y = y_top - top_margin
+    tank_y  = grade_y - usable_h
+
+    max_half_w = max(top_width_in, bottom_width_in) / 2.0
+    usable_half_w = (w / 2.0) - 12
+    scale = usable_half_w / max(max_half_w, 1.0)
+
+    cx = x + w / 2.0
+    top_half_px = (top_width_in / 2.0) * scale
+    bot_half_px = (bottom_width_in / 2.0) * scale
+
+    # soil column
+    c.setFillColor(colors.HexColor('#d6c9a8'))
+    c.rect(x, tank_y, w, grade_y - tank_y, fill=1, stroke=0)
+
+    # spread cone (dashed)
+    c.setStrokeColor(colors.HexColor('#334155'))
+    c.setLineWidth(0.75)
+    c.setDash([3, 2])
+    c.line(cx - top_half_px, grade_y, cx - bot_half_px, tank_y)
+    c.line(cx + top_half_px, grade_y, cx + bot_half_px, tank_y)
+    c.setDash([])
+
+    # contact footprint bar at grade
+    c.setFillColor(NAVY)
+    c.rect(cx - top_half_px, grade_y, top_half_px * 2, 4, fill=1, stroke=0)
+
+    # load arrow (red) down into footprint
+    c.setStrokeColor(RED)
+    c.setLineWidth(1.25)
+    c.line(cx, grade_y + 15, cx, grade_y + 6)
+    c.setFillColor(RED)
+    p = c.beginPath()
+    p.moveTo(cx - 3, grade_y + 6)
+    p.lineTo(cx + 3, grade_y + 6)
+    p.lineTo(cx, grade_y + 1)
+    p.close()
+    c.drawPath(p, fill=1, stroke=0)
+
+    # AquaCell band at tank-top depth
+    c.setFillColor(colors.HexColor('#cbd5e1'))
+    c.setStrokeColor(NAVY)
+    c.setLineWidth(0.75)
+    c.rect(cx - bot_half_px, tank_y - 8, bot_half_px * 2, 8, fill=1, stroke=1)
+
+    # pressure arrows (green) into the band
+    c.setFillColor(GREEN)
+    c.setStrokeColor(GREEN)
+    c.setLineWidth(1.0)
+    for frac in (0.3, 0.5, 0.7):
+        ax = cx - bot_half_px + bot_half_px * 2 * frac
+        c.line(ax, tank_y + 9, ax, tank_y + 1)
+        p2 = c.beginPath()
+        p2.moveTo(ax - 2, tank_y + 1)
+        p2.lineTo(ax + 2, tank_y + 1)
+        p2.lineTo(ax, tank_y - 2)
+        p2.close()
+        c.drawPath(p2, fill=1, stroke=0)
+
+    # grade line + label
+    c.setStrokeColor(colors.HexColor('#1e293b'))
+    c.setLineWidth(1.0)
+    c.line(x, grade_y, x + w, grade_y)
+    c.setFillColor(colors.HexColor('#1e293b'))
+    c.setFont('Helvetica-Bold', 5.5)
+    c.drawString(x + 2, grade_y + 2, 'GRADE')
+
+    # dimension labels
+    c.setFillColor(NAVY)
+    c.setFont('Helvetica-Bold', 6.5)
+    c.drawCentredString(cx, grade_y + 20, f'{top_width_in:.1f} in')
+    c.drawCentredString(cx, tank_y - 18, f'{bottom_width_in:.1f} in')
+    c.setFillColor(GRAY)
+    c.setFont('Helvetica', 5.5)
+    c.drawCentredString(cx, tank_y - 27, f'{dim_label} spread at AquaCell')
+    c.setFont('Helvetica', 5.5)
+    c.drawRightString(x + w - 2, (grade_y + tank_y) / 2 + 4, 'Cover')
+    c.drawRightString(x + w - 2, (grade_y + tank_y) / 2 - 4, f'{cover_in / 12.0:.2f} ft')
+
+
+def _draw_buoyancy_diagram_pdf(c, x, y_top, w, h, r):
+    """ReportLab canvas version of the web buoyancy cross-section diagram."""
+    top_margin = 20
+    bottom_margin = 8
+    usable_h = h - top_margin - bottom_margin
+
+    top_tank_depth = r['top_of_tank_depth_ft']
+    bot_tank_depth = r['bottom_of_tank_depth_ft']
+    gw_depth       = r['gw_depth_ft']
+
+    max_ref = max(bot_tank_depth, gw_depth, 1)
+    total_depth_shown = max_ref * 1.2
+    px_per_ft = usable_h / total_depth_shown
+
+    def y_at(depth_ft):
+        return (y_top - top_margin) - depth_ft * px_per_ft
+
+    box_left  = x + w * 0.16
+    box_right = x + w * 0.84
+    box_w     = box_right - box_left
+
+    grade_y    = y_at(0)
+    top_tank_y = y_at(top_tank_depth)
+    bot_tank_y = y_at(bot_tank_depth)
+    gw_shown   = min(gw_depth, total_depth_shown)
+    gw_y       = y_at(gw_shown)
+
+    soil_dry_bottom_depth = min(gw_depth, top_tank_depth)
+    soil_dry_bottom_y = y_at(soil_dry_bottom_depth)
+    has_soil_submerged = gw_depth < top_tank_depth
+
+    # dry soil band
+    c.setFillColor(colors.HexColor('#d6c9a8'))
+    c.rect(box_left, soil_dry_bottom_y, box_w, grade_y - soil_dry_bottom_y, fill=1, stroke=0)
+
+    # submerged soil band
+    if has_soil_submerged:
+        c.setFillColor(colors.HexColor('#a8967a'))
+        c.rect(box_left, top_tank_y, box_w, soil_dry_bottom_y - top_tank_y, fill=1, stroke=0)
+
+    # tank rect + illustrative crate grid
+    c.setFillColor(colors.HexColor('#cbd5e1'))
+    c.setStrokeColor(NAVY)
+    c.setLineWidth(0.85)
+    c.rect(box_left, bot_tank_y, box_w, top_tank_y - bot_tank_y, fill=1, stroke=1)
+    c.setStrokeColor(colors.HexColor('#94a3b8'))
+    c.setLineWidth(0.35)
+    for i in range(1, 4):
+        gx = box_left + (box_w / 4.0) * i
+        c.line(gx, bot_tank_y, gx, top_tank_y)
+
+    # submerged tank tint
+    if r.get('submerged_height_ft', 0) > 0:
+        sub_top_depth = max(gw_depth, top_tank_depth)
+        sub_top_y = y_at(sub_top_depth)
+        c.setFillColor(colors.Color(0.23, 0.51, 0.96, alpha=0.28))
+        c.rect(box_left, bot_tank_y, box_w, sub_top_y - bot_tank_y, fill=1, stroke=0)
+
+    # groundwater dashed line
+    if gw_depth <= total_depth_shown:
+        c.setStrokeColor(colors.HexColor('#2563eb'))
+        c.setLineWidth(0.85)
+        c.setDash([3, 2])
+        c.line(box_left - 6, gw_y, box_right + 6, gw_y)
+        c.setDash([])
+        c.setFillColor(colors.HexColor('#2563eb'))
+        c.setFont('Helvetica', 5.5)
+        c.drawRightString(box_left - 8, gw_y - 2, 'GW')
+
+    # grade line + label
+    c.setStrokeColor(colors.HexColor('#1e293b'))
+    c.setLineWidth(1.0)
+    c.line(box_left - 12, grade_y, box_right + 12, grade_y)
+    c.setFillColor(colors.HexColor('#1e293b'))
+    c.setFont('Helvetica-Bold', 5.5)
+    c.drawRightString(box_left - 14, grade_y + 2, 'GRADE')
+
+    # resisting force arrows (green, down into top of tank)
+    c.setFillColor(GREEN)
+    c.setStrokeColor(GREEN)
+    c.setLineWidth(0.9)
+    for frac in (0.25, 0.5, 0.75):
+        ax = box_left + box_w * frac
+        c.line(ax, top_tank_y + 12, ax, top_tank_y + 2)
+        p = c.beginPath()
+        p.moveTo(ax - 2, top_tank_y + 2)
+        p.lineTo(ax + 2, top_tank_y + 2)
+        p.lineTo(ax, top_tank_y - 1)
+        p.close()
+        c.drawPath(p, fill=1, stroke=0)
+
+    # uplift arrows (blue, up into bottom of tank) if submerged
+    if r.get('f_up_lbs', 0) > 0:
+        blue = colors.HexColor('#2563eb')
+        c.setFillColor(blue)
+        c.setStrokeColor(blue)
+        for frac in (0.25, 0.5, 0.75):
+            ax = box_left + box_w * frac
+            c.line(ax, bot_tank_y - 12, ax, bot_tank_y - 2)
+            p2 = c.beginPath()
+            p2.moveTo(ax - 2, bot_tank_y - 2)
+            p2.lineTo(ax + 2, bot_tank_y - 2)
+            p2.lineTo(ax, bot_tank_y + 1)
+            p2.close()
+            c.drawPath(p2, fill=1, stroke=0)
+
 
 
 def build_buoyancy_pdf(inputs, results, project_name=None):
@@ -1279,6 +1487,31 @@ def build_buoyancy_pdf(inputs, results, project_name=None):
     c.drawCentredString(PW / 2, hero_bottom + 8, status)
 
     y = hero_bottom - 10
+
+    # ── Schematic cross-section (sized to use exactly the space available
+    #    above the disclaimer, computed from its real wrapped height so the
+    #    two never collide regardless of how long the disclaimer text is) ──
+    disc_h = _disclaimer_box_height(_BUOYANCY_DISCLAIMER_TEXT)
+    disc_top = 40 + disc_h
+    available = y - disc_top - 10
+    if available >= 90:
+        diagram_h = min(available - 16, 170)
+        bar_h = 16
+        c.setFillColor(BLUE)
+        c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
+        c.setFillColor(WHITE)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM + 8, y - bar_h + 4, 'CROSS-SECTION (NOT TO SCALE)')
+        diagram_top = y - bar_h
+        diagram_bottom = diagram_top - diagram_h
+        c.setFillColor(LGRAY)
+        c.setStrokeColor(MGRAY)
+        c.setLineWidth(0.5)
+        c.rect(LM, diagram_bottom, CW, diagram_h, fill=1, stroke=1)
+        diagram_w = 220
+        diagram_x = LM + (CW - diagram_w) / 2.0
+        _draw_buoyancy_diagram_pdf(c, diagram_x, diagram_top - 6, diagram_w, diagram_h - 10, results)
+        y = diagram_bottom - 10
 
     # ── Disclaimer (anchored at bottom margin) ──
     _draw_disclaimer_block(c, 40, disclaimer_lines_raw=_BUOYANCY_DISCLAIMER_TEXT,
@@ -1468,6 +1701,40 @@ def build_loading_truck_pdf(inputs, results, project_name=None):
 
     y = hero_bottom - 10
 
+    # ── Schematic load-spread cross-sections (transverse + longitudinal,
+    #    side by side), sized to use exactly the space available above the
+    #    disclaimer so the two never collide regardless of text length ──
+    disc_h = _disclaimer_box_height(_LOADING_TRUCK_DISCLAIMER_TEXT)
+    disc_top = 40 + disc_h
+    available = y - disc_top - 10
+    if available >= 90:
+        diagram_h = min(available - 16, 150)
+        bar_h = 16
+        c.setFillColor(BLUE)
+        c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
+        c.setFillColor(WHITE)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM + 8, y - bar_h + 4, 'LOAD SPREAD (NOT TO SCALE)')
+        diagram_top = y - bar_h
+        diagram_bottom = diagram_top - diagram_h
+        c.setFillColor(LGRAY)
+        c.setStrokeColor(MGRAY)
+        c.setLineWidth(0.5)
+        c.rect(LM, diagram_bottom, CW, diagram_h, fill=1, stroke=1)
+
+        # tire_dims is like '10" x 20"' — first number is longitudinal
+        # (direction of travel), second is transverse, per the source workbook.
+        dims_parts = results['tire_dims'].replace('"', '').split('x')
+        lo_top_in = float(dims_parts[0].strip())
+        wo_top_in = float(dims_parts[1].strip()) if len(dims_parts) > 1 else lo_top_in
+
+        half_w = (CW - 20) / 2.0
+        _draw_load_spread_diagram_pdf(c, LM + 6, diagram_top - 6, half_w - 6, diagram_h - 10,
+                                       wo_top_in, results['cover_in'], results['wo_spread_in'], 'Transverse (wo)')
+        _draw_load_spread_diagram_pdf(c, LM + half_w + 14, diagram_top - 6, half_w - 6, diagram_h - 10,
+                                       lo_top_in, results['cover_in'], results['lo_spread_in'], 'Longitudinal (lo)')
+        y = diagram_bottom - 10
+
     _draw_disclaimer_block(c, 40, disclaimer_lines_raw=_LOADING_TRUCK_DISCLAIMER_TEXT,
                             bold_triggers=_LOADING_BOLD_TRIGGERS)
 
@@ -1551,6 +1818,44 @@ def build_loading_outrigger_pdf(inputs, results, project_name=None):
     fos_disp = f"{results['fos']:.2f}" if results['fos'] is not None else '—'
     y = _draw_fos_hero(c, y, fos_disp, 'Factor of Safety — no minimum specified in source workbook',
                         'INFORMATIONAL ONLY', hero_h=64)
+
+    # ── Schematic load-spread cross-section(s) — two side-by-side (length +
+    #    width) for a rectangular pad, one centered (diameter) for circular,
+    #    since a circular pad spreads identically in every direction ──
+    disc_h = _disclaimer_box_height(_LOADING_OUTRIGGER_DISCLAIMER_TEXT)
+    disc_top = 40 + disc_h
+    available = y - disc_top - 10
+    if available >= 90:
+        diagram_h = min(available - 16, 150)
+        bar_h = 16
+        c.setFillColor(BLUE)
+        c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
+        c.setFillColor(WHITE)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM + 8, y - bar_h + 4, 'LOAD SPREAD (NOT TO SCALE)')
+        diagram_top = y - bar_h
+        diagram_bottom = diagram_top - diagram_h
+        c.setFillColor(LGRAY)
+        c.setStrokeColor(MGRAY)
+        c.setLineWidth(0.5)
+        c.rect(LM, diagram_bottom, CW, diagram_h, fill=1, stroke=1)
+
+        cover_in = results['cover_in']
+        if results['pad_shape'] == 'Circular':
+            diam_in = float(inputs.get('pad_diameter_in', 0) or 0)
+            diagram_w = 220
+            diagram_x = LM + (CW - diagram_w) / 2.0
+            _draw_load_spread_diagram_pdf(c, diagram_x, diagram_top - 6, diagram_w, diagram_h - 10,
+                                           diam_in, cover_in, diam_in + cover_in, 'Diameter')
+        else:
+            length_in = float(inputs.get('pad_length_in', 0) or 0)
+            width_in  = float(inputs.get('pad_width_in', 0) or 0)
+            half_w = (CW - 20) / 2.0
+            _draw_load_spread_diagram_pdf(c, LM + 6, diagram_top - 6, half_w - 6, diagram_h - 10,
+                                           length_in, cover_in, length_in + cover_in, 'Length')
+            _draw_load_spread_diagram_pdf(c, LM + half_w + 14, diagram_top - 6, half_w - 6, diagram_h - 10,
+                                           width_in, cover_in, width_in + cover_in, 'Width')
+        y = diagram_bottom - 10
 
     _draw_disclaimer_block(c, 40, disclaimer_lines_raw=_LOADING_OUTRIGGER_DISCLAIMER_TEXT,
                             bold_triggers=_LOADING_OUTRIGGER_BOLD_TRIGGERS)
