@@ -130,6 +130,17 @@
             overflow: hidden;
         }
 
+        /* ── Each calculator panel (inputs + results) fills calc-main and lays
+           its two children side-by-side. Missing this rule was the bug — without
+           it, calc-inputs/calc-results stacked vertically and anything below the
+           fold was clipped by calc-main's overflow:hidden, with no scrollbar. ── */
+        .calc-panel {
+            display: flex;
+            flex: 1;
+            width: 100%;
+            overflow: hidden;
+        }
+
         /* ── LEFT: shared geometry + calc-specific inputs ── */
         .calc-inputs {
             width: 400px;
