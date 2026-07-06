@@ -432,6 +432,9 @@
         <button class="calc-nav-item" data-calc="excavation_slope" onclick="selectCalc('excavation_slope')">
             Excavation Slope
         </button>
+        <button class="calc-nav-item" data-calc="stepped_backfill" onclick="selectCalc('stepped_backfill')">
+            Stepped Perimeter Backfill
+        </button>
     </div>
 
     <!-- ══════════════ MAIN: inputs + results, per calculator ══════════════ -->
@@ -749,6 +752,106 @@
 
             <div class="calc-results" id="es_results">
                 <div class="empty-state">Enter tank geometry and soil type, then click Calculate.</div>
+            </div>
+        </div>
+
+        <!-- ── STEPPED PERIMETER BACKFILL ── -->
+        <div id="panel-stepped_backfill" class="calc-panel" style="display:none;">
+            <div class="calc-inputs">
+
+                <div class="disclaimer-box">
+                    This is a first-principles geometric calculation, not a Wavin-verified source. It
+                    replaces a simplified two-box-difference method with an exact stepped-void volume:
+                    each step is a sloped riser topped by a flat bench, with the topmost riser reaching
+                    grade directly (no bench above ground level). Benching is not permitted in Type C
+                    soil per OSHA Appendix B. OSHA Table B-1 sets specific maximum bench height/width
+                    limits for Type A/B soil — this tool does not enforce those specific dimensions;
+                    verify your chosen step height and bench width against Table B-1 yourself.
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Shared Tank Geometry</div>
+                    <div class="section-card-body">
+                        <label>Configuration</label>
+                        <select id="sb_config">
+                            <option value="SC">SC — Standard Capacity</option>
+                            <option value="EX">EX — Extra Strong</option>
+                        </select>
+
+                        <label>Tank Width (ft)</label>
+                        <input type="number" id="sb_width_ft" step="0.01" placeholder="e.g. 90.55">
+
+                        <label>Tank Length (ft)</label>
+                        <input type="number" id="sb_length_ft" step="0.01" placeholder="e.g. 118.11">
+
+                        <label>Number of Layers</label>
+                        <select id="sb_layers">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8" selected>8</option>
+                        </select>
+
+                        <label>Cover Depth (ft) <span class="units-warning">— enter FEET, not inches</span></label>
+                        <span class="field-hint">Depth from finish grade to top of tank</span>
+                        <input type="number" id="sb_cover_ft" step="0.01" placeholder="e.g. 2.5"
+                               oninput="updateFtInReadout('sb_cover_ft','sb_cover_ft_readout')">
+                        <span class="ft-in-readout" id="sb_cover_ft_readout"></span>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Soil Type &amp; Slope</div>
+                    <div class="section-card-body">
+                        <label>OSHA Soil Type</label>
+                        <span class="field-hint">Selecting a type fills in its OSHA maximum slope ratio below — still editable. Benching is not permitted in Type C.</span>
+                        <select id="sb_soil_type" onchange="applyOshaSoilPresetBackfill()">
+                            <option value="TypeA">Type A (¾:1, 53°)</option>
+                            <option value="TypeA_ShortTerm">Type A — Short-Term ≤24hr, ≤12ft (½:1, 63°)</option>
+                            <option value="TypeB" selected>Type B (1:1, 45°)</option>
+                            <option value="TypeC">Type C (1½:1, 34°) — benching not permitted</option>
+                            <option value="Custom">Custom (enter ratio manually)</option>
+                        </select>
+
+                        <label>Slope Ratio (H:V) — for each riser</label>
+                        <span class="field-hint">Auto-filled from soil type above; edit freely for a custom slope.</span>
+                        <input type="number" id="sb_slope_ratio" step="0.05" value="1.0">
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Benching</div>
+                    <div class="section-card-body">
+                        <label>Step Height (ft)</label>
+                        <span class="field-hint">Vertical rise of each riser</span>
+                        <input type="number" id="sb_step_height_ft" step="0.1" placeholder="e.g. 1.0">
+
+                        <label>Bench Width per Step (ft)</label>
+                        <span class="field-hint">Flat ledge width at the top of each riser (except the topmost, which reaches grade directly)</span>
+                        <input type="number" id="sb_bench_width_ft" step="0.1" placeholder="e.g. 1.0">
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Project (optional — for PDF header)</div>
+                    <div class="section-card-body">
+                        <label>Project Name</label>
+                        <input type="text" id="sb_project_name" placeholder="e.g. Maple Ridge Retail Site">
+                    </div>
+                </div>
+
+                <button class="calc-btn" onclick="runSteppedBackfill()">Calculate Backfill Volume</button>
+                <button class="calc-btn secondary" id="sb_pdf_btn" onclick="downloadSteppedBackfillPDF()" disabled>
+                    ⬇ Download Submittal PDF
+                </button>
+            </div>
+
+            <div class="calc-results" id="sb_results">
+                <div class="empty-state">Enter tank geometry, soil type, and benching parameters, then click Calculate.</div>
             </div>
         </div>
 
@@ -1640,6 +1743,219 @@
             const a = document.createElement('a');
             a.href = url;
             a.download = 'AquaCell_Excavation_Slope.pdf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('PDF request failed: ' + err.message);
+        } finally {
+            pdfBtn.disabled = false;
+            pdfBtn.textContent = originalText;
+        }
+    }
+
+    // ══════════════════ STEPPED PERIMETER BACKFILL ══════════════════
+    function applyOshaSoilPresetBackfill() {
+        const soilType = document.getElementById('sb_soil_type').value;
+        if (soilType in OSHA_SLOPE_PRESETS) {
+            document.getElementById('sb_slope_ratio').value = OSHA_SLOPE_PRESETS[soilType];
+        }
+    }
+
+    let sbLastInputs  = null;
+    let sbLastResults = null;
+
+    async function runSteppedBackfill() {
+        const resultsDiv = document.getElementById('sb_results');
+        const pdfBtn = document.getElementById('sb_pdf_btn');
+        pdfBtn.disabled = true;
+
+        const inputs = {
+            config:          document.getElementById('sb_config').value,
+            width_ft:        document.getElementById('sb_width_ft').value || 0,
+            length_ft:       document.getElementById('sb_length_ft').value || 0,
+            layers:          document.getElementById('sb_layers').value || 1,
+            cover_ft:        document.getElementById('sb_cover_ft').value || 0,
+            soil_type:       document.getElementById('sb_soil_type').value,
+            slope_ratio:     document.getElementById('sb_slope_ratio').value || 0,
+            step_height_ft:  document.getElementById('sb_step_height_ft').value || 0,
+            bench_width_ft:  document.getElementById('sb_bench_width_ft').value || 0,
+        };
+
+        resultsDiv.innerHTML = '<div class="empty-state">Calculating…</div>';
+
+        try {
+            const resp = await fetch('/design-tools/calculate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calc_type: 'stepped_backfill', inputs: inputs })
+            });
+            const data = await resp.json();
+
+            if (!resp.ok || data.error) {
+                resultsDiv.innerHTML = `<div class="error-box">${data.error || 'Calculation failed.'}</div>`;
+                sbLastInputs = null; sbLastResults = null;
+                return;
+            }
+
+            sbLastInputs  = inputs;
+            sbLastResults = data;
+            pdfBtn.disabled = false;
+            renderSteppedBackfillResults(data);
+        } catch (err) {
+            resultsDiv.innerHTML = `<div class="error-box">Request failed: ${err.message}</div>`;
+            sbLastInputs = null; sbLastResults = null;
+        }
+    }
+
+    function renderSteppedBackfillResults(d) {
+        const resultsDiv = document.getElementById('sb_results');
+
+        const warningsHtml = (d.warnings && d.warnings.length)
+            ? `<div class="result-card">
+                 <h3 style="color:#b45309;">OSHA Flags</h3>
+                 ${d.warnings.map(w => `<div class="disclaimer-box" style="margin-bottom:8px;">${w}</div>`).join('')}
+               </div>`
+            : '';
+
+        resultsDiv.innerHTML = `
+            <div class="results-flex">
+                <div class="results-data">
+                    <div class="result-card">
+                        <h3>Benching Geometry</h3>
+                        <div class="result-row"><span>Tank Footprint (bottom)</span><span class="val">${d.bottom_length_ft} ft × ${d.bottom_width_ft} ft</span></div>
+                        <div class="result-row"><span>Tank Height</span><span class="val">${d.tank_height_ft} ft</span></div>
+                        <div class="result-row"><span>Cover Depth</span><span class="val">${d.cover_ft} ft</span></div>
+                        <div class="result-row"><span><strong>Total Excavation Depth</strong></span><span class="val">${d.total_depth_ft} ft</span></div>
+                        <div class="result-row"><span>Soil Type</span><span class="val">${d.soil_type_label}</span></div>
+                        <div class="result-row"><span>Slope Ratio (H:V)</span><span class="val">${d.slope_ratio}:1</span></div>
+                        <div class="result-row"><span>Step Height</span><span class="val">${d.step_height_ft} ft</span></div>
+                        <div class="result-row"><span>Bench Width</span><span class="val">${d.bench_width_ft} ft</span></div>
+                    </div>
+
+                    <div class="result-card">
+                        <h3>Results</h3>
+                        <div class="result-row"><span><strong>Number of Steps</strong></span><span class="val">${d.n_steps}</span></div>
+                        <div class="result-row"><span>Total Offset at Grade</span><span class="val">${d.total_offset_at_grade_ft} ft</span></div>
+                        <div class="result-row"><span><strong>Outer Footprint (at grade)</strong></span><span class="val">${d.outer_length_ft} ft × ${d.outer_width_ft} ft</span></div>
+                        <div class="result-row"><span><strong>Backfill Volume</strong></span><span class="val">${d.volume_cf.toLocaleString()} cf (${d.volume_cy.toLocaleString()} cy)</span></div>
+                    </div>
+
+                    ${warningsHtml}
+                </div>
+
+                <div class="results-diagram-col">
+                    <div class="diagram-box">
+                        <h3>Cross-Section (Not to Scale)</h3>
+                        ${buildSteppedBackfillSVG(d)}
+                        <div class="diagram-caption">
+                            Illustrative — the staircase lines shown are the actual excavated profile
+                            (not a stress-distribution cone). Length direction shown; width direction
+                            uses the same step height, bench width, and slope ratio.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Actual staircase profile — solid lines, widening step by step from the
+    // tank at the bottom to the outer footprint at grade. Each step = a
+    // sloped riser + a flat bench, except the topmost riser which reaches
+    // grade directly with no trailing bench.
+    function buildSteppedBackfillSVG(d) {
+        const svgW = 300, svgH = 340;
+        const topMargin = 40, bottomMargin = 40;
+        const usableH = svgH - topMargin - bottomMargin;
+        const pxPerFt = usableH / d.total_depth_ft;
+
+        const topWidthFt = d.outer_length_ft;
+        const bottomWidthFt = d.bottom_length_ft;
+        const maxHalfWidth = Math.max(topWidthFt, bottomWidthFt) / 2;
+        const usableHalfW = 110;
+        const scale = usableHalfW / Math.max(maxHalfWidth, 1);
+
+        const cx = svgW / 2;
+        const gradeY = topMargin;
+        const tankY  = topMargin + usableH;
+
+        // Build the right-side staircase outline from the step_rows the
+        // backend already computed (same numbers as the results table).
+        let z = 0;
+        let ptsRight = [[cx + (bottomWidthFt/2)*scale, tankY]];
+        d.step_rows.forEach((row, idx) => {
+            z += row.riser_height_ft;
+            const yAfter = tankY - z*pxPerFt;
+            const xAfter = cx + (bottomWidthFt/2 + row.offset_end_ft)*scale;
+            ptsRight.push([xAfter, yAfter]);
+            if (idx < d.step_rows.length - 1) {
+                const xBenchEnd = cx + (bottomWidthFt/2 + row.offset_end_ft + d.bench_width_ft)*scale;
+                ptsRight.push([xBenchEnd, yAfter]);
+            }
+        });
+        const ptsLeft = ptsRight.map(([px, py]) => [2*cx - px, py]);
+        const polyPts = ptsRight.concat(ptsLeft.slice().reverse());
+
+        let parts = [];
+        parts.push(`<svg viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:280px;">`);
+        parts.push(`<rect x="0" y="0" width="${svgW}" height="${gradeY}" fill="#eff6ff"/>`);
+
+        // soil fill
+        const polyStr = polyPts.map(p => p.join(',')).join(' ');
+        parts.push(`<polygon points="${polyStr}" fill="#d6c9a8"/>`);
+
+        // staircase outline — solid (actual cut, not illustrative)
+        [ptsRight, ptsLeft].forEach(pts => {
+            const lineStr = pts.map(p => p.join(',')).join(' ');
+            parts.push(`<polyline points="${lineStr}" fill="none" stroke="#334155" stroke-width="1.5"/>`);
+        });
+
+        // AquaCell band at the bottom
+        const bottomHalfPx = (bottomWidthFt/2)*scale;
+        parts.push(`<rect x="${cx-bottomHalfPx}" y="${tankY}" width="${bottomHalfPx*2}" height="14" fill="#cbd5e1" stroke="#0f1e3c" stroke-width="1.5"/>`);
+
+        // grade line + label
+        parts.push(`<line x1="10" y1="${gradeY}" x2="${svgW-10}" y2="${gradeY}" stroke="#1e293b" stroke-width="2"/>`);
+        parts.push(`<text x="14" y="${gradeY-6}" font-size="9" fill="#1e293b">GRADE</text>`);
+
+        // dimension labels
+        parts.push(`<text x="${cx}" y="${gradeY-14}" font-size="9" fill="#0f1e3c" text-anchor="middle" font-weight="bold">${topWidthFt.toFixed(1)} ft</text>`);
+        parts.push(`<text x="${cx}" y="${tankY+34}" font-size="9" fill="#0f1e3c" text-anchor="middle" font-weight="bold">${bottomWidthFt.toFixed(1)} ft (tank)</text>`);
+        parts.push(`<text x="${svgW-14}" y="${(gradeY+tankY)/2-4}" font-size="8" fill="#475569" text-anchor="end">${d.n_steps} steps</text>`);
+        parts.push(`<text x="${svgW-14}" y="${(gradeY+tankY)/2+8}" font-size="8" fill="#475569" text-anchor="end">Depth ${d.total_depth_ft.toFixed(2)} ft</text>`);
+
+        parts.push(`</svg>`);
+        return parts.join('');
+    }
+
+    async function downloadSteppedBackfillPDF() {
+        if (!sbLastInputs || !sbLastResults) return;
+
+        const projectName = document.getElementById('sb_project_name').value || null;
+        const pdfBtn = document.getElementById('sb_pdf_btn');
+        const originalText = pdfBtn.textContent;
+        pdfBtn.disabled = true;
+        pdfBtn.textContent = 'Generating…';
+
+        try {
+            const resp = await fetch('/design-tools/download_pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calc_type: 'stepped_backfill', inputs: sbLastInputs, project_name: projectName })
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                alert(err.error || 'PDF generation failed.');
+                return;
+            }
+
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'AquaCell_Stepped_Backfill.pdf';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
