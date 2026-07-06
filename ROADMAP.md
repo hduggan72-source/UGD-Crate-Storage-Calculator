@@ -14,8 +14,8 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 
 **## Backlog / Future Enhancements (Add here when ideas come up)**
- - Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed (added to excavation & dimensional summary card
- - bouyancy calculator
+
+
  - Metric toggle
  - Update font to Nunito (Wavin speciifc calculator ONLY)
 
@@ -30,15 +30,21 @@ Professional web-based calculator for designing and quoting underground stormwat
      -  CRATE BUILDER FOR COMPLEX (ENTER ROW BY ROW, THEN DESIGNATE HOW MANY CRATES IN THE ROW)
 - (v18) Optional 3D isometric view of the crate layout
 - (v19) SEPARATE WEB BASED CLIENT USER CALCULATOR TOOL WITH NO PRICING;
-- ONE BUTTON THAT TAKES YOU TO "TOOLS" WHERE MULTIPLE CALCULATORS LIVE AND EXPORT TO THEIR OWN PAGE WITH GRAPHICS
-- ADD DISTANCE FROM BUILDING CALCULATOR (THAT AND BUOYANCY SHOULD BE SEPARATE BRANCHES SIMILAR TO MULTI-TANK)
-- MOVE ALL CALCULATIONS TOOLS TO A "DESIGN TOOLS" UI WHICH CALCULATIONS AS SELECTED CAN BE ADDED TO A SUMMARY SHEET
+- Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed (added to excavation & dimensional summary card
+- ADD DISTANCE FROM BUILDING CALCULATOR
+- MIN. COVER / BURIAL DEPTH
 
 - **##SYSTEM CHECKS TO VERIFY / CONFIRM**
-- 
 
-**## PREVIOUS Version (v12-v14) — v15 Completed**
+- **DESIGN TOOLS PAGE** - COMPELETED**
+-  [X] SEPARATE PAGE FOR "DESIGN TOOLS" MULTIPLE CALCULATORS LIVE AND EXPORT TO THEIR OWN PAGE WITH GRAPHICS
+   - [X] bouyancy calculator
+   - [X] LOADING MODEL (TRUCK ASTM F2787) & OUTRIGGER
 
+
+
+-
+- **## PREVIOUS Version (v12-v15) — Completed**
 -  [X] EXPORT CSV PRICE SHEET WITH COMPONENT PRICING FOR CUSTOMER SERVICE
 -  [X] ADD ADDITIONAL ACCESSORY FIELD FOR 18-36" GEO BOOTS. ENTER QUANTITY PASSES TO QUOTE SHEET
 -  [X] FIXED MULTI TANK COPY TO EMAIL ACCESSORY WASTE LABELING (CHANGE TO DYNAMIC W/ EXCEPTION OF BACKFILL REMAINING AT 10%)
