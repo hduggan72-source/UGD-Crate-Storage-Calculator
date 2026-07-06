@@ -14,8 +14,6 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 
 **## Backlog / Future Enhancements (Add here when ideas come up)**
-
-
  - Metric toggle
  - Update font to Nunito (Wavin speciifc calculator ONLY)
 
@@ -30,22 +28,20 @@ Professional web-based calculator for designing and quoting underground stormwat
      -  CRATE BUILDER FOR COMPLEX (ENTER ROW BY ROW, THEN DESIGNATE HOW MANY CRATES IN THE ROW)
 - (v18) Optional 3D isometric view of the crate layout
 - (v19) SEPARATE WEB BASED CLIENT USER CALCULATOR TOOL WITH NO PRICING;
-- Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed (added to excavation & dimensional summary card
+
 - ADD DISTANCE FROM BUILDING CALCULATOR
 - MIN. COVER / BURIAL DEPTH
 
 - **##SYSTEM CHECKS TO VERIFY / CONFIRM**
--  ***LOADING MODEL OUTRIGGER - VERIFY MATH ON AREA OF APPLIED LOAD ON AQUACELL (FoS IS TOO HIGH COMPARED TO EXCEL SHEET)***
-- 
+
 
 - **DESIGN TOOLS PAGE** - COMPELETED**
 -  [X] SEPARATE PAGE FOR "DESIGN TOOLS" MULTIPLE CALCULATORS LIVE AND EXPORT TO THEIR OWN PAGE WITH GRAPHICS
    - [X] bouyancy calculator
    - [X] LOADING MODEL (TRUCK ASTM F2787) & OUTRIGGER
+   - [X] Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed
+   - [ ] 
 
-
-
--
 - **## PREVIOUS Version (v12-v15) — Completed**
 -  [X] EXPORT CSV PRICE SHEET WITH COMPONENT PRICING FOR CUSTOMER SERVICE
 -  [X] ADD ADDITIONAL ACCESSORY FIELD FOR 18-36" GEO BOOTS. ENTER QUANTITY PASSES TO QUOTE SHEET
