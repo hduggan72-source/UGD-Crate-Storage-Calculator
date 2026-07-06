@@ -251,6 +251,126 @@ def calc_outrigger_load(total_weight_lbs, pad_shape, pad_length_in, pad_width_in
         'min_fos':          None,
     }
 
+
+# ══════════════════════════════════════════════════════════════════
+#  DESIGN VERIFICATION DASHBOARD — Excavation Slope Calculator
+#
+#  Soil-type maximum allowable slopes are from OSHA 29 CFR 1926 Subpart P,
+#  Appendix B (Sloping and Benching), confirmed directly against osha.gov
+#  on 2026-07-02:
+#    Type A        = 3/4 : 1  (53°)
+#    Type A, short-term (<=24 hr, <=12 ft depth) = 1/2 : 1  (63°)
+#    Type B        = 1 : 1    (45°)
+#    Type C        = 1.5 : 1  (34°)
+#    Stable Rock   = vertical (90°, no slope required)
+#  These tabulated slopes apply only up to 20 ft of depth — beyond that,
+#  OSHA requires a registered professional engineer's design (App. B is
+#  not applicable). Soil classification itself (assigning Type A/B/C) must
+#  be performed by a "competent person" per OSHA Appendix A visual/manual
+#  tests — this tool does not classify soil, it only applies the tabulated
+#  slope once a type is selected.
+#
+#  Excavation volume uses the prismoidal formula V = (H/6)*(A1+4*Am+A2).
+#  This is NOT an approximation for this specific shape: since the
+#  excavation's cross-sectional area at any depth z is
+#      Area(z) = (L + 2*z*ratio) * (W + 2*z*ratio)
+#  — a degree-2 polynomial in z — and the prismoidal formula is exact for
+#  any polynomial up to degree 3, the two are mathematically identical
+#  here. This was verified by direct integration, not just recalled as a
+#  general civil-engineering rule of thumb.
+# ══════════════════════════════════════════════════════════════════
+_OSHA_SLOPE_RATIOS = {
+    'TypeA':            0.75,
+    'TypeA_ShortTerm':  0.5,
+    'TypeB':            1.0,
+    'TypeC':            1.5,
+    'StableRock':       0.0,
+}
+_OSHA_SLOPE_LABELS = {
+    'TypeA':            'Type A (\u00be:1, 53\u00b0)',
+    'TypeA_ShortTerm':  'Type A \u2014 Short-Term \u226424hr, \u226412ft (\u00bd:1, 63\u00b0)',
+    'TypeB':            'Type B (1:1, 45\u00b0)',
+    'TypeC':            'Type C (1\u00bd:1, 34\u00b0)',
+    'StableRock':       'Stable Rock (vertical, 90\u00b0)',
+    'Custom':           'Custom (user-entered ratio)',
+}
+
+
+def calc_excavation_slope(payload):
+    config    = payload.get('config', 'SC')
+    width_ft  = float(payload.get('width_ft', 0) or 0)
+    length_ft = float(payload.get('length_ft', 0) or 0)
+    layers    = int(float(payload.get('layers', 1) or 1))
+    cover_ft  = float(payload.get('cover_ft', 0) or 0)
+    soil_type = payload.get('soil_type', 'TypeB')
+    ratio     = float(payload.get('slope_ratio', 1.0) or 0)
+
+    if width_ft <= 0 or length_ft <= 0:
+        return {'error': 'Enter a valid tank footprint (width & length).'}
+    if ratio < 0:
+        return {'error': 'Slope ratio cannot be negative.'}
+
+    cd = CONFIG_DATA.get(config, CONFIG_DATA['SC'])
+    layer_heights = cd['layer_heights']
+    layers = max(1, min(layers, len(layer_heights)))
+    tank_height_ft = layer_heights[layers - 1]
+
+    total_depth_ft = cover_ft + tank_height_ft
+    if total_depth_ft <= 0:
+        return {'error': 'Enter a valid cover depth.'}
+
+    offset_per_side_ft = total_depth_ft * ratio
+    slope_angle_deg = math.degrees(math.atan(1.0 / ratio)) if ratio > 0 else 90.0
+
+    bottom_length_ft = length_ft
+    bottom_width_ft  = width_ft
+    top_length_ft    = length_ft + 2.0 * offset_per_side_ft
+    top_width_ft     = width_ft + 2.0 * offset_per_side_ft
+    mid_length_ft     = length_ft + offset_per_side_ft
+    mid_width_ft      = width_ft + offset_per_side_ft
+
+    a_bottom = bottom_length_ft * bottom_width_ft
+    a_top    = top_length_ft * top_width_ft
+    a_mid    = mid_length_ft * mid_width_ft
+
+    volume_cf = (total_depth_ft / 6.0) * (a_bottom + 4.0 * a_mid + a_top)
+    volume_cy = volume_cf / 27.0
+
+    warnings = []
+    if total_depth_ft > 20.0:
+        warnings.append('Excavation depth exceeds 20 ft \u2014 OSHA tabulated slopes (Appendix B) only apply '
+                         'up to 20 ft. Excavations deeper than 20 ft require a registered professional '
+                         'engineer\u2019s design, not a tabulated slope.')
+    if total_depth_ft >= 5.0:
+        warnings.append('Excavation is 5 ft or deeper \u2014 OSHA 1926.652 requires a protective system '
+                         '(sloping, benching, shoring, or shielding) unless made entirely in stable rock.')
+    if soil_type == 'TypeC' and total_depth_ft > 0:
+        warnings.append('Benching is not permitted in Type C soil per OSHA Appendix B \u2014 sloping or '
+                         'another protective system must be used.')
+
+    return {
+        'config':               config,
+        'tank_height_ft':       round(tank_height_ft, 3),
+        'cover_ft':             round(cover_ft, 2),
+        'total_depth_ft':       round(total_depth_ft, 3),
+        'soil_type':            soil_type,
+        'soil_type_label':      _OSHA_SLOPE_LABELS.get(soil_type, 'Custom (user-entered ratio)'),
+        'slope_ratio':          round(ratio, 3),
+        'slope_angle_deg':      round(slope_angle_deg, 1),
+        'offset_per_side_ft':   round(offset_per_side_ft, 3),
+        'bottom_length_ft':     round(bottom_length_ft, 2),
+        'bottom_width_ft':      round(bottom_width_ft, 2),
+        'top_length_ft':        round(top_length_ft, 2),
+        'top_width_ft':         round(top_width_ft, 2),
+        'a_bottom_sf':          round(a_bottom, 1),
+        'a_mid_sf':             round(a_mid, 1),
+        'a_top_sf':             round(a_top, 1),
+        'volume_cf':            round(volume_cf, 1),
+        'volume_cy':            round(volume_cy, 2),
+        'warnings':             warnings,
+    }
+
+
 # ══════════════════════════════════════════════════════════════════
 #  VOID SPACE ENTRY  (Complex Shape mode)
 #  Open areas inside the tank footprint (concrete islands, light
@@ -1866,6 +1986,220 @@ def build_loading_outrigger_pdf(inputs, results, project_name=None):
     return buffer
 
 
+def _draw_excavation_slope_diagram_pdf(c, x, y_top, w, h, r):
+    """
+    ReportLab canvas diagram for the excavation slope cross-section: wide
+    open cut at grade tapering down via a real (solid-line) slope to the
+    narrow AquaCell footprint at the bottom. Unlike the load-spread
+    diagrams, these slope lines are the actual excavated ground surface,
+    not an illustrative stress-distribution cone — drawn solid, no arrows.
+    """
+    top_margin = 24
+    bottom_margin = 30
+    usable_h = h - top_margin - bottom_margin
+    grade_y = y_top - top_margin
+    tank_y  = grade_y - usable_h
+
+    top_w_in    = r['top_length_ft'] * 12.0
+    bottom_w_in = r['bottom_length_ft'] * 12.0
+    max_half_w = max(top_w_in, bottom_w_in) / 2.0
+    usable_half_w = (w / 2.0) - 12
+    scale = usable_half_w / max(max_half_w, 1.0)
+
+    cx = x + w / 2.0
+    top_half_px = (top_w_in / 2.0) * scale
+    bot_half_px = (bottom_w_in / 2.0) * scale
+
+    # soil column (open excavation)
+    c.setFillColor(colors.HexColor('#d6c9a8'))
+    p = c.beginPath()
+    p.moveTo(cx - top_half_px, grade_y)
+    p.lineTo(cx + top_half_px, grade_y)
+    p.lineTo(cx + bot_half_px, tank_y)
+    p.lineTo(cx - bot_half_px, tank_y)
+    p.close()
+    c.drawPath(p, fill=1, stroke=0)
+
+    # actual slope faces (solid lines — this is the real cut, not illustrative)
+    c.setStrokeColor(colors.HexColor('#334155'))
+    c.setLineWidth(1.1)
+    c.line(cx - top_half_px, grade_y, cx - bot_half_px, tank_y)
+    c.line(cx + top_half_px, grade_y, cx + bot_half_px, tank_y)
+
+    # AquaCell band at the bottom of the excavation
+    c.setFillColor(colors.HexColor('#cbd5e1'))
+    c.setStrokeColor(NAVY)
+    c.setLineWidth(0.85)
+    c.rect(cx - bot_half_px, tank_y, bot_half_px * 2, 9, fill=1, stroke=1)
+    c.setStrokeColor(colors.HexColor('#94a3b8'))
+    c.setLineWidth(0.35)
+    for i in range(1, 4):
+        gx = cx - bot_half_px + (bot_half_px * 2 / 4.0) * i
+        c.line(gx, tank_y, gx, tank_y + 9)
+
+    # grade line + label
+    c.setStrokeColor(colors.HexColor('#1e293b'))
+    c.setLineWidth(1.0)
+    c.line(x, grade_y, x + w, grade_y)
+    c.setFillColor(colors.HexColor('#1e293b'))
+    c.setFont('Helvetica-Bold', 5.5)
+    c.drawString(x + 2, grade_y + 2, 'GRADE')
+
+    # dimension labels
+    c.setFillColor(NAVY)
+    c.setFont('Helvetica-Bold', 6.5)
+    c.drawCentredString(cx, grade_y + 18, f"{r['top_length_ft']:.1f} ft")
+    c.drawCentredString(cx, tank_y - 16, f"{r['bottom_length_ft']:.1f} ft (tank)")
+    c.setFillColor(GRAY)
+    c.setFont('Helvetica', 5.5)
+    c.drawRightString(x + w - 2, (grade_y + tank_y) / 2 + 8, f"{r['slope_ratio']}:1")
+    c.drawRightString(x + w - 2, (grade_y + tank_y) / 2 - 2, f"{r['slope_angle_deg']}\u00b0")
+    c.drawRightString(x + w - 2, (grade_y + tank_y) / 2 - 12, f"Depth {r['total_depth_ft']:.2f} ft")
+
+
+_EXCAVATION_SLOPE_DISCLAIMER_TEXT = (
+    "DISCLAIMER: Maximum allowable slopes shown are from OSHA 29 CFR 1926 Subpart P, Appendix B "
+    "(Sloping and Benching), confirmed directly against osha.gov. These tabulated slopes apply only up "
+    "to 20 ft of excavation depth -- excavations deeper than 20 ft require a registered professional "
+    "engineer's design. Soil classification (assigning Type A/B/C) must be performed by a competent "
+    "person per OSHA Appendix A visual and manual tests -- this tool does not classify soil, it only "
+    "applies the tabulated slope once a type is selected. Excavation volume uses the prismoidal formula, "
+    "which is mathematically exact for this uniform-slope rectangular shape, not an approximation. THE "
+    "ENGINEER OF RECORD AND THE JOBSITE COMPETENT PERSON ARE SOLELY RESPONSIBLE FOR SOIL "
+    "CLASSIFICATION, PROTECTIVE SYSTEM SELECTION, AND COMPLIANCE WITH ALL APPLICABLE OSHA AND LOCAL "
+    "REQUIREMENTS."
+)
+_EXCAVATION_SLOPE_BOLD_TRIGGERS = ('THE ENGINEER OF RECORD AND THE JOBSITE',)
+
+
+def build_excavation_slope_pdf(inputs, results, project_name=None):
+    """Single-page submittal-ready PDF for the Excavation Slope calculator."""
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
+
+    band_h = 64
+    c.setFillColor(NAVY)
+    c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
+    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    if logo_path and os.path.exists(logo_path):
+        try:
+            img = ImageReader(logo_path)
+            c.drawImage(img, LM, PH - band_h + 8, width=160, height=46,
+                        preserveAspectRatio=True, mask='auto')
+        except Exception:
+            pass
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 14)
+    c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
+    c.setFont('Helvetica', 9)
+    c.setFillColor(colors.HexColor('#93c5fd'))
+    c.drawRightString(PW - RM, PH - 37, 'Excavation Slope — OSHA 29 CFR 1926 Subpart P, Appendix B')
+    c.setFont('Helvetica', 7)
+    c.setFillColor(colors.HexColor('#94a3b8'))
+    c.drawRightString(PW - RM, PH - 50, generated_str)
+
+    y = PH - band_h - 10
+    if project_name:
+        c.setFillColor(GRAY)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM, y, f'Project: {project_name}')
+        y -= 16
+
+    geom_rows = [
+        ('Configuration',            'SC — Standard' if results['config'] == 'SC' else 'EX — Extra Strong'),
+        ('Tank Footprint (bottom)',  f"{results['bottom_length_ft']} ft x {results['bottom_width_ft']} ft"),
+        ('Tank Height',              f"{results['tank_height_ft']} ft"),
+        ('Cover Depth',              f"{results['cover_ft']} ft"),
+        ('Total Excavation Depth',   f"{results['total_depth_ft']} ft"),
+        ('Soil Type',                results['soil_type_label']),
+        ('Slope Ratio (H:V)',        f"{results['slope_ratio']}:1"),
+        ('Slope Angle',              f"{results['slope_angle_deg']}\u00b0"),
+    ]
+    y = _draw_section_kv(c, y, 'EXCAVATION GEOMETRY', geom_rows, ncols=2)
+
+    result_rows = [
+        ('Offset per Side',          f"{results['offset_per_side_ft']} ft"),
+        ('Top Footprint (at grade)', f"{results['top_length_ft']} ft x {results['top_width_ft']} ft"),
+        ('Bottom Area',              f"{results['a_bottom_sf']:,.1f} sf"),
+        ('Mid-Depth Area',           f"{results['a_mid_sf']:,.1f} sf"),
+        ('Top Area',                 f"{results['a_top_sf']:,.1f} sf"),
+        ('Excavation Volume',        f"{results['volume_cf']:,.1f} cf ({results['volume_cy']:,.2f} cy)"),
+    ]
+    y = _draw_section_kv(c, y, 'RESULTS', result_rows, ncols=2)
+
+    warnings = results.get('warnings') or []
+    if warnings:
+        bar_h = 16
+        c.setFillColor(AMBER)
+        c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
+        c.setFillColor(WHITE)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM + 8, y - bar_h + 4, 'OSHA FLAGS')
+        warn_top = y - bar_h
+        line_h = 11
+        pad = 8
+        from reportlab.pdfbase.pdfmetrics import stringWidth
+        max_w = CW - pad * 2
+        wrapped = []
+        for w_text in warnings:
+            words = w_text.split()
+            cur = ''
+            for wd in words:
+                test = (cur + ' ' + wd).strip()
+                if stringWidth(test, 'Helvetica', 7.5) <= max_w:
+                    cur = test
+                else:
+                    if cur:
+                        wrapped.append(cur)
+                    cur = wd
+            if cur:
+                wrapped.append(cur)
+        warn_h = len(wrapped) * line_h + pad * 2
+        warn_bottom = warn_top - warn_h
+        c.setFillColor(LTAMB)
+        c.setStrokeColor(AMBER)
+        c.setLineWidth(0.6)
+        c.rect(LM, warn_bottom, CW, warn_h, fill=1, stroke=1)
+        ty = warn_top - pad - 6
+        c.setFont('Helvetica', 7.5)
+        c.setFillColor(BLACK)
+        for line in wrapped:
+            c.drawString(LM + pad, ty, line)
+            ty -= line_h
+        y = warn_bottom - 10
+
+    disc_h = _disclaimer_box_height(_EXCAVATION_SLOPE_DISCLAIMER_TEXT)
+    disc_top = 40 + disc_h
+    available = y - disc_top - 10
+    if available >= 90:
+        diagram_h = min(available - 16, 170)
+        bar_h = 16
+        c.setFillColor(BLUE)
+        c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
+        c.setFillColor(WHITE)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM + 8, y - bar_h + 4, 'CROSS-SECTION (NOT TO SCALE)')
+        diagram_top = y - bar_h
+        diagram_bottom = diagram_top - diagram_h
+        c.setFillColor(LGRAY)
+        c.setStrokeColor(MGRAY)
+        c.setLineWidth(0.5)
+        c.rect(LM, diagram_bottom, CW, diagram_h, fill=1, stroke=1)
+        diagram_w = 240
+        diagram_x = LM + (CW - diagram_w) / 2.0
+        _draw_excavation_slope_diagram_pdf(c, diagram_x, diagram_top - 6, diagram_w, diagram_h - 10, results)
+        y = diagram_bottom - 10
+
+    _draw_disclaimer_block(c, 40, disclaimer_lines_raw=_EXCAVATION_SLOPE_DISCLAIMER_TEXT,
+                            bold_triggers=_EXCAVATION_SLOPE_BOLD_TRIGGERS)
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
 # ══════════════════════════════════════════════════════════════════
 #  CALC ENGINE  —  single-tank calculation (returns dict)
 # ══════════════════════════════════════════════════════════════════
@@ -2322,6 +2656,8 @@ def design_tools_calculate():
             config           = payload.get('config', 'SC')
             result = calc_outrigger_load(total_weight_lbs, pad_shape, pad_length_in, pad_width_in,
                                           pad_diameter_in, cover_ft, fill_pcf, load_factor_pct, config)
+        elif calc_type == 'excavation_slope':
+            result = calc_excavation_slope(payload)
         else:
             return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
 
@@ -2379,6 +2715,12 @@ def design_tools_download_pdf():
                 return jsonify(result), 400
             buffer = build_loading_outrigger_pdf(payload, result, project_name=project_name)
             download_name = 'AquaCell_Loading_Outrigger.pdf'
+        elif calc_type == 'excavation_slope':
+            result = calc_excavation_slope(payload)
+            if 'error' in result:
+                return jsonify(result), 400
+            buffer = build_excavation_slope_pdf(payload, result, project_name=project_name)
+            download_name = 'AquaCell_Excavation_Slope.pdf'
         else:
             return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
 

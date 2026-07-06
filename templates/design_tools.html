@@ -193,6 +193,20 @@
             margin-top: -2px;
             margin-bottom: 4px;
         }
+        .units-warning {
+            color: #b91c1c;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .ft-in-readout {
+            display: block;
+            font-size: 11.5px;
+            font-weight: bold;
+            color: #0f4c81;
+            margin-top: 3px;
+            min-height: 14px;
+        }
+        [data-theme="dark"] .ft-in-readout { color: #60a5fa; }
         input, select, textarea {
             width: 100%;
             padding: 7px 8px;
@@ -415,8 +429,8 @@
         <button class="calc-nav-item disabled" disabled>
             Min Distance from Structure <span class="soon-tag">SOON</span>
         </button>
-        <button class="calc-nav-item disabled" disabled>
-            Excavation Slope <span class="soon-tag">SOON</span>
+        <button class="calc-nav-item" data-calc="excavation_slope" onclick="selectCalc('excavation_slope')">
+            Excavation Slope
         </button>
     </div>
 
@@ -461,9 +475,11 @@
                             <option value="8" selected>8</option>
                         </select>
 
-                        <label>Cover Depth (ft)</label>
+                        <label>Cover Depth (ft) <span class="units-warning">— enter FEET, not inches</span></label>
                         <span class="field-hint">Depth from finish grade to top of tank</span>
-                        <input type="number" id="bq_cover_ft" step="0.01" placeholder="e.g. 2.5">
+                        <input type="number" id="bq_cover_ft" step="0.01" placeholder="e.g. 2.5"
+                               oninput="updateFtInReadout('bq_cover_ft','bq_cover_ft_readout')">
+                        <span class="ft-in-readout" id="bq_cover_ft_readout"></span>
                     </div>
                 </div>
 
@@ -544,9 +560,11 @@
                             <option value="EX">EX — Extra Strong (100 psi max, 30 ft max cover)</option>
                         </select>
 
-                        <label>Cover Depth (ft)</label>
+                        <label>Cover Depth (ft) <span class="units-warning">— enter FEET, not inches</span></label>
                         <span class="field-hint">Top of pavement to top of AquaCell</span>
-                        <input type="number" id="lt_cover_ft" step="0.01" placeholder="e.g. 2.0">
+                        <input type="number" id="lt_cover_ft" step="0.01" placeholder="e.g. 2.0"
+                               oninput="updateFtInReadout('lt_cover_ft','lt_cover_ft_readout')">
+                        <span class="ft-in-readout" id="lt_cover_ft_readout"></span>
 
                         <label>Unit Weight of Fill Above AquaCell (pcf)</label>
                         <span class="field-hint">Workbook default is 120 pcf — adjust if your project's fill differs.</span>
@@ -617,9 +635,11 @@
                             <option value="EX">EX — Extra Strong (100 psi max, 30 ft max cover)</option>
                         </select>
 
-                        <label>Cover Depth (ft)</label>
+                        <label>Cover Depth (ft) <span class="units-warning">— enter FEET, not inches</span></label>
                         <span class="field-hint">Top of pavement to top of AquaCell</span>
-                        <input type="number" id="lo_cover_ft" step="0.01" placeholder="e.g. 2.0">
+                        <input type="number" id="lo_cover_ft" step="0.01" placeholder="e.g. 2.0"
+                               oninput="updateFtInReadout('lo_cover_ft','lo_cover_ft_readout')">
+                        <span class="ft-in-readout" id="lo_cover_ft_readout"></span>
 
                         <label>Unit Weight of Fill Above AquaCell (pcf)</label>
                         <span class="field-hint">Workbook default is 120 pcf.</span>
@@ -646,10 +666,111 @@
             </div>
         </div>
 
+        <!-- ── EXCAVATION SLOPE ── -->
+        <div id="panel-excavation_slope" class="calc-panel" style="display:none;">
+            <div class="calc-inputs">
+
+                <div class="disclaimer-box">
+                    Maximum allowable slopes are from OSHA 29 CFR 1926 Subpart P, Appendix B, confirmed
+                    directly against osha.gov. Soil classification (assigning Type A/B/C) must be performed
+                    by a competent person per OSHA Appendix A — this tool does not classify soil, it only
+                    applies the tabulated slope once a type is selected. Tabulated slopes apply only up to
+                    20 ft of depth; deeper excavations require a registered professional engineer's design.
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Shared Tank Geometry</div>
+                    <div class="section-card-body">
+                        <label>Configuration</label>
+                        <select id="es_config">
+                            <option value="SC">SC — Standard Capacity</option>
+                            <option value="EX">EX — Extra Strong</option>
+                        </select>
+
+                        <label>Tank Width (ft)</label>
+                        <input type="number" id="es_width_ft" step="0.01" placeholder="e.g. 20">
+
+                        <label>Tank Length (ft)</label>
+                        <input type="number" id="es_length_ft" step="0.01" placeholder="e.g. 40">
+
+                        <label>Number of Layers</label>
+                        <select id="es_layers">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8" selected>8</option>
+                        </select>
+
+                        <label>Cover Depth (ft) <span class="units-warning">— enter FEET, not inches</span></label>
+                        <span class="field-hint">Depth from finish grade to top of tank</span>
+                        <input type="number" id="es_cover_ft" step="0.01" placeholder="e.g. 2.5"
+                               oninput="updateFtInReadout('es_cover_ft','es_cover_ft_readout')">
+                        <span class="ft-in-readout" id="es_cover_ft_readout"></span>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Soil Type &amp; Slope</div>
+                    <div class="section-card-body">
+                        <label>OSHA Soil Type</label>
+                        <span class="field-hint">Selecting a type fills in its OSHA maximum slope ratio below — still editable.</span>
+                        <select id="es_soil_type" onchange="applyOshaSoilPreset()">
+                            <option value="TypeA">Type A (¾:1, 53°)</option>
+                            <option value="TypeA_ShortTerm">Type A — Short-Term ≤24hr, ≤12ft (½:1, 63°)</option>
+                            <option value="TypeB" selected>Type B (1:1, 45°)</option>
+                            <option value="TypeC">Type C (1½:1, 34°)</option>
+                            <option value="StableRock">Stable Rock (vertical, 90°)</option>
+                            <option value="Custom">Custom (enter ratio manually)</option>
+                        </select>
+
+                        <label>Slope Ratio (H:V)</label>
+                        <span class="field-hint">Auto-filled from soil type above; edit freely for a custom slope.</span>
+                        <input type="number" id="es_slope_ratio" step="0.05" value="1.0">
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Project (optional — for PDF header)</div>
+                    <div class="section-card-body">
+                        <label>Project Name</label>
+                        <input type="text" id="es_project_name" placeholder="e.g. Maple Ridge Retail Site">
+                    </div>
+                </div>
+
+                <button class="calc-btn" onclick="runExcavationSlope()">Calculate Excavation Slope</button>
+                <button class="calc-btn secondary" id="es_pdf_btn" onclick="downloadExcavationSlopePDF()" disabled>
+                    ⬇ Download Submittal PDF
+                </button>
+            </div>
+
+            <div class="calc-results" id="es_results">
+                <div class="empty-state">Enter tank geometry and soil type, then click Calculate.</div>
+            </div>
+        </div>
+
     </div>
 </div>
 
 <script>
+    // ── Shared: live ft→in readout for every "Cover Depth (ft)" field.
+    //    Exists specifically to catch the mistake of typing an inches
+    //    value (e.g. from a workbook labeled "in.") into a feet field —
+    //    seeing "24 ft = 288 in" staring back at you catches that instantly. ──
+    function updateFtInReadout(inputId, readoutId) {
+        const val = parseFloat(document.getElementById(inputId).value);
+        const readout = document.getElementById(readoutId);
+        if (isNaN(val)) {
+            readout.textContent = '';
+            return;
+        }
+        const inches = val * 12;
+        readout.textContent = `= ${val} ft = ${inches.toLocaleString(undefined, {maximumFractionDigits: 1})} in`;
+    }
+
     // ── Theme Toggle ──
     const toggleBtn = document.getElementById('themeToggle');
     const savedTheme = localStorage.getItem('theme') || 'light';
@@ -1310,6 +1431,215 @@
             const a = document.createElement('a');
             a.href = url;
             a.download = 'AquaCell_Loading_Outrigger.pdf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('PDF request failed: ' + err.message);
+        } finally {
+            pdfBtn.disabled = false;
+            pdfBtn.textContent = originalText;
+        }
+    }
+
+    // ══════════════════ EXCAVATION SLOPE ══════════════════
+    const OSHA_SLOPE_PRESETS = {
+        'TypeA': 0.75,
+        'TypeA_ShortTerm': 0.5,
+        'TypeB': 1.0,
+        'TypeC': 1.5,
+        'StableRock': 0.0
+        // 'Custom' intentionally has no preset — leaves the ratio field alone
+    };
+
+    function applyOshaSoilPreset() {
+        const soilType = document.getElementById('es_soil_type').value;
+        if (soilType in OSHA_SLOPE_PRESETS) {
+            document.getElementById('es_slope_ratio').value = OSHA_SLOPE_PRESETS[soilType];
+        }
+    }
+
+    let esLastInputs  = null;
+    let esLastResults = null;
+
+    async function runExcavationSlope() {
+        const resultsDiv = document.getElementById('es_results');
+        const pdfBtn = document.getElementById('es_pdf_btn');
+        pdfBtn.disabled = true;
+
+        const inputs = {
+            config:      document.getElementById('es_config').value,
+            width_ft:    document.getElementById('es_width_ft').value || 0,
+            length_ft:   document.getElementById('es_length_ft').value || 0,
+            layers:      document.getElementById('es_layers').value || 1,
+            cover_ft:    document.getElementById('es_cover_ft').value || 0,
+            soil_type:   document.getElementById('es_soil_type').value,
+            slope_ratio: document.getElementById('es_slope_ratio').value || 0,
+        };
+
+        resultsDiv.innerHTML = '<div class="empty-state">Calculating…</div>';
+
+        try {
+            const resp = await fetch('/design-tools/calculate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calc_type: 'excavation_slope', inputs: inputs })
+            });
+            const data = await resp.json();
+
+            if (!resp.ok || data.error) {
+                resultsDiv.innerHTML = `<div class="error-box">${data.error || 'Calculation failed.'}</div>`;
+                esLastInputs = null; esLastResults = null;
+                return;
+            }
+
+            esLastInputs  = inputs;
+            esLastResults = data;
+            pdfBtn.disabled = false;
+            renderExcavationSlopeResults(data);
+        } catch (err) {
+            resultsDiv.innerHTML = `<div class="error-box">Request failed: ${err.message}</div>`;
+            esLastInputs = null; esLastResults = null;
+        }
+    }
+
+    function renderExcavationSlopeResults(d) {
+        const resultsDiv = document.getElementById('es_results');
+
+        const warningsHtml = (d.warnings && d.warnings.length)
+            ? `<div class="result-card">
+                 <h3 style="color:#b45309;">OSHA Flags</h3>
+                 ${d.warnings.map(w => `<div class="disclaimer-box" style="margin-bottom:8px;">${w}</div>`).join('')}
+               </div>`
+            : '';
+
+        resultsDiv.innerHTML = `
+            <div class="results-flex">
+                <div class="results-data">
+                    <div class="result-card">
+                        <h3>Excavation Geometry</h3>
+                        <div class="result-row"><span>Tank Footprint (bottom)</span><span class="val">${d.bottom_length_ft} ft × ${d.bottom_width_ft} ft</span></div>
+                        <div class="result-row"><span>Tank Height</span><span class="val">${d.tank_height_ft} ft</span></div>
+                        <div class="result-row"><span>Cover Depth</span><span class="val">${d.cover_ft} ft</span></div>
+                        <div class="result-row"><span><strong>Total Excavation Depth</strong></span><span class="val">${d.total_depth_ft} ft</span></div>
+                        <div class="result-row"><span>Soil Type</span><span class="val">${d.soil_type_label}</span></div>
+                        <div class="result-row"><span>Slope Ratio (H:V)</span><span class="val">${d.slope_ratio}:1</span></div>
+                        <div class="result-row"><span>Slope Angle</span><span class="val">${d.slope_angle_deg}°</span></div>
+                    </div>
+
+                    <div class="result-card">
+                        <h3>Results</h3>
+                        <div class="result-row"><span>Offset per Side</span><span class="val">${d.offset_per_side_ft} ft</span></div>
+                        <div class="result-row"><span><strong>Top Footprint (at grade)</strong></span><span class="val">${d.top_length_ft} ft × ${d.top_width_ft} ft</span></div>
+                        <div class="result-row"><span>Bottom Area</span><span class="val">${d.a_bottom_sf.toLocaleString()} sf</span></div>
+                        <div class="result-row"><span>Mid-Depth Area</span><span class="val">${d.a_mid_sf.toLocaleString()} sf</span></div>
+                        <div class="result-row"><span>Top Area</span><span class="val">${d.a_top_sf.toLocaleString()} sf</span></div>
+                        <div class="result-row"><span><strong>Excavation Volume</strong></span><span class="val">${d.volume_cf.toLocaleString()} cf (${d.volume_cy.toLocaleString()} cy)</span></div>
+                    </div>
+
+                    ${warningsHtml}
+                </div>
+
+                <div class="results-diagram-col">
+                    <div class="diagram-box">
+                        <h3>Cross-Section (Not to Scale)</h3>
+                        ${buildExcavationSlopeSVG(d)}
+                        <div class="diagram-caption">
+                            Illustrative — the slope lines shown are the actual excavated ground surface
+                            (not a stress-distribution cone like the loading diagrams). Length direction
+                            shown; width direction uses the same ratio and angle.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Wide open cut at grade tapering via a REAL (solid-line) slope down to
+    // the narrow tank footprint at the bottom — visually the mirror image of
+    // the load-spread diagrams (which taper the other direction), and with
+    // no load arrows since these lines represent the actual cut, not an
+    // illustrative stress cone.
+    function buildExcavationSlopeSVG(d) {
+        const svgW = 300, svgH = 340;
+        const topMargin = 40, bottomMargin = 40;
+        const usableH = svgH - topMargin - bottomMargin;
+
+        const topWidthIn = d.top_length_ft * 12;
+        const bottomWidthIn = d.bottom_length_ft * 12;
+        const maxHalfWidth = Math.max(topWidthIn, bottomWidthIn) / 2;
+        const usableHalfW = 110;
+        const scale = usableHalfW / Math.max(maxHalfWidth, 1);
+
+        const cx = svgW / 2;
+        const gradeY = topMargin;
+        const tankY  = topMargin + usableH;
+
+        const topHalfPx = (topWidthIn / 2) * scale;
+        const bottomHalfPx = (bottomWidthIn / 2) * scale;
+
+        let parts = [];
+        parts.push(`<svg viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:280px;">`);
+
+        parts.push(`<rect x="0" y="0" width="${svgW}" height="${gradeY}" fill="#eff6ff"/>`);
+
+        // soil polygon: wide at grade, narrow at tank
+        parts.push(`<polygon points="${cx-topHalfPx},${gradeY} ${cx+topHalfPx},${gradeY} ${cx+bottomHalfPx},${tankY} ${cx-bottomHalfPx},${tankY}" fill="#d6c9a8"/>`);
+
+        // actual slope faces — solid lines (real cut, not illustrative)
+        parts.push(`<line x1="${cx-topHalfPx}" y1="${gradeY}" x2="${cx-bottomHalfPx}" y2="${tankY}" stroke="#334155" stroke-width="1.5"/>`);
+        parts.push(`<line x1="${cx+topHalfPx}" y1="${gradeY}" x2="${cx+bottomHalfPx}" y2="${tankY}" stroke="#334155" stroke-width="1.5"/>`);
+
+        // AquaCell band at the bottom of the excavation
+        parts.push(`<rect x="${cx-bottomHalfPx}" y="${tankY}" width="${bottomHalfPx*2}" height="14" fill="#cbd5e1" stroke="#0f1e3c" stroke-width="1.5"/>`);
+        for (let i = 1; i < 4; i++) {
+            const gx = cx - bottomHalfPx + (bottomHalfPx*2/4)*i;
+            parts.push(`<line x1="${gx}" y1="${tankY}" x2="${gx}" y2="${tankY+14}" stroke="#94a3b8" stroke-width="0.75"/>`);
+        }
+
+        // grade line + label
+        parts.push(`<line x1="10" y1="${gradeY}" x2="${svgW-10}" y2="${gradeY}" stroke="#1e293b" stroke-width="2"/>`);
+        parts.push(`<text x="14" y="${gradeY-6}" font-size="9" fill="#1e293b">GRADE</text>`);
+
+        // dimension labels
+        parts.push(`<text x="${cx}" y="${gradeY-14}" font-size="9" fill="#0f1e3c" text-anchor="middle" font-weight="bold">${d.top_length_ft.toFixed(1)} ft</text>`);
+        parts.push(`<text x="${cx}" y="${tankY+34}" font-size="9" fill="#0f1e3c" text-anchor="middle" font-weight="bold">${d.bottom_length_ft.toFixed(1)} ft (tank)</text>`);
+        parts.push(`<text x="${svgW-14}" y="${(gradeY+tankY)/2-8}" font-size="8" fill="#475569" text-anchor="end">${d.slope_ratio}:1</text>`);
+        parts.push(`<text x="${svgW-14}" y="${(gradeY+tankY)/2+3}" font-size="8" fill="#475569" text-anchor="end">${d.slope_angle_deg}°</text>`);
+        parts.push(`<text x="${svgW-14}" y="${(gradeY+tankY)/2+14}" font-size="8" fill="#475569" text-anchor="end">Depth ${d.total_depth_ft.toFixed(2)} ft</text>`);
+
+        parts.push(`</svg>`);
+        return parts.join('');
+    }
+
+    async function downloadExcavationSlopePDF() {
+        if (!esLastInputs || !esLastResults) return;
+
+        const projectName = document.getElementById('es_project_name').value || null;
+        const pdfBtn = document.getElementById('es_pdf_btn');
+        const originalText = pdfBtn.textContent;
+        pdfBtn.disabled = true;
+        pdfBtn.textContent = 'Generating…';
+
+        try {
+            const resp = await fetch('/design-tools/download_pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calc_type: 'excavation_slope', inputs: esLastInputs, project_name: projectName })
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                alert(err.error || 'PDF generation failed.');
+                return;
+            }
+
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'AquaCell_Excavation_Slope.pdf';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
