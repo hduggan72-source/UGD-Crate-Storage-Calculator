@@ -99,6 +99,37 @@ def _ll_lo_not_tandem(cover_in):
         return _LL_LLDF * cover_in + 10.0
 
 
+# ══════════════════════════════════════════════════════════════════
+#  MIN / MAX COVER TABLE — Wavin AQ-100-08 Rev 2 (4/1/2026),
+#  "AquaCell Cover & Burial Depths - Standard & EX Models"
+#  Read directly from the drawing, not OCR'd from a corrupted scan.
+#  Max cover figures are explicitly stated on the drawing as applying
+#  to a SINGLE-LAYER tank; for multi-layer tanks the drawing states the
+#  window of application "may be limited" without giving an exact
+#  number, and directs you to contact Wavin directly.
+# ══════════════════════════════════════════════════════════════════
+_MIN_MAX_COVER_TABLE = {
+    'SC': {
+        'H10':  {'min_in': 12, 'max_ft': 14.4},
+        'HS20': {'min_in': 18, 'max_ft': 14.4},
+        'HS25': {'min_in': 30, 'max_ft': 14.1},
+    },
+    'EX': {
+        'H10':  {'min_in': 12, 'max_ft': 26.2},
+        'HS20': {'min_in': 16, 'max_ft': 26.2},
+        'HS25': {'min_in': 22, 'max_ft': 26.1},
+    },
+}
+# Used only by calculators that have no traffic-load context of their own
+# (Outrigger) — the most conservative (smallest) single-layer max cover
+# across all three AASHTO ratings for that configuration, since there's
+# no way to know which traffic rating actually governs for those loads.
+_CONSERVATIVE_MAX_COVER_FT = {
+    'SC': min(v['max_ft'] for v in _MIN_MAX_COVER_TABLE['SC'].values()),
+    'EX': min(v['max_ft'] for v in _MIN_MAX_COVER_TABLE['EX'].values()),
+}
+
+
 def calc_astm_f2787_truck(traffic_load, cover_depth_ft, config, fill_pcf=_LL_FILL_PCF_DEFAULT):
     """
     Full ASTM F2787 Truck Load Model — faithful port of the verified workbook.
@@ -145,7 +176,11 @@ def calc_astm_f2787_truck(traffic_load, cover_depth_ft, config, fill_pcf=_LL_FIL
 
     dl_psi       = (fill_pcf / 1728.0) * cover_in
     max_str      = 70.0 if config == 'SC' else 100.0
-    max_cover_ft = 20.0 if config == 'SC' else 30.0
+    # Verified per-traffic-load max cover (AQ-100-08 Rev 2) — NOT a flat
+    # 20/30 ft by config. This is the single-layer figure; see the
+    # dashboard's Min Cover / Burial Depth calculator for the multi-layer
+    # caveat, which this simpler truck-load calculator doesn't carry.
+    max_cover_ft = _MIN_MAX_COVER_TABLE[config][traffic_load]['max_ft']
 
     total_press = (ll_psi or 0.0) + dl_psi
     fos_live = round(max_str / total_press, 2) if total_press > 0 else None
@@ -229,7 +264,12 @@ def calc_outrigger_load(total_weight_lbs, pad_shape, pad_length_in, pad_width_in
     factored_psi = (total_weight_lbs * (load_factor_pct / 100.0) / proj_area) if proj_area > 0 else None
     dl_psi       = (fill_pcf / 1728.0) * cover_in
     max_str      = 70.0 if config == 'SC' else 100.0
-    max_cover_ft = 20.0 if config == 'SC' else 30.0
+    # Outrigger loads don't map to an AASHTO traffic rating (H10/HS20/HS25),
+    # so there's no single verified max-cover figure for this load type in
+    # AQ-100-08. Using the most conservative (smallest) single-layer max
+    # cover across all three ratings for this config, clearly flagged as
+    # such in the results/PDF disclaimer.
+    max_cover_ft = _CONSERVATIVE_MAX_COVER_FT[config]
 
     total_press = (factored_psi or 0.0) + dl_psi
     fos = round(max_str / total_press, 2) if total_press > 0 else None
@@ -511,6 +551,94 @@ def calc_stepped_backfill(payload):
         'step_rows':             step_rows,
         'warnings':              warnings,
     }
+
+
+# ══════════════════════════════════════════════════════════════════
+#  DESIGN VERIFICATION DASHBOARD — Min Cover / Burial Depth Calculator
+#
+#  Uses the verified _MIN_MAX_COVER_TABLE (Wavin AQ-100-08, Rev 2,
+#  4/1/2026) directly -- the same table already used to fix the Truck
+#  and Outrigger calculators' max_cover_ft. This calculator's whole
+#  purpose is to check a proposed cover depth against that table.
+#
+#  Min cover PASS/FAIL is layer-count-independent (the drawing gives
+#  no such caveat for min cover -- it's a top-layer structural
+#  concern). Max cover is explicitly a single-layer figure on the
+#  drawing; for layers > 1 this returns a CAUTION status rather than
+#  a clean PASS/FAIL, per your call.
+# ══════════════════════════════════════════════════════════════════
+def calc_min_cover_burial(payload):
+    config      = payload.get('config', 'SC')
+    width_ft    = float(payload.get('width_ft', 0) or 0)
+    length_ft   = float(payload.get('length_ft', 0) or 0)
+    layers      = int(float(payload.get('layers', 1) or 1))
+    cover_ft    = float(payload.get('cover_ft', 0) or 0)
+    traffic_load = payload.get('traffic_load', 'HS20')
+    if traffic_load not in ('H10', 'HS20', 'HS25'):
+        traffic_load = 'HS20'
+
+    if width_ft <= 0 or length_ft <= 0:
+        return {'error': 'Enter a valid tank footprint (width & length).'}
+    if cover_ft <= 0:
+        return {'error': 'Enter a valid cover depth.'}
+
+    cd = CONFIG_DATA.get(config, CONFIG_DATA['SC'])
+    layer_heights = cd['layer_heights']
+    layers = max(1, min(layers, len(layer_heights)))
+    tank_height_ft = layer_heights[layers - 1]
+
+    table_entry = _MIN_MAX_COVER_TABLE[config][traffic_load]
+    min_cover_in = table_entry['min_in']
+    min_cover_ft = min_cover_in / 12.0
+    max_cover_ft = table_entry['max_ft']
+
+    min_status = 'PASS' if cover_ft >= min_cover_ft else 'FAIL'
+
+    if layers == 1:
+        max_status = 'PASS' if cover_ft <= max_cover_ft else 'FAIL'
+        max_status_label = max_status
+    else:
+        # Wavin's max-cover figure is explicitly for a single-layer tank.
+        # Still compute the comparison (useful reference), but never claim
+        # a verified PASS/FAIL for a configuration Wavin didn't tabulate.
+        max_status = 'PASS' if cover_ft <= max_cover_ft else 'FAIL'
+        max_status_label = 'CAUTION \u2014 NOT WAVIN-VERIFIED FOR MULTI-LAYER'
+
+    warnings = []
+    if layers > 1:
+        warnings.append(_MULTI_LAYER_MAX_COVER_NOTE)
+    if min_status == 'FAIL':
+        warnings.append(f'Proposed cover ({cover_ft} ft) is below the {min_cover_ft:.2f} ft '
+                         f'({min_cover_in:.0f} in) minimum required for {traffic_load} traffic on '
+                         f'{"SC" if config == "SC" else "EX"} \u2014 per Wavin AQ-100-08.')
+    if max_status == 'FAIL':
+        warnings.append(f'Proposed cover ({cover_ft} ft) exceeds the {max_cover_ft} ft maximum '
+                         f'(single-layer) for {traffic_load} traffic on {"SC" if config == "SC" else "EX"} '
+                         f'\u2014 per Wavin AQ-100-08.')
+
+    return {
+        'config':            config,
+        'traffic_load':      traffic_load,
+        'tank_height_ft':    round(tank_height_ft, 3),
+        'layers':            layers,
+        'cover_ft':          round(cover_ft, 3),
+        'total_depth_ft':    round(cover_ft + tank_height_ft, 3),
+        'min_cover_in':      round(min_cover_in, 1),
+        'min_cover_ft':      round(min_cover_ft, 3),
+        'max_cover_ft':      round(max_cover_ft, 2),
+        'min_status':        min_status,
+        'max_status':        max_status,
+        'max_status_label':  max_status_label,
+        'warnings':          warnings,
+    }
+
+
+_MULTI_LAYER_MAX_COVER_NOTE = (
+    'Max cover shown is Wavin\u2019s single-layer figure (AQ-100-08, Rev 2). This tank has more than '
+    '1 layer, and Wavin states the window of application "may be limited" for multi-layer tanks '
+    'without giving an exact reduced number \u2014 consult Wavin directly before relying on this max '
+    'cover figure for a multi-layer design.'
+)
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -2576,6 +2704,206 @@ def build_stepped_backfill_pdf(inputs, results, project_name=None):
     return buffer
 
 
+def _draw_min_cover_gauge_pdf(c, x, y_top, w, h, r):
+    """
+    ReportLab canvas "compliance gauge" for min/max cover: a horizontal
+    bar spanning [min required -> max allowed], with the proposed cover
+    plotted as a marker. Deliberately NOT drawn to a linear physical
+    scale (min and max can differ by 10x+), so the diagram stays legible
+    regardless of how far apart the two figures are.
+    """
+    min_ft  = r['min_cover_ft']
+    max_ft  = r['max_cover_ft']
+    cover_ft = r['cover_ft']
+
+    bar_y = y_top - h / 2.0
+    bar_left = x + 20
+    bar_right = x + w - 20
+    bar_w = bar_right - bar_left
+
+    span = max(max_ft - min_ft, 0.01)
+
+    def pos_of(v):
+        frac = (v - min_ft) / span
+        frac = max(-0.15, min(1.15, frac))
+        return bar_left + frac * bar_w
+
+    # bar background (the "safe" window)
+    c.setFillColor(LTGRN if r['min_status'] == 'PASS' and r['max_status'] == 'PASS' else colors.HexColor('#fef3c7'))
+    c.setStrokeColor(MGRAY)
+    c.setLineWidth(0.75)
+    c.rect(bar_left, bar_y - 8, bar_w, 16, fill=1, stroke=1)
+
+    # min / max end ticks + labels
+    c.setStrokeColor(colors.HexColor('#334155'))
+    c.setLineWidth(1.25)
+    c.line(bar_left, bar_y - 14, bar_left, bar_y + 14)
+    c.line(bar_right, bar_y - 14, bar_right, bar_y + 14)
+
+    c.setFillColor(colors.HexColor('#334155'))
+    c.setFont('Helvetica-Bold', 7)
+    c.drawCentredString(bar_left, bar_y - 22, f"Min {min_ft:.2f} ft")
+    label = f"Max {max_ft:.1f} ft"
+    if r['layers'] > 1:
+        label += " *"
+    c.drawCentredString(bar_right, bar_y - 22, label)
+
+    # proposed-cover marker
+    mx = pos_of(cover_ft)
+    marker_color = RED if (r['min_status'] == 'FAIL' or r['max_status'] == 'FAIL') else colors.HexColor('#1d4ed8')
+    c.setFillColor(marker_color)
+    c.setStrokeColor(marker_color)
+    c.setLineWidth(2)
+    c.line(mx, bar_y - 20, mx, bar_y + 20)
+    tri = c.beginPath()
+    tri.moveTo(mx - 5, bar_y + 20)
+    tri.lineTo(mx + 5, bar_y + 20)
+    tri.lineTo(mx, bar_y + 27)
+    tri.close()
+    c.drawPath(tri, fill=1, stroke=0)
+    c.setFont('Helvetica-Bold', 8)
+    c.drawCentredString(mx, bar_y + 34, f"Proposed: {cover_ft:.2f} ft")
+
+    if r['layers'] > 1:
+        c.setFillColor(GRAY)
+        c.setFont('Helvetica', 6.5)
+        c.drawCentredString(x + w / 2.0, y_top - h + 4, "* single-layer figure \u2014 not Wavin-verified for multi-layer tanks")
+
+
+_MIN_COVER_BURIAL_DISCLAIMER_TEXT = (
+    "DISCLAIMER: Minimum and maximum cover depths shown are from Wavin drawing AQ-100-08, Rev 2 "
+    "(4/1/2026), \"AquaCell Cover & Burial Depths - Standard & EX Models,\" read directly from the "
+    "drawing. Minimum cover applies regardless of layer count. Maximum cover is explicitly stated on "
+    "the drawing as applying to a SINGLE-LAYER tank; for multi-layer tanks Wavin states the window of "
+    "application may be limited without giving an exact reduced figure. THE ENGINEER OF RECORD IS "
+    "SOLELY RESPONSIBLE FOR VERIFYING FINAL COVER DEPTH AND CONSULTING WAVIN DIRECTLY FOR ANY "
+    "MULTI-LAYER TANK CONFIGURATION."
+)
+_MIN_COVER_BURIAL_BOLD_TRIGGERS = ('THE ENGINEER OF RECORD',)
+
+
+def build_min_cover_burial_pdf(inputs, results, project_name=None):
+    """Single-page submittal-ready PDF for the Min Cover / Burial Depth calculator."""
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
+
+    band_h = 64
+    c.setFillColor(NAVY)
+    c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
+    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    if logo_path and os.path.exists(logo_path):
+        try:
+            img = ImageReader(logo_path)
+            c.drawImage(img, LM, PH - band_h + 8, width=160, height=46,
+                        preserveAspectRatio=True, mask='auto')
+        except Exception:
+            pass
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 14)
+    c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
+    c.setFont('Helvetica', 9)
+    c.setFillColor(colors.HexColor('#93c5fd'))
+    c.drawRightString(PW - RM, PH - 37, 'Min Cover / Burial Depth \u2014 Wavin AQ-100-08, Rev 2')
+    c.setFont('Helvetica', 7)
+    c.setFillColor(colors.HexColor('#94a3b8'))
+    c.drawRightString(PW - RM, PH - 50, generated_str)
+
+    y = PH - band_h - 10
+    if project_name:
+        c.setFillColor(GRAY)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM, y, f'Project: {project_name}')
+        y -= 16
+
+    geom_rows = [
+        ('Configuration',        'SC — Standard' if results['config'] == 'SC' else 'EX — Extra Strong'),
+        ('Traffic Load',         results['traffic_load']),
+        ('Layers',               str(results['layers'])),
+        ('Tank Height',          f"{results['tank_height_ft']} ft"),
+        ('Proposed Cover Depth', f"{results['cover_ft']} ft"),
+        ('Total Excavation Depth', f"{results['total_depth_ft']} ft"),
+    ]
+    y = _draw_section_kv(c, y, 'TANK GEOMETRY', geom_rows, ncols=2)
+
+    result_rows = [
+        ('Min. Required Cover',  f"{results['min_cover_ft']:.2f} ft ({results['min_cover_in']:.0f} in)"),
+        ('Min. Cover Status',    results['min_status']),
+        ('Max. Allowed Cover (single-layer)', f"{results['max_cover_ft']} ft"),
+        ('Max. Cover Status',    results['max_status_label']),
+    ]
+    y = _draw_section_kv(c, y, 'RESULTS', result_rows, ncols=2)
+
+    warnings = results.get('warnings') or []
+    if warnings:
+        bar_h = 16
+        c.setFillColor(AMBER)
+        c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
+        c.setFillColor(WHITE)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM + 8, y - bar_h + 4, 'FLAGS')
+        warn_top = y - bar_h
+        line_h = 11
+        pad = 8
+        from reportlab.pdfbase.pdfmetrics import stringWidth
+        max_w = CW - pad * 2
+        wrapped = []
+        for w_text in warnings:
+            words = w_text.split()
+            cur = ''
+            for wd in words:
+                test = (cur + ' ' + wd).strip()
+                if stringWidth(test, 'Helvetica', 7.5) <= max_w:
+                    cur = test
+                else:
+                    if cur:
+                        wrapped.append(cur)
+                    cur = wd
+            if cur:
+                wrapped.append(cur)
+        warn_h = len(wrapped) * line_h + pad * 2
+        warn_bottom = warn_top - warn_h
+        c.setFillColor(LTAMB)
+        c.setStrokeColor(AMBER)
+        c.setLineWidth(0.6)
+        c.rect(LM, warn_bottom, CW, warn_h, fill=1, stroke=1)
+        ty = warn_top - pad - 6
+        c.setFont('Helvetica', 7.5)
+        c.setFillColor(BLACK)
+        for line in wrapped:
+            c.drawString(LM + pad, ty, line)
+            ty -= line_h
+        y = warn_bottom - 10
+
+    disc_h = _disclaimer_box_height(_MIN_COVER_BURIAL_DISCLAIMER_TEXT)
+    disc_top = 40 + disc_h
+    available = y - disc_top - 10
+    if available >= 90:
+        diagram_h = min(available - 16, 150)
+        bar_h = 16
+        c.setFillColor(BLUE)
+        c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
+        c.setFillColor(WHITE)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM + 8, y - bar_h + 4, 'COMPLIANCE GAUGE (NOT TO SCALE)')
+        diagram_top = y - bar_h
+        diagram_bottom = diagram_top - diagram_h
+        c.setFillColor(LGRAY)
+        c.setStrokeColor(MGRAY)
+        c.setLineWidth(0.5)
+        c.rect(LM, diagram_bottom, CW, diagram_h, fill=1, stroke=1)
+        _draw_min_cover_gauge_pdf(c, LM, diagram_top - 6, CW, diagram_h - 10, results)
+        y = diagram_bottom - 10
+
+    _draw_disclaimer_block(c, 40, disclaimer_lines_raw=_MIN_COVER_BURIAL_DISCLAIMER_TEXT,
+                            bold_triggers=_MIN_COVER_BURIAL_BOLD_TRIGGERS)
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
 # ══════════════════════════════════════════════════════════════════
 #  CALC ENGINE  —  single-tank calculation (returns dict)
 # ══════════════════════════════════════════════════════════════════
@@ -3036,6 +3364,8 @@ def design_tools_calculate():
             result = calc_excavation_slope(payload)
         elif calc_type == 'stepped_backfill':
             result = calc_stepped_backfill(payload)
+        elif calc_type == 'min_cover_burial':
+            result = calc_min_cover_burial(payload)
         else:
             return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
 
@@ -3105,6 +3435,12 @@ def design_tools_download_pdf():
                 return jsonify(result), 400
             buffer = build_stepped_backfill_pdf(payload, result, project_name=project_name)
             download_name = 'AquaCell_Stepped_Backfill.pdf'
+        elif calc_type == 'min_cover_burial':
+            result = calc_min_cover_burial(payload)
+            if 'error' in result:
+                return jsonify(result), 400
+            buffer = build_min_cover_burial_pdf(payload, result, project_name=project_name)
+            download_name = 'AquaCell_Min_Cover_Burial_Depth.pdf'
         else:
             return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
 

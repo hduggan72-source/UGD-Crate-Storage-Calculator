@@ -420,8 +420,8 @@
         <button class="calc-nav-item" data-calc="loading_outrigger" onclick="selectCalc('loading_outrigger')">
             Loading Model — Outrigger
         </button>
-        <button class="calc-nav-item disabled" disabled>
-            Min Cover / Burial Depth <span class="soon-tag">SOON</span>
+        <button class="calc-nav-item" data-calc="min_cover_burial" onclick="selectCalc('min_cover_burial')">
+            Min Cover / Burial Depth
         </button>
         <button class="calc-nav-item disabled" disabled>
             Min Distance from Manhole <span class="soon-tag">SOON</span>
@@ -852,6 +852,85 @@
 
             <div class="calc-results" id="sb_results">
                 <div class="empty-state">Enter tank geometry, soil type, and benching parameters, then click Calculate.</div>
+            </div>
+        </div>
+
+        <!-- ── MIN COVER / BURIAL DEPTH ── -->
+        <div id="panel-min_cover_burial" class="calc-panel" style="display:none;">
+            <div class="calc-inputs">
+
+                <div class="disclaimer-box">
+                    Min/max cover figures are from Wavin drawing AQ-100-08, Rev 2 (4/1/2026),
+                    "AquaCell Cover &amp; Burial Depths - Standard &amp; EX Models." Minimum cover applies
+                    regardless of layer count. Maximum cover is explicitly a <strong>single-layer</strong>
+                    figure on that drawing — for tanks with more than 1 layer, Wavin states the window of
+                    application may be limited without giving an exact reduced number, so this tool flags
+                    (rather than PASSes) the max-cover check for multi-layer tanks.
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Shared Tank Geometry</div>
+                    <div class="section-card-body">
+                        <label>Configuration</label>
+                        <select id="mc_config">
+                            <option value="SC">SC — Standard Capacity</option>
+                            <option value="EX">EX — Extra Strong</option>
+                        </select>
+
+                        <label>Tank Width (ft)</label>
+                        <input type="number" id="mc_width_ft" step="0.01" placeholder="e.g. 20">
+
+                        <label>Tank Length (ft)</label>
+                        <input type="number" id="mc_length_ft" step="0.01" placeholder="e.g. 40">
+
+                        <label>Number of Layers</label>
+                        <select id="mc_layers">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8" selected>8</option>
+                        </select>
+
+                        <label>Proposed Cover Depth (ft) <span class="units-warning">— enter FEET, not inches</span></label>
+                        <span class="field-hint">Depth from finish grade to top of tank</span>
+                        <input type="number" id="mc_cover_ft" step="0.01" placeholder="e.g. 2.5"
+                               oninput="updateFtInReadout('mc_cover_ft','mc_cover_ft_readout')">
+                        <span class="ft-in-readout" id="mc_cover_ft_readout"></span>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Traffic Load</div>
+                    <div class="section-card-body">
+                        <label>Design Truck</label>
+                        <select id="mc_traffic_load">
+                            <option value="H10">H-10</option>
+                            <option value="HS20" selected>HS-20</option>
+                            <option value="HS25">HS-25</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Project (optional — for PDF header)</div>
+                    <div class="section-card-body">
+                        <label>Project Name</label>
+                        <input type="text" id="mc_project_name" placeholder="e.g. Maple Ridge Retail Site">
+                    </div>
+                </div>
+
+                <button class="calc-btn" onclick="runMinCoverBurial()">Check Cover Depth</button>
+                <button class="calc-btn secondary" id="mc_pdf_btn" onclick="downloadMinCoverBurialPDF()" disabled>
+                    ⬇ Download Submittal PDF
+                </button>
+            </div>
+
+            <div class="calc-results" id="mc_results">
+                <div class="empty-state">Enter tank geometry, traffic load, and proposed cover depth, then click Check Cover Depth.</div>
             </div>
         </div>
 
@@ -1956,6 +2035,209 @@
             const a = document.createElement('a');
             a.href = url;
             a.download = 'AquaCell_Stepped_Backfill.pdf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('PDF request failed: ' + err.message);
+        } finally {
+            pdfBtn.disabled = false;
+            pdfBtn.textContent = originalText;
+        }
+    }
+
+    // ══════════════════ MIN COVER / BURIAL DEPTH ══════════════════
+    let mcLastInputs  = null;
+    let mcLastResults = null;
+
+    async function runMinCoverBurial() {
+        const resultsDiv = document.getElementById('mc_results');
+        const pdfBtn = document.getElementById('mc_pdf_btn');
+        pdfBtn.disabled = true;
+
+        const inputs = {
+            config:       document.getElementById('mc_config').value,
+            width_ft:     document.getElementById('mc_width_ft').value || 0,
+            length_ft:    document.getElementById('mc_length_ft').value || 0,
+            layers:       document.getElementById('mc_layers').value || 1,
+            cover_ft:     document.getElementById('mc_cover_ft').value || 0,
+            traffic_load: document.getElementById('mc_traffic_load').value,
+        };
+
+        resultsDiv.innerHTML = '<div class="empty-state">Checking…</div>';
+
+        try {
+            const resp = await fetch('/design-tools/calculate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calc_type: 'min_cover_burial', inputs: inputs })
+            });
+            const data = await resp.json();
+
+            if (!resp.ok || data.error) {
+                resultsDiv.innerHTML = `<div class="error-box">${data.error || 'Calculation failed.'}</div>`;
+                mcLastInputs = null; mcLastResults = null;
+                return;
+            }
+
+            mcLastInputs  = inputs;
+            mcLastResults = data;
+            pdfBtn.disabled = false;
+            renderMinCoverBurialResults(data);
+        } catch (err) {
+            resultsDiv.innerHTML = `<div class="error-box">Request failed: ${err.message}</div>`;
+            mcLastInputs = null; mcLastResults = null;
+        }
+    }
+
+    function renderMinCoverBurialResults(d) {
+        const resultsDiv = document.getElementById('mc_results');
+
+        function badgeHtml(status) {
+            let cls = 'badge-na';
+            if (status === 'PASS') cls = 'badge-pass';
+            else if (status === 'FAIL') cls = 'badge-fail';
+            return `<span class="badge ${cls}">${status}</span>`;
+        }
+
+        let maxBadgeCls = 'badge-na';
+        if (d.max_status_label === 'PASS') maxBadgeCls = 'badge-pass';
+        else if (d.max_status_label === 'FAIL') maxBadgeCls = 'badge-fail';
+
+        const warningsHtml = (d.warnings && d.warnings.length)
+            ? `<div class="result-card">
+                 <h3 style="color:#b45309;">Flags</h3>
+                 ${d.warnings.map(w => `<div class="disclaimer-box" style="margin-bottom:8px;">${w}</div>`).join('')}
+               </div>`
+            : '';
+
+        resultsDiv.innerHTML = `
+            <div class="results-flex">
+                <div class="results-data">
+                    <div class="result-card">
+                        <div class="fos-hero">
+                            <div class="fos-label" style="margin-bottom:6px;">Min. Cover Check</div>
+                            <div class="fos-value" style="font-size:26px;">${d.min_cover_ft.toFixed(2)} ft req.</div>
+                            <div style="margin-top:8px;">${badgeHtml(d.min_status)}</div>
+                        </div>
+                    </div>
+
+                    <div class="result-card">
+                        <div class="fos-hero">
+                            <div class="fos-label" style="margin-bottom:6px;">Max. Cover Check (single-layer)</div>
+                            <div class="fos-value" style="font-size:26px;">${d.max_cover_ft} ft max</div>
+                            <div style="margin-top:8px;"><span class="badge ${maxBadgeCls}">${d.max_status_label}</span></div>
+                        </div>
+                    </div>
+
+                    <div class="result-card">
+                        <h3>Tank Geometry</h3>
+                        <div class="result-row"><span>Configuration</span><span class="val">${d.config}</span></div>
+                        <div class="result-row"><span>Traffic Load</span><span class="val">${d.traffic_load}</span></div>
+                        <div class="result-row"><span>Layers</span><span class="val">${d.layers}</span></div>
+                        <div class="result-row"><span>Tank Height</span><span class="val">${d.tank_height_ft} ft</span></div>
+                        <div class="result-row"><span>Proposed Cover Depth</span><span class="val">${d.cover_ft} ft</span></div>
+                        <div class="result-row"><span>Total Excavation Depth</span><span class="val">${d.total_depth_ft} ft</span></div>
+                        <div class="result-row"><span>Min. Required Cover</span><span class="val">${d.min_cover_ft.toFixed(2)} ft (${d.min_cover_in.toFixed(0)} in)</span></div>
+                        <div class="result-row"><span>Max. Allowed Cover</span><span class="val">${d.max_cover_ft} ft</span></div>
+                    </div>
+
+                    ${warningsHtml}
+                </div>
+
+                <div class="results-diagram-col">
+                    <div class="diagram-box">
+                        <h3>Compliance Gauge (Not to Scale)</h3>
+                        ${buildMinCoverGaugeSVG(d)}
+                        <div class="diagram-caption">
+                            Illustrative — the bar spans Wavin's minimum-to-maximum cover window; the
+                            marker shows your proposed cover depth. Not drawn to a linear physical scale.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Horizontal "compliance gauge": a bar spanning [min required -> max
+    // allowed], with the proposed cover plotted as a marker. Deliberately
+    // not to a linear physical scale, since min and max can differ by 10x+.
+    function buildMinCoverGaugeSVG(d) {
+        const svgW = 300, svgH = 200;
+        const barY = 90;
+        const barLeft = 40, barRight = svgW - 40;
+        const barW = barRight - barLeft;
+
+        const minFt = d.min_cover_ft, maxFt = d.max_cover_ft, coverFt = d.cover_ft;
+        const span = Math.max(maxFt - minFt, 0.01);
+
+        function posOf(v) {
+            let frac = (v - minFt) / span;
+            frac = Math.max(-0.15, Math.min(1.15, frac));
+            return barLeft + frac * barW;
+        }
+
+        const allPass = (d.min_status === 'PASS' && d.max_status === 'PASS');
+        const barFill = allPass ? '#dcfce7' : '#fef3c7';
+
+        let parts = [];
+        parts.push(`<svg viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:280px;">`);
+
+        // bar
+        parts.push(`<rect x="${barLeft}" y="${barY-8}" width="${barW}" height="16" fill="${barFill}" stroke="#94a3b8" stroke-width="0.75"/>`);
+
+        // end ticks
+        parts.push(`<line x1="${barLeft}" y1="${barY-14}" x2="${barLeft}" y2="${barY+14}" stroke="#334155" stroke-width="1.5"/>`);
+        parts.push(`<line x1="${barRight}" y1="${barY-14}" x2="${barRight}" y2="${barY+14}" stroke="#334155" stroke-width="1.5"/>`);
+
+        parts.push(`<text x="${barLeft}" y="${barY+30}" font-size="9" fill="#334155" text-anchor="middle" font-weight="bold">Min ${minFt.toFixed(2)} ft</text>`);
+        let maxLabel = `Max ${maxFt.toFixed(1)} ft`;
+        if (d.layers > 1) maxLabel += ' *';
+        parts.push(`<text x="${barRight}" y="${barY+30}" font-size="9" fill="#334155" text-anchor="middle" font-weight="bold">${maxLabel}</text>`);
+
+        // marker
+        const mx = posOf(coverFt);
+        const markerColor = (d.min_status === 'FAIL' || d.max_status === 'FAIL') ? '#dc2626' : '#1d4ed8';
+        parts.push(`<line x1="${mx}" y1="${barY-24}" x2="${mx}" y2="${barY+24}" stroke="${markerColor}" stroke-width="2.5"/>`);
+        parts.push(`<polygon points="${mx-6},${barY-24} ${mx+6},${barY-24} ${mx},${barY-34}" fill="${markerColor}"/>`);
+        parts.push(`<text x="${mx}" y="${barY-40}" font-size="10" fill="${markerColor}" text-anchor="middle" font-weight="bold">Proposed: ${coverFt.toFixed(2)} ft</text>`);
+
+        if (d.layers > 1) {
+            parts.push(`<text x="${svgW/2}" y="${svgH-16}" font-size="8" fill="#6b7280" text-anchor="middle">* single-layer figure — not Wavin-verified for multi-layer tanks</text>`);
+        }
+
+        parts.push(`</svg>`);
+        return parts.join('');
+    }
+
+    async function downloadMinCoverBurialPDF() {
+        if (!mcLastInputs || !mcLastResults) return;
+
+        const projectName = document.getElementById('mc_project_name').value || null;
+        const pdfBtn = document.getElementById('mc_pdf_btn');
+        const originalText = pdfBtn.textContent;
+        pdfBtn.disabled = true;
+        pdfBtn.textContent = 'Generating…';
+
+        try {
+            const resp = await fetch('/design-tools/download_pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calc_type: 'min_cover_burial', inputs: mcLastInputs, project_name: projectName })
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                alert(err.error || 'PDF generation failed.');
+                return;
+            }
+
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'AquaCell_Min_Cover_Burial_Depth.pdf';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
