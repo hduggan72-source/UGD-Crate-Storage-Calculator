@@ -2367,14 +2367,16 @@ def _draw_stepped_backfill_diagram_pdf(c, x, y_top, w, h, r):
     cx = x + w / 2.0
 
     # Build the staircase outline (right side only; left side is a mirror).
-    # z is measured from the tank (0) up to grade (total_depth).
+    # z is measured from the tank (0) up to grade (total_depth). ReportLab's
+    # y-axis increases UPWARD (origin bottom-left), so as z increases toward
+    # grade, y must increase toward grade_y — i.e. ADD, not subtract.
     z = 0.0
     pts_right = [(cx + (r['bottom_length_ft'] / 2.0) * scale, tank_y)]
     for idx, row in enumerate(r['step_rows']):
         h_k = row['riser_height_ft']
         o_end = row['offset_end_ft']
         z += h_k
-        y_after = tank_y - z * px_per_ft
+        y_after = tank_y + z * px_per_ft
         x_after = cx + (r['bottom_length_ft'] / 2.0 + o_end) * scale
         pts_right.append((x_after, y_after))
         # vertical jump for the flat bench (skipped on the last/topmost riser,
