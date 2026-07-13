@@ -12,6 +12,8 @@ Professional web-based calculator for designing and quoting underground stormwat
 - MULTI-TANK UPDATE ON SUMMARY UI CHANGE UNITS TO FT² FROM YD² (OR HAVE SEELCTION OPTION)
 - FIX SUMMARY REPORT  SHOWING (TOP= VALUE) INSTEAD OF UNITS
 
+- ##MULIT-TANK WHEN BACKFILL STONE INFILTRATION CHANGED TO ZERO, IT DOES NOT RESET ON EACH TANK, IT CARRIES OVER TO MULTIPLE TANKS.
+
 
 **## Backlog / Future Enhancements (Add here when ideas come up)**
  - Metric toggle
