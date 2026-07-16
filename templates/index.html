@@ -1470,6 +1470,10 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             <td id="geoTankAdjCell" style="text-align:right;font-size:11px;font-weight:600;color:#10b981;"></td>
                         </tr>
                         <tr><td>Stone Backfill Envelope</td><td id="geoStoneCell" style="text-align:right;font-weight:bold;"></td></tr>
+                        <tr id="geoLinerProtRow" style="display:none;color:#10b981;">
+                            <td style="font-size:11px;">↳ Liner Protection Layer <span style="opacity:0.6;">(AQ-100-03.4)</span></td>
+                            <td id="geoLinerProtCell" style="text-align:right;font-size:11px;font-weight:600;"></td>
+                        </tr>
                         <tr><td><strong>Total Geotextile</strong></td><td id="geoTotalCell" style="text-align:right;font-weight:bold;"></td></tr>
                         <tr><td style="font-size:12px;opacity:0.7;">Waste/Overlap</td><td style="text-align:right;font-size:12px;opacity:0.7;">{{ results.geoWaste }}%</td></tr>
                     </table>
@@ -1621,11 +1625,18 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         Combined liner on Quote PDF line H: <strong id="linerCombinedDisplay">0 sq yd</strong>
                     </div>
 
-                    <!-- Hidden form inputs for liner -->
-                    <input type="hidden" id="formLinerOnTank"   name="liner_on_tank"   value="{{ '1' if form_data.get('liner_on_tank')  == '1' else '0' }}">
-                    <input type="hidden" id="formLinerOnStone"  name="liner_on_stone"  value="{{ '1' if form_data.get('liner_on_stone') == '1' else '0' }}">
-                    <input type="hidden" id="formLinerTankQty"  name="liner_tank_yd2"  value="{{ form_data.get('liner_tank_yd2',  0) }}">
-                    <input type="hidden" id="formLinerStoneQty" name="liner_stone_yd2" value="{{ form_data.get('liner_stone_yd2', 0) }}">
+                    <!-- Hidden form inputs for liner.
+                         These live in the RESULTS card, which sits OUTSIDE <form id="mainForm">
+                         (the form closes before the results section). Without the explicit
+                         form="mainForm" attribute they are not submitted on Calculate, so the
+                         liner selection silently reset to unchecked on every POST-back.
+                         The form attribute associates them with the form regardless of DOM
+                         position — same reason the geogrid/PT-ROW hidden fields work: they
+                         happen to sit inside the form tag. -->
+                    <input type="hidden" form="mainForm" id="formLinerOnTank"   name="liner_on_tank"   value="{{ '1' if form_data.get('liner_on_tank')  == '1' else '0' }}">
+                    <input type="hidden" form="mainForm" id="formLinerOnStone"  name="liner_on_stone"  value="{{ '1' if form_data.get('liner_on_stone') == '1' else '0' }}">
+                    <input type="hidden" form="mainForm" id="formLinerTankQty"  name="liner_tank_yd2"  value="{{ form_data.get('liner_tank_yd2',  0) }}">
+                    <input type="hidden" form="mainForm" id="formLinerStoneQty" name="liner_stone_yd2" value="{{ form_data.get('liner_stone_yd2', 0) }}">
 
                     <script>
                     (function(){
@@ -1661,6 +1672,10 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             document.getElementById('formLinerOnStone').value  = onStone ? '1' : '0';
                             document.getElementById('formLinerTankQty').value  = tankYd2;
                             document.getElementById('formLinerStoneQty').value = stoneYd2;
+
+                            // Liner drives the AQ-100-03.4 protection layer, which is part
+                            // of Total Geotextile — re-paint the geotextile card.
+                            if (window.setGeoUnit) window.setGeoUnit(window._currentGeoUnit || 'ft2');
                         };
 
                         // Initialise on page load
@@ -1688,10 +1703,33 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             var deduct    = unit === 'ft2' ? geoBotFt2 : geoBotYd2;
                             var adjTank   = Math.max(0, v.tank - deduct);
 
+                            // ── Liner protection non-woven (AQ-100-03.4 Note C) ──
+                            // The WT geomembrane needs non-woven on both faces; the
+                            // standard wrap provides one, so each selected liner adds
+                            // ONE matching layer equal to the liner qty (yd²-native,
+                            // waste already included). Rolled into Total Geotextile.
+                            var protTankYd2  = parseFloat(document.getElementById('formLinerTankQty')?.value)  || 0;
+                            var protStoneYd2 = parseFloat(document.getElementById('formLinerStoneQty')?.value) || 0;
+                            var protYd2      = protTankYd2 + protStoneYd2;
+                            var protDisp     = unit === 'ft2' ? protYd2 * 9 : protYd2;
+                            var grandTotal   = Math.round((v.total + protDisp) * 10) / 10;
+
                             document.getElementById('geoUnitHeader').textContent = 'Quantity (' + lbl + ')';
                             document.getElementById('geoTankCell').textContent   = v.tank.toLocaleString() + ' ' + lbl;
                             document.getElementById('geoStoneCell').textContent  = v.stone.toLocaleString() + ' ' + lbl;
-                            document.getElementById('geoTotalCell').innerHTML    = '<strong>' + v.total.toLocaleString() + ' ' + lbl + '</strong>';
+                            document.getElementById('geoTotalCell').innerHTML    = '<strong>' + grandTotal.toLocaleString() + ' ' + lbl + '</strong>';
+
+                            // Liner protection row — only when a liner is selected
+                            var protRow  = document.getElementById('geoLinerProtRow');
+                            var protCell = document.getElementById('geoLinerProtCell');
+                            if (protRow && protCell) {
+                                if (protYd2 > 0) {
+                                    protRow.style.display = '';
+                                    protCell.textContent  = '+ ' + protDisp.toLocaleString() + ' ' + lbl;
+                                } else {
+                                    protRow.style.display = 'none';
+                                }
+                            }
 
                             // Show/hide deduction rows
                             var deductRow = document.getElementById('geoDeductRow');

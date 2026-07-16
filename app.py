@@ -5267,6 +5267,18 @@ def download_quote():
       liner_stone_yd2 = int(request.form.get('liner_stone_yd2', 0) or 0)
       liner_total_yd2 = liner_tank_yd2 + liner_stone_yd2
 
+      # ── Liner protection non-woven (AQ-100-03.4 Rev 4, Note C) ────────
+      # The WT geomembrane is protected with an inner & outer layer of
+      # min. 6 oz/yd² non-woven geotextile. The standard tank wrap /
+      # backfill envelope geotextile already provides ONE of those two
+      # faces, so each selected liner adds ONE additional matching layer
+      # of non-woven equal to the liner qty (waste already included).
+      # Folded into quote lines A / B. Mirrors calc_tank() in the
+      # multi-tank model so both calculators agree.
+      liner_prot_tank_yd2  = liner_tank_yd2  if liner_on_tank  else 0
+      liner_prot_stone_yd2 = liner_stone_yd2 if liner_on_stone else 0
+      liner_prot_total_yd2 = liner_prot_tank_yd2 + liner_prot_stone_yd2
+
       if liner_on_tank and liner_on_stone:
           liner_label = f'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 TANK + STONE ENVELOPE  [{liner_tank_yd2} SY TANK + {liner_stone_yd2} SY STONE]'
       elif liner_on_tank:
@@ -5528,10 +5540,18 @@ def download_quote():
       y -= 13
 
       alpha = ['A','B','C','D','E','F','G','H','I','J']
+      # Liner protection non-woven (AQ-100-03.4 Note C) folds into lines A / B —
+      # one matching layer per selected liner; the standard wrap is the other face.
+      _line_a_qty  = geoTank_yd2_adj + liner_prot_tank_yd2
+      _line_b_qty  = int(geoStone_yd2) + liner_prot_stone_yd2
+      _line_a_desc = nw_tank_label + (' INCL. LINER PROTECTION LAYER (AQ-100-03.4)'
+                                      if liner_prot_tank_yd2 > 0 else '')
+      _line_b_desc = (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE (BACKFILL ONLY)'
+                      + (' INCL. LINER PROTECTION LAYER (AQ-100-03.4)'
+                         if liner_prot_stone_yd2 > 0 else ''))
       others_rows = [
-          (nw_tank_label, geoTank_yd2_adj, 'SQ YD'),
-          (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE (BACKFILL ONLY)',
-           int(geoStone_yd2), 'SQ YD'),
+          (_line_a_desc, _line_a_qty, 'SQ YD'),
+          (_line_b_desc, _line_b_qty, 'SQ YD'),
           (f'WOVEN MONOFILAMENT GEOTEXTILE \u2014 PT-ROW\u2122 PRE-TREATMENT + {geoWaste}% WASTE',
            int(ptrow_woven_q), 'SQ YD'),
           (f'BIAXIAL GEOGRID (INTEGRALLY FORMED POLYPROPYLENE) + {geoWaste}% WASTE'
