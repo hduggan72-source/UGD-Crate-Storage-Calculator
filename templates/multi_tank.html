@@ -1434,6 +1434,17 @@ const FIELDS = [
 // Non-scalar fields handled separately: ptrow_enabled, ptrow_areas, liner_on_tank, liner_on_stone
 
 function loadEditor(idx) {
+    // ── LOAD GUARD ──────────────────────────────────────────────────
+    // While the editor is being populated from tanks[idx], several
+    // restore helpers (setMtPtrowMethod, renderPtrowTable,
+    // renderPtrowFlowTable → updatePtrowOutputs) fire an unconditional
+    // saveDraft(). At that moment the liner and stone-inclusion
+    // checkboxes still hold the PREVIOUS tank's DOM state, so without
+    // this guard the previous tank's selections get written into the
+    // newly selected tank (carry-over bug). saveDraft() early-returns
+    // while this flag is set. Cleared in the finally block below.
+    window._loadingEditor = true;
+    try {
     document.getElementById('emptyState').style.display = 'none';
     document.getElementById('tankEditor').classList.add('visible');
     document.getElementById('editorTankTitle').textContent = tanks[idx].tank_label || `Tank ${idx + 1}`;
@@ -1474,9 +1485,15 @@ function loadEditor(idx) {
             el.checked = (v === undefined ? true : !!v);
         }
     });
+    } finally {
+        // Always release the guard — even if a restore helper throws —
+        // so normal saveDraft() behavior resumes after the editor load.
+        window._loadingEditor = false;
+    }
 }
 
 function saveDraft() {
+    if (window._loadingEditor) return;   // Editor is mid-load — DOM is a mix of old/new tank state; do not persist.
     if (activeIdx === null) return;
     FIELDS.forEach(f => {
         const el = document.getElementById('f_' + f);
