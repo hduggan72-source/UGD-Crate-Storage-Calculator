@@ -8,7 +8,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 ** ## Next Up (High Priority – Do These Next)**
 
 ##UPDATES FOR BOTH MULTI-TANK/SINGLE TANK CALCULATORS
-
+- can a drag & drop file upload by added so i can drop in the JSON for the calculator to load, rather than go to import, then have to search the file?
 - WHENEVER PVC LINER IS ADDED, MAKE SURE THERE IS A CORRESPONDNG OUTER LAYER OF NON-WOVEN GEOTEXTILE ADDED TO THE OVERALL TOTALS OF FABRIC (SINGLE TANK)
 
 **## Backlog / Future Enhancements (Add here when ideas come up)**
