@@ -3710,6 +3710,14 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const linerOnTank   = document.getElementById('linerOnTank')?.checked  || false;
         const linerOnStone  = document.getElementById('linerOnStone')?.checked || false;
 
+        // --- Liner protection non-woven (AQ-100-03.4 Note C) ---
+        // One matching layer per selected liner; already included in the
+        // Total Geotextile figure read from geoTotalCell above, so it gets
+        // its own line to keep the arithmetic transparent to the reader.
+        const linerProtYd2  = (parseFloat(linerTankQty) || 0) + (parseFloat(linerStoneQty) || 0);
+        const linerProtDisp = (window._currentGeoUnit === 'yd2' ? linerProtYd2 : linerProtYd2 * 9)
+                                .toLocaleString() + ' ' + geoUnit;
+
         const emailLines = [
             'AquaCell Proposed System',
             '',
@@ -3727,6 +3735,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             ...(parseFloat(largePipeQty) > 0 ? [`Large Diameter Pipe Connection (18"–36") ea.:    ${largePipeQty}`] : []),
             `AquaCell Tank Wrap Geotextile (${geoUnit}):              ${geoTank}${geoWasteLabel}`,
             `Stone Backfill Envelope Geotextile (${geoUnit}):         ${geoStone}${geoWasteLabel}`,
+            ...(linerProtYd2 > 0 ? [`Liner Protection Geotextile (${geoUnit}):                ${linerProtDisp}  (AQ-100-03.4)`] : []),
             `Total Geotextile (${geoUnit}):                           ${geoTotal}${geoWasteLabel}`,
             ...(parseFloat(geogridTop)    > 0 ? [`Biaxial Geogrid - Top/Cover (sq yd):              ${geogridTop}${geoWasteLabel}`]    : []),
             ...(parseFloat(geogridBottom) > 0 ? [`Biaxial Geogrid - Bottom/Tank Base (sq yd):       ${geogridBottom}${geoWasteLabel}`] : []),
