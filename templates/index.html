@@ -1388,7 +1388,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                                     <td style="text-align:right;padding:5px 10px;">{{ "{:,.1f}".format(results.stone_top_gross) }}</td>
                                     <td style="text-align:right;padding:5px 10px;" id="stoneTopNetCell">{{ "{:,.1f}".format(results.stone_top_net) }}</td>
                                     <td style="text-align:center;padding:5px 10px;">
-                                        <input type="checkbox" id="inclStoneTop" name="stone_top_included" value="1" checked
+                                        <input type="checkbox" id="inclStoneTop" value="1"
+                                            {{ '' if form_data.get('stone_top_included') == '0' else 'checked' }}
                                             onchange="recalcStoneToggles()"
                                             style="width:16px;height:16px;cursor:pointer;accent-color:#059669;">
                                     </td>
@@ -1398,7 +1399,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                                     <td style="text-align:right;padding:5px 10px;">{{ "{:,.1f}".format(results.stone_perim_gross) }}</td>
                                     <td style="text-align:right;padding:5px 10px;" id="stonePerimNetCell">{{ "{:,.1f}".format(results.stone_perim_net) }}</td>
                                     <td style="text-align:center;padding:5px 10px;">
-                                        <input type="checkbox" id="inclStonePerim" name="stone_perim_included" value="1" checked
+                                        <input type="checkbox" id="inclStonePerim" value="1"
+                                            {{ '' if form_data.get('stone_perim_included') == '0' else 'checked' }}
                                             onchange="recalcStoneToggles()"
                                             style="width:16px;height:16px;cursor:pointer;accent-color:#059669;">
                                     </td>
@@ -1408,7 +1410,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                                     <td style="text-align:right;padding:5px 10px;">{{ "{:,.1f}".format(results.stone_base_gross) }}</td>
                                     <td style="text-align:right;padding:5px 10px;" id="stoneBaseNetCell">{{ "{:,.1f}".format(results.stone_base_net) }}</td>
                                     <td style="text-align:center;padding:5px 10px;">
-                                        <input type="checkbox" id="inclStoneBase" name="stone_base_included" value="1" checked
+                                        <input type="checkbox" id="inclStoneBase" value="1"
+                                            {{ '' if form_data.get('stone_base_included') == '0' else 'checked' }}
                                             onchange="recalcStoneToggles()"
                                             style="width:16px;height:16px;cursor:pointer;accent-color:#059669;">
                                     </td>
@@ -1423,13 +1426,26 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         </table>
                         <div style="font-size:11px;opacity:0.6;margin-top:5px;padding:0 4px;">Net = Gross × stone void ratio ({{ (form_data.get('stone_void', 0.40)|float * 100)|round(0)|int }}% void). Gross values used for purchase quantity estimates. Toggle layers to include/exclude their net storage from Total System Storage.</div>
                     </div>
-                    <!-- Hidden toggle fields — synced by recalcStoneToggles(), passed on every form POST -->
-                    <input type="hidden" id="hiddenStoneTopIncl"   name="stone_top_included"   value="1">
-                    <input type="hidden" id="hiddenStonePerimIncl" name="stone_perim_included" value="1">
-                    <input type="hidden" id="hiddenStoneBaseIncl"  name="stone_base_included"  value="1">
+                    <!-- Hidden toggle fields — the single source of truth POSTed to the server.
+                         Synced by recalcStoneToggles() whenever a checkbox above changes.
+
+                         These live in the RESULTS card, which sits OUTSIDE <form id="mainForm">
+                         (the form closes well above). Without form="mainForm" they are not
+                         submitted on Calculate, so an excluded layer silently reverted to
+                         included on every POST-back. Same root cause as the liner fields.
+
+                         The visible checkboxes are deliberately UI-only (no name attribute):
+                         an unchecked checkbox submits nothing at all, so it cannot express
+                         "0" on its own — these hidden fields carry the explicit 0/1 instead.
+                         value= is seeded from the server so the state survives the round-trip. -->
+                    <input type="hidden" form="mainForm" id="hiddenStoneTopIncl"   name="stone_top_included"   value="{{ '0' if form_data.get('stone_top_included')   == '0' else '1' }}">
+                    <input type="hidden" form="mainForm" id="hiddenStonePerimIncl" name="stone_perim_included" value="{{ '0' if form_data.get('stone_perim_included') == '0' else '1' }}">
+                    <input type="hidden" form="mainForm" id="hiddenStoneBaseIncl"  name="stone_base_included"  value="{{ '0' if form_data.get('stone_base_included')  == '0' else '1' }}">
                     <script>
                     (function(){
-                        // Raw net values from server — used by recalcStoneToggles()
+                        // Raw net values from server — used by recalcStoneToggles().
+                        // These are always the FULL all-layers-included figures; the
+                        // inclusion ratio is applied client-side by recalcStoneToggles().
                         window._stoneNetRaw = {
                             top:   {{ results.stone_top_net }},
                             perim: {{ results.stone_perim_net }},
@@ -1437,6 +1453,14 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             tank:  {{ results.tank_storage }},
                             minStorage: {{ results.min_storage if results.min_storage else 0 }},
                         };
+
+                        // Repaint on load so restored toggle state (after Calculate) is
+                        // reflected in Storage Summary / totals / stage chart. Deferred to
+                        // DOMContentLoaded because recalcStoneToggles() is defined further
+                        // down the page and the stage-chart data block must exist first.
+                        document.addEventListener('DOMContentLoaded', function(){
+                            if (typeof recalcStoneToggles === 'function') recalcStoneToggles();
+                        });
                     })();
                     </script>
                 </div>
