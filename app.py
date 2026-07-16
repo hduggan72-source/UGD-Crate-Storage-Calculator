@@ -4009,6 +4009,14 @@ def multi_download_tank_summary():
         project_num     = data.get('project_num', '')
         generated_str   = datetime.datetime.now().strftime('%m/%d/%Y')
 
+        # ft²/yd² display preference from the UI toggle.
+        # 'yd2' default preserves legacy output if the field is absent.
+        # NOTE: geogrid, liner, and PT-ROW woven are purchased in whole
+        # sq yd — ft² figures are conversions (yd² × 9) of that rounded
+        # purchase quantity, not re-computed raw areas.
+        unit_mode = (data.get('unit_mode') or 'yd2').lower()
+        use_ft2   = unit_mode == 'ft2'
+
         tanks_in     = data.get('tanks', [])
         tank_results = [calc_tank(t) for t in tanks_in]
 
@@ -4212,39 +4220,56 @@ def multi_download_tank_summary():
             y -= 5
 
             # ── Accessories / provided-by-others (this tank) — full one-sheet BOM ──
+            # All area/volume lines honor the ft²/yd² UI toggle (unit_mode).
             section_hdr_mt('\u25a0  ACCESSORIES & PROVIDED BY OTHERS (THIS TANK)')
             _sh = [False]
             def _acc(label, value):
                 detail_row_mt(label, value, shade=_sh[0])
                 _sh[0] = not _sh[0]
-            # Geotextile (always present)
-            _acc('Non-Woven Geotextile \u2014 Tank Wrap',
-                 f"{r['geoTank_yd2']:,.1f} yd\u00b2  ({r['geoTank']:,.1f} ft\u00b2)")
-            _acc('Non-Woven Geotextile \u2014 Stone / Backfill',
-                 f"{r['geoStone_yd2']:,.1f} yd\u00b2  ({r['geoStone']:,.1f} ft\u00b2)")
-            # Stone backfill (always present)
-            _acc('Stone Backfill (#57 or select)',
-                 f"{r['stone_yd3']:,.1f} cu yd  ({r['stone_tons']:,.1f} tons)")
+            # Geotextile (always present) — primary unit first, other in parens
+            if use_ft2:
+                _acc('Non-Woven Geotextile \u2014 Tank Wrap',
+                     f"{r['geoTank']:,.1f} ft\u00b2  ({r['geoTank_yd2']:,.1f} yd\u00b2)")
+                _acc('Non-Woven Geotextile \u2014 Stone / Backfill',
+                     f"{r['geoStone']:,.1f} ft\u00b2  ({r['geoStone_yd2']:,.1f} yd\u00b2)")
+            else:
+                _acc('Non-Woven Geotextile \u2014 Tank Wrap',
+                     f"{r['geoTank_yd2']:,.1f} yd\u00b2  ({r['geoTank']:,.1f} ft\u00b2)")
+                _acc('Non-Woven Geotextile \u2014 Stone / Backfill',
+                     f"{r['geoStone_yd2']:,.1f} yd\u00b2  ({r['geoStone']:,.1f} ft\u00b2)")
+            # Stone backfill (always present) — purchase volume w/ overage
+            if use_ft2:
+                _acc('Stone Backfill (#57 or select)',
+                     f"{r['stone_yd3'] * 27:,.1f} cu ft  ({r['stone_tons']:,.1f} tons)")
+            else:
+                _acc('Stone Backfill (#57 or select)',
+                     f"{r['stone_yd3']:,.1f} cu yd  ({r['stone_tons']:,.1f} tons)")
+            # Unit label + yd²-native → display converter for the lines below
+            _au   = 'ft\u00b2' if use_ft2 else 'yd\u00b2'
+            _conv = (lambda v: v * 9) if use_ft2 else (lambda v: v)
             # PT-ROW pre-treatment (if applicable)
             if r.get('ptrow_enabled') and r.get('ptrow_total_crates', 0) > 0:
                 _acc('PT-ROW\u2122 Pre-Treatment Crates', f"{r['ptrow_total_crates']:,}")
                 if r.get('ptrow_woven_yd2', 0) > 0:
-                    _acc('PT-ROW\u2122 Woven Monofilament Geotextile', f"{r['ptrow_woven_yd2']:,.1f} yd\u00b2")
-            # Biaxial geogrid (if applicable)
-            _geogrid_total = (r.get('geogrid_top_yd2', 0) or 0) + (r.get('geogrid_bottom_yd2', 0) or 0)
+                    _acc('PT-ROW\u2122 Woven Monofilament Geotextile',
+                         f"{_conv(r['ptrow_woven_yd2']):,.1f} {_au}")
+            # Biaxial geogrid (if applicable) — units on every value
+            _geogrid_top = r.get('geogrid_top_yd2', 0) or 0
+            _geogrid_bot = r.get('geogrid_bottom_yd2', 0) or 0
+            _geogrid_total = _geogrid_top + _geogrid_bot
             if _geogrid_total > 0:
                 _detail = []
-                if r.get('geogrid_top_yd2', 0) > 0:    _detail.append(f"top {r['geogrid_top_yd2']:,.1f}")
-                if r.get('geogrid_bottom_yd2', 0) > 0: _detail.append(f"bot {r['geogrid_bottom_yd2']:,.1f}")
+                if _geogrid_top > 0: _detail.append(f"top {_conv(_geogrid_top):,.1f} {_au}")
+                if _geogrid_bot > 0: _detail.append(f"bottom {_conv(_geogrid_bot):,.1f} {_au}")
                 _suffix = f"  ({', '.join(_detail)})" if _detail else ''
-                _acc('Biaxial Geogrid', f"{_geogrid_total:,.1f} yd\u00b2{_suffix}")
+                _acc('Biaxial Geogrid', f"{_conv(_geogrid_total):,.1f} {_au}{_suffix}")
             # PVC / geomembrane liner (if applicable)
             if (r.get('liner_total_yd2', 0) or 0) > 0:
                 _lscope = []
                 if r.get('liner_on_tank'):  _lscope.append('tank')
                 if r.get('liner_on_stone'): _lscope.append('stone')
                 _lsfx = f"  ({' + '.join(_lscope)})" if _lscope else ''
-                _acc('PVC / Geomembrane Liner', f"{r['liner_total_yd2']:,.1f} yd\u00b2{_lsfx}")
+                _acc('PVC / Geomembrane Liner', f"{_conv(r['liner_total_yd2']):,.1f} {_au}{_lsfx}")
             # Large diameter pipe connections (if applicable)
             if (r.get('large_pipe_qty', 0) or 0) > 0:
                 _acc('Large Diameter Pipe Connections (18\u201336\u2033)', f"{r['large_pipe_qty']:,} ea")
