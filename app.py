@@ -3079,6 +3079,17 @@ def calc_tank(t):
     liner_tank_yd2  = math.ceil(geoTank  * (1 + geoWaste/100.0) / 9) if liner_on_tank  else 0
     liner_stone_yd2 = math.ceil(geoStone * (1 + geoWaste/100.0) / 9) if liner_on_stone else 0
     liner_total_yd2 = liner_tank_yd2 + liner_stone_yd2
+
+    # ── Liner protection non-woven (AQ-100-03.4 Rev 4, Note C) ────────
+    # The WT geomembrane is protected with an inner & outer layer of
+    # min. 6 oz/yd² non-woven geotextile. The standard tank wrap /
+    # backfill envelope geotextile already provides ONE of those two
+    # faces, so each selected liner adds ONE additional matching layer
+    # of non-woven, equal to the liner quantity (waste already included
+    # in the liner qty). Rolled into all fabric totals downstream.
+    liner_prot_tank_yd2  = liner_tank_yd2
+    liner_prot_stone_yd2 = liner_stone_yd2
+    liner_prot_total_yd2 = liner_prot_tank_yd2 + liner_prot_stone_yd2
     stone_yd3  = round(stone_env_vol * 1.10 / 27, 1)
     stone_tons = round(stone_env_vol * 1.10 * 100 / 2000, 2)
 
@@ -3199,6 +3210,9 @@ def calc_tank(t):
         'liner_tank_yd2':  liner_tank_yd2,
         'liner_stone_yd2': liner_stone_yd2,
         'liner_total_yd2': liner_total_yd2,
+        'liner_prot_tank_yd2':  liner_prot_tank_yd2,
+        'liner_prot_stone_yd2': liner_prot_stone_yd2,
+        'liner_prot_total_yd2': liner_prot_total_yd2,
         # Large pipe
         'large_pipe_qty': large_pipe_qty,
         # Stone backfill
@@ -3249,6 +3263,7 @@ def cumulative_bom(tank_results):
         'ptrow_total_crates': 0, 'ptrow_woven_yd2': 0,
         'geogrid_top_yd2': 0, 'geogrid_bottom_yd2': 0,
         'liner_tank_yd2': 0, 'liner_stone_yd2': 0, 'liner_total_yd2': 0,
+        'liner_prot_tank_yd2': 0, 'liner_prot_stone_yd2': 0, 'liner_prot_total_yd2': 0,
         'large_pipe_qty': 0,
     }
     for r in tank_results:
@@ -3746,6 +3761,17 @@ def multi_download_quote():
         cum_adapters     = cum['top_adapters_12'] + cum['top_adapters_16']
         geoWaste_pct     = tank_results[0]['geoWaste'] if tank_results else 20
 
+        # Liner protection non-woven (AQ-100-03.4 Note C) — one matching
+        # layer per selected liner, folded into quote lines A / B.
+        cum_prot_tank  = int(cum.get('liner_prot_tank_yd2', 0))
+        cum_prot_stone = int(cum.get('liner_prot_stone_yd2', 0))
+        line_a_qty  = cum_geoTank_yd2_adj + cum_prot_tank
+        line_b_qty  = cum_geoStone_yd2 + cum_prot_stone
+        line_a_desc = (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste_pct}% WASTE (TANK ONLY)'
+                       + (' INCL. LINER PROTECTION LAYER (AQ-100-03.4)' if cum_prot_tank > 0 else ''))
+        line_b_desc = (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste_pct}% WASTE (BACKFILL ONLY)'
+                       + (' INCL. LINER PROTECTION LAYER (AQ-100-03.4)' if cum_prot_stone > 0 else ''))
+
         # Geogrid combined
         cum_geogrid_top  = int(cum.get('geogrid_top_yd2', 0))
         cum_geogrid_bot  = int(cum.get('geogrid_bottom_yd2', 0))
@@ -3773,10 +3799,8 @@ def multi_download_quote():
             liner_desc = 'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 NOT SPECIFIED'
 
         others_rows_mt = [
-            ('A', f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste_pct}% WASTE (TANK ONLY)',
-             cum_geoTank_yd2_adj, 'SQ YD'),
-            ('B', f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste_pct}% WASTE (BACKFILL ONLY)',
-             cum_geoStone_yd2, 'SQ YD'),
+            ('A', line_a_desc, line_a_qty, 'SQ YD'),
+            ('B', line_b_desc, line_b_qty, 'SQ YD'),
             ('C', f'WOVEN MONOFILAMENT GEOTEXTILE \u2014 PT-ROW\u2122 PRE-TREATMENT + {geoWaste_pct}% WASTE',
              int(cum.get('ptrow_woven_yd2', 0)), 'SQ YD'),
             ('D', geogrid_desc, cum_geogrid_total, 'SQ YD'),
@@ -4270,6 +4294,12 @@ def multi_download_tank_summary():
                 if r.get('liner_on_stone'): _lscope.append('stone')
                 _lsfx = f"  ({' + '.join(_lscope)})" if _lscope else ''
                 _acc('PVC / Geomembrane Liner', f"{_conv(r['liner_total_yd2']):,.1f} {_au}{_lsfx}")
+                # Liner protection non-woven (AQ-100-03.4 Note C) — one
+                # matching layer per liner; standard wrap is the other face.
+                _prot = r.get('liner_prot_total_yd2', 0) or 0
+                if _prot > 0:
+                    _acc('Non-Woven Geotextile \u2014 Liner Protection Layer (AQ-100-03.4)',
+                         f"{_conv(_prot):,.1f} {_au}")
             # Large diameter pipe connections (if applicable)
             if (r.get('large_pipe_qty', 0) or 0) > 0:
                 _acc('Large Diameter Pipe Connections (18\u201336\u2033)', f"{r['large_pipe_qty']:,} ea")

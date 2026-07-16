@@ -1131,6 +1131,10 @@
                         <span class="rl" id="lbl_r_liner">Watertight Liner (ft²)</span>
                         <span class="rv" id="r_liner">—</span>
                     </div>
+                    <div class="result-row">
+                        <span class="rl" id="lbl_r_liner_prot">Liner Protection Non-Woven (ft²) — AQ-100-03.4</span>
+                        <span class="rv" id="r_liner_prot">—</span>
+                    </div>
                 </div>
             </div>
 
@@ -1244,6 +1248,10 @@
         <div class="cum-bom-row">
             <span class="cum-bom-label" id="lbl_cum_liner">Liner (ft²)</span>
             <span class="cum-bom-val" id="cum_liner_total">—</span>
+        </div>
+        <div class="cum-bom-row">
+            <span class="cum-bom-label" id="lbl_cum_liner_prot">Liner Protection Non-Woven (ft²)</span>
+            <span class="cum-bom-val" id="cum_liner_prot">—</span>
         </div>
         <div class="cum-bom-row">
             <span class="cum-bom-label">Large Diameter Connections</span>
@@ -1758,6 +1766,7 @@ function setMtGeoUnit(unit) {
     setEl('lbl_r_geoStone', `Backfill Envelope (${a})`);
     setEl('lbl_r_geoTotal', `Total Non-Woven Geotextile (${a})`);
     setEl('lbl_r_liner',    `Watertight Liner (${a})`);
+    setEl('lbl_r_liner_prot', `Liner Protection Non-Woven (${a}) — AQ-100-03.4`);
     // Static labels — cumulative panel
     setEl('lbl_cum_geo_tank',  `Non-Woven Geo — Tank (${a})`);
     setEl('lbl_cum_geo_stone', `Non-Woven Geo — Backfill (${a})`);
@@ -1765,6 +1774,7 @@ function setMtGeoUnit(unit) {
     setEl('lbl_cum_ptrow',     `PT-ROW™ Woven Fabric (${a})`);
     setEl('lbl_cum_geogrid',   `Biaxial Geogrid (${a})`);
     setEl('lbl_cum_liner',     `Liner (${a})`);
+    setEl('lbl_cum_liner_prot', `Liner Protection Non-Woven (${a})`);
     setEl('lbl_cum_stone',     `Total Stone (${v} w/overage)`);
 
     // Re-paint live values without recalculating
@@ -1777,10 +1787,16 @@ function renderGeoDisplays(r) {
     const a = mtAreaLbl();
     const geoWaste = r.geoWaste || 20;
 
-    // Geotextile (server values are ft²-native)
+    // Geotextile (server values are ft²-native). Grand total includes the
+    // liner-protection non-woven (yd²-native, AQ-100-03.4 Note C) when present.
+    const protYd2 = r.liner_prot_total_yd2 || 0;
     setEl('r_geoTank',  mtAreaFromFt2(r.geoTank).toLocaleString()  + ' ' + a);
     setEl('r_geoStone', mtAreaFromFt2(r.geoStone).toLocaleString() + ' ' + a);
-    setEl('r_geoTotal', mtAreaFromFt2(r.geoTotal).toLocaleString() + ' ' + a);
+    const geoGrand = Math.round((mtAreaFromFt2(r.geoTotal) + mtAreaFromYd2(protYd2)) * 10) / 10;
+    setEl('r_geoTotal', geoGrand.toLocaleString() + ' ' + a);
+
+    // Liner protection non-woven row
+    setEl('r_liner_prot', protYd2 > 0 ? mtAreaFromYd2(protYd2).toLocaleString() + ' ' + a : '—');
 
     // PT-ROW woven fabric (yd²-native purchase qty)
     const ptrowFabEl = document.getElementById('r_ptrow_woven');
@@ -1831,12 +1847,16 @@ function renderGeoDisplays(r) {
 // Cumulative panel "By Others" values — unit-aware painter
 function renderCumUnits(cum) {
     const a = mtAreaLbl();
+    const cumProtYd2 = cum.liner_prot_total_yd2 || 0;
     setEl('cum_geo_tank_yd2',   mtAreaFromFt2(cum.geoTank).toLocaleString()  + ' ' + a);
     setEl('cum_geo_stone_yd2',  mtAreaFromFt2(cum.geoStone).toLocaleString() + ' ' + a);
-    setEl('cum_geo',            mtAreaFromFt2(cum.geoTotal).toLocaleString() + ' ' + a);
+    // Total non-woven includes liner-protection layers (AQ-100-03.4 Note C)
+    const cumGeoGrand = Math.round((mtAreaFromFt2(cum.geoTotal) + mtAreaFromYd2(cumProtYd2)) * 10) / 10;
+    setEl('cum_geo',            cumGeoGrand.toLocaleString() + ' ' + a);
     setEl('cum_ptrow_woven_yd2', mtAreaFromYd2(cum.ptrow_woven_yd2 || 0).toLocaleString() + ' ' + a);
     setEl('cum_geogrid_total',  mtAreaFromYd2((cum.geogrid_top_yd2||0) + (cum.geogrid_bottom_yd2||0)).toLocaleString() + ' ' + a);
     setEl('cum_liner_total',    mtAreaFromYd2(cum.liner_total_yd2 || 0).toLocaleString() + ' ' + a);
+    setEl('cum_liner_prot',     cumProtYd2 > 0 ? mtAreaFromYd2(cumProtYd2).toLocaleString() + ' ' + a : '—');
     setEl('cum_stone_yd3',      mtVolFromYd3(cum.stone_yd3).toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1}) + ' ' + mtVolLbl());
 }
 
@@ -1919,7 +1939,7 @@ function clearCumulative() {
      'cum_bottom_plates','cum_pipe_connectors','cum_top_adapters_12','cum_top_adapters_16',
      'cum_weight','cum_pallets',
      'cum_geo_tank_yd2','cum_geo_stone_yd2','cum_geo',
-     'cum_ptrow_woven_yd2','cum_geogrid_total','cum_liner_total','cum_large_pipe',
+     'cum_ptrow_woven_yd2','cum_geogrid_total','cum_liner_total','cum_liner_prot','cum_large_pipe',
      'cum_stone_yd3','priceFloorCost','priceSubtotal','priceFreight','priceTotal',
      'priceCostPerFt3'].forEach(id => setEl(id, '—'));
     document.getElementById('cum_contingency').value = '';
@@ -2673,6 +2693,9 @@ function copyToClipboard() {
     const totGeogridTopU = mtAreaFromYd2(calcedResults.reduce((s, r) => s + (r.geogrid_top_yd2   || 0), 0));
     const totGeogridBotU = mtAreaFromYd2(calcedResults.reduce((s, r) => s + (r.geogrid_bottom_yd2|| 0), 0));
     const totLinerTotalU = mtAreaFromYd2(calcedResults.reduce((s, r) => s + (r.liner_total_yd2   || 0), 0));
+    const totLinerProtU  = mtAreaFromYd2(calcedResults.reduce((s, r) => s + (r.liner_prot_total_yd2 || 0), 0));
+    // Grand total non-woven = tank wrap + backfill envelope + liner protection (AQ-100-03.4)
+    const totGeoGrandU   = Math.round((totGeoTotalU + totLinerProtU) * 10) / 10;
     const totLargePipe   = calcedResults.reduce((s, r) => s + (r.large_pipe_qty    || 0), 0);
     const contingency = (window._contingencyOverride !== null && window._contingencyOverride !== undefined)
         ? window._contingencyOverride
@@ -2720,7 +2743,8 @@ function copyToClipboard() {
         '',
         `Non-Woven Geo — Tank Wrap (${uA}):                 ${fmt(totGeoTankU)}${wasteLabel}`,
         `Non-Woven Geo — Backfill Envelope (${uA}):         ${fmt(totGeoStoneU)}${wasteLabel}`,
-        `Total Non-Woven Geotextile (${uA}):                ${fmt(totGeoTotalU)}${wasteLabel}`,
+        ...(totLinerProtU > 0 ? [`Non-Woven Geo — Liner Protection (${uA}):          ${fmtI(totLinerProtU)}  (AQ-100-03.4)`] : []),
+        `Total Non-Woven Geotextile (${uA}):                ${fmt(totGeoGrandU)}${wasteLabel}`,
         ...(totPtrowWovenU > 0 ? [`PT-ROW™ Woven Fabric (${uA}):                      ${fmtI(totPtrowWovenU)}${wasteLabel}${totPtrowCrates > 0 ? '  (' + totPtrowCrates + ' crates)' : ''}`] : []),
         ...(totGeogridTopU > 0 ? [`Biaxial Geogrid — Top (${uA}):                     ${fmtI(totGeogridTopU)}${wasteLabel}`]  : []),
         ...(totGeogridBotU > 0 ? [`Biaxial Geogrid — Bottom (${uA}):                  ${fmtI(totGeogridBotU)}${wasteLabel}`]  : []),
