@@ -2414,6 +2414,9 @@
                 <div class="result-row"><span>Bounding Box Area</span><span class="val">${d.bounding_box_area_sf.toLocaleString()} sf</span></div>
                 <div class="result-row"><span><strong>Net Footprint Area</strong></span><span class="val">${d.net_footprint_area_sf.toLocaleString()} sf</span></div>
                 <div class="result-row"><span><strong>Fill Efficiency</strong></span><span class="val">${d.fill_efficiency_pct}%</span></div>
+                <div class="result-row"><span><strong>Perimeter</strong></span><span class="val">${d.perimeter_ft.toLocaleString()} ft</span></div>
+                <div class="result-row"><span style="padding-left:12px;color:#64748b;">— horizontal (top/bottom edges)</span><span class="val">${d.perim_horizontal_ft.toLocaleString()} ft</span></div>
+                <div class="result-row"><span style="padding-left:12px;color:#64748b;">— vertical (side edges)</span><span class="val">${d.perim_vertical_ft.toLocaleString()} ft</span></div>
             </div>
 
             <div class="result-card">

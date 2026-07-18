@@ -710,6 +710,39 @@ def calc_complex_shape_builder(payload):
     bounding_width_crates  = max_extent_crates
     bounding_length_crates = n_rows
 
+    # ── Perimeter of the row-union footprint ────────────────────────
+    # Each row is a single contiguous horizontal strip spanning crate
+    # columns [offset, offset + crate_count). Perimeter = exposed edges
+    # of the union of these strips.
+    #   • Vertical edges (left/right of a row) run in the LENGTH
+    #     direction, each MODULE_LEN long. Because every row is one
+    #     contiguous span, each row always exposes exactly its left and
+    #     right edge → 2 * MODULE_LEN per row.
+    #   • Horizontal edges (top/bottom of a row) run in the WIDTH
+    #     direction. A row's top/bottom edge is exposed only where it
+    #     does NOT overlap the adjacent row above/below.
+    # Verified against brute-force per-crate edge rasterization
+    # (rectangle, corner-notch L, and centered-notch traces all match).
+    # ASSUMPTION: rows have no internal gaps (data model can't express
+    # one). If gapped rows are ever added, the vertical term must be
+    # recomputed from exposed spans.
+    perim_vertical_ft   = 2.0 * n_rows * MODULE_LEN
+    perim_horizontal_ft = 0.0
+    for i, r in enumerate(rows):
+        lo = r['offset_crates']
+        hi = lo + r['crate_count']
+        for nb in (i - 1, i + 1):
+            if 0 <= nb < n_rows:
+                nlo = rows[nb]['offset_crates']
+                nhi = nlo + rows[nb]['crate_count']
+                overlap = max(0, min(hi, nhi) - max(lo, nlo))
+            else:
+                overlap = 0
+            exposed_cols = r['crate_count'] - overlap
+            perim_horizontal_ft += exposed_cols * MODULE_WID
+
+    perimeter_ft = perim_horizontal_ft + perim_vertical_ft
+
     net_footprint_area_sf     = total_crates_layer * MODULE_WID * MODULE_LEN
     bounding_width_ft         = bounding_width_crates * MODULE_WID
     bounding_length_ft        = bounding_length_crates * MODULE_LEN
@@ -733,6 +766,9 @@ def calc_complex_shape_builder(payload):
         'net_footprint_area_sf':    round(net_footprint_area_sf, 2),
         'bounding_box_area_sf':     round(bounding_box_area_sf, 2),
         'fill_efficiency_pct':      round(fill_efficiency_pct, 1),
+        'perimeter_ft':             round(perimeter_ft, 2),
+        'perim_horizontal_ft':      round(perim_horizontal_ft, 2),
+        'perim_vertical_ft':        round(perim_vertical_ft, 2),
         'module_wid_ft':            MODULE_WID,
         'module_len_ft':            MODULE_LEN,
     }
