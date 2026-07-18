@@ -2389,6 +2389,121 @@
         }
     }
 
+    // ──────────────────────────────────────────────────────────────
+    //  Plan-view SVG builder for the Complex Shape Builder.
+    //  Draws the true footprint from the row data: one rectangle per
+    //  row positioned by offset_crates (x) and row index (y). Includes
+    //  a crate-module grid, dashed bounding box, a thick union-outline
+    //  traced around the exposed perimeter (matches the reported
+    //  perimeter number), dimension labels, and a north/orientation
+    //  arrow. Pure client-side; scales to fit any tank size.
+    //
+    //  Coordinate model (cell units): x = crate column, y = row index.
+    //  1 column = MODULE_WID ft (X), 1 row = MODULE_LEN ft (Y).
+    //  We scale X and Y independently by real feet so proportions are
+    //  physically honest (a crate is wider than it is deep).
+    // ──────────────────────────────────────────────────────────────
+    function buildComplexShapeSVG(d) {
+        const MW = d.module_wid_ft;   // ft per column (X)
+        const ML = d.module_len_ft;   // ft per row    (Y)
+        const rows = d.rows.map(r => ({ cc: r.crate_count, off: r.offset_crates }));
+        const nRows = rows.length;
+        if (nRows === 0) return '';
+
+        // Footprint extent in cell units.
+        const maxCol = Math.max(...rows.map(r => r.off + r.cc));   // right edge
+        const minCol = 0;                                          // left edge (offsets >= 0)
+
+        // Real-world extent in feet.
+        const widthFt  = (maxCol - minCol) * MW;
+        const lengthFt = nRows * ML;
+
+        // Canvas sizing. Fixed drawable area; scale to fit, keep feet-honest.
+        const PAD = 46;                       // room for labels/arrow
+        const MAXW = 560, MAXH = 460;         // drawable box (px) for the shape
+        const sx = MAXW / widthFt;
+        const sy = MAXH / lengthFt;
+        const s  = Math.min(sx, sy);          // uniform ft->px so aspect is true
+        const drawW = widthFt  * s;
+        const drawH = lengthFt * s;
+        const svgW = drawW + PAD * 2;
+        const svgH = drawH + PAD * 2;
+
+        // Cell -> pixel helpers. Origin (0,0) cell maps to (PAD, PAD).
+        const px = col => PAD + (col - minCol) * MW * s;
+        const py = row => PAD + row * ML * s;
+
+        // ── Row rectangles ──────────────────────────────────────────
+        let rects = '';
+        rows.forEach((r, i) => {
+            const x = px(r.off);
+            const y = py(i);
+            const w = r.cc * MW * s;
+            const h = ML * s;
+            rects += `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" fill="var(--highlight)" stroke="none"/>`;
+        });
+
+        // ── Crate-module grid (interior cell lines) ─────────────────
+        let grid = '';
+        rows.forEach((r, i) => {
+            const y0 = py(i), y1 = py(i + 1);
+            // vertical lines between crates in this row
+            for (let c = r.off; c <= r.off + r.cc; c++) {
+                const x = px(c);
+                grid += `<line x1="${x.toFixed(2)}" y1="${y0.toFixed(2)}" x2="${x.toFixed(2)}" y2="${y1.toFixed(2)}" stroke="var(--border)" stroke-width="0.5"/>`;
+            }
+            // horizontal line at row bottom across this row's span
+            grid += `<line x1="${px(r.off).toFixed(2)}" y1="${y1.toFixed(2)}" x2="${px(r.off + r.cc).toFixed(2)}" y2="${y1.toFixed(2)}" stroke="var(--border)" stroke-width="0.5"/>`;
+        });
+        // top line of first row
+        grid += `<line x1="${px(rows[0].off).toFixed(2)}" y1="${py(0).toFixed(2)}" x2="${px(rows[0].off + rows[0].cc).toFixed(2)}" y2="${py(0).toFixed(2)}" stroke="var(--border)" stroke-width="0.5"/>`;
+
+        // ── Union outline (exposed boundary edges) ──────────────────
+        // Emit each boundary edge (filled cell adjacent to empty/outside).
+        const filled = new Set();
+        rows.forEach((r, i) => { for (let c = r.off; c < r.off + r.cc; c++) filled.add(i + ',' + c); });
+        const has = (r, c) => filled.has(r + ',' + c);
+        let outline = '';
+        rows.forEach((r, i) => {
+            for (let c = r.off; c < r.off + r.cc; c++) {
+                if (!has(i - 1, c)) outline += `<line x1="${px(c).toFixed(2)}" y1="${py(i).toFixed(2)}" x2="${px(c + 1).toFixed(2)}" y2="${py(i).toFixed(2)}"/>`;
+                if (!has(i + 1, c)) outline += `<line x1="${px(c).toFixed(2)}" y1="${py(i + 1).toFixed(2)}" x2="${px(c + 1).toFixed(2)}" y2="${py(i + 1).toFixed(2)}"/>`;
+                if (!has(i, c - 1)) outline += `<line x1="${px(c).toFixed(2)}" y1="${py(i).toFixed(2)}" x2="${px(c).toFixed(2)}" y2="${py(i + 1).toFixed(2)}"/>`;
+                if (!has(i, c + 1)) outline += `<line x1="${px(c + 1).toFixed(2)}" y1="${py(i).toFixed(2)}" x2="${px(c + 1).toFixed(2)}" y2="${py(i + 1).toFixed(2)}"/>`;
+            }
+        });
+
+        // ── Dashed bounding box ─────────────────────────────────────
+        const bbX = px(minCol), bbY = py(0);
+        const bbW = (maxCol - minCol) * MW * s;
+        const bbH = nRows * ML * s;
+        const bbox = `<rect x="${bbX.toFixed(2)}" y="${bbY.toFixed(2)}" width="${bbW.toFixed(2)}" height="${bbH.toFixed(2)}" fill="none" stroke="var(--accent)" stroke-width="1" stroke-dasharray="5 4" opacity="0.6"/>`;
+
+        // ── Dimension labels ────────────────────────────────────────
+        const labelW = `<text x="${(bbX + bbW / 2).toFixed(2)}" y="${(bbY - 14).toFixed(2)}" text-anchor="middle" font-size="12" fill="var(--text)">${d.bounding_width_ft} ft (${d.bounding_width_crates} crates)</text>`;
+        const labelH = `<text x="${(bbX - 12).toFixed(2)}" y="${(bbY + bbH / 2).toFixed(2)}" text-anchor="middle" font-size="12" fill="var(--text)" transform="rotate(-90 ${(bbX - 12).toFixed(2)} ${(bbY + bbH / 2).toFixed(2)})">${d.bounding_length_ft} ft (${nRows} rows)</text>`;
+
+        // ── North / orientation arrow (top-right) ───────────────────
+        const nx = svgW - 24, ny = 30;
+        const northArrow = `
+            <g opacity="0.8">
+              <line x1="${nx}" y1="${ny + 16}" x2="${nx}" y2="${ny - 8}" stroke="var(--text)" stroke-width="1.5"/>
+              <path d="M ${nx - 4} ${ny - 3} L ${nx} ${ny - 9} L ${nx + 4} ${ny - 3} Z" fill="var(--text)"/>
+              <text x="${nx}" y="${ny + 28}" text-anchor="middle" font-size="10" fill="var(--text)">PLAN</text>
+            </g>`;
+
+        return `
+          <svg viewBox="0 0 ${svgW.toFixed(0)} ${svgH.toFixed(0)}" width="100%" style="max-width:${svgW.toFixed(0)}px;height:auto;display:block;margin:0 auto;">
+            ${bbox}
+            ${rects}
+            ${grid}
+            <g stroke="var(--accent)" stroke-width="2.5" stroke-linecap="square">${outline}</g>
+            ${labelW}
+            ${labelH}
+            ${northArrow}
+          </svg>`;
+    }
+
     function renderComplexShapeBuilderResults(d) {
         const resultsDiv = document.getElementById('cs_results');
 
@@ -2396,7 +2511,19 @@
             `<div class="result-row"><span>Row ${r.row_index} — ${r.crate_count} crates wide, offset ${r.offset_crates}</span><span class="val">${r.row_width_ft} ft wide @ ${r.row_offset_ft} ft</span></div>`
         ).join('');
 
+        const svg = buildComplexShapeSVG(d);
+
         resultsDiv.innerHTML = `
+            <div class="result-card">
+                <h3>Plan View (Top-Down)</h3>
+                <div style="padding:8px 4px;overflow-x:auto;">${svg}</div>
+                <div style="font-size:11px;color:#64748b;margin-top:6px;line-height:1.4;">
+                    Top-down footprint. Shaded cells = crate modules; blue outline = tank perimeter (${d.perimeter_ft.toLocaleString()} ft);
+                    dashed box = bounding extent. Rows run top-to-bottom in entry order. Interior obstructions (light poles, manhole
+                    islands) are handled by the Void Space Entry feature in the main calculators, not shown here.
+                </div>
+            </div>
+
             <div class="result-card">
                 <h3>Shape Summary</h3>
                 <div class="result-row"><span>Configuration</span><span class="val">${d.config}</span></div>
@@ -2422,10 +2549,6 @@
             <div class="result-card">
                 <h3>Row Detail</h3>
                 ${rowsHtml}
-            </div>
-
-            <div class="disclaimer-box" style="margin-top:12px;">
-                Data model verified — plan-view drawing is the next phase of this tool, not built yet.
             </div>
         `;
     }
