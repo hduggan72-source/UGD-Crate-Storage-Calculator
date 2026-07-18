@@ -13,6 +13,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 **## Backlog / Future Enhancements (Add here when ideas come up)**
  - Metric toggle
  - Update font to Nunito (Wavin speciifc calculator ONLY)
+ - UPDATE SINGLE TANK UI (EXPAND THE INPUTS AND REDUCE THE DASHBOARD DISPLAYS)
 
 **Proposed Workflow & Calculator Evolution*
 [ ] Pricing_Engine_v1 → git checkout -b Client_Facing_v1 → strip pricing
