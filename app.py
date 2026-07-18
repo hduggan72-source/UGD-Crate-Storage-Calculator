@@ -642,6 +642,103 @@ _MULTI_LAYER_MAX_COVER_NOTE = (
 
 
 # ══════════════════════════════════════════════════════════════════
+#  DESIGN VERIFICATION DASHBOARD — Complex Shape Builder (Groundwork)
+#
+#  Per ROADMAP.md v17: "CRATE BUILDER FOR COMPLEX (ENTER ROW BY ROW,
+#  THEN DESIGNATE HOW MANY CRATES IN THE ROW)". This is phase one:
+#  the data model and derived-values calc only. No drawing yet.
+#
+#  A complex (non-rectangular) footprint is built as an ordered list
+#  of rows. Each row is one crate-length deep and some whole number
+#  of crates wide, indented by some whole number of crates from a
+#  shared reference edge. Stacking rows with varying width/offset
+#  produces any rectilinear shape (L, T, U, staircase, notch) without
+#  needing a separate "subtract" concept -- that's what makes this
+#  simpler than a composite-rectangle model. Discrete obstructions
+#  (light poles, manhole islands) stay the job of the EXISTING void
+#  space entry feature above/below this function, layered on top of
+#  whatever outer shape the row builder produces.
+#
+#  crate_count and offset_crates are both integers -- there's no such
+#  thing as a fractional crate; every row's crates must align to the
+#  same underlying module grid to actually interlock in the field.
+# ══════════════════════════════════════════════════════════════════
+_MAX_SHAPE_ROWS = 200  # sanity cap
+
+
+def calc_complex_shape_builder(payload):
+    config = payload.get('config', 'SC')
+    layers = int(float(payload.get('layers', 1) or 1))
+    rows_in = payload.get('rows', [])
+
+    if not isinstance(rows_in, list) or len(rows_in) == 0:
+        return {'error': 'Add at least one row to build the shape.'}
+    if len(rows_in) > _MAX_SHAPE_ROWS:
+        return {'error': f'Too many rows (limit {_MAX_SHAPE_ROWS}).'}
+
+    cd = CONFIG_DATA.get(config, CONFIG_DATA['SC'])
+    layer_heights = cd['layer_heights']
+    layers = max(1, min(layers, len(layer_heights)))
+    tank_height_ft = layer_heights[layers - 1]
+
+    rows = []
+    total_crates_layer = 0
+    max_extent_crates = 0
+    for i, row_in in enumerate(rows_in):
+        try:
+            crate_count = int(float(row_in.get('crate_count', 0) or 0))
+            offset_crates = int(float(row_in.get('offset_crates', 0) or 0))
+        except (TypeError, ValueError, AttributeError):
+            return {'error': f'Row {i + 1}: crate count and offset must be whole numbers.'}
+
+        if crate_count <= 0:
+            return {'error': f'Row {i + 1}: crate count must be at least 1.'}
+        if offset_crates < 0:
+            return {'error': f'Row {i + 1}: offset cannot be negative.'}
+
+        total_crates_layer += crate_count
+        max_extent_crates = max(max_extent_crates, offset_crates + crate_count)
+        rows.append({
+            'row_index':     i,
+            'crate_count':   crate_count,
+            'offset_crates': offset_crates,
+            'row_width_ft':  round(crate_count * MODULE_WID, 3),
+            'row_offset_ft': round(offset_crates * MODULE_WID, 3),
+        })
+
+    n_rows = len(rows)
+    bounding_width_crates  = max_extent_crates
+    bounding_length_crates = n_rows
+
+    net_footprint_area_sf     = total_crates_layer * MODULE_WID * MODULE_LEN
+    bounding_width_ft         = bounding_width_crates * MODULE_WID
+    bounding_length_ft        = bounding_length_crates * MODULE_LEN
+    bounding_box_area_sf      = bounding_width_ft * bounding_length_ft
+    fill_efficiency_pct       = (net_footprint_area_sf / bounding_box_area_sf * 100.0) if bounding_box_area_sf > 0 else 0.0
+
+    total_crates_all_layers = total_crates_layer * layers
+
+    return {
+        'config':                   config,
+        'layers':                   layers,
+        'tank_height_ft':           round(tank_height_ft, 3),
+        'rows':                     rows,
+        'n_rows':                   n_rows,
+        'total_crates_layer':       total_crates_layer,
+        'total_crates_all_layers':  total_crates_all_layers,
+        'bounding_width_crates':    bounding_width_crates,
+        'bounding_length_crates':   bounding_length_crates,
+        'bounding_width_ft':        round(bounding_width_ft, 3),
+        'bounding_length_ft':       round(bounding_length_ft, 3),
+        'net_footprint_area_sf':    round(net_footprint_area_sf, 2),
+        'bounding_box_area_sf':     round(bounding_box_area_sf, 2),
+        'fill_efficiency_pct':      round(fill_efficiency_pct, 1),
+        'module_wid_ft':            MODULE_WID,
+        'module_len_ft':            MODULE_LEN,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════
 #  VOID SPACE ENTRY  (Complex Shape mode)
 #  Open areas inside the tank footprint (concrete islands, light
 #  poles, monuments, etc.) that the tank must form around.
@@ -3079,17 +3176,6 @@ def calc_tank(t):
     liner_tank_yd2  = math.ceil(geoTank  * (1 + geoWaste/100.0) / 9) if liner_on_tank  else 0
     liner_stone_yd2 = math.ceil(geoStone * (1 + geoWaste/100.0) / 9) if liner_on_stone else 0
     liner_total_yd2 = liner_tank_yd2 + liner_stone_yd2
-
-    # ── Liner protection non-woven (AQ-100-03.4 Rev 4, Note C) ────────
-    # The WT geomembrane is protected with an inner & outer layer of
-    # min. 6 oz/yd² non-woven geotextile. The standard tank wrap /
-    # backfill envelope geotextile already provides ONE of those two
-    # faces, so each selected liner adds ONE additional matching layer
-    # of non-woven, equal to the liner quantity (waste already included
-    # in the liner qty). Rolled into all fabric totals downstream.
-    liner_prot_tank_yd2  = liner_tank_yd2
-    liner_prot_stone_yd2 = liner_stone_yd2
-    liner_prot_total_yd2 = liner_prot_tank_yd2 + liner_prot_stone_yd2
     stone_yd3  = round(stone_env_vol * 1.10 / 27, 1)
     stone_tons = round(stone_env_vol * 1.10 * 100 / 2000, 2)
 
@@ -3210,9 +3296,6 @@ def calc_tank(t):
         'liner_tank_yd2':  liner_tank_yd2,
         'liner_stone_yd2': liner_stone_yd2,
         'liner_total_yd2': liner_total_yd2,
-        'liner_prot_tank_yd2':  liner_prot_tank_yd2,
-        'liner_prot_stone_yd2': liner_prot_stone_yd2,
-        'liner_prot_total_yd2': liner_prot_total_yd2,
         # Large pipe
         'large_pipe_qty': large_pipe_qty,
         # Stone backfill
@@ -3263,7 +3346,6 @@ def cumulative_bom(tank_results):
         'ptrow_total_crates': 0, 'ptrow_woven_yd2': 0,
         'geogrid_top_yd2': 0, 'geogrid_bottom_yd2': 0,
         'liner_tank_yd2': 0, 'liner_stone_yd2': 0, 'liner_total_yd2': 0,
-        'liner_prot_tank_yd2': 0, 'liner_prot_stone_yd2': 0, 'liner_prot_total_yd2': 0,
         'large_pipe_qty': 0,
     }
     for r in tank_results:
@@ -3381,6 +3463,8 @@ def design_tools_calculate():
             result = calc_stepped_backfill(payload)
         elif calc_type == 'min_cover_burial':
             result = calc_min_cover_burial(payload)
+        elif calc_type == 'complex_shape_builder':
+            result = calc_complex_shape_builder(payload)
         else:
             return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
 
@@ -3761,17 +3845,6 @@ def multi_download_quote():
         cum_adapters     = cum['top_adapters_12'] + cum['top_adapters_16']
         geoWaste_pct     = tank_results[0]['geoWaste'] if tank_results else 20
 
-        # Liner protection non-woven (AQ-100-03.4 Note C) — one matching
-        # layer per selected liner, folded into quote lines A / B.
-        cum_prot_tank  = int(cum.get('liner_prot_tank_yd2', 0))
-        cum_prot_stone = int(cum.get('liner_prot_stone_yd2', 0))
-        line_a_qty  = cum_geoTank_yd2_adj + cum_prot_tank
-        line_b_qty  = cum_geoStone_yd2 + cum_prot_stone
-        line_a_desc = (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste_pct}% WASTE (TANK ONLY)'
-                       + (' INCL. LINER PROTECTION LAYER (AQ-100-03.4)' if cum_prot_tank > 0 else ''))
-        line_b_desc = (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste_pct}% WASTE (BACKFILL ONLY)'
-                       + (' INCL. LINER PROTECTION LAYER (AQ-100-03.4)' if cum_prot_stone > 0 else ''))
-
         # Geogrid combined
         cum_geogrid_top  = int(cum.get('geogrid_top_yd2', 0))
         cum_geogrid_bot  = int(cum.get('geogrid_bottom_yd2', 0))
@@ -3799,8 +3872,10 @@ def multi_download_quote():
             liner_desc = 'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 NOT SPECIFIED'
 
         others_rows_mt = [
-            ('A', line_a_desc, line_a_qty, 'SQ YD'),
-            ('B', line_b_desc, line_b_qty, 'SQ YD'),
+            ('A', f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste_pct}% WASTE (TANK ONLY)',
+             cum_geoTank_yd2_adj, 'SQ YD'),
+            ('B', f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste_pct}% WASTE (BACKFILL ONLY)',
+             cum_geoStone_yd2, 'SQ YD'),
             ('C', f'WOVEN MONOFILAMENT GEOTEXTILE \u2014 PT-ROW\u2122 PRE-TREATMENT + {geoWaste_pct}% WASTE',
              int(cum.get('ptrow_woven_yd2', 0)), 'SQ YD'),
             ('D', geogrid_desc, cum_geogrid_total, 'SQ YD'),
@@ -4033,14 +4108,6 @@ def multi_download_tank_summary():
         project_num     = data.get('project_num', '')
         generated_str   = datetime.datetime.now().strftime('%m/%d/%Y')
 
-        # ft²/yd² display preference from the UI toggle.
-        # 'yd2' default preserves legacy output if the field is absent.
-        # NOTE: geogrid, liner, and PT-ROW woven are purchased in whole
-        # sq yd — ft² figures are conversions (yd² × 9) of that rounded
-        # purchase quantity, not re-computed raw areas.
-        unit_mode = (data.get('unit_mode') or 'yd2').lower()
-        use_ft2   = unit_mode == 'ft2'
-
         tanks_in     = data.get('tanks', [])
         tank_results = [calc_tank(t) for t in tanks_in]
 
@@ -4244,62 +4311,39 @@ def multi_download_tank_summary():
             y -= 5
 
             # ── Accessories / provided-by-others (this tank) — full one-sheet BOM ──
-            # All area/volume lines honor the ft²/yd² UI toggle (unit_mode).
             section_hdr_mt('\u25a0  ACCESSORIES & PROVIDED BY OTHERS (THIS TANK)')
             _sh = [False]
             def _acc(label, value):
                 detail_row_mt(label, value, shade=_sh[0])
                 _sh[0] = not _sh[0]
-            # Geotextile (always present) — primary unit first, other in parens
-            if use_ft2:
-                _acc('Non-Woven Geotextile \u2014 Tank Wrap',
-                     f"{r['geoTank']:,.1f} ft\u00b2  ({r['geoTank_yd2']:,.1f} yd\u00b2)")
-                _acc('Non-Woven Geotextile \u2014 Stone / Backfill',
-                     f"{r['geoStone']:,.1f} ft\u00b2  ({r['geoStone_yd2']:,.1f} yd\u00b2)")
-            else:
-                _acc('Non-Woven Geotextile \u2014 Tank Wrap',
-                     f"{r['geoTank_yd2']:,.1f} yd\u00b2  ({r['geoTank']:,.1f} ft\u00b2)")
-                _acc('Non-Woven Geotextile \u2014 Stone / Backfill',
-                     f"{r['geoStone_yd2']:,.1f} yd\u00b2  ({r['geoStone']:,.1f} ft\u00b2)")
-            # Stone backfill (always present) — purchase volume w/ overage
-            if use_ft2:
-                _acc('Stone Backfill (#57 or select)',
-                     f"{r['stone_yd3'] * 27:,.1f} cu ft  ({r['stone_tons']:,.1f} tons)")
-            else:
-                _acc('Stone Backfill (#57 or select)',
-                     f"{r['stone_yd3']:,.1f} cu yd  ({r['stone_tons']:,.1f} tons)")
-            # Unit label + yd²-native → display converter for the lines below
-            _au   = 'ft\u00b2' if use_ft2 else 'yd\u00b2'
-            _conv = (lambda v: v * 9) if use_ft2 else (lambda v: v)
+            # Geotextile (always present)
+            _acc('Non-Woven Geotextile \u2014 Tank Wrap',
+                 f"{r['geoTank_yd2']:,.1f} yd\u00b2  ({r['geoTank']:,.1f} ft\u00b2)")
+            _acc('Non-Woven Geotextile \u2014 Stone / Backfill',
+                 f"{r['geoStone_yd2']:,.1f} yd\u00b2  ({r['geoStone']:,.1f} ft\u00b2)")
+            # Stone backfill (always present)
+            _acc('Stone Backfill (#57 or select)',
+                 f"{r['stone_yd3']:,.1f} cu yd  ({r['stone_tons']:,.1f} tons)")
             # PT-ROW pre-treatment (if applicable)
             if r.get('ptrow_enabled') and r.get('ptrow_total_crates', 0) > 0:
                 _acc('PT-ROW\u2122 Pre-Treatment Crates', f"{r['ptrow_total_crates']:,}")
                 if r.get('ptrow_woven_yd2', 0) > 0:
-                    _acc('PT-ROW\u2122 Woven Monofilament Geotextile',
-                         f"{_conv(r['ptrow_woven_yd2']):,.1f} {_au}")
-            # Biaxial geogrid (if applicable) — units on every value
-            _geogrid_top = r.get('geogrid_top_yd2', 0) or 0
-            _geogrid_bot = r.get('geogrid_bottom_yd2', 0) or 0
-            _geogrid_total = _geogrid_top + _geogrid_bot
+                    _acc('PT-ROW\u2122 Woven Monofilament Geotextile', f"{r['ptrow_woven_yd2']:,.1f} yd\u00b2")
+            # Biaxial geogrid (if applicable)
+            _geogrid_total = (r.get('geogrid_top_yd2', 0) or 0) + (r.get('geogrid_bottom_yd2', 0) or 0)
             if _geogrid_total > 0:
                 _detail = []
-                if _geogrid_top > 0: _detail.append(f"top {_conv(_geogrid_top):,.1f} {_au}")
-                if _geogrid_bot > 0: _detail.append(f"bottom {_conv(_geogrid_bot):,.1f} {_au}")
+                if r.get('geogrid_top_yd2', 0) > 0:    _detail.append(f"top {r['geogrid_top_yd2']:,.1f}")
+                if r.get('geogrid_bottom_yd2', 0) > 0: _detail.append(f"bot {r['geogrid_bottom_yd2']:,.1f}")
                 _suffix = f"  ({', '.join(_detail)})" if _detail else ''
-                _acc('Biaxial Geogrid', f"{_conv(_geogrid_total):,.1f} {_au}{_suffix}")
+                _acc('Biaxial Geogrid', f"{_geogrid_total:,.1f} yd\u00b2{_suffix}")
             # PVC / geomembrane liner (if applicable)
             if (r.get('liner_total_yd2', 0) or 0) > 0:
                 _lscope = []
                 if r.get('liner_on_tank'):  _lscope.append('tank')
                 if r.get('liner_on_stone'): _lscope.append('stone')
                 _lsfx = f"  ({' + '.join(_lscope)})" if _lscope else ''
-                _acc('PVC / Geomembrane Liner', f"{_conv(r['liner_total_yd2']):,.1f} {_au}{_lsfx}")
-                # Liner protection non-woven (AQ-100-03.4 Note C) — one
-                # matching layer per liner; standard wrap is the other face.
-                _prot = r.get('liner_prot_total_yd2', 0) or 0
-                if _prot > 0:
-                    _acc('Non-Woven Geotextile \u2014 Liner Protection Layer (AQ-100-03.4)',
-                         f"{_conv(_prot):,.1f} {_au}")
+                _acc('PVC / Geomembrane Liner', f"{r['liner_total_yd2']:,.1f} yd\u00b2{_lsfx}")
             # Large diameter pipe connections (if applicable)
             if (r.get('large_pipe_qty', 0) or 0) > 0:
                 _acc('Large Diameter Pipe Connections (18\u201336\u2033)', f"{r['large_pipe_qty']:,} ea")
@@ -5267,18 +5311,6 @@ def download_quote():
       liner_stone_yd2 = int(request.form.get('liner_stone_yd2', 0) or 0)
       liner_total_yd2 = liner_tank_yd2 + liner_stone_yd2
 
-      # ── Liner protection non-woven (AQ-100-03.4 Rev 4, Note C) ────────
-      # The WT geomembrane is protected with an inner & outer layer of
-      # min. 6 oz/yd² non-woven geotextile. The standard tank wrap /
-      # backfill envelope geotextile already provides ONE of those two
-      # faces, so each selected liner adds ONE additional matching layer
-      # of non-woven equal to the liner qty (waste already included).
-      # Folded into quote lines A / B. Mirrors calc_tank() in the
-      # multi-tank model so both calculators agree.
-      liner_prot_tank_yd2  = liner_tank_yd2  if liner_on_tank  else 0
-      liner_prot_stone_yd2 = liner_stone_yd2 if liner_on_stone else 0
-      liner_prot_total_yd2 = liner_prot_tank_yd2 + liner_prot_stone_yd2
-
       if liner_on_tank and liner_on_stone:
           liner_label = f'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 TANK + STONE ENVELOPE  [{liner_tank_yd2} SY TANK + {liner_stone_yd2} SY STONE]'
       elif liner_on_tank:
@@ -5540,18 +5572,10 @@ def download_quote():
       y -= 13
 
       alpha = ['A','B','C','D','E','F','G','H','I','J']
-      # Liner protection non-woven (AQ-100-03.4 Note C) folds into lines A / B —
-      # one matching layer per selected liner; the standard wrap is the other face.
-      _line_a_qty  = geoTank_yd2_adj + liner_prot_tank_yd2
-      _line_b_qty  = int(geoStone_yd2) + liner_prot_stone_yd2
-      _line_a_desc = nw_tank_label + (' INCL. LINER PROTECTION LAYER (AQ-100-03.4)'
-                                      if liner_prot_tank_yd2 > 0 else '')
-      _line_b_desc = (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE (BACKFILL ONLY)'
-                      + (' INCL. LINER PROTECTION LAYER (AQ-100-03.4)'
-                         if liner_prot_stone_yd2 > 0 else ''))
       others_rows = [
-          (_line_a_desc, _line_a_qty, 'SQ YD'),
-          (_line_b_desc, _line_b_qty, 'SQ YD'),
+          (nw_tank_label, geoTank_yd2_adj, 'SQ YD'),
+          (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE (BACKFILL ONLY)',
+           int(geoStone_yd2), 'SQ YD'),
           (f'WOVEN MONOFILAMENT GEOTEXTILE \u2014 PT-ROW\u2122 PRE-TREATMENT + {geoWaste}% WASTE',
            int(ptrow_woven_q), 'SQ YD'),
           (f'BIAXIAL GEOGRID (INTEGRALLY FORMED POLYPROPYLENE) + {geoWaste}% WASTE'
