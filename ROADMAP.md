@@ -1,4 +1,4 @@
-# AquaCell v15 (Internal) Crate Calculator — Development Roadmap
+# AquaCell (Internal) Crate Calculator — Development Roadmap
 
 **Project Goal:**  
 Professional web-based calculator for designing and quoting underground stormwater retention, detention, and infiltration systems using Wavin AquaCell polypropylene stackable crates. The tool must produce accurate storage volumes, BOM with part codes, geotextile quantities (burrito-style wrap), professional PDF reports, and visual layout drawings for client submittals.
@@ -9,6 +9,9 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 ##UPDATES FOR BOTH MULTI-TANK/SINGLE TANK CALCULATORS
 - can a drag & drop file upload by added so i can drop in the JSON for the calculator to load, rather than go to import, then have to search the file?
+- ADD DISTANCE FROM BUILDING CALCULATOR
+- 
+
 
 **## Backlog / Future Enhancements (Add here when ideas come up)**
  - Metric toggle
@@ -22,13 +25,8 @@ Professional web-based calculator for designing and quoting underground stormwat
 
 **Future Version Releases**
 - (v16) UPLOAD PLAN SHEET AND CREATE AN OVERLAY OF TANK (RECTANGLE/SQUARE ONLY)
-- (v17) USE CANVAS TO BUILD A CONCEPTUAL TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS
-     -  CRATE BUILDER FOR COMPLEX (ENTER ROW BY ROW, THEN DESIGNATE HOW MANY CRATES IN THE ROW)
 - (v18) Optional 3D isometric view of the crate layout
 - (v19) SEPARATE WEB BASED CLIENT USER CALCULATOR TOOL WITH NO PRICING;
-
-- ADD DISTANCE FROM BUILDING CALCULATOR
-- MIN. COVER / BURIAL DEPTH
 
 - **##SYSTEM CHECKS TO VERIFY / CONFIRM**
 
@@ -36,9 +34,11 @@ Professional web-based calculator for designing and quoting underground stormwat
 - **DESIGN TOOLS PAGE** - COMPELETED**
 -  [X] SEPARATE PAGE FOR "DESIGN TOOLS" MULTIPLE CALCULATORS LIVE AND EXPORT TO THEIR OWN PAGE WITH GRAPHICS
    - [X] bouyancy calculator
-   - [X] LOADING MODEL (TRUCK ASTM F2787) & OUTRIGGER
+   - [X] MIN. COVER / BURIAL DEPTH
+   - [X] LOADING MODEL (TRUCK ASTM F2787) & OUTRIGGER MODEL
+   - [X] STEPPED PERIMETER CALCULATOR
    - [X] Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed
-   - [ ] 
+   - [X] USE CANVAS TO BUILD A CONCEPTUAL TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS; CRATE BUILDER FOR COMPLEX (ENTER ROW BY ROW, THEN DESIGNATE HOW MANY CRATES IN THE ROW)
 
 - **## PREVIOUS Version (v12-v15) — Completed**
 
