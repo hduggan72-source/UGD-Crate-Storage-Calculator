@@ -666,10 +666,93 @@ _MULTI_LAYER_MAX_COVER_NOTE = (
 _MAX_SHAPE_ROWS = 200  # sanity cap
 
 
+# ── Envelope → rows converter ──────────────────────────────────────
+#  "Fit to footprint" mode. Given a scaled width and length (typically
+#  read off a civil plan in Bluebeam), generate a rectangular whole-
+#  crate row model that fits INSIDE that footprint (snaps DOWN — never
+#  exceeds the entered envelope). The row model produced flows through
+#  the exact same verified perimeter/area/drawing math as hand-built
+#  rows, so nothing downstream changes.
+#
+#  IMPORTANT GEOMETRY FACT: MODULE_LEN (3.937) == 2 * MODULE_WID
+#  (1.9685) exactly. The AquaCell module is a clean 2:1 rectangle,
+#  so both crate orientations tile the same MODULE_WID grid with no
+#  fractional columns.
+#
+#  The downstream row model is fixed at MODULE_LEN-deep rows counted in
+#  MODULE_WID columns. The FOOTPRINT RECTANGLE and PERIMETER are
+#  identical regardless of crate orientation — only the internal crate
+#  TALLY differs. So envelope mode reports BOTH orientation counts and
+#  flags which one is active; the drawing's internal grid is schematic
+#  (MODULE_LEN strips) and labeled as such.
+#
+#    orientation 'len_along_length'  (crate long axis runs down the
+#        tank length): crate = MODULE_LEN deep x MODULE_WID wide, so
+#        every grid cell is one crate → crates = n_rows * n_cols.
+#    orientation 'len_along_width'   (crate long axis runs across the
+#        tank width): crate = MODULE_WID deep x MODULE_LEN wide →
+#        crates = (length // MODULE_WID) * (width // MODULE_LEN).
+# ───────────────────────────────────────────────────────────────────
+def _envelope_to_rows(width_ft, length_ft):
+    n_rows = int(length_ft // MODULE_LEN)   # MODULE_LEN-deep strips down the length
+    n_cols = int(width_ft // MODULE_WID)    # MODULE_WID columns across the width
+    if n_rows < 1 or n_cols < 1:
+        return None
+
+    rows = [{'crate_count': n_cols, 'offset_crates': 0} for _ in range(n_rows)]
+
+    crates_len_along_length = n_rows * n_cols
+    rows_b = int(length_ft // MODULE_WID)
+    cols_b = int(width_ft // MODULE_LEN)
+    crates_len_along_width = rows_b * cols_b
+
+    return {
+        'rows': rows,
+        'n_rows': n_rows,
+        'n_cols': n_cols,
+        'crates_len_along_length': crates_len_along_length,
+        'crates_len_along_width':  crates_len_along_width,
+        'used_width_ft':  round(n_cols * MODULE_WID, 3),
+        'used_length_ft': round(n_rows * MODULE_LEN, 3),
+    }
+
+
 def calc_complex_shape_builder(payload):
     config = payload.get('config', 'SC')
     layers = int(float(payload.get('layers', 1) or 1))
-    rows_in = payload.get('rows', [])
+    mode = payload.get('mode', 'rows')
+
+    # ── Envelope mode: synthesize the row model from a footprint ────
+    envelope_meta = None
+    if mode == 'envelope':
+        try:
+            env_w = float(payload.get('envelope_width_ft', 0) or 0)
+            env_l = float(payload.get('envelope_length_ft', 0) or 0)
+        except (TypeError, ValueError):
+            return {'error': 'Envelope width and length must be numbers.'}
+        if env_w <= 0 or env_l <= 0:
+            return {'error': 'Enter a positive width and length for the footprint.'}
+
+        env = _envelope_to_rows(env_w, env_l)
+        if env is None:
+            return {'error': 'Footprint is too small to fit even one crate module.'}
+
+        orientation = payload.get('orientation', 'len_along_length')
+        if orientation not in ('len_along_length', 'len_along_width'):
+            orientation = 'len_along_length'
+
+        rows_in = env['rows']
+        envelope_meta = {
+            'entered_width_ft':  round(env_w, 3),
+            'entered_length_ft': round(env_l, 3),
+            'used_width_ft':     env['used_width_ft'],
+            'used_length_ft':    env['used_length_ft'],
+            'orientation':       orientation,
+            'crates_len_along_length': env['crates_len_along_length'],
+            'crates_len_along_width':  env['crates_len_along_width'],
+        }
+    else:
+        rows_in = payload.get('rows', [])
 
     if not isinstance(rows_in, list) or len(rows_in) == 0:
         return {'error': 'Add at least one row to build the shape.'}
@@ -749,11 +832,25 @@ def calc_complex_shape_builder(payload):
     bounding_box_area_sf      = bounding_width_ft * bounding_length_ft
     fill_efficiency_pct       = (net_footprint_area_sf / bounding_box_area_sf * 100.0) if bounding_box_area_sf > 0 else 0.0
 
+    # ── Envelope mode: the per-orientation physical crate tally can
+    #    differ from the raw MODULE_WID-column count (grid cells).
+    #    Override the reported crate count with the selected
+    #    orientation's true tally. The footprint rectangle, perimeter,
+    #    and drawing are unchanged — only the count reflects orientation.
+    if envelope_meta is not None:
+        if envelope_meta['orientation'] == 'len_along_width':
+            total_crates_layer = envelope_meta['crates_len_along_width']
+        else:
+            total_crates_layer = envelope_meta['crates_len_along_length']
+        net_footprint_area_sf = total_crates_layer * MODULE_WID * MODULE_LEN
+        fill_efficiency_pct = (net_footprint_area_sf / bounding_box_area_sf * 100.0) if bounding_box_area_sf > 0 else 0.0
+
     total_crates_all_layers = total_crates_layer * layers
 
-    return {
+    result = {
         'config':                   config,
         'layers':                   layers,
+        'mode':                     mode,
         'tank_height_ft':           round(tank_height_ft, 3),
         'rows':                     rows,
         'n_rows':                   n_rows,
@@ -772,6 +869,9 @@ def calc_complex_shape_builder(payload):
         'module_wid_ft':            MODULE_WID,
         'module_len_ft':            MODULE_LEN,
     }
+    if envelope_meta is not None:
+        result['envelope'] = envelope_meta
+    return result
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -3037,6 +3137,238 @@ def build_min_cover_burial_pdf(inputs, results, project_name=None):
     return buffer
 
 
+_COMPLEX_SHAPE_DISCLAIMER_TEXT = (
+    "This conceptual schematic is a preliminary planning aid only and is NOT a stamped engineering "
+    "design or a construction layout. Crate counts and footprint areas are approximate: envelope "
+    "(fit-to-footprint) mode packs whole rectangular modules into the entered dimensions and does not "
+    "account for stepped corners, angled edges, interior obstructions, or field trimming. The Engineer "
+    "of Record and a project-specific takeoff (e.g. CAD / Bluebeam) remain the source of truth for final "
+    "quantities. AquaCell module dimensions follow published product data. FINAL LAYOUTS, CAPACITIES, "
+    "AND INSTALLATION DEPTHS MUST BE CONFIRMED BY A LICENSED PROFESSIONAL ENGINEER."
+)
+_COMPLEX_SHAPE_BOLD_TRIGGERS = ['NOT', 'source of truth', 'MUST BE CONFIRMED BY A LICENSED PROFESSIONAL ENGINEER']
+
+
+def _draw_complex_shape_plan_pdf(c, x0, y0, w_area, h_area, results):
+    """Draw the plan-view footprint from the row data, scaled to fit the
+    given drawable box (x0,y0 = bottom-left; w_area,h_area = box size).
+    Mirrors the on-screen SVG: shaded rows, crate grid, thick perimeter
+    outline, dashed bounding box, and a scale bar. Feet-honest scaling."""
+    MW = results['module_wid_ft']
+    ML = results['module_len_ft']
+    rows = results['rows']
+    n_rows = len(rows)
+    if n_rows == 0:
+        return
+
+    max_col = max(r['offset_crates'] + r['crate_count'] for r in rows)
+    width_ft = max_col * MW
+    length_ft = n_rows * ML
+
+    # Reserve strip at bottom for scale bar.
+    bar_strip = 26
+    draw_h = h_area - bar_strip
+    draw_w = w_area
+    s = min(draw_w / width_ft, draw_h / length_ft)   # ft -> pt, uniform
+
+    shape_w = width_ft * s
+    shape_h = length_ft * s
+    # center in the box
+    ox = x0 + (w_area - shape_w) / 2.0
+    oy = y0 + bar_strip + (draw_h - shape_h) / 2.0
+
+    def px(col): return ox + col * MW * s
+    def py_top(row): return oy + shape_h - row * ML * s   # row 0 at top
+
+    # Dashed bounding box
+    c.setStrokeColor(DKBLUE)
+    c.setLineWidth(0.7)
+    c.setDash(4, 3)
+    c.rect(ox, oy, shape_w, shape_h, fill=0, stroke=1)
+    c.setDash()
+
+    # Row fills
+    c.setFillColor(LTBLUE)
+    for i, r in enumerate(rows):
+        x = px(r['offset_crates'])
+        yt = py_top(i)
+        w = r['crate_count'] * MW * s
+        h = ML * s
+        c.rect(x, yt - h, w, h, fill=1, stroke=0)
+
+    # Crate grid (light)
+    c.setStrokeColor(MGRAY)
+    c.setLineWidth(0.3)
+    for i, r in enumerate(rows):
+        yt = py_top(i)
+        yb = yt - ML * s
+        for cc in range(r['offset_crates'], r['offset_crates'] + r['crate_count'] + 1):
+            gx = px(cc)
+            c.line(gx, yb, gx, yt)
+        c.line(px(r['offset_crates']), yb, px(r['offset_crates'] + r['crate_count']), yb)
+        c.line(px(r['offset_crates']), yt, px(r['offset_crates'] + r['crate_count']), yt)
+
+    # Perimeter outline (thick) — exposed boundary edges of the union
+    filled = set()
+    for i, r in enumerate(rows):
+        for cc in range(r['offset_crates'], r['offset_crates'] + r['crate_count']):
+            filled.add((i, cc))
+    def has(rr, cc): return (rr, cc) in filled
+    c.setStrokeColor(BLUE)
+    c.setLineWidth(2)
+    for i, r in enumerate(rows):
+        yt = py_top(i)
+        yb = yt - ML * s
+        for cc in range(r['offset_crates'], r['offset_crates'] + r['crate_count']):
+            xl = px(cc); xr = px(cc + 1)
+            if not has(i - 1, cc): c.line(xl, yt, xr, yt)          # top
+            if not has(i + 1, cc): c.line(xl, yb, xr, yb)          # bottom
+            if not has(i, cc - 1): c.line(xl, yb, xl, yt)          # left
+            if not has(i, cc + 1): c.line(xr, yb, xr, yt)          # right
+
+    # Dimension labels
+    c.setFillColor(GRAY)
+    c.setFont('Helvetica', 7)
+    c.drawCentredString(ox + shape_w / 2, oy + shape_h + 4,
+                        f"{round(width_ft,2)} ft ({max_col} crates)")
+    c.saveState()
+    c.translate(ox - 6, oy + shape_h / 2)
+    c.rotate(90)
+    c.drawCentredString(0, 0, f"{round(length_ft,2)} ft ({n_rows} rows)")
+    c.restoreState()
+
+    # Scale bar: pick a round footage that fits
+    candidates = [5, 10, 25, 50, 100, 200]
+    bar_ft = candidates[0]
+    for cand in candidates:
+        if cand * s <= shape_w * 0.6:
+            bar_ft = cand
+    bar_px = bar_ft * s
+    bx = x0 + 4
+    by = y0 + 8
+    c.setStrokeColor(BLACK)
+    c.setLineWidth(1)
+    c.setFillColor(BLACK)
+    c.rect(bx, by, bar_px, 4, fill=1, stroke=0)
+    c.setFont('Helvetica', 7)
+    c.drawString(bx, by + 8, f"{bar_ft} ft")
+    c.setFillColor(GRAY)
+    c.drawRightString(x0 + w_area, by + 8,
+                      f"1 crate = {round(ML,3)} ft x {round(MW,4)} ft")
+
+
+def build_complex_shape_pdf(inputs, results, project_name=None):
+    """Two-page conceptual submittal PDF for the Complex Shape Builder.
+    Page 1: configuration + derived quantities. Page 2: scaled plan-view."""
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
+
+    def header(subtitle):
+        band_h = 64
+        c.setFillColor(NAVY)
+        c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
+        logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+        if logo_path and os.path.exists(logo_path):
+            try:
+                img = ImageReader(logo_path)
+                c.drawImage(img, LM, PH - band_h + 8, width=160, height=46,
+                            preserveAspectRatio=True, mask='auto')
+            except Exception:
+                pass
+        c.setFillColor(WHITE)
+        c.setFont('Helvetica-Bold', 14)
+        c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
+        c.setFont('Helvetica', 9)
+        c.setFillColor(colors.HexColor('#93c5fd'))
+        c.drawRightString(PW - RM, PH - 37, subtitle)
+        c.setFont('Helvetica', 7)
+        c.setFillColor(colors.HexColor('#94a3b8'))
+        c.drawRightString(PW - RM, PH - 50, generated_str)
+        return PH - band_h - 10
+
+    # ── PAGE 1 ──────────────────────────────────────────────────────
+    y = header('Complex Shape Builder \u2014 Conceptual Schematic')
+    if project_name:
+        c.setFillColor(GRAY)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM, y, f'Project: {project_name}')
+        y -= 16
+
+    mode = results.get('mode', 'rows')
+    mode_label = 'Fit to Footprint (envelope)' if mode == 'envelope' else 'Build by Rows'
+    cfg_rows = [
+        ('Configuration', 'SC — Standard' if results['config'] == 'SC' else 'EX — Extra Strong'),
+        ('Build Mode', mode_label),
+        ('Number of Layers', str(results['layers'])),
+        ('Tank Height', f"{results['tank_height_ft']} ft"),
+        ('Number of Rows', str(results['n_rows'])),
+        ('Total Crates / Layer', f"{results['total_crates_layer']:,}"),
+    ]
+    y = _draw_section_kv(c, y, 'SYSTEM CONFIGURATION', cfg_rows, ncols=2)
+
+    if mode == 'envelope' and results.get('envelope'):
+        e = results['envelope']
+        orient_label = ('Long axis down length' if e['orientation'] == 'len_along_length'
+                        else 'Long axis across width')
+        env_rows = [
+            ('Entered Footprint', f"{e['entered_width_ft']} ft x {e['entered_length_ft']} ft"),
+            ('Used Footprint (snapped down)', f"{e['used_width_ft']} ft x {e['used_length_ft']} ft"),
+            ('Crate Orientation', orient_label),
+            ('Crates — long axis down length', f"{e['crates_len_along_length']:,}"),
+            ('Crates — long axis across width', f"{e['crates_len_along_width']:,}"),
+            ('Active Count', f"{results['total_crates_layer']:,} / layer"),
+        ]
+        y = _draw_section_kv(c, y, 'ENVELOPE / FOOTPRINT', env_rows, ncols=2)
+
+    qty_rows = [
+        ('Net Footprint Area', f"{results['net_footprint_area_sf']:,.2f} sf"),
+        ('Bounding Box Area', f"{results['bounding_box_area_sf']:,.2f} sf"),
+        ('Fill Efficiency', f"{results['fill_efficiency_pct']}%"),
+        ('Perimeter', f"{results['perimeter_ft']:,.2f} ft"),
+        ('Total Crates (all layers)', f"{results['total_crates_all_layers']:,}"),
+        ('Bounding W x L', f"{results['bounding_width_ft']} x {results['bounding_length_ft']} ft"),
+    ]
+    y = _draw_section_kv(c, y, 'DERIVED QUANTITIES', qty_rows, ncols=2)
+
+    _draw_disclaimer_block(c, 40, disclaimer_lines_raw=_COMPLEX_SHAPE_DISCLAIMER_TEXT,
+                            bold_triggers=_COMPLEX_SHAPE_BOLD_TRIGGERS)
+    c.showPage()
+
+    # ── PAGE 2 ──────────────────────────────────────────────────────
+    y = header('Conceptual Plan View (Top-Down)')
+    c.setFillColor(GRAY)
+    c.setFont('Helvetica-Bold', 10)
+    title_bits = f"AquaCell {results['config']} | {results['bounding_width_ft']} x {results['bounding_length_ft']} ft | {results['total_crates_layer']:,} crates/layer"
+    c.drawString(LM, y, title_bits)
+    y -= 6
+
+    bar_h = 16
+    c.setFillColor(BLUE)
+    c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 9)
+    c.drawString(LM + 8, y - bar_h + 4, 'PLAN VIEW \u2014 SHADED = CRATE MODULES, BLUE OUTLINE = PERIMETER')
+    box_top = y - bar_h
+
+    disc_h = _disclaimer_box_height(_COMPLEX_SHAPE_DISCLAIMER_TEXT)
+    box_bottom = 40 + disc_h + 10
+    box_h = box_top - box_bottom
+    c.setFillColor(WHITE)
+    c.setStrokeColor(MGRAY)
+    c.setLineWidth(0.5)
+    c.rect(LM, box_bottom, CW, box_h, fill=1, stroke=1)
+
+    _draw_complex_shape_plan_pdf(c, LM + 10, box_bottom + 6, CW - 20, box_h - 12, results)
+
+    _draw_disclaimer_block(c, 40, disclaimer_lines_raw=_COMPLEX_SHAPE_DISCLAIMER_TEXT,
+                            bold_triggers=_COMPLEX_SHAPE_BOLD_TRIGGERS)
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
 # ══════════════════════════════════════════════════════════════════
 #  CALC ENGINE  —  single-tank calculation (returns dict)
 # ══════════════════════════════════════════════════════════════════
@@ -3576,6 +3908,12 @@ def design_tools_download_pdf():
                 return jsonify(result), 400
             buffer = build_min_cover_burial_pdf(payload, result, project_name=project_name)
             download_name = 'AquaCell_Min_Cover_Burial_Depth.pdf'
+        elif calc_type == 'complex_shape_builder':
+            result = calc_complex_shape_builder(payload)
+            if 'error' in result:
+                return jsonify(result), 400
+            buffer = build_complex_shape_pdf(payload, result, project_name=project_name)
+            download_name = 'AquaCell_Complex_Shape_Schematic.pdf'
         else:
             return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
 

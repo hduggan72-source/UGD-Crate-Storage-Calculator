@@ -942,14 +942,14 @@
             <div class="calc-inputs">
 
                 <div class="disclaimer-box">
-                    <strong>Groundwork / Beta.</strong> This is phase one of a non-rectangular tank
-                    schematic tool (ROADMAP.md v17): the row-by-row shape data model and derived
-                    numbers only. No plan-view drawing yet — that's the next phase. Build your footprint
-                    as an ordered stack of rows, each one crate-length deep. Each row is some whole
-                    number of crates wide, indented by some whole number of crates from a shared left
-                    edge — stack enough rows with varying width/offset to get any L, T, U, or notched
-                    shape. Discrete obstructions (light poles, manhole islands) are handled separately
-                    by the existing Void Space Entry feature in the main calculators, not here.
+                    <strong>Conceptual schematic — Beta.</strong> A quick companion tool for
+                    non-rectangular tanks: get a plan-view drawing plus a submittal PDF and PNG without
+                    a full CAD layout. Two ways to build — <strong>Build by Rows</strong> (stack rows to
+                    make any L, T, U, or notched shape) or <strong>Fit to Footprint</strong> (enter a
+                    scaled width and length off the plans and pack whole crates into it). Crate counts
+                    are conceptual — a project-specific takeoff (CAD / Bluebeam) and the Engineer of
+                    Record remain the source of truth. Interior obstructions are handled by the Void
+                    Space Entry feature in the main calculators, not here.
                 </div>
 
                 <div class="section-card">
@@ -972,10 +972,16 @@
                             <option value="7">7</option>
                             <option value="8" selected>8</option>
                         </select>
+
+                        <label>Build Mode</label>
+                        <div style="display:flex;gap:8px;margin-top:4px;">
+                            <button type="button" id="cs_mode_rows_btn" class="calc-btn" style="flex:1;" onclick="setComplexMode('rows')">Build by Rows</button>
+                            <button type="button" id="cs_mode_env_btn" class="calc-btn secondary" style="flex:1;" onclick="setComplexMode('envelope')">Fit to Footprint</button>
+                        </div>
                     </div>
                 </div>
 
-                <div class="section-card">
+                <div class="section-card" id="cs_rows_section">
                     <div class="section-card-header">Rows (top to bottom)</div>
                     <div class="section-card-body">
                         <div style="display:flex;gap:8px;font-size:11px;font-weight:bold;color:#6b7280;margin-bottom:4px;padding:0 2px;">
@@ -986,6 +992,28 @@
                         </div>
                         <div id="cs_rows_container"></div>
                         <button type="button" class="calc-btn secondary" style="margin-top:8px;" onclick="addShapeRow()">+ Add Row</button>
+                    </div>
+                </div>
+
+                <div class="section-card" id="cs_envelope_section" style="display:none;">
+                    <div class="section-card-header">Footprint (from scaled plan)</div>
+                    <div class="section-card-body">
+                        <label>Footprint Width (ft)</label>
+                        <input type="number" id="cs_env_width" step="0.01" min="0" placeholder="e.g. 66.92">
+
+                        <label>Footprint Length (ft)</label>
+                        <input type="number" id="cs_env_length" step="0.01" min="0" placeholder="e.g. 114.17">
+
+                        <label>Crate Orientation</label>
+                        <select id="cs_env_orientation">
+                            <option value="len_along_length">Long axis down length</option>
+                            <option value="len_along_width">Long axis across width</option>
+                        </select>
+                        <div style="font-size:11px;color:#64748b;margin-top:6px;line-height:1.4;">
+                            Whole crates are packed inside the entered footprint (snapped down — never
+                            larger than what you enter). Both orientation counts are reported; the
+                            selected one drives the storage number.
+                        </div>
                     </div>
                 </div>
 
@@ -2347,27 +2375,63 @@
         });
     }
 
-    async function runComplexShapeBuilder() {
-        const resultsDiv = document.getElementById('cs_results');
-        const container = document.getElementById('cs_rows_container');
-        const rowDivs = Array.from(container.children);
+    let csMode = 'rows';
+    let csLastInputs = null;
 
-        if (rowDivs.length === 0) {
-            resultsDiv.innerHTML = '<div class="error-box">Add at least one row to build the shape.</div>';
-            return;
+    function setComplexMode(mode) {
+        csMode = mode;
+        const rowsSec = document.getElementById('cs_rows_section');
+        const envSec  = document.getElementById('cs_envelope_section');
+        const rowsBtn = document.getElementById('cs_mode_rows_btn');
+        const envBtn  = document.getElementById('cs_mode_env_btn');
+        if (mode === 'envelope') {
+            rowsSec.style.display = 'none';
+            envSec.style.display = '';
+            rowsBtn.className = 'calc-btn secondary';
+            envBtn.className = 'calc-btn';
+        } else {
+            rowsSec.style.display = '';
+            envSec.style.display = 'none';
+            rowsBtn.className = 'calc-btn';
+            envBtn.className = 'calc-btn secondary';
         }
+    }
 
-        const rows = rowDivs.map(rowDiv => ({
-            crate_count:   rowDiv.querySelector('.cs-crate-count').value || 0,
-            offset_crates: rowDiv.querySelector('.cs-offset-crates').value || 0,
-        }));
-
+    function collectComplexInputs() {
         const inputs = {
             config: document.getElementById('cs_config').value,
             layers: document.getElementById('cs_layers').value || 1,
-            rows:   rows,
+            mode:   csMode,
         };
+        if (csMode === 'envelope') {
+            inputs.envelope_width_ft  = document.getElementById('cs_env_width').value || 0;
+            inputs.envelope_length_ft = document.getElementById('cs_env_length').value || 0;
+            inputs.orientation        = document.getElementById('cs_env_orientation').value;
+        } else {
+            const container = document.getElementById('cs_rows_container');
+            const rowDivs = Array.from(container.children);
+            inputs.rows = rowDivs.map(rowDiv => ({
+                crate_count:   rowDiv.querySelector('.cs-crate-count').value || 0,
+                offset_crates: rowDiv.querySelector('.cs-offset-crates').value || 0,
+            }));
+        }
+        return inputs;
+    }
 
+    async function runComplexShapeBuilder() {
+        const resultsDiv = document.getElementById('cs_results');
+        const inputs = collectComplexInputs();
+
+        if (csMode === 'rows' && (!inputs.rows || inputs.rows.length === 0)) {
+            resultsDiv.innerHTML = '<div class="error-box">Add at least one row to build the shape.</div>';
+            return;
+        }
+        if (csMode === 'envelope' && (!(parseFloat(inputs.envelope_width_ft) > 0) || !(parseFloat(inputs.envelope_length_ft) > 0))) {
+            resultsDiv.innerHTML = '<div class="error-box">Enter a positive footprint width and length.</div>';
+            return;
+        }
+
+        csLastInputs = inputs;
         resultsDiv.innerHTML = '<div class="empty-state">Calculating…</div>';
 
         try {
@@ -2387,6 +2451,77 @@
         } catch (err) {
             resultsDiv.innerHTML = `<div class="error-box">Request failed: ${err.message}</div>`;
         }
+    }
+
+    async function downloadComplexShapePdf() {
+        if (!csLastInputs) { alert('Calculate first.'); return; }
+        const btn = document.getElementById('cs_pdf_btn');
+        const orig = btn ? btn.textContent : '';
+        if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+        try {
+            const projName = (document.getElementById('project_name') || {}).value || null;
+            const resp = await fetch('/design-tools/download_pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calc_type: 'complex_shape_builder', inputs: csLastInputs, project_name: projName })
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                alert(err.error || 'PDF generation failed.');
+                return;
+            }
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'AquaCell_Complex_Shape_Schematic.pdf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('PDF request failed: ' + err.message);
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = orig; }
+        }
+    }
+
+    function downloadComplexShapePng() {
+        const svg = document.querySelector('#cs_results svg');
+        if (!svg) { alert('Calculate first to generate the drawing.'); return; }
+        // Serialize the SVG and rasterize to a white-background PNG canvas.
+        const xml = new XMLSerializer().serializeToString(svg);
+        const vb = svg.getAttribute('viewBox').split(/\s+/).map(Number);
+        const vbW = vb[2], vbH = vb[3];
+        const scale = 2; // 2x for crisp output
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(vbW * scale);
+        canvas.height = Math.round(vbH * scale);
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        const svgBlob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        img.onload = function () {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(url);
+            canvas.toBlob(function (blob) {
+                const purl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = purl;
+                a.download = 'AquaCell_Complex_Shape_PlanView.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(purl);
+            }, 'image/png');
+        };
+        img.onerror = function () {
+            URL.revokeObjectURL(url);
+            alert('PNG export failed to rasterize the drawing.');
+        };
+        img.src = url;
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -2517,10 +2652,15 @@
             <div class="result-card">
                 <h3>Plan View (Top-Down)</h3>
                 <div style="padding:8px 4px;overflow-x:auto;">${svg}</div>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                    <button type="button" id="cs_pdf_btn" class="calc-btn" style="flex:1;" onclick="downloadComplexShapePdf()">Download Submittal PDF</button>
+                    <button type="button" class="calc-btn secondary" style="flex:1;" onclick="downloadComplexShapePng()">Download PNG</button>
+                </div>
                 <div style="font-size:11px;color:#64748b;margin-top:6px;line-height:1.4;">
                     Top-down footprint. Shaded cells = crate modules; blue outline = tank perimeter (${d.perimeter_ft.toLocaleString()} ft);
                     dashed box = bounding extent. Rows run top-to-bottom in entry order. Interior obstructions (light poles, manhole
                     islands) are handled by the Void Space Entry feature in the main calculators, not shown here.
+                    PNG has a white background — reduce its opacity in Bluebeam to overlay on plans.
                 </div>
             </div>
 
@@ -2533,6 +2673,16 @@
                 <div class="result-row"><span><strong>Total Crates / Layer</strong></span><span class="val">${d.total_crates_layer.toLocaleString()}</span></div>
                 <div class="result-row"><span><strong>Total Crates (all layers)</strong></span><span class="val">${d.total_crates_all_layers.toLocaleString()}</span></div>
             </div>
+
+            ${d.envelope ? `
+            <div class="result-card">
+                <h3>Footprint / Orientation</h3>
+                <div class="result-row"><span>Entered Footprint</span><span class="val">${d.envelope.entered_width_ft} × ${d.envelope.entered_length_ft} ft</span></div>
+                <div class="result-row"><span>Used (snapped down)</span><span class="val">${d.envelope.used_width_ft} × ${d.envelope.used_length_ft} ft</span></div>
+                <div class="result-row"><span>Crates — long axis down length</span><span class="val">${d.envelope.crates_len_along_length.toLocaleString()}</span></div>
+                <div class="result-row"><span>Crates — long axis across width</span><span class="val">${d.envelope.crates_len_along_width.toLocaleString()}</span></div>
+                <div class="result-row"><span><strong>Active orientation</strong></span><span class="val">${d.envelope.orientation === 'len_along_length' ? 'Down length' : 'Across width'}</span></div>
+            </div>` : ''}
 
             <div class="result-card">
                 <h3>Bounding Box &amp; Fill Efficiency</h3>
@@ -2557,6 +2707,9 @@
     document.addEventListener('DOMContentLoaded', () => {
         if (document.getElementById('cs_rows_container') && document.getElementById('cs_rows_container').children.length === 0) {
             addShapeRow(10, 0);
+        }
+        if (document.getElementById('cs_mode_rows_btn')) {
+            setComplexMode('rows');
         }
     });
 </script>
