@@ -11,6 +11,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 - can a drag & drop file upload by added so i can drop in the JSON for the calculator to load, rather than go to import, then have to search the file?
 - ADD DISTANCE FROM BUILDING CALCULATOR
 - PT-ROW™ DESIGN CALCULATOR WITH VISUAL WITHIN A STRUCTURED TANK (OR BE ABLE TO PLACE BASED ON NUMBER OF CALCULATED CRATES)
+- UPDATE LARGE DIAMETER PIPE SELECTION - 30" PIPE IS MISSING FROM SELECTIONS
 
 
 **## Backlog / Future Enhancements (Add here when ideas come up)**
