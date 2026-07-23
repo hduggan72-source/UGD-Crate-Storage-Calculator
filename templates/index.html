@@ -825,7 +825,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                                 oninput="updateLargePipeTotal()" style="text-align:center;">
                         </div>
                         <div>
-                            <div style="font-size:10px;opacity:0.6;margin-bottom:2px;text-align:center;">36"</div>
+                            <div style="font-size:10px;opacity:0.6;margin-bottom:2px;text-align:center;">30"</div>
                             <input type="number" name="large_pipe_36" id="large_pipe_36" min="0"
                                 value="{{ form_data.get('large_pipe_36', 0) }}"
                                 oninput="updateLargePipeTotal()" style="text-align:center;">
@@ -3756,7 +3756,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             `8-12" Pipe Connectors (2476631200) ea.:           ${pipeConnectors}`,
             `12" Top Adapters (3085857) ea.:                   ${topAdapters12}`,
             `16" Top Adapters (2476842000) ea.:                ${topAdapters16}`,
-            ...(parseFloat(largePipeQty) > 0 ? [`Large Diameter Pipe Connection (18"–36") ea.:    ${largePipeQty}`] : []),
+            ...(parseFloat(largePipeQty) > 0 ? [`Large Diameter Pipe Connection (18"–30") ea.:    ${largePipeQty}`] : []),
             `AquaCell Tank Wrap Geotextile (${geoUnit}):              ${geoTank}${geoWasteLabel}`,
             `Stone Backfill Envelope Geotextile (${geoUnit}):         ${geoStone}${geoWasteLabel}`,
             ...(linerProtYd2 > 0 ? [`Liner Protection Geotextile (${geoUnit}):                ${linerProtDisp}  (AQ-100-03.4)`] : []),
