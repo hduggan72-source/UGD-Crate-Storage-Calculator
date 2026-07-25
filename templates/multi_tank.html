@@ -531,7 +531,7 @@
         <div style="border:3px dashed #ffc107;border-radius:16px;padding:48px 64px;background:rgba(15,23,42,0.6);text-align:center;color:#f8fafc;font-family:system-ui,Segoe UI,Arial,sans-serif;">
             <div style="font-size:52px;line-height:1;margin-bottom:14px;">⬇️</div>
             <div style="font-size:22px;font-weight:700;letter-spacing:0.3px;">Drop AquaCell JSON to load</div>
-            <div style="font-size:13px;opacity:0.75;margin-top:8px;">Release anywhere on this window</div>
+            <div style="font-size:13px;opacity:0.75;margin-top:8px;">Loads and calculates automatically</div>
         </div>
     </div>
 
@@ -566,6 +566,7 @@
         <button class="topbar-btn" onclick="exportJSON()" style="background:#0891b2;color:#fff;">⬇ Export JSON</button>
         <button class="topbar-btn" onclick="importJSON()" style="background:#ffc107;color:#212529;">Import JSON</button>
         <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImport(event)">
+        <button class="topbar-btn" onclick="newProject()" style="background:#dc3545;color:#fff;" title="Clear the dashboard and start a fresh project">🆕 New Project</button>
         <button id="themeToggle" class="topbar-btn" style="background:transparent;color:#fff;font-size:18px;padding:4px 9px;">☀️</button>
     </div>
 </div>
@@ -806,7 +807,7 @@
                                 oninput="saveDraft()" style="text-align:center;">
                         </div>
                         <div>
-                            <div style="font-size:10px;opacity:0.6;margin-bottom:2px;text-align:center;">36"</div>
+                            <div style="font-size:10px;opacity:0.6;margin-bottom:2px;text-align:center;">30"</div>
                             <input type="number" id="f_large_pipe_36" value="0" min="0"
                                 oninput="saveDraft()" style="text-align:center;">
                         </div>
@@ -2262,7 +2263,7 @@ function importJSON() {
     document.getElementById('importFile').click();
 }
 
-function handleImport(ev) {
+function handleImport(ev, autoCalc) {
     const file = ev.target.files[0];
     if (!file) return;
     const reader = new FileReader();
@@ -2287,7 +2288,13 @@ function handleImport(ev) {
             renderSidebar();
             if (tanks.length > 0) selectTank(0);
             else showEmpty();
-            rebuildCumulative();
+            if (autoCalc && tanks.length > 0) {
+                // Drag & drop path: recalc every tank that had saved results
+                // so the dashboard picks up exactly where it left off.
+                recalcAllImported();
+            } else {
+                rebuildCumulative();
+            }
             showToast('✓ Project imported');
         } catch (err) {
             alert('Failed to import JSON: ' + err.message);
@@ -2295,6 +2302,33 @@ function handleImport(ev) {
     };
     reader.readAsText(file);
     ev.target.value = '';
+}
+
+/* ---- Recalculate all imported tanks that had results (drag & drop auto-calc) ---- */
+async function recalcAllImported() {
+    var spinner = document.getElementById('calcSpinner');
+    if (spinner) spinner.classList.add('active');
+    try {
+        for (var i = 0; i < tanks.length; i++) {
+            if (!results[i]) continue;
+            try {
+                var resp = await fetch('/multi/calculate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tanks: [tanks[i]] })
+                });
+                var data = await resp.json();
+                if (!data.error && data.tank_results && data.tank_results[0]) {
+                    results[i] = data.tank_results[0];
+                }
+            } catch (e) { /* leave this tank as-is on failure */ }
+        }
+        renderSidebar();
+        if (activeIdx !== null && results[activeIdx]) showResults(results[activeIdx]);
+        rebuildCumulative();
+    } finally {
+        if (spinner) spinner.classList.remove('active');
+    }
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -2306,6 +2340,33 @@ function toggleRC(hdr) {
     if (!body) return;
     const collapsed = hdr.classList.toggle('collapsed');
     body.classList.toggle('hidden', collapsed);
+}
+
+/* ---- New Project: export reminder + clear (Option A) ---- */
+function newProject() {
+    var doExport = confirm('⚠️ Start a NEW project?\n\nThis clears the current dashboard.\n\nClick OK to EXPORT your current project first (recommended), or Cancel to choose whether to clear without exporting.');
+    if (doExport) {
+        try { exportJSON(); } catch (e) {}
+        setTimeout(clearProjectState, 400);
+        return;
+    }
+    var clearAnyway = confirm('Clear WITHOUT exporting?\n\nAny unsaved work will be lost. Click OK to clear anyway, or Cancel to keep working.');
+    if (clearAnyway) clearProjectState();
+}
+
+function clearProjectState() {
+    tanks = [];
+    results = [];
+    activeIdx = null;
+    ['q_project_name','q_project_num','q_client','q_location','q_estimator','q_estimator_email','q_notes'].forEach(function(id){
+        var el = document.getElementById(id); if (el) el.value = '';
+    });
+    var mk = document.getElementById('markupPct'); if (mk) mk.value = 10;
+    var fr = document.getElementById('freightPct'); if (fr) fr.value = 10;
+    renderSidebar();
+    showEmpty();
+    rebuildCumulative();
+    showToast('✓ New project started');
 }
 
 function showToast(msg) {
@@ -2746,7 +2807,7 @@ function copyToClipboard() {
         `12" Top Adapters (3085857) ea.:                    ${fmtI(totTop12)}`,
         `16" Top Adapters (2476842000) ea.:                 ${fmtI(totTop16)}`,
         `Contingency Base Units (pallet fill) ea.:          ${fmtI(contingency)}`,
-        ...(totLargePipe > 0 ? [`Large Diameter Pipe Connections (18"-36") ea.:     ${fmtI(totLargePipe)}`] : []),
+        ...(totLargePipe > 0 ? [`Large Diameter Pipe Connections (18"-30") ea.:     ${fmtI(totLargePipe)}`] : []),
         '',
         `Non-Woven Geo — Tank Wrap (${uA}):                 ${fmt(totGeoTankU)}${wasteLabel}`,
         `Non-Woven Geo — Backfill Envelope (${uA}):         ${fmt(totGeoStoneU)}${wasteLabel}`,
@@ -2954,7 +3015,7 @@ function generateDetailsPDF() {
 renderSidebar();
 setMtGeoUnit('ft2');   // paint pill state + unit labels (default ft²)
 
-/* ---- Drag & drop JSON loader (reuses handleImport) ---- */
+/* ---- Drag & drop JSON loader (reuses handleImport, auto-calculates) ---- */
 (function () {
     var overlay = document.getElementById('jsonDropOverlay');
     var dragDepth = 0;
@@ -2994,7 +3055,7 @@ setMtGeoUnit('ft2');   // paint pill state + unit labels (default ft²)
             alert('❌ Please drop a .json file.');
             return;
         }
-        handleImport({ target:{ files:[file], value:'' } });
+        handleImport({ target:{ files:[file], value:'' } }, true);
     });
 })();
 </script>

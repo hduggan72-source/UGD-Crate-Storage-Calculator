@@ -548,7 +548,7 @@
         <div style="border:3px dashed #ffc107;border-radius:16px;padding:48px 64px;background:rgba(15,23,42,0.6);text-align:center;color:#f8fafc;font-family:system-ui,Segoe UI,Arial,sans-serif;">
             <div style="font-size:52px;line-height:1;margin-bottom:14px;">⬇️</div>
             <div style="font-size:22px;font-weight:700;letter-spacing:0.3px;">Drop AquaCell JSON to load</div>
-            <div style="font-size:13px;opacity:0.75;margin-top:8px;">Release anywhere on this window</div>
+            <div style="font-size:13px;opacity:0.75;margin-top:8px;">Loads and calculates automatically</div>
         </div>
     </div>
 
@@ -572,6 +572,7 @@
         <button class="topbar-btn" onclick="exportProject()" style="background:#17a2b8;color:white;">Export</button>
         <button class="topbar-btn" onclick="document.getElementById('importFile').click()" style="background:#ffc107;color:#212529;">Import</button>
         <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importProject(event)">
+        <button class="topbar-btn" onclick="newProject()" style="background:#dc3545;color:white;" title="Clear the dashboard and start a fresh project">🆕 New Project</button>
         <a href="/multi" class="topbar-btn" style="background:#0891b2;color:white;text-decoration:none;"
            onclick="return confirm('Heads up: switching to Multi-Tank will leave this single-tank session. Any unsaved entries here will be lost unless you\'ve exported. Continue?');">
             🏗️ Multi-Tank
@@ -832,7 +833,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                                 oninput="updateLargePipeTotal()" style="text-align:center;">
                         </div>
                         <div>
-                            <div style="font-size:10px;opacity:0.6;margin-bottom:2px;text-align:center;">36"</div>
+                            <div style="font-size:10px;opacity:0.6;margin-bottom:2px;text-align:center;">30"</div>
                             <input type="number" name="large_pipe_36" id="large_pipe_36" min="0"
                                 value="{{ form_data.get('large_pipe_36', 0) }}"
                                 oninput="updateLargePipeTotal()" style="text-align:center;">
@@ -3142,7 +3143,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         URL.revokeObjectURL(url);
     }
 
-    function importProject(event) {
+    function importProject(event, autoCalc) {
         const file = event.target.files[0];
         if (!file) return;
         const reader = new FileReader();
@@ -3153,6 +3154,17 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     const el = document.querySelector(`[name="${k}"]`);
                     if (el) el.value = data[k];
                 });
+                if (autoCalc) {
+                    // Drag & drop path: submit the form so Flask recalculates and
+                    // renders results immediately — no manual Calculate click needed.
+                    const form = document.getElementById('mainForm');
+                    if (form) {
+                        if (typeof injectPtrowToForm === 'function') injectPtrowToForm();
+                        if (window.syncVoidHidden) syncVoidHidden();
+                        form.submit();
+                        return;
+                    }
+                }
                 alert('✅ Project loaded successfully! Click "Calculate System" to refresh results.');
             } catch (err) {
                 alert('❌ Error reading JSON file.');
@@ -3160,6 +3172,20 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         };
         reader.readAsText(file);
         event.target.value = '';
+    }
+
+    /* ---- New Project: export reminder + clear (Option A) ---- */
+    function newProject() {
+        var doExport = confirm('⚠️ Start a NEW project?\n\nThis clears the current dashboard.\n\nClick OK to EXPORT your current project first (recommended), or Cancel to choose whether to clear without exporting.');
+        if (doExport) {
+            try { exportProject(); } catch (e) {}
+            setTimeout(function () { window.location.href = '/'; }, 400);
+            return;
+        }
+        var clearAnyway = confirm('Clear WITHOUT exporting?\n\nAny unsaved work will be lost. Click OK to clear anyway, or Cancel to keep working.');
+        if (clearAnyway) {
+            window.location.href = '/';
+        }
     }
 
     function updateSuggestion() {
@@ -3763,7 +3789,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             `8-12" Pipe Connectors (2476631200) ea.:           ${pipeConnectors}`,
             `12" Top Adapters (3085857) ea.:                   ${topAdapters12}`,
             `16" Top Adapters (2476842000) ea.:                ${topAdapters16}`,
-            ...(parseFloat(largePipeQty) > 0 ? [`Large Diameter Pipe Connection (18"–36") ea.:    ${largePipeQty}`] : []),
+            ...(parseFloat(largePipeQty) > 0 ? [`Large Diameter Pipe Connection (18"–30") ea.:    ${largePipeQty}`] : []),
             `AquaCell Tank Wrap Geotextile (${geoUnit}):              ${geoTank}${geoWasteLabel}`,
             `Stone Backfill Envelope Geotextile (${geoUnit}):         ${geoStone}${geoWasteLabel}`,
             ...(linerProtYd2 > 0 ? [`Liner Protection Geotextile (${geoUnit}):                ${linerProtDisp}  (AQ-100-03.4)`] : []),
@@ -4022,7 +4048,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     }
 
 
-    /* ---- Drag & drop JSON loader (reuses importProject) ---- */
+    /* ---- Drag & drop JSON loader (reuses importProject, auto-calculates) ---- */
     (function () {
         var overlay = document.getElementById('jsonDropOverlay');
         var dragDepth = 0;
@@ -4062,7 +4088,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 alert('❌ Please drop a .json file.');
                 return;
             }
-            importProject({ target:{ files:[file], value:'' } });
+            importProject({ target:{ files:[file], value:'' } }, true);
         });
     })();
 </script>
