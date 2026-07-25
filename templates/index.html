@@ -3305,6 +3305,67 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
 
     const COLORS = {frame:'#d0d0d0', text:'#000', muted:'#333', stoneFill:'#e6e6e6', stoneStroke:'#7d7d7d', crateFill:'#d5eaff', crateStroke:'#234c93', red:'#ff3b3b', baseStone:'#7a7f89'};
 
+    // Draws the AquaCell module glyph inside one crate cell (drawn along the
+    // long axis, left→right): a fat cross, a center pill with end nubs, and a
+    // ring on the right. Called only when the cell is large enough to read.
+    // (cx,cy) = top-left of the cell in px; (cw,ch) = cell size in px.
+    function drawCrateGlyph(ctx, cx, cy, cw, ch) {
+        const gStroke = '#5f7fb0';   // muted blue-grey, reads on crateFill
+        const midY = cy + ch / 2;
+
+        // Three zones across the long axis: cross | pill | ring
+        const pad   = cw * 0.10;
+        const usableW = cw - pad * 2;
+        const zoneW = usableW / 3;
+        const x0 = cx + pad;                 // cross zone left
+        const x1 = x0 + zoneW;               // pill  zone left
+        const x2 = x1 + zoneW;               // ring  zone left
+
+        ctx.save();
+        ctx.strokeStyle = gStroke;
+        ctx.fillStyle = gStroke;
+
+        // ---- FAT CROSS (left) ----
+        const crossCx = x0 + zoneW / 2;
+        const armLen  = Math.min(zoneW, ch) * 0.42;   // half-length of each arm
+        const armThk  = Math.max(1.5, Math.min(zoneW, ch) * 0.16); // arm thickness
+        ctx.fillRect(crossCx - armThk/2, midY - armLen, armThk, armLen * 2); // vertical
+        ctx.fillRect(crossCx - armLen, midY - armThk/2, armLen * 2, armThk); // horizontal
+
+        // ---- PILL (middle) ----
+        const pillH = Math.max(2, ch * 0.26);
+        const pillW = zoneW * 0.62;
+        const pillX = x1 + (zoneW - pillW) / 2;
+        const pillY = midY - pillH / 2;
+        const r = pillH / 2;
+        ctx.lineWidth = Math.max(1, ch * 0.05);
+        ctx.beginPath();
+        ctx.moveTo(pillX + r, pillY);
+        ctx.lineTo(pillX + pillW - r, pillY);
+        ctx.arc(pillX + pillW - r, pillY + r, r, -Math.PI/2, Math.PI/2);
+        ctx.lineTo(pillX + r, pillY + pillH);
+        ctx.arc(pillX + r, pillY + r, r, Math.PI/2, -Math.PI/2);
+        ctx.closePath();
+        ctx.stroke();
+        // pill end-nubs (short connector stubs + end dots)
+        const nub = zoneW * 0.10;
+        ctx.beginPath();
+        ctx.moveTo(pillX - nub, midY); ctx.lineTo(pillX, midY);
+        ctx.moveTo(pillX + pillW, midY); ctx.lineTo(pillX + pillW + nub, midY);
+        ctx.stroke();
+        const dotR = Math.max(1, r * 0.55);
+        ctx.beginPath(); ctx.arc(pillX - nub, midY, dotR, 0, Math.PI*2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(pillX + pillW + nub, midY, dotR, 0, Math.PI*2); ctx.stroke();
+
+        // ---- RING (right) ----
+        const ringCx = x2 + zoneW / 2;
+        const ringR  = Math.min(zoneW, ch) * 0.30;
+        ctx.lineWidth = Math.max(1, ch * 0.05);
+        ctx.beginPath(); ctx.arc(ringCx, midY, ringR, 0, Math.PI*2); ctx.stroke();
+
+        ctx.restore();
+    }
+
     function drawPlan(ctx, state, b) {
         const {L, W, snap} = state;
         ctx.save();
@@ -3319,12 +3380,22 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         ctx.fillRect(ox+(snap.margin_L-ring)*pxpf, oy+(snap.margin_W-ring)*pxpf, (snap.used_L+2*ring)*pxpf, (snap.used_W+2*ring)*pxpf);
         ctx.strokeRect(ox+(snap.margin_L-ring)*pxpf, oy+(snap.margin_W-ring)*pxpf, (snap.used_L+2*ring)*pxpf, (snap.used_W+2*ring)*pxpf);
 
+        // Glyph legibility gate: only draw the fat-cross/pill/ring glyph when a
+        // single cell is wide enough to read it. Below the threshold we keep the
+        // original plain filled rect (clean on large jobs like 300+ ft tanks).
+        const cellWpx = CRATE_LEN_FT * pxpf;
+        const cellHpx = CRATE_WID_FT * pxpf;
+        const GLYPH_MIN_CELL_PX = 22;   // tune: raise to show glyph on fewer/larger cells only
+
         for(let i=0; i<snap.crates_long; i++) for(let j=0; j<snap.crates_wide; j++) {
             const cx = ox + (snap.margin_L + i*CRATE_LEN_FT)*pxpf;
             const cy = oy + (snap.margin_W + j*CRATE_WID_FT)*pxpf;
             ctx.fillStyle = COLORS.crateFill; ctx.strokeStyle = COLORS.crateStroke;
-            ctx.fillRect(cx,cy,CRATE_LEN_FT*pxpf,CRATE_WID_FT*pxpf);
-            ctx.strokeRect(cx,cy,CRATE_LEN_FT*pxpf,CRATE_WID_FT*pxpf);
+            ctx.fillRect(cx,cy,cellWpx,cellHpx);
+            ctx.strokeRect(cx,cy,cellWpx,cellHpx);
+            if (cellWpx >= GLYPH_MIN_CELL_PX) {
+                drawCrateGlyph(ctx, cx, cy, cellWpx, cellHpx);
+            }
         }
 
         ctx.strokeStyle = '#000'; ctx.lineWidth=3;
