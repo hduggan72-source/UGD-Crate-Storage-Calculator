@@ -1787,6 +1787,10 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             var cb = document.getElementById('linerEnable');
                             if (cb) cb.checked = !!anyOn;
                             window.toggleLinerEnable(!!anyOn);
+                            // When restoring to ON, recompute so the auto-calculated quantities
+                            // repopulate from the checked envelopes (calcLiner is not otherwise
+                            // called on load — the visible inputs are hardcoded to 0 until it runs).
+                            if (anyOn) window.calcLiner();
                         })();
                     })();
                     </script>
