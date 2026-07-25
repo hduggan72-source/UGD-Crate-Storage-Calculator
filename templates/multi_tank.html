@@ -832,9 +832,14 @@
             </div>
 
             <!-- BIAXIAL GEOGRID -->
-            <div class="section-label" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleSection('geogridSection',this)">
+            <div class="section-label" style="display:flex;align-items:center;justify-content:space-between;">
                 <span>Biaxial Geogrid — Optional</span>
-                <span style="font-size:10px;opacity:0.6;">▼</span>
+                <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:normal;cursor:pointer;">
+                    <input type="checkbox" id="f_geogrid_enabled"
+                        style="width:14px;height:14px;accent-color:#7c3aed;cursor:pointer;"
+                        onchange="toggleGeogridSection(this.checked,true)">
+                    Enable
+                </label>
             </div>
             <div id="geogridSection" style="display:none;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:5px;margin-bottom:10px;">
                 <div style="font-size:11px;opacity:0.6;margin-bottom:8px;line-height:1.5;">
@@ -959,9 +964,14 @@
             </div>
 
             <!-- WATERTIGHT LINER -->
-            <div class="section-label" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleSection('linerSection',this)">
+            <div class="section-label" style="display:flex;align-items:center;justify-content:space-between;">
                 <span>Watertight Liner (Min. 30 Mil) — Optional</span>
-                <span style="font-size:10px;opacity:0.6;">▼</span>
+                <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:normal;cursor:pointer;">
+                    <input type="checkbox" id="f_liner_enabled"
+                        style="width:14px;height:14px;accent-color:#0891b2;cursor:pointer;"
+                        onchange="toggleLinerSection(this.checked,true)">
+                    Enable
+                </label>
             </div>
             <div id="linerSection" style="display:none;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:5px;margin-bottom:10px;">
                 <div style="font-size:11px;opacity:0.6;margin-bottom:8px;line-height:1.5;">
@@ -1357,6 +1367,7 @@ function addTank() {
         ptrow_enabled: false, ptrow_areas: [{label:'Area 1', wqv:0, pct:10}],
         ptrow_flow_areas: [{label:'Area 1', cfs:0}], ptrow_method: 'volume',
         liner_on_tank: false, liner_on_stone: false,
+        geogrid_enabled: false, liner_enabled: false,
     });
     results.push(null);
     renderSidebar();
@@ -1512,6 +1523,18 @@ function loadEditor(idx) {
     if (lnkTank)  lnkTank.checked  = !!tanks[idx].liner_on_tank;
     if (lnkStone) lnkStone.checked = !!tanks[idx].liner_on_stone;
 
+    // Non-scalar: geogrid & liner Enable toggles (default OFF for legacy tanks)
+    const geoEn = document.getElementById('f_geogrid_enabled');
+    if (geoEn) {
+        geoEn.checked = !!tanks[idx].geogrid_enabled;
+        toggleGeogridSection(geoEn.checked, false);
+    }
+    const linEn = document.getElementById('f_liner_enabled');
+    if (linEn) {
+        linEn.checked = !!tanks[idx].liner_enabled;
+        toggleLinerSection(linEn.checked, false);
+    }
+
     // Stone-layer inclusion toggles (default included for legacy tanks)
     ['top','perim','base'].forEach(function(seg) {
         const el = document.getElementById('f_stone_' + seg + '_included');
@@ -1552,6 +1575,10 @@ function saveDraft() {
     const lnkStone = document.getElementById('f_liner_on_stone');
     if (lnkTank)  tanks[activeIdx].liner_on_tank  = lnkTank.checked;
     if (lnkStone) tanks[activeIdx].liner_on_stone = lnkStone.checked;
+    const geoEn = document.getElementById('f_geogrid_enabled');
+    if (geoEn) tanks[activeIdx].geogrid_enabled = geoEn.checked;
+    const linEn = document.getElementById('f_liner_enabled');
+    if (linEn) tanks[activeIdx].liner_enabled = linEn.checked;
     ['top','perim','base'].forEach(function(seg) {
         const el = document.getElementById('f_stone_' + seg + '_included');
         if (el) tanks[activeIdx]['stone_' + seg + '_included'] = el.checked;
@@ -2416,6 +2443,32 @@ function toggleSection(sectionId, btn) {
 function togglePtrowSection(on, doSave) {
     const sec = document.getElementById('ptrowSection');
     if (sec) sec.style.display = on ? 'block' : 'none';
+    if (doSave) saveDraft();
+}
+
+function toggleGeogridSection(on, doSave) {
+    const sec = document.getElementById('geogridSection');
+    if (sec) sec.style.display = on ? 'block' : 'none';
+    if (!on) {
+        // Force quantities to 0 so nothing flows to the quote/BOM when disabled.
+        const t = document.getElementById('f_geogrid_top_yd2');
+        const b = document.getElementById('f_geogrid_bottom_yd2');
+        if (t) t.value = 0;
+        if (b) b.value = 0;
+    }
+    if (doSave) saveDraft();
+}
+
+function toggleLinerSection(on, doSave) {
+    const sec = document.getElementById('linerSection');
+    if (sec) sec.style.display = on ? 'block' : 'none';
+    if (!on) {
+        // Uncheck both envelope options so liner quantities resolve to 0 when disabled.
+        const t = document.getElementById('f_liner_on_tank');
+        const st = document.getElementById('f_liner_on_stone');
+        if (t) t.checked = false;
+        if (st) st.checked = false;
+    }
     if (doSave) saveDraft();
 }
 

@@ -899,11 +899,13 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             {% if results %}
             <input type="hidden" id="formGeogridTop"    name="geogrid_top_yd2"    value="{{ results.geogrid_top_yd2 }}">
             <input type="hidden" id="formGeogridBottom" name="geogrid_bottom_yd2" value="{{ results.geogrid_bottom_yd2 }}">
+            <input type="hidden" id="formGeogridEnabled" name="geogrid_enabled" value="{{ '1' if form_data.get('geogrid_enabled') == '1' else '0' }}">
             <!-- PT-ROW enabled flag (always present so Flask can read it) -->
             <input type="hidden" id="formPtrowEnabled" name="ptrow_enabled" value="{{ '1' if results.ptrow_enabled else '0' }}">
             {% else %}
             <input type="hidden" id="formGeogridTop"    name="geogrid_top_yd2"    value="">
             <input type="hidden" id="formGeogridBottom" name="geogrid_bottom_yd2" value="">
+            <input type="hidden" id="formGeogridEnabled" name="geogrid_enabled" value="0">
             <input type="hidden" id="formPtrowEnabled" name="ptrow_enabled" value="0">
             {% endif %}
 
@@ -1512,9 +1514,18 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
 
                     <!-- ── Geogrid section ── -->
                     <div style="margin:10px 12px 4px;padding-top:10px;border-top:1px solid var(--border);">
-                        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:8px;">
-                            Biaxial Geogrid (Integrally Formed Polypropylene) — Optional
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;">
+                                Biaxial Geogrid (Integrally Formed Polypropylene) — Optional
+                            </div>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:normal;cursor:pointer;margin-left:auto;">
+                                <input type="checkbox" id="geogridEnable"
+                                    style="width:14px;height:14px;accent-color:#7c3aed;cursor:pointer;"
+                                    onchange="toggleGeogridEnable(this.checked)">
+                                Enable
+                            </label>
                         </div>
+                        <div id="geogridInner">
                         <div style="font-size:11px;opacity:0.6;margin-bottom:10px;line-height:1.5;">
                             Auto-calculated below. Override to <strong>0</strong> to exclude from quote. Both quantities combine onto line D of the PDF quote.
                             Top/Cover geogrid = excavation area + 2 ft overlap each side. Bottom geogrid = tank footprint only. Both include {{ results.geoWaste }}% waste.
@@ -1557,6 +1568,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         <div style="font-size:11px;opacity:0.55;padding:0 2px;">
                             Combined total on PDF Quote line D: <strong id="geogridCombinedDisplay">0 sq yd</strong>
                         </div>
+                        </div><!-- /geogridInner -->
                     </div>
 
                     <script>
@@ -1606,14 +1618,56 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             updateCombinedDisplay();
                             if (window.setGeoUnit) window.setGeoUnit(window._currentGeoUnit || 'ft2');
                         };
+
+                        // Enable/disable the whole geogrid sub-section. When OFF, force both
+                        // quantities (display + hidden form fields) to 0 so nothing flows to
+                        // the quote/BOM, and dim the inputs. When ON, restore editability.
+                        window.toggleGeogridEnable = function(on) {
+                            var inner   = document.getElementById('geogridInner');
+                            var topEl   = document.getElementById('geogridTopQty');
+                            var botEl   = document.getElementById('geogridBottomQty');
+                            var fTop    = document.getElementById('formGeogridTop');
+                            var fBot    = document.getElementById('formGeogridBottom');
+                            var fEnabled= document.getElementById('formGeogridEnabled');
+                            if (fEnabled) fEnabled.value = on ? '1' : '0';
+                            if (inner) {
+                                inner.style.opacity = on ? '1' : '0.4';
+                                inner.style.pointerEvents = on ? 'auto' : 'none';
+                            }
+                            if (!on) {
+                                if (topEl) topEl.value = 0;
+                                if (botEl) botEl.value = 0;
+                                if (fTop)  fTop.value  = 0;
+                                if (fBot)  fBot.value  = 0;
+                            }
+                            updateCombinedDisplay();
+                            if (window.setGeoUnit) window.setGeoUnit(window._currentGeoUnit || 'ft2');
+                        };
+
+                        // Restore enable state from server (survives recalculate). Default OFF.
+                        (function(){
+                            var savedEnabled = (document.getElementById('formGeogridEnabled') || {}).value === '1';
+                            var cb = document.getElementById('geogridEnable');
+                            if (cb) cb.checked = savedEnabled;
+                            window.toggleGeogridEnable(savedEnabled);
+                        })();
                     })();
                     </script>
 
                 <!-- ── PVC Liner section ── -->
                 <div style="margin:0 12px 12px;padding-top:10px;border-top:1px solid var(--border);">
-                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;margin-bottom:8px;">
-                        Watertight Liner (Min. 30 Mil Geomembrane) — Optional
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;">
+                            Watertight Liner (Min. 30 Mil Geomembrane) — Optional
+                        </div>
+                        <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:normal;cursor:pointer;margin-left:auto;">
+                            <input type="checkbox" id="linerEnable"
+                                style="width:14px;height:14px;accent-color:#0891b2;cursor:pointer;"
+                                onchange="toggleLinerEnable(this.checked)">
+                            Enable
+                        </label>
                     </div>
+                    <div id="linerInner">
                     <div style="font-size:11px;opacity:0.6;margin-bottom:10px;line-height:1.5;">
                         Select which envelope(s) require a liner. Quantities auto-calculated using same waste % as geotextiles.
                         Geotextile quantities are <strong>not affected</strong>. Flows to Quote PDF line H.
@@ -1656,6 +1710,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     <div style="font-size:11px;opacity:0.55;padding:0 2px;">
                         Combined liner on Quote PDF line H: <strong id="linerCombinedDisplay">0 sq yd</strong>
                     </div>
+                    </div><!-- /linerInner -->
 
                     <!-- Hidden form inputs for liner.
                          These live in the RESULTS card, which sits OUTSIDE <form id="mainForm">
@@ -1710,8 +1765,29 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             if (window.setGeoUnit) window.setGeoUnit(window._currentGeoUnit || 'ft2');
                         };
 
-                        // Initialise on page load
-                        window.calcLiner();
+                        // Master Enable toggle for the liner sub-section. When OFF, uncheck
+                        // both envelope options (which forces liner quantities to 0 via calcLiner)
+                        // and hide the envelope cards. When ON, reveal them for selection.
+                        window.toggleLinerEnable = function(on) {
+                            var inner = document.getElementById('linerInner');
+                            if (inner) inner.style.display = on ? 'block' : 'none';
+                            if (!on) {
+                                var t = document.getElementById('linerOnTank');
+                                var st = document.getElementById('linerOnStone');
+                                if (t)  t.checked  = false;
+                                if (st) st.checked = false;
+                                window.calcLiner();  // recompute -> zeros both quantities
+                            }
+                        };
+
+                        // Derive master enable state: ON if the server had either envelope selected.
+                        (function(){
+                            var anyOn = (_linerOnTank === 1) || (_linerOnStone === 1)
+                                     || (_linerOnTank === '1') || (_linerOnStone === '1');
+                            var cb = document.getElementById('linerEnable');
+                            if (cb) cb.checked = !!anyOn;
+                            window.toggleLinerEnable(!!anyOn);
+                        })();
                     })();
                     </script>
                 </div>
