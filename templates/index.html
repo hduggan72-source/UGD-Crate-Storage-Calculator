@@ -544,6 +544,13 @@
     </style>
 </head>
 <body>
+    <div id="jsonDropOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(30,41,59,0.82);backdrop-filter:blur(2px);align-items:center;justify-content:center;pointer-events:none;">
+        <div style="border:3px dashed #ffc107;border-radius:16px;padding:48px 64px;background:rgba(15,23,42,0.6);text-align:center;color:#f8fafc;font-family:system-ui,Segoe UI,Arial,sans-serif;">
+            <div style="font-size:52px;line-height:1;margin-bottom:14px;">⬇️</div>
+            <div style="font-size:22px;font-weight:700;letter-spacing:0.3px;">Drop AquaCell JSON to load</div>
+            <div style="font-size:13px;opacity:0.75;margin-top:8px;">Release anywhere on this window</div>
+        </div>
+    </div>
 
 <!-- ══════════════ TOP BAR ══════════════ -->
 <div class="topbar">
@@ -825,7 +832,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                                 oninput="updateLargePipeTotal()" style="text-align:center;">
                         </div>
                         <div>
-                            <div style="font-size:10px;opacity:0.6;margin-bottom:2px;text-align:center;">30"</div>
+                            <div style="font-size:10px;opacity:0.6;margin-bottom:2px;text-align:center;">36"</div>
                             <input type="number" name="large_pipe_36" id="large_pipe_36" min="0"
                                 value="{{ form_data.get('large_pipe_36', 0) }}"
                                 oninput="updateLargePipeTotal()" style="text-align:center;">
@@ -3756,7 +3763,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             `8-12" Pipe Connectors (2476631200) ea.:           ${pipeConnectors}`,
             `12" Top Adapters (3085857) ea.:                   ${topAdapters12}`,
             `16" Top Adapters (2476842000) ea.:                ${topAdapters16}`,
-            ...(parseFloat(largePipeQty) > 0 ? [`Large Diameter Pipe Connection (18"–30") ea.:    ${largePipeQty}`] : []),
+            ...(parseFloat(largePipeQty) > 0 ? [`Large Diameter Pipe Connection (18"–36") ea.:    ${largePipeQty}`] : []),
             `AquaCell Tank Wrap Geotextile (${geoUnit}):              ${geoTank}${geoWasteLabel}`,
             `Stone Backfill Envelope Geotextile (${geoUnit}):         ${geoStone}${geoWasteLabel}`,
             ...(linerProtYd2 > 0 ? [`Liner Protection Geotextile (${geoUnit}):                ${linerProtDisp}  (AQ-100-03.4)`] : []),
@@ -4014,6 +4021,50 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         });
     }
 
+
+    /* ---- Drag & drop JSON loader (reuses importProject) ---- */
+    (function () {
+        var overlay = document.getElementById('jsonDropOverlay');
+        var dragDepth = 0;
+        function showOverlay(){ if(overlay) overlay.style.display='flex'; }
+        function hideOverlay(){ if(overlay) overlay.style.display='none'; }
+        function hasFiles(e){
+            if(!e.dataTransfer) return false;
+            var t=e.dataTransfer.types;
+            if(!t) return false;
+            for(var i=0;i<t.length;i++){ if(t[i]==='Files') return true; }
+            return false;
+        }
+        window.addEventListener('dragenter', function(e){
+            if(!hasFiles(e)) return;
+            e.preventDefault();
+            dragDepth++;
+            showOverlay();
+        });
+        window.addEventListener('dragover', function(e){
+            if(!hasFiles(e)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect='copy';
+        });
+        window.addEventListener('dragleave', function(e){
+            if(!hasFiles(e)) return;
+            dragDepth--;
+            if(dragDepth<=0){ dragDepth=0; hideOverlay(); }
+        });
+        window.addEventListener('drop', function(e){
+            if(!hasFiles(e)) return;
+            e.preventDefault();
+            dragDepth=0;
+            hideOverlay();
+            var file=e.dataTransfer.files && e.dataTransfer.files[0];
+            if(!file) return;
+            if(!/\.json$/i.test(file.name)){
+                alert('❌ Please drop a .json file.');
+                return;
+            }
+            importProject({ target:{ files:[file], value:'' } });
+        });
+    })();
 </script>
 
 <!-- ══ DETAIL SHEET EXPORTER MODAL ══ -->
