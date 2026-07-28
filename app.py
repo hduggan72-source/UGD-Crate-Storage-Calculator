@@ -4256,7 +4256,7 @@ def multi_download_quote():
             ('E', 'CASTINGS FOR VENTING / INSPECTION PORTS / INLETS', int(cum_adapters), 'EACH'),
             ('F', 'LARGE DIAMETER PIPE CONNECTION (18\u201336\u2033) \u2014 GEOTEXTILE BOOT / ABUTMENT',
              int(cum.get('large_pipe_qty', 0)), 'EACH'),
-            ('G', 'STONE BACKFILL OR SELECT BACKFILL ESTIMATED FOR UG SYSTEM', cum_stone_yd3, 'CU YD'),
+            ('G', 'STONE BACKFILL OR SELECT BACKFILL ESTIMATED FOR UG SYSTEM + 10%', cum_stone_yd3, 'CU YD'),
             ('H', liner_desc, cum_liner_total, 'SQ YD'),
         ]
 
@@ -5959,7 +5959,7 @@ def download_quote():
           ('CASTINGS FOR VENTING / INSPECTION PORTS / INLETS',
            top_adapters_12 + top_adapters_16, 'EACH'),
           (large_pipe_desc, large_pipe_qty, 'EACH'),
-          ('STONE BACKFILL OR SELECT BACKFILL ESTIMATED FOR UG SYSTEM',
+          ('STONE BACKFILL OR SELECT BACKFILL ESTIMATED FOR UG SYSTEM + 10%',
            int(stone_yd3), 'CU YD'),
           (liner_label, liner_total_yd2, 'SQ YD'),
       ]
