@@ -387,6 +387,17 @@
             border-color: #b91c1c;
             color: #fca5a5;
         }
+        /* Crate Comparison — two-column input grid */
+        .cc-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; margin-top:6px; }
+        .cc-cmp-table { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
+        .cc-cmp-table th, .cc-cmp-table td { padding:7px 9px; border:1px solid var(--border); text-align:right; }
+        .cc-cmp-table th:first-child, .cc-cmp-table td:first-child { text-align:left; }
+        .cc-cmp-table thead th { background:var(--accent); color:#fff; font-weight:700; }
+        .cc-cmp-table tbody tr:nth-child(even) { background:rgba(0,0,0,0.03); }
+        .cc-delta-good { color:#15803d; font-weight:700; }
+        .cc-delta-bad  { color:#b91c1c; font-weight:700; }
+        .cc-delta-zero { color:var(--muted); }
+        .cc-estimate-stamp { background:#92400e; color:#fff; padding:8px 12px; border-radius:6px; font-size:12px; font-weight:700; margin:10px 0; }
     </style>
 </head>
 <body>
@@ -437,6 +448,9 @@
         </button>
         <button class="calc-nav-item" data-calc="complex_shape_builder" onclick="selectCalc('complex_shape_builder')">
             Complex Shape Builder <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
+        </button>
+        <button class="calc-nav-item" data-calc="crate_comparison" onclick="selectCalc('crate_comparison')">
+            Crate Comparison <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
         </button>
     </div>
 
@@ -1033,6 +1047,81 @@
             </div>
         </div>
 
+        <!-- ── CRATE COMPARISON (BETA) ── -->
+        <div id="panel-crate_comparison" class="calc-panel">
+            <div class="calc-inputs">
+                <div class="disclaimer-box">
+                    <strong>Crate Comparison (BETA) &mdash; value-engineering estimate.</strong>
+                    Compares an AquaCell system to a competitor crate system on a
+                    <em>quantities-only</em> basis (no cost). Both are sized to an equal required
+                    storage volume, each by its own rules. Competitor values are user-supplied.
+                    For internal estimating only &mdash; not a manufacturer-engineered design or a
+                    published competitive claim.
+                </div>
+
+                <label class="calc-label">Project Name (optional)</label>
+                <input type="text" id="cc_project" class="calc-input" placeholder="e.g. Cape Coral Home Depot">
+
+                <label class="calc-label" style="margin-top:10px;">Comparison Mode</label>
+                <div style="display:flex; gap:8px; margin-bottom:6px;">
+                    <button type="button" id="cc_mode_a_btn" class="calc-btn" style="flex:1;" onclick="setCCMode('A')">A &mdash; Specified design</button>
+                    <button type="button" id="cc_mode_b_btn" class="calc-btn secondary" style="flex:1;" onclick="setCCMode('B')">B &mdash; Estimate from target</button>
+                </div>
+                <div id="cc_mode_note" style="font-size:11px; color:var(--muted); margin-bottom:10px;">
+                    <strong>Mode A:</strong> enter a real competitor design (module count) &mdash; the tool sizes an equal-storage AquaCell system.
+                </div>
+
+                <div id="cc_target_wrap" style="display:none; margin-bottom:10px;">
+                    <label class="calc-label">Required Storage Volume (cf) &mdash; Mode B</label>
+                    <input type="number" step="any" id="cc_required_storage" class="calc-input" placeholder="e.g. 5000">
+                </div>
+
+                <!-- AquaCell block -->
+                <div style="border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:12px;">
+                    <div style="font-weight:700; color:var(--accent); margin-bottom:8px;">AquaCell System</div>
+                    <label class="calc-label">Label</label>
+                    <input type="text" id="cc_aq_label" class="calc-input" value="AquaCell SC">
+                    <div class="cc-grid">
+                        <div><label class="calc-label">Module Length (ft)</label><input type="number" step="any" id="cc_aq_len" class="calc-input" value="3.937"></div>
+                        <div><label class="calc-label">Module Width (ft)</label><input type="number" step="any" id="cc_aq_wid" class="calc-input" value="1.9685"></div>
+                        <div><label class="calc-label">Module Height / Layer (ft)</label><input type="number" step="any" id="cc_aq_ht" class="calc-input" value="1.331"></div>
+                        <div><label class="calc-label">Layers</label><input type="number" step="1" id="cc_aq_layers" class="calc-input" value="4"></div>
+                        <div><label class="calc-label">Storage per Module (cf)</label><input type="number" step="any" id="cc_aq_storage" class="calc-input" value="9.86"></div>
+                        <div><label class="calc-label">Stone Void (%)</label><input type="number" step="any" id="cc_aq_void" class="calc-input" value="40"></div>
+                        <div><label class="calc-label">Stone Base (ft)</label><input type="number" step="any" id="cc_aq_base" class="calc-input" value="0.333"></div>
+                        <div><label class="calc-label">Stone Cover (ft)</label><input type="number" step="any" id="cc_aq_cover" class="calc-input" value="1.0"></div>
+                        <div><label class="calc-label">Stone Perimeter (ft/side)</label><input type="number" step="any" id="cc_aq_perim" class="calc-input" value="1.0"></div>
+                    </div>
+                </div>
+
+                <!-- Competitor block -->
+                <div style="border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:12px;">
+                    <div style="font-weight:700; color:#b45309; margin-bottom:8px;">Competitor System</div>
+                    <label class="calc-label">Label</label>
+                    <input type="text" id="cc_cp_label" class="calc-input" value="Ferguson R-Tank HD 2.5">
+                    <div class="cc-grid">
+                        <div><label class="calc-label">Module Length (ft)</label><input type="number" step="any" id="cc_cp_len" class="calc-input" value="2.35"></div>
+                        <div><label class="calc-label">Module Width (ft)</label><input type="number" step="any" id="cc_cp_wid" class="calc-input" value="1.308"></div>
+                        <div><label class="calc-label">Module Height (ft)</label><input type="number" step="any" id="cc_cp_ht" class="calc-input" value="4.79"></div>
+                        <div><label class="calc-label">Layers</label><input type="number" step="1" id="cc_cp_layers" class="calc-input" value="1"></div>
+                        <div><label class="calc-label">Storage per Module (cf)</label><input type="number" step="any" id="cc_cp_storage" class="calc-input" value="10.4"></div>
+                        <div id="cc_cp_modules_wrap"><label class="calc-label">Module Count (Mode A)</label><input type="number" step="1" id="cc_cp_modules" class="calc-input" value="100"></div>
+                        <div><label class="calc-label">Stone Void (%)</label><input type="number" step="any" id="cc_cp_void" class="calc-input" value="40"></div>
+                        <div><label class="calc-label">Stone Base (ft)</label><input type="number" step="any" id="cc_cp_base" class="calc-input" value="0.25"></div>
+                        <div><label class="calc-label">Stone Cover (ft)</label><input type="number" step="any" id="cc_cp_cover" class="calc-input" value="1.0"></div>
+                        <div><label class="calc-label">Stone Perimeter (ft/side)</label><input type="number" step="any" id="cc_cp_perim" class="calc-input" value="2.0"></div>
+                    </div>
+                </div>
+
+                <button class="calc-btn" onclick="runCrateComparison()">Run Comparison</button>
+                <button class="calc-btn secondary" id="cc_pdf_btn" onclick="downloadCrateComparisonPDF()" disabled>Export PDF</button>
+            </div>
+
+            <div class="calc-results" id="cc_results">
+                <div class="empty-state">Enter both systems and click Run Comparison.</div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -1079,6 +1168,223 @@
         document.querySelectorAll('.calc-panel').forEach(p => p.style.display = 'none');
         const panel = document.getElementById('panel-' + name);
         if (panel) panel.style.display = 'flex';
+    }
+
+    // ══════════════ CRATE COMPARISON (BETA) ══════════════
+    // Client-side geometry mirrors app.py _cc_size_system() exactly so the
+    // on-screen table equals the PDF. Quantities only — no cost.
+    let ccMode = 'A';
+    let ccLastResults = null;
+
+    function setCCMode(mode) {
+        ccMode = mode;
+        const aBtn = document.getElementById('cc_mode_a_btn');
+        const bBtn = document.getElementById('cc_mode_b_btn');
+        const targetWrap = document.getElementById('cc_target_wrap');
+        const modulesWrap = document.getElementById('cc_cp_modules_wrap');
+        const note = document.getElementById('cc_mode_note');
+        if (mode === 'A') {
+            aBtn.className = 'calc-btn'; bBtn.className = 'calc-btn secondary';
+            targetWrap.style.display = 'none';
+            modulesWrap.style.display = '';
+            note.innerHTML = '<strong>Mode A:</strong> enter a real competitor design (module count) &mdash; the tool sizes an equal-storage AquaCell system.';
+        } else {
+            aBtn.className = 'calc-btn secondary'; bBtn.className = 'calc-btn';
+            targetWrap.style.display = '';
+            modulesWrap.style.display = 'none';
+            note.innerHTML = '<strong>Mode B:</strong> enter a target storage volume &mdash; the competitor system is ESTIMATED to meet it (not a manufacturer-engineered design).';
+        }
+    }
+
+    function ccNum(id, dflt) {
+        const v = parseFloat(document.getElementById(id).value);
+        return isNaN(v) ? (dflt || 0) : v;
+    }
+
+    // Size one system by its own rules — mirrors app.py _cc_size_system().
+    function ccSizeSystem(sys, requiredStorage) {
+        const modulePlanArea = sys.len * sys.wid;
+        let modules = sys.storage > 0 ? Math.ceil(requiredStorage / sys.storage) : 0;
+        if (sys.fixedModules != null) modules = sys.fixedModules;
+        modules = Math.max(modules, 0);
+        const layers = Math.max(1, sys.layers);
+        const modulesPerLayer = layers > 0 ? Math.ceil(modules / layers) : modules;
+        const footprintSf = modulesPerLayer * modulePlanArea;
+        const fpSide = footprintSf > 0 ? Math.sqrt(footprintSf) : 0;
+        const systemHeightFt = sys.ht * layers;
+        const fieldLen = fpSide + 2 * sys.perim;
+        const fieldWid = fpSide + 2 * sys.perim;
+        const fieldFootprintSf = fieldLen * fieldWid;
+        const fieldDepthFt = sys.base + systemHeightFt + sys.cover;
+        const excavationCf = fieldFootprintSf * fieldDepthFt;
+        const crateStorageCf = modules * sys.storage;
+        const moduleBoundingCf = modulePlanArea * sys.ht * modules;
+        const stoneEnvCf = Math.max(excavationCf - moduleBoundingCf, 0);
+        const stoneStorageCf = stoneEnvCf * (sys.void / 100);
+        const totalStorageCf = crateStorageCf + stoneStorageCf;
+        const efficiencyPct = excavationCf > 0 ? (totalStorageCf / excavationCf * 100) : 0;
+        const wrapSf = (2 * fieldFootprintSf) + (2 * fieldLen * fieldDepthFt) + (2 * fieldWid * fieldDepthFt);
+        return {
+            label: sys.label,
+            modules: modules,
+            footprint_sf: footprintSf,
+            system_height_ft: systemHeightFt,
+            excavation_cy: excavationCf / 27,
+            stone_backfill_cy: stoneEnvCf / 27,
+            wrap_sy: wrapSf / 9,
+            total_storage_cf: totalStorageCf,
+            efficiency_pct: efficiencyPct
+        };
+    }
+
+    function ccReadSystem(prefix, opts) {
+        opts = opts || {};
+        return {
+            label:   document.getElementById(prefix + '_label').value || 'System',
+            len:     ccNum(prefix + '_len'),
+            wid:     ccNum(prefix + '_wid'),
+            ht:      ccNum(prefix + '_ht'),
+            layers:  Math.max(1, Math.round(ccNum(prefix + '_layers', 1))),
+            storage: ccNum(prefix + '_storage'),
+            void:    ccNum(prefix + '_void'),
+            base:    ccNum(prefix + '_base'),
+            cover:   ccNum(prefix + '_cover'),
+            perim:   ccNum(prefix + '_perim'),
+            fixedModules: (opts.fixedModules != null) ? opts.fixedModules : null
+        };
+    }
+
+    function runCrateComparison() {
+        const resultsDiv = document.getElementById('cc_results');
+        const pdfBtn = document.getElementById('cc_pdf_btn');
+
+        let requiredStorage;
+        let comp, aqua;
+
+        if (ccMode === 'B') {
+            requiredStorage = ccNum('cc_required_storage');
+            if (requiredStorage <= 0) {
+                resultsDiv.innerHTML = '<div class="empty-state" style="color:#b91c1c;">Enter a required storage volume (cf) for Mode B.</div>';
+                pdfBtn.disabled = true;
+                return;
+            }
+            comp = ccSizeSystem(ccReadSystem('cc_cp'), requiredStorage);
+            aqua = ccSizeSystem(ccReadSystem('cc_aq'), requiredStorage);
+        } else {
+            const compModules = Math.max(0, Math.round(ccNum('cc_cp_modules')));
+            const compStorageEach = ccNum('cc_cp_storage');
+            if (compModules <= 0 || compStorageEach <= 0) {
+                resultsDiv.innerHTML = '<div class="empty-state" style="color:#b91c1c;">Mode A requires competitor module count and per-module storage.</div>';
+                pdfBtn.disabled = true;
+                return;
+            }
+            requiredStorage = compModules * compStorageEach;
+            comp = ccSizeSystem(ccReadSystem('cc_cp', {fixedModules: compModules}), requiredStorage);
+            aqua = ccSizeSystem(ccReadSystem('cc_aq'), requiredStorage);
+        }
+
+        ccLastResults = {mode: ccMode, requiredStorage: requiredStorage, aquacell: aqua, competitor: comp};
+        renderCrateComparison(ccLastResults);
+        pdfBtn.disabled = false;
+    }
+
+    function ccDeltaCell(aqv, cpv, higherIsBetter, unit, decimals) {
+        const d = aqv - cpv;
+        const p = cpv ? (d / cpv * 100) : 0;
+        const dec = (decimals == null) ? 1 : decimals;
+        let cls = 'cc-delta-zero';
+        if (d !== 0) {
+            const favorable = (d < 0) !== higherIsBetter;
+            cls = favorable ? 'cc-delta-good' : 'cc-delta-bad';
+        }
+        const sign = d > 0 ? '+' : '';
+        const u = unit || '';
+        return `<td class="${cls}">${sign}${d.toLocaleString(undefined,{maximumFractionDigits:dec})}${u} (${sign}${p.toLocaleString(undefined,{maximumFractionDigits:1})}%)</td>`;
+    }
+
+    function renderCrateComparison(r) {
+        const aq = r.aquacell, cp = r.competitor;
+        const fmt = (v, d) => v.toLocaleString(undefined, {maximumFractionDigits: (d==null?1:d)});
+
+        let estimateStamp = '';
+        if (r.mode === 'B') {
+            estimateStamp = '<div class="cc-estimate-stamp">ESTIMATED &mdash; competitor system is a preliminary estimate, NOT a manufacturer-engineered design.</div>';
+        }
+
+        const rows = [
+            ['Modules / chambers needed', fmt(aq.modules,0), fmt(cp.modules,0), ccDeltaCell(aq.modules, cp.modules, false, '', 0)],
+            ['Footprint (sf)', fmt(aq.footprint_sf), fmt(cp.footprint_sf), ccDeltaCell(aq.footprint_sf, cp.footprint_sf, false)],
+            ['System height (ft)', fmt(aq.system_height_ft,2), fmt(cp.system_height_ft,2), ccDeltaCell(aq.system_height_ft, cp.system_height_ft, false, '', 2)],
+            ['Excavation volume (cy)', fmt(aq.excavation_cy), fmt(cp.excavation_cy), ccDeltaCell(aq.excavation_cy, cp.excavation_cy, false)],
+            ['Stone backfill (cy)', fmt(aq.stone_backfill_cy), fmt(cp.stone_backfill_cy), ccDeltaCell(aq.stone_backfill_cy, cp.stone_backfill_cy, false)],
+            ['Geotextile wrap (sy)', fmt(aq.wrap_sy), fmt(cp.wrap_sy), ccDeltaCell(aq.wrap_sy, cp.wrap_sy, false)],
+            ['Total storage provided (cf)', fmt(aq.total_storage_cf), fmt(cp.total_storage_cf), ccDeltaCell(aq.total_storage_cf, cp.total_storage_cf, true)],
+            ['System-scale efficiency (%)', fmt(aq.efficiency_pct)+'%', fmt(cp.efficiency_pct)+'%', ccDeltaCell(aq.efficiency_pct, cp.efficiency_pct, true, '')]
+        ];
+
+        let html = estimateStamp;
+        html += `<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Required storage basis: <strong>${fmt(r.requiredStorage)} cf</strong></div>`;
+        html += '<table class="cc-cmp-table"><thead><tr><th>Metric</th><th>AquaCell</th><th>Competitor</th><th>Δ (AC − Comp)</th></tr></thead><tbody>';
+        rows.forEach(row => {
+            html += `<tr><td>${row[0]}</td><td>${row[1]}</td><td>${row[2]}</td>${row[3]}</tr>`;
+        });
+        html += '</tbody></table>';
+        html += '<div style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5;">'
+             + 'Both systems sized to equal required storage, each by its own rules. Efficiency = total storage / total excavated field, '
+             + 'computed identically for both (this tool\u2019s system-scale figure; differs from a vendor single-module sheet). '
+             + 'Green = favorable to AquaCell, red = unfavorable. Competitor values are user-supplied; internal estimate only, no cost implied.'
+             + '</div>';
+        document.getElementById('cc_results').innerHTML = html;
+    }
+
+    async function downloadCrateComparisonPDF() {
+        if (!ccLastResults) return;
+        const btn = document.getElementById('cc_pdf_btn');
+        const orig = btn.textContent;
+        btn.textContent = 'Generating…'; btn.disabled = true;
+        try {
+            const payload = {
+                calc_type: 'crate_comparison',
+                project_name: document.getElementById('cc_project').value || null,
+                mode: ccMode,
+                required_storage_cf: ccNum('cc_required_storage'),
+                aquacell: {
+                    label: document.getElementById('cc_aq_label').value,
+                    module_len_ft: ccNum('cc_aq_len'), module_wid_ft: ccNum('cc_aq_wid'),
+                    module_height_ft: ccNum('cc_aq_ht'), layers: Math.round(ccNum('cc_aq_layers',1)),
+                    storage_per_module_cf: ccNum('cc_aq_storage'), stone_void_pct: ccNum('cc_aq_void'),
+                    stone_base_ft: ccNum('cc_aq_base'), stone_cover_ft: ccNum('cc_aq_cover'),
+                    stone_perimeter_ft: ccNum('cc_aq_perim')
+                },
+                competitor: {
+                    label: document.getElementById('cc_cp_label').value,
+                    module_len_ft: ccNum('cc_cp_len'), module_wid_ft: ccNum('cc_cp_wid'),
+                    module_height_ft: ccNum('cc_cp_ht'), layers: Math.round(ccNum('cc_cp_layers',1)),
+                    storage_per_module_cf: ccNum('cc_cp_storage'), modules: Math.round(ccNum('cc_cp_modules')),
+                    stone_void_pct: ccNum('cc_cp_void'), stone_base_ft: ccNum('cc_cp_base'),
+                    stone_cover_ft: ccNum('cc_cp_cover'), stone_perimeter_ft: ccNum('cc_cp_perim')
+                }
+            };
+            const resp = await fetch('/design-tools/download_pdf', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({calc_type: 'crate_comparison', project_name: payload.project_name, inputs: payload})
+            });
+            if (!resp.ok) {
+                const err = await resp.json();
+                alert('PDF error: ' + (err.error || 'unknown'));
+                return;
+            }
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'AquaCell_Crate_Comparison.pdf';
+            a.click(); URL.revokeObjectURL(url);
+        } catch (e) {
+            alert('PDF error: ' + e.message);
+        } finally {
+            btn.textContent = orig; btn.disabled = false;
+        }
     }
 
     // ── Buoyancy calculator ──

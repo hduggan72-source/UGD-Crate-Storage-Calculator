@@ -3781,6 +3781,339 @@ def multi_calculate():
 
 
 # ══════════════════════════════════════════════════════════════════
+#  CRATE COMPARISON (BETA)  -  value-engineering estimator
+#
+#  Compares an AquaCell system against a generic competitor crate
+#  system on a QUANTITIES-ONLY basis (no cost), sized to an equal
+#  required storage volume. Each system is sized BY ITS OWN RULES:
+#  its own per-module storage, its own stone envelope (base / cover /
+#  perimeter / stone void). Efficiency is computed identically for
+#  both (total storage / total excavated field) so it is a fair,
+#  apples-to-apples, this-tool system-scale figure - deliberately
+#  NOT the same as a vendor's single-chamber sheet number.
+#
+#  Mode A: user transcribes a real competitor design; the target
+#          storage is derived from that competitor system.
+#  Mode B: user types a target storage; the competitor system is
+#          ESTIMATED to meet it (clearly stamped, not a vendor design).
+#
+#  Sizing is client-side JS for the on-screen table; this server
+#  helper re-derives the same numbers from raw inputs so the PDF is
+#  authoritative and self-contained (never trusts JS-computed values).
+# ══════════════════════════════════════════════════════════════════
+def _cc_size_system(sysd, required_storage_cf):
+    """Size one crate system to meet a required storage volume, by its
+    own rules. `sysd` is a per-system input dict. Returns a result dict
+    of quantities. Pure geometry; no cost."""
+    def f(key, default=0.0):
+        try:
+            return float(sysd.get(key, default) or default)
+        except (TypeError, ValueError):
+            return default
+
+    label            = str(sysd.get('label', 'System')).strip() or 'System'
+    module_len_ft    = f('module_len_ft')
+    module_wid_ft    = f('module_wid_ft')
+    module_height_ft = f('module_height_ft')
+    storage_per_cf   = f('storage_per_module_cf')
+    layers           = max(1, int(f('layers', 1)))
+    stone_base_ft    = f('stone_base_ft')
+    stone_cover_ft   = f('stone_cover_ft')
+    stone_perim_ft   = f('stone_perimeter_ft')
+    stone_void_pct   = f('stone_void_pct')
+
+    module_plan_area = module_len_ft * module_wid_ft            # sf (one module footprint)
+
+    # Modules needed to meet required storage (whole modules, snap up).
+    if storage_per_cf > 0:
+        modules = math.ceil(required_storage_cf / storage_per_cf)
+    else:
+        modules = 0
+    modules = max(modules, 0)
+
+    # Footprint = modules per layer laid out in plan.
+    modules_per_layer = math.ceil(modules / layers) if layers > 0 else modules
+    footprint_sf      = modules_per_layer * module_plan_area
+
+    # Approximate a square-ish footprint L x W for reporting (informational).
+    fp_side = math.sqrt(footprint_sf) if footprint_sf > 0 else 0.0
+
+    system_height_ft = module_height_ft * layers
+
+    # Excavated field: footprint expanded by the stone perimeter on all sides,
+    # by the full field depth (base + system height + cover).
+    field_len = fp_side + 2 * stone_perim_ft
+    field_wid = fp_side + 2 * stone_perim_ft
+    field_footprint_sf = field_len * field_wid
+    field_depth_ft = stone_base_ft + system_height_ft + stone_cover_ft
+    excavation_cf = field_footprint_sf * field_depth_ft
+
+    # Module (crate) storage provided.
+    crate_storage_cf = modules * storage_per_cf
+
+    # Module displacement volume (solid bounding volume of all modules).
+    module_bounding_cf = module_plan_area * module_height_ft * modules
+    # Stone envelope volume = excavated field minus the module bounding volume.
+    stone_env_cf = max(excavation_cf - module_bounding_cf, 0.0)
+    stone_storage_cf = stone_env_cf * (stone_void_pct / 100.0)
+
+    total_storage_cf = crate_storage_cf + stone_storage_cf
+
+    # System-scale efficiency (this tool's basis, identical both systems).
+    efficiency_pct = (total_storage_cf / excavation_cf * 100.0) if excavation_cf > 0 else 0.0
+
+    # Geotextile wrap = outer surface area of the field envelope (all 6 faces).
+    wrap_sf = (2 * field_footprint_sf) + (2 * field_len * field_depth_ft) + (2 * field_wid * field_depth_ft)
+
+    return {
+        'label':             label,
+        'modules':           int(modules),
+        'layers':            int(layers),
+        'module_plan_area_sf': round(module_plan_area, 3),
+        'footprint_sf':      round(footprint_sf, 1),
+        'footprint_side_ft': round(fp_side, 1),
+        'system_height_ft':  round(system_height_ft, 2),
+        'field_depth_ft':    round(field_depth_ft, 2),
+        'excavation_cf':     round(excavation_cf, 1),
+        'excavation_cy':     round(excavation_cf / 27.0, 1),
+        'crate_storage_cf':  round(crate_storage_cf, 1),
+        'stone_env_cf':      round(stone_env_cf, 1),
+        'stone_storage_cf':  round(stone_storage_cf, 1),
+        'stone_backfill_cf': round(stone_env_cf, 1),
+        'stone_backfill_cy': round(stone_env_cf / 27.0, 1),
+        'wrap_sf':           round(wrap_sf, 1),
+        'wrap_sy':           round(wrap_sf / 9.0, 1),
+        'total_storage_cf':  round(total_storage_cf, 1),
+        'efficiency_pct':    round(efficiency_pct, 1),
+    }
+
+
+def calc_crate_comparison(payload):
+    """Compute the AquaCell-vs-competitor comparison from raw inputs.
+    Returns a dict with both sized systems, the deltas, and echo of mode."""
+    mode = (payload.get('mode') or 'A').upper()
+    aqua_in = payload.get('aquacell', {}) or {}
+    comp_in = payload.get('competitor', {}) or {}
+
+    def f(d, key, default=0.0):
+        try:
+            return float(d.get(key, default) or default)
+        except (TypeError, ValueError):
+            return default
+
+    # Determine required storage volume (the held-constant basis).
+    if mode == 'B':
+        required_storage_cf = f(payload, 'required_storage_cf')
+        if required_storage_cf <= 0:
+            return {'error': 'Enter a required storage volume (cf) for Mode B.'}
+    else:
+        # Mode A: derive target from the competitor system as specified.
+        comp_modules = max(0, int(f(comp_in, 'modules', 0)))
+        comp_storage_each = f(comp_in, 'storage_per_module_cf')
+        if comp_modules <= 0 or comp_storage_each <= 0:
+            return {'error': 'Mode A requires competitor module count and per-module storage.'}
+        # Target = competitor CRATE storage (module storage only, apples-to-apples
+        # sizing driver; each system then adds its own stone credit on top).
+        required_storage_cf = comp_modules * comp_storage_each
+
+    # In Mode A the competitor is sized as specified (fixed module count),
+    # not re-derived. In Mode B the competitor is sized to the target.
+    if mode == 'A':
+        comp_fixed = dict(comp_in)
+        comp_storage_each = f(comp_in, 'storage_per_module_cf')
+        comp_modules = max(0, int(f(comp_in, 'modules', 0)))
+        comp_required = comp_modules * comp_storage_each
+        comp_res = _cc_size_system(comp_fixed, comp_required)
+        # guard: snap-up could add one module; force exact specified count.
+        comp_res['modules'] = comp_modules
+    else:
+        comp_res = _cc_size_system(comp_in, required_storage_cf)
+
+    aqua_res = _cc_size_system(aqua_in, required_storage_cf)
+
+    # Deltas (AquaCell minus competitor). Negative = AquaCell uses less.
+    def delta(a, b):
+        return round(a - b, 1)
+    def pct(a, b):
+        return round((a - b) / b * 100.0, 1) if b else 0.0
+
+    deltas = {
+        'modules':          {'d': aqua_res['modules'] - comp_res['modules'],
+                             'p': pct(aqua_res['modules'], comp_res['modules'])},
+        'footprint_sf':     {'d': delta(aqua_res['footprint_sf'], comp_res['footprint_sf']),
+                             'p': pct(aqua_res['footprint_sf'], comp_res['footprint_sf'])},
+        'system_height_ft': {'d': delta(aqua_res['system_height_ft'], comp_res['system_height_ft']),
+                             'p': pct(aqua_res['system_height_ft'], comp_res['system_height_ft'])},
+        'excavation_cy':    {'d': delta(aqua_res['excavation_cy'], comp_res['excavation_cy']),
+                             'p': pct(aqua_res['excavation_cy'], comp_res['excavation_cy'])},
+        'stone_backfill_cy':{'d': delta(aqua_res['stone_backfill_cy'], comp_res['stone_backfill_cy']),
+                             'p': pct(aqua_res['stone_backfill_cy'], comp_res['stone_backfill_cy'])},
+        'wrap_sy':          {'d': delta(aqua_res['wrap_sy'], comp_res['wrap_sy']),
+                             'p': pct(aqua_res['wrap_sy'], comp_res['wrap_sy'])},
+        'total_storage_cf': {'d': delta(aqua_res['total_storage_cf'], comp_res['total_storage_cf']),
+                             'p': pct(aqua_res['total_storage_cf'], comp_res['total_storage_cf'])},
+        'efficiency_pct':   {'d': delta(aqua_res['efficiency_pct'], comp_res['efficiency_pct']),
+                             'p': pct(aqua_res['efficiency_pct'], comp_res['efficiency_pct'])},
+    }
+
+    return {
+        'mode':                mode,
+        'required_storage_cf': round(required_storage_cf, 1),
+        'aquacell':            aqua_res,
+        'competitor':          comp_res,
+        'deltas':              deltas,
+    }
+
+
+def build_crate_comparison_pdf(inputs, results, project_name=None):
+    """Single-page quantities-only comparison submittal PDF."""
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
+
+    band_h = 64
+    c.setFillColor(NAVY)
+    c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
+    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    if logo_path and os.path.exists(logo_path):
+        try:
+            img = ImageReader(logo_path)
+            c.drawImage(img, LM, PH - band_h + 8, width=160, height=46,
+                        preserveAspectRatio=True, mask='auto')
+        except Exception:
+            pass
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 14)
+    c.drawRightString(PW - RM, PH - 24, 'AquaCell Design Verification Dashboard')
+    c.setFont('Helvetica', 9)
+    c.setFillColor(colors.HexColor('#93c5fd'))
+    c.drawRightString(PW - RM, PH - 37, 'Crate Comparison (BETA) - Value-Engineering Estimate')
+    c.setFont('Helvetica', 7)
+    c.setFillColor(colors.HexColor('#94a3b8'))
+    c.drawRightString(PW - RM, PH - 50, generated_str)
+
+    y = PH - band_h - 10
+    if project_name:
+        c.setFillColor(GRAY)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM, y, f'Project: {project_name}')
+        y -= 16
+
+    mode = results.get('mode', 'A')
+    aq = results['aquacell']
+    cp = results['competitor']
+
+    basis_rows = [
+        ('Comparison Mode',        'A - Specified competitor design' if mode == 'A'
+                                    else 'B - Estimated competitor system'),
+        ('Required Storage (basis)', f"{results['required_storage_cf']:,.1f} cf"),
+        ('AquaCell System',        aq['label']),
+        ('Competitor System',      cp['label']),
+    ]
+    y = _draw_section_kv(c, y, 'BASIS OF COMPARISON', basis_rows, ncols=2)
+
+    # Mode B estimate stamp.
+    if mode == 'B':
+        bar_h = 16
+        c.setFillColor(AMBER)
+        c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
+        c.setFillColor(WHITE)
+        c.setFont('Helvetica-Bold', 8.5)
+        c.drawString(LM + 8, y - bar_h + 4,
+                     'ESTIMATED - competitor system is a preliminary estimate, NOT a manufacturer-engineered design.')
+        y -= (bar_h + 8)
+
+    # ── Comparison table ──
+    bar_h = 16
+    c.setFillColor(BLUE)
+    c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 9)
+    c.drawString(LM + 8, y - bar_h + 4, 'SIDE-BY-SIDE QUANTITIES (NO COST)')
+    y -= bar_h
+
+    rows = [
+        ('Modules / chambers needed',   f"{aq['modules']:,}",           f"{cp['modules']:,}",           results['deltas']['modules']),
+        ('Footprint (sf)',              f"{aq['footprint_sf']:,.1f}",   f"{cp['footprint_sf']:,.1f}",   results['deltas']['footprint_sf']),
+        ('System height (ft)',          f"{aq['system_height_ft']:,.2f}", f"{cp['system_height_ft']:,.2f}", results['deltas']['system_height_ft']),
+        ('Excavation volume (cy)',      f"{aq['excavation_cy']:,.1f}",  f"{cp['excavation_cy']:,.1f}",  results['deltas']['excavation_cy']),
+        ('Stone backfill (cy)',         f"{aq['stone_backfill_cy']:,.1f}", f"{cp['stone_backfill_cy']:,.1f}", results['deltas']['stone_backfill_cy']),
+        ('Geotextile wrap (sy)',        f"{aq['wrap_sy']:,.1f}",        f"{cp['wrap_sy']:,.1f}",        results['deltas']['wrap_sy']),
+        ('Total storage provided (cf)', f"{aq['total_storage_cf']:,.1f}", f"{cp['total_storage_cf']:,.1f}", results['deltas']['total_storage_cf']),
+        ('System-scale efficiency (%)', f"{aq['efficiency_pct']:,.1f}%", f"{cp['efficiency_pct']:,.1f}%", results['deltas']['efficiency_pct']),
+    ]
+
+    col_metric = LM + 8
+    col_aq     = LM + 250
+    col_cp     = LM + 350
+    col_delta  = LM + 450
+    row_h = 18
+    header_h = 15
+
+    c.setFillColor(MGRAY)
+    c.rect(LM, y - header_h, CW, header_h, fill=1, stroke=0)
+    c.setFillColor(BLACK)
+    c.setFont('Helvetica-Bold', 7.5)
+    c.drawString(col_metric, y - header_h + 4, 'METRIC')
+    c.drawString(col_aq, y - header_h + 4, 'AQUACELL')
+    c.drawString(col_cp, y - header_h + 4, 'COMPETITOR')
+    c.drawString(col_delta, y - header_h + 4, 'DELTA (AC - COMP)')
+    y -= header_h
+
+    for i, (metric, aqv, cpv, dl) in enumerate(rows):
+        rh = row_h
+        c.setFillColor(LGRAY if i % 2 == 0 else WHITE)
+        c.setStrokeColor(MGRAY)
+        c.setLineWidth(0.5)
+        c.rect(LM, y - rh, CW, rh, fill=1, stroke=1)
+        c.setFillColor(BLACK)
+        c.setFont('Helvetica', 8)
+        c.drawString(col_metric, y - rh + 5, metric)
+        c.setFont('Helvetica-Bold', 8)
+        c.drawString(col_aq, y - rh + 5, aqv)
+        c.drawString(col_cp, y - rh + 5, cpv)
+        d_val = dl.get('d', 0)
+        d_pct = dl.get('p', 0)
+        higher_is_better = metric.startswith('System-scale efficiency') or metric.startswith('Total storage')
+        if d_val == 0:
+            c.setFillColor(GRAY)
+        elif (d_val < 0) != higher_is_better:
+            c.setFillColor(GREEN)
+        else:
+            c.setFillColor(RED)
+        sign = '+' if d_val > 0 else ''
+        c.drawString(col_delta, y - rh + 5, f"{sign}{d_val:,.1f} ({sign}{d_pct:,.1f}%)")
+        y -= rh
+
+    y -= 10
+
+    note_lines = [
+        'BASIS & DISCLAIMER',
+        'Both systems sized to an equal required storage volume, each by its own rules (own per-module storage,',
+        'own stone envelope: base / cover / perimeter / stone void). System-scale efficiency = total storage /',
+        'total excavated field, computed identically for both systems; it is this tool\'s figure and differs from a',
+        'vendor\'s single-module sheet value. Competitor values are USER-SUPPLIED. This is an internal',
+        'value-engineering estimate for reference only - not a manufacturer-engineered design or a published',
+        'competitive claim. Quantities only; no cost figures are implied.',
+    ]
+    c.setFillColor(GRAY)
+    for i, ln in enumerate(note_lines):
+        if i == 0:
+            c.setFont('Helvetica-Bold', 8)
+            c.setFillColor(BLACK)
+        else:
+            c.setFont('Helvetica', 7)
+            c.setFillColor(GRAY)
+        c.drawString(LM, y, ln)
+        y -= 10
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
+# ══════════════════════════════════════════════════════════════════
 #  ROUTE: /design-tools  —  Design Verification Dashboard (page)
 # ══════════════════════════════════════════════════════════════════
 @app.route('/design-tools', methods=['GET'])
@@ -3914,6 +4247,12 @@ def design_tools_download_pdf():
                 return jsonify(result), 400
             buffer = build_complex_shape_pdf(payload, result, project_name=project_name)
             download_name = 'AquaCell_Complex_Shape_Schematic.pdf'
+        elif calc_type == 'crate_comparison':
+            result = calc_crate_comparison(payload)
+            if 'error' in result:
+                return jsonify(result), 400
+            buffer = build_crate_comparison_pdf(payload, result, project_name=project_name)
+            download_name = 'AquaCell_Crate_Comparison.pdf'
         else:
             return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
 
