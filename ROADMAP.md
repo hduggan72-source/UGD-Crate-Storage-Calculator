@@ -10,9 +10,9 @@ Professional web-based calculator for designing and quoting underground stormwat
 ##UPDATES FOR BOTH MULTI-TANK/SINGLE TANK CALCULATORS
 - ADD DEFAULT NOTE IN SINGLE TANK: AQUACELL SYSTEM: SUBJECT TO CHANGE UPON APPROVAL OF PRELIMINARY DESIGN; SOURCE PLANS DATED
 - COLLAPSABLE ADD TANK SIDEBAR ON MULTI TANK UI
+- Project/Site Address (if available) as input beleow Project Location (which is typically City/State)
 
 ##UPDATES FOR DESIGN TOOLS PAGE
-- ADD DISTANCE FROM BUILDING CALCULATOR
 - PT-ROW™ DESIGN CALCULATOR WITH VISUAL WITHIN A STRUCTURED TANK (OR BE ABLE TO PLACE BASED ON NUMBER OF CALCULATED CRATES)
 
 **## Backlog / Future Enhancements (Add here when ideas come up)**
@@ -43,6 +43,7 @@ Professional web-based calculator for designing and quoting underground stormwat
    - [X] STEPPED PERIMETER CALCULATOR
    - [X] Excavation slope calculator integration (with variable H:V ratios) - lives on Dashboard used for estimating the amount of stone/fabric needed
    - [X] USE CANVAS TO BUILD A CONCEPTUAL TANK SYSTEM LAYOUT FOR COMPLEX CALCULATORS; CRATE BUILDER FOR COMPLEX (ENTER ROW BY ROW, THEN DESIGNATE HOW MANY CRATES IN THE ROW)
+   - [x] ADD DISTANCE FROM BUILDING CALCULATOR
 
 - **## PREVIOUS Version (v12-v15) — Completed**
 

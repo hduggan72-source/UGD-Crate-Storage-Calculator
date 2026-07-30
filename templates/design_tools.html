@@ -437,8 +437,8 @@
         <button class="calc-nav-item disabled" disabled>
             Min Distance from Manhole <span class="soon-tag">SOON</span>
         </button>
-        <button class="calc-nav-item disabled" disabled>
-            Min Distance from Structure <span class="soon-tag">SOON</span>
+        <button class="calc-nav-item" data-calc="min_distance_structure" onclick="selectCalc('min_distance_structure')">
+            Min Distance from Structure
         </button>
         <button class="calc-nav-item" data-calc="excavation_slope" onclick="selectCalc('excavation_slope')">
             Excavation Slope
@@ -948,6 +948,82 @@
 
             <div class="calc-results" id="mc_results">
                 <div class="empty-state">Enter tank geometry, traffic load, and proposed cover depth, then click Check Cover Depth.</div>
+            </div>
+        </div>
+
+        <!-- ── MIN DISTANCE FROM STRUCTURE (building / footing / retaining-wall setback) ── -->
+        <div id="panel-min_distance_structure" class="calc-panel" style="display:none;">
+            <div class="calc-inputs">
+
+                <div class="disclaimer-box">
+                    Screens the minimum horizontal setback between an adjacent foundation, footing, or
+                    retaining wall and the AquaCell tank, so lateral load from that structure does not
+                    project down onto the crates. Based on a single soil load-influence wedge rising from
+                    the tank base at the internal shear angle. Method:
+                    <strong>L min = (H2 &minus; H1) &times; tan(90&deg; &minus; a)</strong>,
+                    equivalently (H2 &minus; H1) &divide; tan(a). Internal Wavin method &mdash; there is
+                    no standalone Wavin drawing number for this check. It is a geometric screen only, not
+                    a geotechnical or structural design.
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Depths (below finish grade)</div>
+                    <div class="section-card-body">
+                        <label>Foundation Depth &mdash; H1 (ft) <span class="units-warning">— enter FEET, not inches</span></label>
+                        <span class="field-hint">Depth from finish grade to the base of the adjacent footing / wall / foundation</span>
+                        <input type="number" id="mds_h1_ft" step="0.01" placeholder="e.g. 9.33"
+                               oninput="updateFtInReadout('mds_h1_ft','mds_h1_ft_readout')">
+                        <span class="ft-in-readout" id="mds_h1_ft_readout"></span>
+
+                        <label>Tank Base Depth &mdash; H2 (ft) <span class="units-warning">— enter FEET, not inches</span></label>
+                        <span class="field-hint">Depth from finish grade to the bottom of the tank, including bedding</span>
+                        <input type="number" id="mds_h2_ft" step="0.01" placeholder="e.g. 14.34"
+                               oninput="updateFtInReadout('mds_h2_ft','mds_h2_ft_readout')">
+                        <span class="ft-in-readout" id="mds_h2_ft_readout"></span>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Soil Wedge</div>
+                    <div class="section-card-body">
+                        <label>Internal Shear / Friction Angle &mdash; a (degrees)</label>
+                        <span class="field-hint">
+                            Angle of the load-influence wedge from horizontal. Default 45&deg;. Use a
+                            project-specific value from the geotechnical report when available &mdash; a
+                            lower angle gives a larger required setback (e.g. 30&deg; &rarr; run = 1.73&times;
+                            the depth difference; 45&deg; &rarr; run = 1.00&times;).
+                        </span>
+                        <input type="number" id="mds_angle_deg" step="0.1" value="45" placeholder="45">
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Proposed Distance (optional — enables PASS/FAIL)</div>
+                    <div class="section-card-body">
+                        <label>Proposed Horizontal Distance (ft)</label>
+                        <span class="field-hint">Actual planned clear distance from the structure to the tank. Leave blank to just compute the required minimum.</span>
+                        <input type="number" id="mds_proposed_ft" step="0.01" placeholder="e.g. 6.0"
+                               oninput="updateFtInReadout('mds_proposed_ft','mds_proposed_ft_readout')">
+                        <span class="ft-in-readout" id="mds_proposed_ft_readout"></span>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Project (optional — for PDF header)</div>
+                    <div class="section-card-body">
+                        <label>Project Name</label>
+                        <input type="text" id="mds_project_name" placeholder="e.g. Maple Ridge Retail Site">
+                    </div>
+                </div>
+
+                <button class="calc-btn" onclick="runMinDistStructure()">Compute Setback</button>
+                <button class="calc-btn secondary" id="mds_pdf_btn" onclick="downloadMinDistStructurePDF()" disabled>
+                    ⬇ Download Submittal PDF
+                </button>
+            </div>
+
+            <div class="calc-results" id="mds_results">
+                <div class="empty-state">Enter the foundation depth (H1), tank base depth (H2), and shear angle, then click Compute Setback.</div>
             </div>
         </div>
 
@@ -2643,6 +2719,213 @@
             const a = document.createElement('a');
             a.href = url;
             a.download = 'AquaCell_Min_Cover_Burial_Depth.pdf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('PDF request failed: ' + err.message);
+        } finally {
+            pdfBtn.disabled = false;
+            pdfBtn.textContent = originalText;
+        }
+    }
+
+    // ══════════════════ MIN DISTANCE FROM STRUCTURE ══════════════════
+    let mdsLastInputs  = null;
+    let mdsLastResults = null;
+
+    async function runMinDistStructure() {
+        const resultsDiv = document.getElementById('mds_results');
+        const pdfBtn = document.getElementById('mds_pdf_btn');
+        pdfBtn.disabled = true;
+
+        const inputs = {
+            h1_found_depth_ft:   document.getElementById('mds_h1_ft').value || 0,
+            h2_tank_depth_ft:    document.getElementById('mds_h2_ft').value || 0,
+            shear_angle_deg:     document.getElementById('mds_angle_deg').value || 45,
+            proposed_distance_ft: document.getElementById('mds_proposed_ft').value || '',
+        };
+
+        resultsDiv.innerHTML = '<div class="empty-state">Computing…</div>';
+
+        try {
+            const resp = await fetch('/design-tools/calculate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calc_type: 'min_distance_structure', inputs: inputs })
+            });
+            const data = await resp.json();
+
+            if (!resp.ok || data.error) {
+                resultsDiv.innerHTML = `<div class="error-box">${data.error || 'Calculation failed.'}</div>`;
+                mdsLastInputs = null; mdsLastResults = null;
+                return;
+            }
+
+            mdsLastInputs  = inputs;
+            mdsLastResults = data;
+            pdfBtn.disabled = false;
+            renderMinDistStructureResults(data);
+        } catch (err) {
+            resultsDiv.innerHTML = `<div class="error-box">Request failed: ${err.message}</div>`;
+            mdsLastInputs = null; mdsLastResults = null;
+        }
+    }
+
+    function renderMinDistStructureResults(d) {
+        const resultsDiv = document.getElementById('mds_results');
+
+        function badgeHtml(status) {
+            if (status === 'PASS') return '<span class="badge badge-pass">PASS</span>';
+            if (status === 'FAIL') return '<span class="badge badge-fail">FAIL</span>';
+            return '';
+        }
+
+        const heroStatusHtml = d.status ? `<div style="margin-top:8px;">${badgeHtml(d.status)}</div>` : '';
+
+        const notesHtml = (d.notes && d.notes.length)
+            ? `<div class="result-card">
+                 <h3 style="color:#b45309;">Notes / Flags</h3>
+                 ${d.notes.map(n => `<div class="disclaimer-box" style="margin-bottom:8px;">${n}</div>`).join('')}
+               </div>`
+            : '';
+
+        let proposedRows = '';
+        if (d.proposed_distance_ft !== null && d.proposed_distance_ft !== undefined) {
+            proposedRows = `
+                <div class="result-row"><span>Proposed Distance</span><span class="val">${d.proposed_distance_ft.toFixed(2)} ft</span></div>
+                <div class="result-row"><span>Margin (Proposed − Required)</span><span class="val">${d.margin_ft.toFixed(2)} ft</span></div>
+            `;
+        }
+
+        resultsDiv.innerHTML = `
+            <div class="results-flex">
+                <div class="results-data">
+                    <div class="result-card">
+                        <div class="fos-hero">
+                            <div class="fos-label" style="margin-bottom:6px;">Required Min. Setback (L min)</div>
+                            <div class="fos-value" style="font-size:30px;">${d.l_min_ft.toFixed(2)} ft</div>
+                            <div style="color:#64748b;font-size:12px;margin-top:2px;">${d.l_min_in.toFixed(0)} in</div>
+                            ${heroStatusHtml}
+                        </div>
+                    </div>
+
+                    <div class="result-card">
+                        <h3>Inputs</h3>
+                        <div class="result-row"><span>Foundation Depth (H1)</span><span class="val">${d.h1_found_depth_ft.toFixed(2)} ft</span></div>
+                        <div class="result-row"><span>Tank Base Depth (H2)</span><span class="val">${d.h2_tank_depth_ft.toFixed(2)} ft</span></div>
+                        <div class="result-row"><span>Internal Shear Angle (a)</span><span class="val">${d.shear_angle_deg.toFixed(1)}°</span></div>
+                        <div class="result-row"><span>Depth Difference (H2 − H1)</span><span class="val">${d.depth_diff_ft.toFixed(2)} ft</span></div>
+                    </div>
+
+                    <div class="result-card">
+                        <h3>Result</h3>
+                        <div class="result-row"><span>Required Min. Setback</span><span class="val">${d.l_min_ft.toFixed(2)} ft (${d.l_min_in.toFixed(0)} in)</span></div>
+                        ${proposedRows}
+                        <div class="result-row"><span>Method</span><span class="val" style="font-size:11px;">(H2−H1)·tan(90°−a)</span></div>
+                    </div>
+
+                    ${notesHtml}
+                </div>
+
+                <div class="results-diagram-col">
+                    <div class="diagram-box">
+                        <h3>Cross-Section (Not to Scale)</h3>
+                        ${buildMinDistStructSVG(d)}
+                        <div class="diagram-caption">
+                            Illustrative wedge from the tank base rising at angle a to finish grade at the
+                            structure face. The horizontal run is the required setback L min. Not drawn to a
+                            linear physical scale.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // On-screen cross-section mirroring the PDF: grade line, structure block to
+    // H1, tank block to H2 set back by L min, and the wedge line to grade.
+    function buildMinDistStructSVG(d) {
+        const svgW = 300, svgH = 220;
+        const padX = 22, padTop = 26, padBot = 34;
+        const h1 = d.h1_found_depth_ft, h2 = d.h2_tank_depth_ft, lmin = d.l_min_ft;
+        const angle = d.shear_angle_deg;
+
+        const structW = Math.max(h2 * 0.35, 2.0);
+        const tankW   = Math.max(lmin * 0.9, h2 * 0.6, 3.0);
+        const totalWft = structW + Math.max(lmin, 0.001) + tankW;
+        const totalHft = Math.max(h2 * 1.25, 1.0);
+
+        const drawW = svgW - padX * 2, drawH = svgH - padTop - padBot;
+        const s = Math.min(drawW / totalWft, drawH / totalHft);
+
+        const ox = padX, gradeY = padTop;
+        const X = ft => ox + ft * s;
+        const Y = depth => gradeY + depth * s;
+
+        const foundFace = structW;
+        const tankLeft = foundFace + Math.max(lmin, 0);
+
+        const p = [];
+        p.push(`<svg viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:300px;">`);
+
+        // grade line
+        p.push(`<line x1="${X(0)}" y1="${gradeY}" x2="${X(totalWft)}" y2="${gradeY}" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>`);
+        p.push(`<text x="${X(0)}" y="${gradeY-4}" font-size="7" fill="#64748b">FINISH GRADE</text>`);
+
+        // structure block
+        p.push(`<rect x="${X(0)}" y="${Y(0)}" width="${foundFace*s}" height="${h1*s}" fill="#e2e8f0" stroke="#64748b" stroke-width="0.8"/>`);
+        p.push(`<text x="${X(foundFace/2)}" y="${Y(h1/2)}" font-size="7.5" font-weight="bold" fill="#0f172a" text-anchor="middle">STRUCTURE</text>`);
+        p.push(`<text x="${X(foundFace/2)}" y="${Y(h1/2)+9}" font-size="6.5" fill="#334155" text-anchor="middle">H1 ${h1.toFixed(2)} ft</text>`);
+
+        // tank block
+        p.push(`<rect x="${X(tankLeft)}" y="${Y(0)}" width="${tankW*s}" height="${h2*s}" fill="#dbeafe" stroke="#1e3a8a" stroke-width="1"/>`);
+        p.push(`<text x="${X(tankLeft+tankW/2)}" y="${Y(h2/2)}" font-size="7.5" font-weight="bold" fill="#1e40af" text-anchor="middle">AquaCell</text>`);
+        p.push(`<text x="${X(tankLeft+tankW/2)}" y="${Y(h2/2)+9}" font-size="6.5" fill="#334155" text-anchor="middle">H2 ${h2.toFixed(2)} ft</text>`);
+
+        // wedge line from tank base to grade at structure face
+        p.push(`<line x1="${X(tankLeft)}" y1="${Y(h2)}" x2="${X(foundFace)}" y2="${Y(0)}" stroke="#dc2626" stroke-width="1.4" stroke-dasharray="3 2"/>`);
+        p.push(`<text x="${X((tankLeft+foundFace)/2)+2}" y="${Y(h2/2)-2}" font-size="6.5" fill="#dc2626" font-style="italic">wedge ${angle.toFixed(0)}°</text>`);
+
+        // L min dimension along grade
+        const dimY = gradeY + 12;
+        p.push(`<line x1="${X(foundFace)}" y1="${dimY}" x2="${X(tankLeft)}" y2="${dimY}" stroke="#1e40af" stroke-width="0.9"/>`);
+        p.push(`<line x1="${X(foundFace)}" y1="${dimY-3}" x2="${X(foundFace)}" y2="${dimY+3}" stroke="#1e40af" stroke-width="0.9"/>`);
+        p.push(`<line x1="${X(tankLeft)}" y1="${dimY-3}" x2="${X(tankLeft)}" y2="${dimY+3}" stroke="#1e40af" stroke-width="0.9"/>`);
+        p.push(`<text x="${X((foundFace+tankLeft)/2)}" y="${dimY+12}" font-size="7.5" font-weight="bold" fill="#1e40af" text-anchor="middle">L min = ${lmin.toFixed(2)} ft</text>`);
+
+        p.push(`</svg>`);
+        return p.join('');
+    }
+
+    async function downloadMinDistStructurePDF() {
+        if (!mdsLastInputs || !mdsLastResults) return;
+
+        const projectName = document.getElementById('mds_project_name').value || null;
+        const pdfBtn = document.getElementById('mds_pdf_btn');
+        const originalText = pdfBtn.textContent;
+        pdfBtn.disabled = true;
+        pdfBtn.textContent = 'Generating…';
+
+        try {
+            const resp = await fetch('/design-tools/download_pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calc_type: 'min_distance_structure', inputs: mdsLastInputs, project_name: projectName })
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                alert(err.error || 'PDF generation failed.');
+                return;
+            }
+
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'AquaCell_Min_Distance_from_Structure.pdf';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);

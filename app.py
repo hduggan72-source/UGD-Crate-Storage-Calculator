@@ -717,6 +717,109 @@ def _envelope_to_rows(width_ft, length_ft):
     }
 
 
+# ══════════════════════════════════════════════════════════════════
+#  DESIGN VERIFICATION DASHBOARD — Min Distance from Structure
+#  (Building / Footing / Retaining-Wall Setback)
+#
+#  Purpose: where an adjacent foundation, footing, or retaining wall
+#  bears DEEPER than a shallow structure but the AquaCell tank base
+#  sits deeper still, lateral load from that structure can project
+#  down-and-out along a soil failure/influence wedge and bear on the
+#  crates. This tool returns the minimum horizontal setback that keeps
+#  the tank clear of that wedge.
+#
+#  Method (ported verbatim from James's internal Wavin
+#  "Distance from building" calculator spreadsheet — there is NO
+#  standalone Wavin drawing number for this; attribute to the
+#  internal method only):
+#
+#      L_min = (H2 - H1) * tan( (90 - a) deg )
+#
+#  where
+#      H1 = depth of building/footing foundation (ft, below grade)
+#      H2 = depth of tank base incl. bedding      (ft, below grade)
+#      a  = soil internal shear / friction angle  (deg, from horizontal)
+#
+#  Equivalent form: L_min = (H2 - H1) / tan(a). The wedge rises from
+#  the tank base at angle 'a' above horizontal; the horizontal run
+#  over the vertical difference (H2 - H1) is the required setback.
+#
+#  Edge case (H2 <= H1): the tank base is at or above the foundation
+#  base, so the wedge never reaches the tank — L_min = 0 ft, with a
+#  note that no setback is required on this basis.
+# ══════════════════════════════════════════════════════════════════
+def calc_min_distance_structure(payload):
+    def _num(key, default):
+        # Preserve an explicit 0 (do NOT collapse via `or default`); only fall
+        # back to default when the field is genuinely absent/blank/None.
+        v = payload.get(key, default)
+        if v in (None, ''):
+            v = default
+        return float(v)
+
+    try:
+        h1 = _num('h1_found_depth_ft', 0)   # foundation depth
+        h2 = _num('h2_tank_depth_ft', 0)    # tank base depth
+        angle = _num('shear_angle_deg', 45) # internal shear angle
+    except (TypeError, ValueError):
+        return {'error': 'Enter valid numeric values for all fields.'}
+
+    proposed = payload.get('proposed_distance_ft', None)
+    try:
+        proposed = float(proposed) if proposed not in (None, '', 0, '0') else None
+    except (TypeError, ValueError):
+        proposed = None
+
+    if h1 < 0 or h2 < 0:
+        return {'error': 'Depths must be zero or positive (measured below finish grade).'}
+    if angle <= 0 or angle >= 90:
+        return {'error': 'Internal shear angle must be between 0 and 90 degrees (exclusive).'}
+
+    depth_diff = h2 - h1
+    notes = []
+
+    if depth_diff <= 0:
+        # Tank base is at or above the foundation base — wedge cannot reach it.
+        l_min = 0.0
+        wedge_clears = True
+        notes.append(
+            'Tank base is at or above the adjacent foundation base (H2 \u2264 H1). The soil '
+            'load-influence wedge cannot reach the tank, so no horizontal setback is required '
+            'on this basis. Confirm site-specific soils and surcharge conditions with the '
+            'Engineer of Record.'
+        )
+    else:
+        wedge_clears = False
+        l_min = depth_diff * math.tan(math.radians(90.0 - angle))
+
+    status = None
+    margin_ft = None
+    if proposed is not None:
+        margin_ft = round(proposed - l_min, 3)
+        status = 'PASS' if proposed >= l_min - 1e-9 else 'FAIL'
+        if status == 'FAIL':
+            notes.append(
+                f'Proposed horizontal distance ({proposed:.2f} ft) is LESS than the required '
+                f'minimum setback ({l_min:.2f} ft). The tank falls within the structure\u2019s '
+                f'load-influence wedge \u2014 increase the setback, deepen/underpin the structure, '
+                f'or provide a designed shoring / load-transfer solution reviewed by the EoR.'
+            )
+
+    return {
+        'h1_found_depth_ft':   round(h1, 3),
+        'h2_tank_depth_ft':    round(h2, 3),
+        'shear_angle_deg':     round(angle, 2),
+        'depth_diff_ft':       round(depth_diff, 3),
+        'l_min_ft':            round(l_min, 3),
+        'l_min_in':            round(l_min * 12.0, 1),
+        'wedge_clears':        wedge_clears,
+        'proposed_distance_ft': (round(proposed, 3) if proposed is not None else None),
+        'margin_ft':           margin_ft,
+        'status':              status,
+        'notes':               notes,
+    }
+
+
 def calc_complex_shape_builder(payload):
     config = payload.get('config', 'SC')
     layers = int(float(payload.get('layers', 1) or 1))
@@ -3137,6 +3240,224 @@ def build_min_cover_burial_pdf(inputs, results, project_name=None):
     return buffer
 
 
+_MIN_DIST_STRUCT_DISCLAIMER_TEXT = (
+    "DISCLAIMER: This setback is a preliminary geometric screen based on a single soil "
+    "load-influence wedge projected from the adjacent foundation base at the entered internal "
+    "shear angle. It is NOT a geotechnical or structural design and does not account for surcharge "
+    "loads, groundwater, sloped grade, layered or cohesive soils, wall/footing eccentricity, or "
+    "global stability. The Engineer of Record and, where warranted, a licensed geotechnical "
+    "engineer are solely responsible for confirming the actual angle of influence, soil parameters, "
+    "and site conditions. FINAL SETBACKS, SHORING, AND LOAD-TRANSFER DETAILS MUST BE CONFIRMED BY "
+    "A LICENSED PROFESSIONAL ENGINEER using project-specific plans and soils data."
+)
+_MIN_DIST_STRUCT_BOLD_TRIGGERS = ('FINAL SETBACKS', 'LICENSED PROFESSIONAL', 'NOT a geotechnical')
+
+
+def _draw_min_dist_struct_diagram_pdf(c, x0, y0, w_area, h_area, r):
+    """Scaled cross-section: finish grade line, adjacent foundation to depth
+    H1, tank base to depth H2, and the wedge line rising from the tank base
+    at angle 'a' to grade. The horizontal run to grade = L_min. Feet-honest
+    within the drawable box."""
+    h1 = r['h1_found_depth_ft']
+    h2 = r['h2_tank_depth_ft']
+    l_min = r['l_min_ft']
+    angle = r['shear_angle_deg']
+
+    # Model space (feet): x from 0 (foundation face) rightward; y downward = depth.
+    # Show a little structure width to the left and a little tank width to the right.
+    struct_w = max(h2 * 0.35, 2.0)
+    tank_w = max(l_min * 0.9, h2 * 0.6, 3.0)
+    total_w_ft = struct_w + max(l_min, 0.001) + tank_w
+    total_h_ft = max(h2 * 1.25, 1.0)
+
+    pad = 16
+    draw_w = w_area - pad * 2
+    draw_h = h_area - pad * 2
+    if total_w_ft <= 0 or total_h_ft <= 0:
+        return
+    s = min(draw_w / total_w_ft, draw_h / total_h_ft)   # ft -> pt
+
+    # Origin: foundation face at model x=struct_w; grade at top of drawable area.
+    ox = x0 + pad
+    grade_y = y0 + h_area - pad
+    def X(ft): return ox + ft * s
+    def Y(depth_ft): return grade_y - depth_ft * s   # depth grows downward
+
+    found_face_x = struct_w  # model-x of the foundation right face / tank-side
+
+    # Finish grade line
+    c.setStrokeColor(GRAY); c.setLineWidth(0.8); c.setDash()
+    c.line(X(0), grade_y, X(total_w_ft), grade_y)
+    c.setFillColor(GRAY); c.setFont('Helvetica', 6.5)
+    c.drawString(X(0), grade_y + 3, 'FINISH GRADE')
+
+    # Adjacent structure (foundation) block
+    c.setFillColor(MGRAY); c.setStrokeColor(GRAY); c.setLineWidth(0.7)
+    c.rect(X(0), Y(h1), (found_face_x) * s, h1 * s, fill=1, stroke=1)
+    c.setFillColor(BLACK); c.setFont('Helvetica-Bold', 6.5)
+    c.drawCentredString(X(found_face_x / 2.0), Y(h1 / 2.0), 'STRUCTURE')
+    c.setFont('Helvetica', 6)
+    c.drawCentredString(X(found_face_x / 2.0), Y(h1 / 2.0) - 8, f'H1 = {h1:.2f} ft')
+
+    # Tank block (starts at required setback from foundation face)
+    tank_left = found_face_x + max(l_min, 0.0)
+    c.setFillColor(LTBLUE); c.setStrokeColor(BLUE); c.setLineWidth(0.9)
+    c.rect(X(tank_left), Y(h2), tank_w * s, (h2 - 0.0) * s, fill=1, stroke=1)
+    c.setFillColor(DKBLUE); c.setFont('Helvetica-Bold', 6.5)
+    c.drawCentredString(X(tank_left + tank_w / 2.0), Y(h2 * 0.5), 'AquaCell')
+    c.setFillColor(BLACK); c.setFont('Helvetica', 6)
+    c.drawCentredString(X(tank_left + tank_w / 2.0), Y(h2 * 0.5) - 8, f'H2 = {h2:.2f} ft')
+
+    # Wedge line: from tank base (tank_left, h2) up to grade at angle 'a'.
+    # Horizontal run to grade = l_min, landing at model-x = found_face_x.
+    c.setStrokeColor(RED); c.setLineWidth(1.3); c.setDash(3, 2)
+    c.line(X(tank_left), Y(h2), X(found_face_x), Y(0))
+    c.setDash()
+    c.setFillColor(RED); c.setFont('Helvetica-Oblique', 6)
+    c.drawString(X((tank_left + found_face_x) / 2.0) + 2,
+                 Y(h2 / 2.0) + 2, f'wedge {angle:.0f}\u00b0')
+
+    # L_min dimension arrow along grade between foundation face and tank face
+    dim_y = grade_y - 10
+    c.setStrokeColor(DKBLUE); c.setLineWidth(0.8)
+    c.line(X(found_face_x), dim_y, X(tank_left), dim_y)
+    for xx in (found_face_x, tank_left):
+        c.line(X(xx), dim_y - 3, X(xx), dim_y + 3)
+    c.setFillColor(DKBLUE); c.setFont('Helvetica-Bold', 7)
+    c.drawCentredString(X((found_face_x + tank_left) / 2.0), dim_y - 10,
+                        f'L min = {l_min:.2f} ft')
+
+
+def build_min_dist_struct_pdf(inputs, results, project_name=None):
+    """Single-page submittal-ready PDF for the Min Distance from Structure
+    (building / footing / retaining-wall setback) calculator."""
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
+
+    band_h = 64
+    c.setFillColor(NAVY)
+    c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
+    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    if logo_path and os.path.exists(logo_path):
+        try:
+            img = ImageReader(logo_path)
+            c.drawImage(img, LM, PH - band_h + 8, width=160, height=46,
+                        preserveAspectRatio=True, mask='auto')
+        except Exception:
+            pass
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 14)
+    c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
+    c.setFont('Helvetica', 9)
+    c.setFillColor(colors.HexColor('#93c5fd'))
+    c.drawRightString(PW - RM, PH - 37, 'Min Distance from Structure \u2014 Foundation Setback')
+    c.setFont('Helvetica', 7)
+    c.setFillColor(colors.HexColor('#94a3b8'))
+    c.drawRightString(PW - RM, PH - 50, generated_str)
+
+    y = PH - band_h - 10
+    if project_name:
+        c.setFillColor(GRAY)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM, y, f'Project: {project_name}')
+        y -= 16
+
+    # Hero: required setback + PASS/FAIL if a proposed distance was given
+    status = results.get('status')
+    hero_status = status if status in ('PASS', 'FAIL') else 'NA'
+    hero_val = f"{results['l_min_ft']:.2f} ft"
+    if results['wedge_clears']:
+        sub = 'No setback required \u2014 tank base at/above foundation base'
+    else:
+        sub = f"Minimum horizontal setback ({results['l_min_in']:.0f} in) from structure to tank"
+    y = _draw_fos_hero(c, y, hero_val, sub, hero_status)
+
+    in_rows = [
+        ('Foundation Depth (H1)', f"{results['h1_found_depth_ft']:.2f} ft"),
+        ('Tank Base Depth (H2)',  f"{results['h2_tank_depth_ft']:.2f} ft"),
+        ('Internal Shear Angle (a)', f"{results['shear_angle_deg']:.1f}\u00b0"),
+        ('Depth Difference (H2\u2212H1)', f"{results['depth_diff_ft']:.2f} ft"),
+    ]
+    y = _draw_section_kv(c, y, 'INPUTS', in_rows, ncols=2)
+
+    res_rows = [('Required Min. Setback (L min)',
+                 f"{results['l_min_ft']:.2f} ft ({results['l_min_in']:.0f} in)")]
+    if results.get('proposed_distance_ft') is not None:
+        res_rows.append(('Proposed Distance', f"{results['proposed_distance_ft']:.2f} ft"))
+        res_rows.append(('Margin (Proposed \u2212 Required)', f"{results['margin_ft']:.2f} ft"))
+        res_rows.append(('Setback Check', status or 'NA'))
+    y = _draw_section_kv(c, y, 'RESULTS', res_rows, ncols=2)
+
+    # Formula line
+    c.setFillColor(GRAY); c.setFont('Helvetica-Oblique', 7.5)
+    c.drawString(LM, y - 2, 'Method: L min = (H2 \u2212 H1) \u00d7 tan(90\u00b0 \u2212 a) = (H2 \u2212 H1) \u00f7 tan(a). '
+                 'Internal Wavin method (no standalone drawing number).')
+    y -= 16
+
+    # Notes / flags
+    notes = results.get('notes') or []
+    if notes:
+        bar_h = 16
+        c.setFillColor(AMBER)
+        c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
+        c.setFillColor(WHITE); c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM + 8, y - bar_h + 4, 'NOTES / FLAGS')
+        warn_top = y - bar_h
+        line_h = 11; pad = 8
+        from reportlab.pdfbase.pdfmetrics import stringWidth
+        max_w = CW - pad * 2
+        wrapped = []
+        for w_text in notes:
+            words = w_text.split(); cur = ''
+            for wd in words:
+                test = (cur + ' ' + wd).strip()
+                if stringWidth(test, 'Helvetica', 7.5) <= max_w:
+                    cur = test
+                else:
+                    if cur:
+                        wrapped.append(cur)
+                    cur = wd
+            if cur:
+                wrapped.append(cur)
+        warn_h = len(wrapped) * line_h + pad * 2
+        warn_bottom = warn_top - warn_h
+        c.setFillColor(LTAMB); c.setStrokeColor(AMBER); c.setLineWidth(0.6)
+        c.rect(LM, warn_bottom, CW, warn_h, fill=1, stroke=1)
+        ty = warn_top - pad - 6
+        c.setFont('Helvetica', 7.5); c.setFillColor(BLACK)
+        for line in wrapped:
+            c.drawString(LM + pad, ty, line)
+            ty -= line_h
+        y = warn_bottom - 10
+
+    # Cross-section diagram (if room)
+    disc_h = _disclaimer_box_height(_MIN_DIST_STRUCT_DISCLAIMER_TEXT)
+    disc_top = 40 + disc_h
+    available = y - disc_top - 10
+    if available >= 90:
+        diagram_h = min(available - 16, 175)
+        bar_h = 16
+        c.setFillColor(BLUE)
+        c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
+        c.setFillColor(WHITE); c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM + 8, y - bar_h + 4, 'CROSS-SECTION (NOT TO SCALE)')
+        diagram_top = y - bar_h
+        diagram_bottom = diagram_top - diagram_h
+        c.setFillColor(LGRAY); c.setStrokeColor(MGRAY); c.setLineWidth(0.5)
+        c.rect(LM, diagram_bottom, CW, diagram_h, fill=1, stroke=1)
+        _draw_min_dist_struct_diagram_pdf(c, LM, diagram_bottom, CW, diagram_h, results)
+        y = diagram_bottom - 10
+
+    _draw_disclaimer_block(c, 40, disclaimer_lines_raw=_MIN_DIST_STRUCT_DISCLAIMER_TEXT,
+                            bold_triggers=_MIN_DIST_STRUCT_BOLD_TRIGGERS)
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
 _COMPLEX_SHAPE_DISCLAIMER_TEXT = (
     "This conceptual schematic is a preliminary planning aid only and is NOT a stamped engineering "
     "design or a construction layout. Crate counts and footprint areas are approximate: envelope "
@@ -4164,6 +4485,8 @@ def design_tools_calculate():
             result = calc_stepped_backfill(payload)
         elif calc_type == 'min_cover_burial':
             result = calc_min_cover_burial(payload)
+        elif calc_type == 'min_distance_structure':
+            result = calc_min_distance_structure(payload)
         elif calc_type == 'complex_shape_builder':
             result = calc_complex_shape_builder(payload)
         else:
@@ -4241,6 +4564,12 @@ def design_tools_download_pdf():
                 return jsonify(result), 400
             buffer = build_min_cover_burial_pdf(payload, result, project_name=project_name)
             download_name = 'AquaCell_Min_Cover_Burial_Depth.pdf'
+        elif calc_type == 'min_distance_structure':
+            result = calc_min_distance_structure(payload)
+            if 'error' in result:
+                return jsonify(result), 400
+            buffer = build_min_dist_struct_pdf(payload, result, project_name=project_name)
+            download_name = 'AquaCell_Min_Distance_from_Structure.pdf'
         elif calc_type == 'complex_shape_builder':
             result = calc_complex_shape_builder(payload)
             if 'error' in result:
