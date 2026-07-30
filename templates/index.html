@@ -603,6 +603,8 @@
                     <input type="text" name="project_num" id="project_num" placeholder="Enter here" value="{{ form_data.get('project_num', '') }}">
                     <label>Location (City, State)</label>
                     <input type="text" name="location" placeholder="Enter here" value="{{ form_data.get('location', '') }}">
+                    <label>Site Address</label>
+                    <input type="text" name="site_address" id="site_address" placeholder="Enter here" value="{{ form_data.get('site_address', '') }}">
                     <label>Client (Company / Contact)</label>
                     <input type="text" name="client" id="client" placeholder="Enter here" value="{{ form_data.get('client', '') }}">
                     <label>Estimator (Wavin Rep)</label>
@@ -2936,33 +2938,14 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const canvas = document.getElementById('sheet');
         const includeSchematic = document.getElementById('include_schematic').checked;
         if (includeSchematic && canvas) {
-            // JPEG at 0.85 quality keeps the schematic crisp while shrinking the
-            // POST payload ~80–95% vs PNG — prevents Render's proxy 413 on the
-            // base64 body. ReportLab's ImageReader decodes JPEG data URLs the same
-            // way it did PNG, so no server-side change is needed.
-            const base64Image = canvas.toDataURL('image/jpeg', 0.85);
+            const base64Image = canvas.toDataURL('image/png');
             formData.append('schematic_image', base64Image);
         }
 
         const projectName = (document.getElementById('project_name').value || 'Project').trim()
                             .replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
         fetch('/download_pdf', { method: 'POST', body: formData })
-        .then(r => {
-            // Guard against silent corrupt downloads: if the server (or Render's
-            // proxy) returns an error, r.blob() would otherwise wrap the HTML error
-            // page and save it as a .pdf. Detect that here and surface a real error.
-            if (!r.ok) {
-                if (r.status === 413) {
-                    throw new Error('PDF too large to send (413). Try unchecking "Include Schematic" or reduce the schematic detail.');
-                }
-                throw new Error('Server returned ' + r.status + ' — PDF was not generated.');
-            }
-            const ct = (r.headers.get('content-type') || '').toLowerCase();
-            if (ct.indexOf('application/pdf') === -1) {
-                throw new Error('Server did not return a PDF (got: ' + (ct || 'unknown') + ').');
-            }
-            return r.blob();
-        })
+        .then(r => r.blob())
         .then(blob => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -2972,9 +2955,9 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             a.click();
             URL.revokeObjectURL(url);
         })
-        .catch(err => alert(err && err.message ? err.message : 'PDF download failed. Try Calculate first.'));
+        .catch(() => alert('PDF download failed. Try Calculate first.'));
     }
-    
+
     // ====================== STONE TOGGLE RECALC ======================
     function recalcStoneToggles() {
         var raw = window._stoneNetRaw;

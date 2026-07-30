@@ -6195,6 +6195,7 @@ def download_quote():
       project_name     = request.form.get('project_name', '')
       project_num      = request.form.get('project_num', '')
       location         = request.form.get('location', '')
+      site_address     = request.form.get('site_address', '')
       client           = request.form.get('client', '')
       estimator        = request.form.get('estimator', '')
       estimator_email  = request.form.get('estimator_email', '')
@@ -6502,7 +6503,11 @@ def download_quote():
       state_str = location.split(',')[1].strip() if location and ',' in location else '—'
       q_text(LQ + 48, y - 44, state_str, 'Helvetica', 8, BLACK)
 
-      y -= 54
+      # Row 5 — full-width Site Address (requested by CS for ordering/shipping)
+      q_text(LQ, y - 56, 'SITE ADDRESS:', 'Helvetica-Bold', 8, QNY)
+      q_text(LQ + 78, y - 56, site_address or '—', 'Helvetica', 8, BLACK)
+
+      y -= 66
       q_rule(y)
       y -= 4
 
