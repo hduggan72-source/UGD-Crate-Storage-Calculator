@@ -8,6 +8,7 @@ Professional web-based calculator for designing and quoting underground stormwat
 ** ## Next Up (High Priority – Do These Next)**
 
 ##UPDATES FOR BOTH MULTI-TANK/SINGLE TANK CALCULATORS
+- REVIEW LINER TOTALS TO ENSURE THE QUOTE IS CORRECTLY LABELED WHEN LINER USED (3X NON-WOVEN WHEN LINER IS USED 
 - ADD DEFAULT NOTE IN SINGLE TANK: AQUACELL SYSTEM: SUBJECT TO CHANGE UPON APPROVAL OF PRELIMINARY DESIGN; SOURCE PLANS DATED
 - COLLAPSABLE ADD TANK SIDEBAR ON MULTI TANK UI
 - Project/Site Address (if available) as input beleow Project Location (which is typically City/State)
