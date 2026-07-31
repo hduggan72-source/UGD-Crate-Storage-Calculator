@@ -6363,6 +6363,27 @@ def download_quote():
       else:
           liner_label = 'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 NOT SPECIFIED'
 
+      # ── Liner protection non-woven (AQ-100-03.4 Note C) ────────────
+      # The WT geomembrane requires non-woven on BOTH faces. The standard
+      # tank wrap (Line A) / backfill envelope (Line B) already provides one
+      # face, so each selected liner envelope adds exactly ONE matching
+      # protection layer equal to that liner's yd^2 (waste already included
+      # in liner_tank_yd2 / liner_stone_yd2). Mirrors the dashboard JS
+      # (index.html: protYd2 = formLinerTankQty + formLinerStoneQty).
+      liner_prot_yd2 = liner_tank_yd2 + liner_stone_yd2
+      if liner_on_tank and liner_on_stone:
+          liner_prot_label = (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE '
+                              f'(LINER PROTECTION \u2014 TANK + STONE FACES, AQ-100-03.4)')
+      elif liner_on_tank:
+          liner_prot_label = (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE '
+                              f'(LINER PROTECTION \u2014 TANK ENVELOPE FACE, AQ-100-03.4)')
+      elif liner_on_stone:
+          liner_prot_label = (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE '
+                              f'(LINER PROTECTION \u2014 STONE ENVELOPE FACE, AQ-100-03.4)')
+      else:
+          liner_prot_label = (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste}% WASTE '
+                              f'(LINER PROTECTION \u2014 AQ-100-03.4)')
+
       # ── Large diameter pipe connection (line F) ────────────────────
       _lp18   = int(request.form.get('large_pipe_18',   0) or 0)
       _lp24   = int(request.form.get('large_pipe_24',   0) or 0)
@@ -6636,16 +6657,27 @@ def download_quote():
            int(stone_yd3), 'CU YD'),
           (liner_label, liner_total_yd2, 'SQ YD'),
       ]
+      # Liner protection non-woven — only when a liner is actually specified.
+      # Sits directly after Line H so the geomembrane and its required
+      # protection fabric read as a pair on the quote.
+      if liner_prot_yd2 > 0:
+          others_rows.append((liner_prot_label, liner_prot_yd2, 'SQ YD'))
       if vs['active']:
           others_rows.append((
               'VOID FILL \u2014 BY OTHERS (NATIVE, STONE, OR MIX \u2014 NO STORAGE CREDIT)',
               int(round(void_fill_yd3)), 'CU YD'))
 
+      def _row_letter(idx):
+          # A..Z, then AA, AB, ... — never IndexErrors as rows are added.
+          if idx < 26:
+              return chr(ord('A') + idx)
+          return chr(ord('A') + idx // 26 - 1) + chr(ord('A') + idx % 26)
+
       for i, (ds, qt, un) in enumerate(others_rows):
           shade = QLGY if i % 2 == 0 else WHITE
           rh = 20
           q_rect(LQ, y - rh, QW, rh, shade)
-          q_text(col_ln, y - 10, alpha[i], 'Helvetica-Bold', 7.5, QNY)
+          q_text(col_ln, y - 10, _row_letter(i), 'Helvetica-Bold', 7.5, QNY)
           max_chars = 80
           if len(ds) <= max_chars:
               ds_line1, ds_line2 = ds, ''
