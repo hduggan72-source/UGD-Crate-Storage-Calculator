@@ -8,10 +8,10 @@ Professional web-based calculator for designing and quoting underground stormwat
 ** ## Next Up (High Priority – Do These Next)**
 
 ##UPDATES FOR BOTH MULTI-TANK/SINGLE TANK CALCULATORS
-- REVIEW LINER TOTALS TO ENSURE THE QUOTE IS CORRECTLY LABELED WHEN LINER USED (3X NON-WOVEN WHEN LINER IS USED 
+
 - ADD DEFAULT NOTE IN SINGLE TANK: AQUACELL SYSTEM: SUBJECT TO CHANGE UPON APPROVAL OF PRELIMINARY DESIGN; SOURCE PLANS DATED
 - COLLAPSABLE ADD TANK SIDEBAR ON MULTI TANK UI
-- Project/Site Address (if available) as input beleow Project Location (which is typically City/State)
+- 
 
 ##UPDATES FOR DESIGN TOOLS PAGE
 - PT-ROW™ DESIGN CALCULATOR WITH VISUAL WITHIN A STRUCTURED TANK (OR BE ABLE TO PLACE BASED ON NUMBER OF CALCULATED CRATES)
@@ -49,6 +49,8 @@ Professional web-based calculator for designing and quoting underground stormwat
 - **## PREVIOUS Version (v12-v15) — Completed**
 
 -  [X] DRAG & DROP JSON FILE ENABLED FOR BOTH UI'S
+-  [X] Project/Site Address (if available) as input beleow Project Location (which is typically City/State)
+-  [X] REVIEW LINER TOTALS TO ENSURE THE QUOTE IS CORRECTLY LABELED WHEN LINER USED (3X NON-WOVEN WHEN LINER IS USED)
 -  [X] SINGLE TANK UI CHANGE GRID AND LINER SECTIONS TO "ENABLE" TOGGLE SIMILAR TO PT-ROW
 -  [X] Conceptual schematic blocks designed to look like top view of AquaCell
 -  [X] ADDED CLEAR DASHBOARD FUNCTION WITH REMINDER TO EXPORT FILE BEFORE STARTING NEW PROJECT
