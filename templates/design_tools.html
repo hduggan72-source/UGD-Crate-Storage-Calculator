@@ -1227,6 +1227,7 @@
                 <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
                     <button type="button" id="so_scale_btn" class="calc-btn secondary" style="flex:0 0 auto;" onclick="soStartScale()">Set Scale</button>
                     <input type="number" step="any" id="so_scale_dist" class="calc-input" style="flex:1;" placeholder="Real distance (ft)">
+                    <button type="button" id="so_scale_confirm_btn" class="calc-btn" style="flex:0 0 auto;" onclick="soFinishScale()">Set Distance</button>
                 </div>
                 <div id="so_scale_status" style="font-size:12px; color:var(--muted); margin-bottom:4px;">Scale: not set</div>
 
@@ -3422,22 +3423,28 @@
         if (!soState.img) { soSetStatus('Load a plan image first.'); return; }
         soState.scaling = true;
         soState.scalePts = [];
+        soState.pxPerFt = null;
+        soRedraw();
+        document.getElementById('so_scale_status').textContent = 'Scale: not set';
         soSetStatus('Scale mode: click the FIRST point of a known dimension.');
     }
 
     function soFinishScale() {
+        // Called by the "Set Distance" button AFTER both points are placed.
+        if (soState.scalePts.length < 2) {
+            soSetStatus('Click two points on the plan first, then enter the distance.');
+            return;
+        }
         const distFt = parseFloat(document.getElementById('so_scale_dist').value);
         if (!distFt || distFt <= 0) {
-            soSetStatus('Enter the real distance (ft) before finishing the scale.');
-            soState.scaling = false;
-            soState.scalePts = [];
-            soRedraw();
+            // Keep the two dots on screen so the user can just type and retry.
+            soSetStatus('Enter the real distance (ft) in the box, then click Set Distance.');
             return;
         }
         const [a, b] = soState.scalePts;
         const px = Math.hypot(b.x - a.x, b.y - a.y);
         if (px < 2) {
-            soSetStatus('Those two points are too close. Try again.');
+            soSetStatus('Those two points are too close. Click Set Scale and try again.');
             soState.scaling = false;
             soState.scalePts = [];
             soRedraw();
@@ -3561,12 +3568,18 @@
             if (!soState.img) return;
             const p = soEventToCanvas(ev);
             if (soState.scaling) {
+                // Allow re-picking: once two points exist, a further click restarts.
+                if (soState.scalePts.length >= 2) {
+                    soState.scalePts = [];
+                }
                 soState.scalePts.push(p);
                 soRedraw();
                 if (soState.scalePts.length === 1) {
                     soSetStatus('Now click the SECOND point of the known dimension.');
                 } else if (soState.scalePts.length === 2) {
-                    soFinishScale();
+                    // Do NOT finish yet — wait for the distance + Set Distance click.
+                    soState.scaling = false;
+                    soSetStatus('Both points set. Enter the real distance (ft) and click Set Distance. (Click Set Scale to redo the points.)');
                 }
                 return;
             }
