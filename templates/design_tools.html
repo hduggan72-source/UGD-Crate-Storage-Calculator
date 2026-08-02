@@ -1250,6 +1250,11 @@
                         </select>
                     </div>
                 </div>
+                <label class="calc-label" style="margin-top:6px;">Overlay Rotation (° — visual only, does not change W/L)</label>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <input type="number" step="any" id="so_rot" class="calc-input" style="flex:1 1 auto; min-width:0;" value="0" oninput="soApplyRotation()">
+                    <button type="button" class="calc-btn secondary" style="flex:0 0 auto; white-space:nowrap;" onclick="soRotate90()">↺ 90°</button>
+                </div>
                 <button type="button" class="calc-btn" style="margin-top:8px;" onclick="soPlaceTank()">Place / Update Tank</button>
 
                 <div style="font-size:12px; color:var(--muted); margin-top:8px;">
@@ -3470,12 +3475,35 @@
             soState.tank.w = wPx;
             soState.tank.h = hPx;
         } else {
-            soState.tank = { x: (cv.width - wPx) / 2, y: (cv.height - hPx) / 2, w: wPx, h: hPx };
+            soState.tank = { x: (cv.width - wPx) / 2, y: (cv.height - hPx) / 2, w: wPx, h: hPx, rot: 0 };
         }
+        if (typeof soState.tank.rot !== 'number') soState.tank.rot = 0;
         soState.tank.wFt = wFt;
         soState.tank.lFt = lFt;
         soRedraw();
         soSetStatus('Tank placed. Drag it on the plan to reposition.');
+    }
+
+    // Rotation is a VISUAL transform of the overlay only. It never changes
+    // the entered Width/Length or how the crate grid is generated.
+    function soApplyRotation() {
+        if (!soState.tank) return;
+        let deg = parseFloat(document.getElementById('so_rot').value);
+        if (isNaN(deg)) deg = 0;
+        soState.tank.rot = deg;
+        soRedraw();
+    }
+
+    function soRotate90() {
+        const el = document.getElementById('so_rot');
+        let deg = parseFloat(el.value);
+        if (isNaN(deg)) deg = 0;
+        deg = ((deg + 90) % 360 + 360) % 360;
+        el.value = deg;
+        if (soState.tank) {
+            soState.tank.rot = deg;
+            soRedraw();
+        }
     }
 
     function soRedraw() {
@@ -3511,13 +3539,25 @@
 
     function soDrawTank(ctx, t) {
         const mode = document.getElementById('so_view_mode').value;
+        const rot = (typeof t.rot === 'number' ? t.rot : 0) * Math.PI / 180;
+        const cx = t.x + t.w / 2;
+        const cy = t.y + t.h / 2;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rot);
+        // From here, draw in a local frame centered on the tank, so the
+        // box spans (-w/2,-h/2) to (+w/2,+h/2). Rotation is applied above.
+        const lx0 = -t.w / 2;
+        const ly0 = -t.h / 2;
+
         // translucent fill
         ctx.fillStyle = 'rgba(30, 58, 138, 0.28)';
-        ctx.fillRect(t.x, t.y, t.w, t.h);
+        ctx.fillRect(lx0, ly0, t.w, t.h);
         // border
         ctx.strokeStyle = '#1e3a8a';
         ctx.lineWidth = 2.5;
-        ctx.strokeRect(t.x, t.y, t.w, t.h);
+        ctx.strokeRect(lx0, ly0, t.w, t.h);
 
         if (mode === 'grid' && soState.pxPerFt) {
             // Draw the crate grid: long axis (MODULE_LEN) runs down the length.
@@ -3525,37 +3565,41 @@
             const rowH = SO_MODULE_LEN * soState.pxPerFt;   // down length
             ctx.save();
             ctx.beginPath();
-            ctx.rect(t.x, t.y, t.w, t.h);
+            ctx.rect(lx0, ly0, t.w, t.h);
             ctx.clip();
             ctx.strokeStyle = 'rgba(30, 58, 138, 0.55)';
             ctx.lineWidth = 0.75;
-            for (let gx = t.x; gx <= t.x + t.w + 0.5; gx += colW) {
+            for (let gx = lx0; gx <= lx0 + t.w + 0.5; gx += colW) {
                 ctx.beginPath();
-                ctx.moveTo(gx, t.y);
-                ctx.lineTo(gx, t.y + t.h);
+                ctx.moveTo(gx, ly0);
+                ctx.lineTo(gx, ly0 + t.h);
                 ctx.stroke();
             }
-            for (let gy = t.y; gy <= t.y + t.h + 0.5; gy += rowH) {
+            for (let gy = ly0; gy <= ly0 + t.h + 0.5; gy += rowH) {
                 ctx.beginPath();
-                ctx.moveTo(t.x, gy);
-                ctx.lineTo(t.x + t.w, gy);
+                ctx.moveTo(lx0, gy);
+                ctx.lineTo(lx0 + t.w, gy);
                 ctx.stroke();
             }
             ctx.restore();
         }
 
-        // dimension labels
+        // dimension label — drawn upright regardless of tank angle so it
+        // stays readable (counter-rotate around the center).
         if (t.wFt && t.lFt) {
+            ctx.save();
+            ctx.rotate(-rot);
             const label = t.wFt + ' ft x ' + t.lFt + ' ft';
             ctx.font = 'bold 14px Helvetica, Arial, sans-serif';
             const tw = ctx.measureText(label).width;
-            const lx = t.x + t.w / 2 - tw / 2;
-            const ly = t.y + t.h / 2 + 5;
             ctx.fillStyle = 'rgba(255,255,255,0.85)';
-            ctx.fillRect(lx - 6, ly - 15, tw + 12, 22);
+            ctx.fillRect(-tw / 2 - 6, -11, tw + 12, 22);
             ctx.fillStyle = '#0f1e3c';
-            ctx.fillText(label, lx, ly);
+            ctx.fillText(label, -tw / 2, 4);
+            ctx.restore();
         }
+
+        ctx.restore();
     }
 
     // ── canvas interaction (scale clicks + tank drag) ──
@@ -3583,10 +3627,20 @@
             }
             if (soState.tank) {
                 const t = soState.tank;
-                if (p.x >= t.x && p.x <= t.x + t.w && p.y >= t.y && p.y <= t.y + t.h) {
+                const rot = (typeof t.rot === 'number' ? t.rot : 0) * Math.PI / 180;
+                const cx = t.x + t.w / 2;
+                const cy = t.y + t.h / 2;
+                // Inverse-rotate the click into the tank's local frame.
+                const dx = p.x - cx;
+                const dy = p.y - cy;
+                const cos = Math.cos(-rot), sin = Math.sin(-rot);
+                const lx = dx * cos - dy * sin;
+                const ly = dx * sin + dy * cos;
+                if (Math.abs(lx) <= t.w / 2 && Math.abs(ly) <= t.h / 2) {
                     soState.dragging = true;
-                    soState.dragDX = p.x - t.x;
-                    soState.dragDY = p.y - t.y;
+                    // Store the offset from tank CENTER to the mouse, in canvas px.
+                    soState.dragDX = p.x - cx;
+                    soState.dragDY = p.y - cy;
                     cv.style.cursor = 'grabbing';
                 }
             }
@@ -3594,8 +3648,12 @@
         cv.addEventListener('mousemove', function (ev) {
             if (!soState.dragging || !soState.tank) return;
             const p = soEventToCanvas(ev);
-            soState.tank.x = p.x - soState.dragDX;
-            soState.tank.y = p.y - soState.dragDY;
+            const t = soState.tank;
+            // Move so the tank CENTER follows the mouse (minus grab offset).
+            const newCx = p.x - soState.dragDX;
+            const newCy = p.y - soState.dragDY;
+            t.x = newCx - t.w / 2;
+            t.y = newCy - t.h / 2;
             soRedraw();
         });
         window.addEventListener('mouseup', function () {
