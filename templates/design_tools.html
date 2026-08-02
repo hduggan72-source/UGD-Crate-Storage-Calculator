@@ -1251,11 +1251,12 @@
                     </div>
                 </div>
                 <label class="calc-label" style="margin-top:6px;">Overlay Rotation (° — visual only, does not change W/L)</label>
-                <div style="display:flex; gap:8px; align-items:center;">
-                    <input type="number" step="any" id="so_rot" class="calc-input" style="flex:1 1 auto; min-width:0;" value="0" oninput="soApplyRotation()">
-                    <button type="button" class="calc-btn secondary" style="flex:0 0 auto; white-space:nowrap;" onclick="soRotate90()">↺ 90°</button>
+                <input type="number" step="any" id="so_rot" class="calc-input" style="width:100%; box-sizing:border-box; margin-bottom:6px;" value="0" oninput="soApplyRotation()">
+                <div style="display:flex; gap:8px; margin-bottom:6px;">
+                    <button type="button" class="calc-btn secondary" style="flex:1 1 0; min-width:0;" onclick="soRotate90(-1)">↺ 90° CCW</button>
+                    <button type="button" class="calc-btn secondary" style="flex:1 1 0; min-width:0;" onclick="soRotate90(1)">↻ 90° CW</button>
                 </div>
-                <button type="button" class="calc-btn" style="margin-top:8px;" onclick="soPlaceTank()">Place / Update Tank</button>
+                <button type="button" class="calc-btn" style="width:100%; margin-top:2px;" onclick="soPlaceTank()">Place / Update Tank</button>
 
                 <div style="font-size:12px; color:var(--muted); margin-top:8px;">
                     Drag the footprint on the plan to reposition. Long axis of the crate module runs
@@ -3494,11 +3495,12 @@
         soRedraw();
     }
 
-    function soRotate90() {
+    function soRotate90(dir) {
+        const step = (dir === -1) ? -90 : 90;
         const el = document.getElementById('so_rot');
         let deg = parseFloat(el.value);
         if (isNaN(deg)) deg = 0;
-        deg = ((deg + 90) % 360 + 360) % 360;
+        deg = ((deg + step) % 360 + 360) % 360;
         el.value = deg;
         if (soState.tank) {
             soState.tank.rot = deg;
