@@ -452,6 +452,9 @@
         <button class="calc-nav-item" data-calc="crate_comparison" onclick="selectCalc('crate_comparison')">
             Crate Comparison <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
         </button>
+        <button class="calc-nav-item" data-calc="site_overlay" onclick="selectCalc('site_overlay')">
+            Site Overlay <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
+        </button>
     </div>
 
     <!-- ══════════════ MAIN: inputs + results, per calculator ══════════════ -->
@@ -1195,6 +1198,78 @@
 
             <div class="calc-results" id="cc_results">
                 <div class="empty-state">Enter both systems and click Run Comparison.</div>
+            </div>
+        </div>
+
+        <!-- ── SITE OVERLAY (BETA) ── -->
+        <div id="panel-site_overlay" class="calc-panel" style="display:none;">
+            <div class="calc-inputs">
+                <div class="disclaimer-box">
+                    <strong>Site Overlay (BETA) &mdash; conceptual visual only.</strong>
+                    Upload a plan page, set a scale by clicking a known dimension, then drop the
+                    AquaCell footprint on top and drag it into place. <em>This is a picture, not a
+                    measurement tool</em> &mdash; a browser canvas measuring off a raster image is not
+                    CAD/Bluebeam. Keep your traced takeoff as the number of record. Every export is
+                    watermarked <em>Not to Scale for Measurement</em>.
+                </div>
+
+                <label class="calc-label">Project Name (optional)</label>
+                <input type="text" id="so_project" class="calc-input" placeholder="e.g. Cape Coral Home Depot">
+
+                <label class="calc-label" style="margin-top:10px;">1. Plan Image (PNG / JPEG)</label>
+                <input type="file" id="so_file" class="calc-input" accept="image/png,image/jpeg,image/jpg" onchange="soLoadImage(event)">
+
+                <label class="calc-label" style="margin-top:10px;">2. Set Scale</label>
+                <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">
+                    Click <strong>Set Scale</strong>, then click two points on a known dimension
+                    (a scale bar or a dimensioned line), and enter the real distance.
+                </div>
+                <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+                    <button type="button" id="so_scale_btn" class="calc-btn secondary" style="flex:0 0 auto;" onclick="soStartScale()">Set Scale</button>
+                    <input type="number" step="any" id="so_scale_dist" class="calc-input" style="flex:1;" placeholder="Real distance (ft)">
+                </div>
+                <div id="so_scale_status" style="font-size:12px; color:var(--muted); margin-bottom:4px;">Scale: not set</div>
+
+                <label class="calc-label" style="margin-top:10px;">3. Tank Footprint</label>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                    <div><label class="calc-label">Width (ft)</label><input type="number" step="any" id="so_tank_w" class="calc-input" value="40"></div>
+                    <div><label class="calc-label">Length (ft)</label><input type="number" step="any" id="so_tank_l" class="calc-input" value="80"></div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;">
+                    <div>
+                        <label class="calc-label">Config</label>
+                        <select id="so_config" class="calc-input">
+                            <option value="SC">SC — Standard</option>
+                            <option value="EX">EX — Extra Strong</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="calc-label">View</label>
+                        <select id="so_view_mode" class="calc-input" onchange="soRedraw()">
+                            <option value="grid">Crate grid</option>
+                            <option value="box">Clean box</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="button" class="calc-btn" style="margin-top:8px;" onclick="soPlaceTank()">Place / Update Tank</button>
+
+                <div style="font-size:12px; color:var(--muted); margin-top:8px;">
+                    Drag the footprint on the plan to reposition. Long axis of the crate module runs
+                    down the <em>length</em>.
+                </div>
+
+                <div style="display:flex; gap:8px; margin-top:12px;">
+                    <button type="button" class="calc-btn secondary" style="flex:1;" onclick="soExportPNG()">Export PNG</button>
+                    <button type="button" class="calc-btn" style="flex:1;" onclick="soExportPDF()">Export PDF</button>
+                </div>
+                <div id="so_status" style="font-size:12px; color:var(--muted); margin-top:8px;"></div>
+            </div>
+
+            <div class="calc-results" id="so_results">
+                <div id="so_canvas_wrap" style="width:100%; overflow:auto; background:var(--panel-2, #0b1220); border:1px solid var(--border, #1e293b); border-radius:8px;">
+                    <canvas id="so_canvas" width="900" height="600" style="display:block; max-width:100%; cursor:crosshair;"></canvas>
+                </div>
+                <div class="empty-state" id="so_empty" style="margin-top:8px;">Upload a plan image to begin.</div>
             </div>
         </div>
 
@@ -3269,6 +3344,354 @@
             setComplexMode('rows');
         }
     });
+
+    // ══════════════════════════════════════════════════════════════
+    //  SITE OVERLAY (BETA)
+    //  Load a plan image onto a canvas, calibrate a pixels-per-foot
+    //  scale by clicking a known dimension, drop the AquaCell footprint
+    //  on top, drag to position, and export PNG + PDF submittal.
+    //  All drawing uses literal hex colors (never CSS vars) so the
+    //  serialized canvas can't render black.
+    // ══════════════════════════════════════════════════════════════
+    const SO_MODULE_WID = 1.9685;   // ft (mirrors app.py MODULE_WID)
+    const SO_MODULE_LEN = 3.937;    // ft (mirrors app.py MODULE_LEN)
+
+    const soState = {
+        img: null,            // loaded Image object
+        pxPerFt: null,        // calibration
+        scaling: false,       // in scale-click mode
+        scalePts: [],         // [{x,y}, {x,y}] in canvas px
+        tank: null,           // {x,y,w,h} in canvas px (top-left + size)
+        dragging: false,
+        dragDX: 0,
+        dragDY: 0,
+    };
+
+    function soCanvas() { return document.getElementById('so_canvas'); }
+    function soCtx() { return soCanvas().getContext('2d'); }
+
+    function soSetStatus(msg) {
+        const el = document.getElementById('so_status');
+        if (el) el.textContent = msg || '';
+    }
+
+    // Convert a mouse event to canvas-pixel coords (canvas may be CSS-scaled).
+    function soEventToCanvas(ev) {
+        const cv = soCanvas();
+        const rect = cv.getBoundingClientRect();
+        const sx = cv.width / rect.width;
+        const sy = cv.height / rect.height;
+        return { x: (ev.clientX - rect.left) * sx, y: (ev.clientY - rect.top) * sy };
+    }
+
+    function soLoadImage(ev) {
+        const file = ev.target.files && ev.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const img = new Image();
+            img.onload = function () {
+                soState.img = img;
+                soState.pxPerFt = null;
+                soState.scalePts = [];
+                soState.scaling = false;
+                soState.tank = null;
+                // Size the canvas to the image (cap long edge for perf).
+                const MAXP = 1600;
+                let w = img.width, h = img.height;
+                const longEdge = Math.max(w, h);
+                if (longEdge > MAXP) {
+                    const k = MAXP / longEdge;
+                    w = Math.round(w * k);
+                    h = Math.round(h * k);
+                }
+                const cv = soCanvas();
+                cv.width = w;
+                cv.height = h;
+                document.getElementById('so_empty').style.display = 'none';
+                document.getElementById('so_scale_status').textContent = 'Scale: not set';
+                soRedraw();
+                soSetStatus('Image loaded. Set the scale next.');
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function soStartScale() {
+        if (!soState.img) { soSetStatus('Load a plan image first.'); return; }
+        soState.scaling = true;
+        soState.scalePts = [];
+        soSetStatus('Scale mode: click the FIRST point of a known dimension.');
+    }
+
+    function soFinishScale() {
+        const distFt = parseFloat(document.getElementById('so_scale_dist').value);
+        if (!distFt || distFt <= 0) {
+            soSetStatus('Enter the real distance (ft) before finishing the scale.');
+            soState.scaling = false;
+            soState.scalePts = [];
+            soRedraw();
+            return;
+        }
+        const [a, b] = soState.scalePts;
+        const px = Math.hypot(b.x - a.x, b.y - a.y);
+        if (px < 2) {
+            soSetStatus('Those two points are too close. Try again.');
+            soState.scaling = false;
+            soState.scalePts = [];
+            soRedraw();
+            return;
+        }
+        soState.pxPerFt = px / distFt;
+        soState.scaling = false;
+        document.getElementById('so_scale_status').textContent =
+            'Scale: ' + soState.pxPerFt.toFixed(2) + ' px/ft  (' + px.toFixed(0) + ' px = ' + distFt + ' ft)';
+        soSetStatus('Scale set. Enter tank size and click Place / Update Tank.');
+        soRedraw();
+    }
+
+    function soPlaceTank() {
+        if (!soState.img) { soSetStatus('Load a plan image first.'); return; }
+        if (!soState.pxPerFt) { soSetStatus('Set the scale before placing the tank.'); return; }
+        const wFt = parseFloat(document.getElementById('so_tank_w').value);
+        const lFt = parseFloat(document.getElementById('so_tank_l').value);
+        if (!wFt || !lFt || wFt <= 0 || lFt <= 0) { soSetStatus('Enter valid tank width and length.'); return; }
+        const cv = soCanvas();
+        const wPx = wFt * soState.pxPerFt;
+        const hPx = lFt * soState.pxPerFt;
+        // Center it if new; otherwise keep top-left and resize.
+        if (soState.tank) {
+            soState.tank.w = wPx;
+            soState.tank.h = hPx;
+        } else {
+            soState.tank = { x: (cv.width - wPx) / 2, y: (cv.height - hPx) / 2, w: wPx, h: hPx };
+        }
+        soState.tank.wFt = wFt;
+        soState.tank.lFt = lFt;
+        soRedraw();
+        soSetStatus('Tank placed. Drag it on the plan to reposition.');
+    }
+
+    function soRedraw() {
+        const cv = soCanvas();
+        const ctx = soCtx();
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        if (soState.img) {
+            ctx.drawImage(soState.img, 0, 0, cv.width, cv.height);
+        }
+        // scale points / line
+        if (soState.scalePts.length > 0) {
+            ctx.fillStyle = '#dc2626';
+            soState.scalePts.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            if (soState.scalePts.length === 2) {
+                const [a, b] = soState.scalePts;
+                ctx.strokeStyle = '#dc2626';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(a.x, a.y);
+                ctx.lineTo(b.x, b.y);
+                ctx.stroke();
+            }
+        }
+        // tank
+        if (soState.tank) {
+            soDrawTank(ctx, soState.tank);
+        }
+    }
+
+    function soDrawTank(ctx, t) {
+        const mode = document.getElementById('so_view_mode').value;
+        // translucent fill
+        ctx.fillStyle = 'rgba(30, 58, 138, 0.28)';
+        ctx.fillRect(t.x, t.y, t.w, t.h);
+        // border
+        ctx.strokeStyle = '#1e3a8a';
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(t.x, t.y, t.w, t.h);
+
+        if (mode === 'grid' && soState.pxPerFt) {
+            // Draw the crate grid: long axis (MODULE_LEN) runs down the length.
+            const colW = SO_MODULE_WID * soState.pxPerFt;   // across width
+            const rowH = SO_MODULE_LEN * soState.pxPerFt;   // down length
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(t.x, t.y, t.w, t.h);
+            ctx.clip();
+            ctx.strokeStyle = 'rgba(30, 58, 138, 0.55)';
+            ctx.lineWidth = 0.75;
+            for (let gx = t.x; gx <= t.x + t.w + 0.5; gx += colW) {
+                ctx.beginPath();
+                ctx.moveTo(gx, t.y);
+                ctx.lineTo(gx, t.y + t.h);
+                ctx.stroke();
+            }
+            for (let gy = t.y; gy <= t.y + t.h + 0.5; gy += rowH) {
+                ctx.beginPath();
+                ctx.moveTo(t.x, gy);
+                ctx.lineTo(t.x + t.w, gy);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        // dimension labels
+        if (t.wFt && t.lFt) {
+            const label = t.wFt + ' ft x ' + t.lFt + ' ft';
+            ctx.font = 'bold 14px Helvetica, Arial, sans-serif';
+            const tw = ctx.measureText(label).width;
+            const lx = t.x + t.w / 2 - tw / 2;
+            const ly = t.y + t.h / 2 + 5;
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            ctx.fillRect(lx - 6, ly - 15, tw + 12, 22);
+            ctx.fillStyle = '#0f1e3c';
+            ctx.fillText(label, lx, ly);
+        }
+    }
+
+    // ── canvas interaction (scale clicks + tank drag) ──
+    (function soWireCanvas() {
+        const cv = soCanvas();
+        if (!cv) return;
+        cv.addEventListener('mousedown', function (ev) {
+            if (!soState.img) return;
+            const p = soEventToCanvas(ev);
+            if (soState.scaling) {
+                soState.scalePts.push(p);
+                soRedraw();
+                if (soState.scalePts.length === 1) {
+                    soSetStatus('Now click the SECOND point of the known dimension.');
+                } else if (soState.scalePts.length === 2) {
+                    soFinishScale();
+                }
+                return;
+            }
+            if (soState.tank) {
+                const t = soState.tank;
+                if (p.x >= t.x && p.x <= t.x + t.w && p.y >= t.y && p.y <= t.y + t.h) {
+                    soState.dragging = true;
+                    soState.dragDX = p.x - t.x;
+                    soState.dragDY = p.y - t.y;
+                    cv.style.cursor = 'grabbing';
+                }
+            }
+        });
+        cv.addEventListener('mousemove', function (ev) {
+            if (!soState.dragging || !soState.tank) return;
+            const p = soEventToCanvas(ev);
+            soState.tank.x = p.x - soState.dragDX;
+            soState.tank.y = p.y - soState.dragDY;
+            soRedraw();
+        });
+        window.addEventListener('mouseup', function () {
+            if (soState.dragging) {
+                soState.dragging = false;
+                soCanvas().style.cursor = 'crosshair';
+            }
+        });
+    })();
+
+    // ── Composite the current canvas to a JPEG data URL, capping the
+    //    long edge and compressing so Render's proxy won't 413. ──
+    function soCompositeJPEG(maxEdge, quality) {
+        const src = soCanvas();
+        let w = src.width, h = src.height;
+        const longEdge = Math.max(w, h);
+        let out = src;
+        if (maxEdge && longEdge > maxEdge) {
+            const k = maxEdge / longEdge;
+            const tmp = document.createElement('canvas');
+            tmp.width = Math.round(w * k);
+            tmp.height = Math.round(h * k);
+            tmp.getContext('2d').drawImage(src, 0, 0, tmp.width, tmp.height);
+            out = tmp;
+        }
+        return out.toDataURL('image/jpeg', quality || 0.72);
+    }
+
+    function soExportPNG() {
+        if (!soState.img) { soSetStatus('Load a plan image first.'); return; }
+        // Add a bottom watermark strip onto a copy before exporting.
+        const src = soCanvas();
+        const tmp = document.createElement('canvas');
+        const stripH = 34;
+        tmp.width = src.width;
+        tmp.height = src.height + stripH;
+        const ctx = tmp.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, tmp.width, tmp.height);
+        ctx.drawImage(src, 0, 0);
+        ctx.fillStyle = '#0f1e3c';
+        ctx.fillRect(0, src.height, tmp.width, stripH);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 13px Helvetica, Arial, sans-serif';
+        ctx.fillText('AquaCell® Conceptual Site Overlay — NOT TO SCALE FOR MEASUREMENT. Refer to stamped plans.',
+                     12, src.height + 22);
+        const url = tmp.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'AquaCell_Site_Overlay.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        soSetStatus('PNG exported.');
+    }
+
+    async function soExportPDF() {
+        if (!soState.img) { soSetStatus('Load a plan image first.'); return; }
+        soSetStatus('Building PDF…');
+        const projName = (document.getElementById('so_project').value || '').trim();
+        const config = document.getElementById('so_config').value;
+        const viewMode = document.getElementById('so_view_mode').value === 'grid' ? 'Crate grid view' : 'Clean box view';
+        const tank = soState.tank;
+        const tankWL = (tank && tank.wFt) ? (tank.wFt + ' ft x ' + tank.lFt + ' ft') : null;
+        const imageDataUrl = soCompositeJPEG(1600, 0.72);
+        try {
+            const r = await fetch('/design-tools/download_pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    calc_type: 'site_overlay',
+                    project_name: projName || null,
+                    image: imageDataUrl,
+                    meta: { config: config, tank_wl: tankWL, view_mode: viewMode }
+                })
+            });
+            if (!r.ok) {
+                let msg = 'PDF export failed (HTTP ' + r.status + ').';
+                try {
+                    const ct = r.headers.get('content-type') || '';
+                    if (ct.indexOf('application/json') !== -1) {
+                        const j = await r.json();
+                        if (j && j.error) msg = j.error;
+                    }
+                } catch (e) {}
+                soSetStatus(msg);
+                return;
+            }
+            const ct = r.headers.get('content-type') || '';
+            if (ct.indexOf('application/pdf') === -1) {
+                soSetStatus('Server did not return a PDF. Try a smaller image.');
+                return;
+            }
+            const blob = await r.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'AquaCell_Site_Overlay.pdf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            soSetStatus('PDF exported.');
+        } catch (err) {
+            soSetStatus('PDF export error: ' + err);
+        }
+    }
 </script>
 
 </body>

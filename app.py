@@ -4435,6 +4435,132 @@ def build_crate_comparison_pdf(inputs, results, project_name=None):
 
 
 # ══════════════════════════════════════════════════════════════════
+#  SITE OVERLAY (BETA)  —  conceptual tank footprint over a plan page
+#  Receives a client-composited JPEG (base64) and drops it onto a
+#  letter page with header + disclaimer. No calc engine: the picture
+#  is built in the browser; the server only wraps it as a submittal.
+# ══════════════════════════════════════════════════════════════════
+_SITE_OVERLAY_DISCLAIMER_TEXT = (
+    "This site overlay is a CONCEPTUAL VISUAL AID only and is NOT TO SCALE FOR MEASUREMENT. "
+    "The tank footprint shown is positioned by hand over a raster (image) copy of the plan; it is "
+    "NOT a surveyed or CAD-accurate placement. Any dimension, area, or setback read from this "
+    "overlay is approximate and MUST NOT be used for construction, permitting, or takeoff. Refer to "
+    "the stamped plans and a project-specific measurement (e.g. CAD / Bluebeam) as the source of "
+    "truth for all dimensions and quantities. AquaCell module dimensions follow published product "
+    "data. FINAL LAYOUTS, CAPACITIES, AND INSTALLATION DEPTHS MUST BE CONFIRMED BY A LICENSED "
+    "PROFESSIONAL ENGINEER."
+)
+_SITE_OVERLAY_BOLD_TRIGGERS = ['NOT TO SCALE FOR MEASUREMENT', 'NOT', 'MUST NOT', 'source of truth',
+                               'MUST BE CONFIRMED BY A LICENSED PROFESSIONAL ENGINEER']
+
+
+def build_site_overlay_pdf(image_data_url, project_name=None, meta=None):
+    """One-page conceptual submittal PDF wrapping a client-composited
+    site overlay image. image_data_url is a 'data:image/jpeg;base64,...'
+    string produced by the browser canvas. meta is an optional dict with
+    keys like tank_wl, config, scale_note, view_mode for a caption line.
+    Returns a BytesIO buffer positioned at 0."""
+    import base64 as _b64
+    meta = meta or {}
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
+
+    # ── header band (matches other submittal PDFs) ──
+    band_h = 64
+    c.setFillColor(NAVY)
+    c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
+    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    if logo_path and os.path.exists(logo_path):
+        try:
+            img = ImageReader(logo_path)
+            c.drawImage(img, LM, PH - band_h + 8, width=160, height=46,
+                        preserveAspectRatio=True, mask='auto')
+        except Exception:
+            pass
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 14)
+    c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
+    c.setFont('Helvetica', 9)
+    c.setFillColor(colors.HexColor('#93c5fd'))
+    c.drawRightString(PW - RM, PH - 37, 'Site Overlay \u2014 Conceptual Submittal')
+    c.setFont('Helvetica', 7)
+    c.setFillColor(colors.HexColor('#94a3b8'))
+    c.drawRightString(PW - RM, PH - 50, generated_str)
+    y = PH - band_h - 10
+
+    if project_name:
+        c.setFillColor(GRAY)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM, y, f'Project: {project_name}')
+        y -= 15
+
+    # ── caption line (config / tank W x L / view mode) ──
+    cap_bits = []
+    if meta.get('config'):
+        cap_bits.append(f"AquaCell {meta['config']}")
+    if meta.get('tank_wl'):
+        cap_bits.append(str(meta['tank_wl']))
+    if meta.get('view_mode'):
+        cap_bits.append(str(meta['view_mode']))
+    if cap_bits:
+        c.setFillColor(GRAY)
+        c.setFont('Helvetica-Bold', 10)
+        c.drawString(LM, y, '  |  '.join(cap_bits))
+        y -= 6
+
+    # ── title bar over the image ──
+    bar_h = 16
+    c.setFillColor(BLUE)
+    c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 9)
+    c.drawString(LM + 8, y - bar_h + 4,
+                 'CONCEPTUAL SITE OVERLAY \u2014 SHADED = AQUACELL FOOTPRINT (NOT TO SCALE)')
+    box_top = y - bar_h
+
+    # ── image box, sized to leave room for the disclaimer ──
+    disc_h = _disclaimer_box_height(_SITE_OVERLAY_DISCLAIMER_TEXT)
+    box_bottom = 40 + disc_h + 10
+    box_h = box_top - box_bottom
+    c.setFillColor(WHITE)
+    c.setStrokeColor(MGRAY)
+    c.setLineWidth(0.5)
+    c.rect(LM, box_bottom, CW, box_h, fill=1, stroke=1)
+
+    # ── decode and draw the composited overlay, letterboxed to fit ──
+    try:
+        raw = image_data_url
+        if ',' in raw:
+            raw = raw.split(',', 1)[1]
+        img_bytes = _b64.b64decode(raw)
+        img_reader = ImageReader(io.BytesIO(img_bytes))
+        iw, ih = img_reader.getSize()
+        avail_w = CW - 12
+        avail_h = box_h - 12
+        if iw > 0 and ih > 0 and avail_w > 0 and avail_h > 0:
+            scale = min(avail_w / iw, avail_h / ih)
+            draw_w = iw * scale
+            draw_h = ih * scale
+            draw_x = LM + 6 + (avail_w - draw_w) / 2.0
+            draw_y = box_bottom + 6 + (avail_h - draw_h) / 2.0
+            c.drawImage(img_reader, draw_x, draw_y, width=draw_w, height=draw_h,
+                        preserveAspectRatio=True, mask=None)
+    except Exception as exc:
+        c.setFillColor(colors.HexColor('#b91c1c'))
+        c.setFont('Helvetica-Bold', 10)
+        c.drawString(LM + 12, box_bottom + box_h / 2.0,
+                     f'Overlay image could not be embedded: {exc}')
+
+    _draw_disclaimer_block(c, 40, disclaimer_lines_raw=_SITE_OVERLAY_DISCLAIMER_TEXT,
+                            bold_triggers=_SITE_OVERLAY_BOLD_TRIGGERS)
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
+# ══════════════════════════════════════════════════════════════════
 #  ROUTE: /design-tools  —  Design Verification Dashboard (page)
 # ══════════════════════════════════════════════════════════════════
 @app.route('/design-tools', methods=['GET'])
@@ -4582,6 +4708,13 @@ def design_tools_download_pdf():
                 return jsonify(result), 400
             buffer = build_crate_comparison_pdf(payload, result, project_name=project_name)
             download_name = 'AquaCell_Crate_Comparison.pdf'
+        elif calc_type == 'site_overlay':
+            image_data_url = data.get('image', '')
+            if not image_data_url:
+                return jsonify({'error': 'No overlay image was received.'}), 400
+            meta = data.get('meta', {}) or {}
+            buffer = build_site_overlay_pdf(image_data_url, project_name=project_name, meta=meta)
+            download_name = 'AquaCell_Site_Overlay.pdf'
         else:
             return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
 
