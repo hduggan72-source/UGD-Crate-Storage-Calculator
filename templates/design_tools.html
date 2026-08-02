@@ -425,35 +425,32 @@
         <button class="calc-nav-item active" data-calc="buoyancy" onclick="selectCalc('buoyancy')">
             Buoyancy / Uplift
         </button>
-        <button class="calc-nav-item" data-calc="loading_truck" onclick="selectCalc('loading_truck')">
-            Loading Model — Truck (ASTM F2787)
-        </button>
-        <button class="calc-nav-item" data-calc="loading_outrigger" onclick="selectCalc('loading_outrigger')">
-            Loading Model — Outrigger
-        </button>
-        <button class="calc-nav-item" data-calc="min_cover_burial" onclick="selectCalc('min_cover_burial')">
-            Min Cover / Burial Depth
-        </button>
-        <button class="calc-nav-item disabled" disabled>
-            Min Distance from Manhole <span class="soon-tag">SOON</span>
-        </button>
-        <button class="calc-nav-item" data-calc="min_distance_structure" onclick="selectCalc('min_distance_structure')">
-            Min Distance from Structure
-        </button>
-        <button class="calc-nav-item" data-calc="excavation_slope" onclick="selectCalc('excavation_slope')">
-            Excavation Slope
-        </button>
-        <button class="calc-nav-item" data-calc="stepped_backfill" onclick="selectCalc('stepped_backfill')">
-            Stepped Perimeter Backfill
-        </button>
         <button class="calc-nav-item" data-calc="complex_shape_builder" onclick="selectCalc('complex_shape_builder')">
             Complex Shape Builder <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
         </button>
         <button class="calc-nav-item" data-calc="crate_comparison" onclick="selectCalc('crate_comparison')">
             Crate Comparison <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
         </button>
+        <button class="calc-nav-item" data-calc="excavation_slope" onclick="selectCalc('excavation_slope')">
+            Excavation Slope
+        </button>
+        <button class="calc-nav-item" data-calc="loading_outrigger" onclick="selectCalc('loading_outrigger')">
+            Loading Model — Outrigger
+        </button>
+        <button class="calc-nav-item" data-calc="loading_truck" onclick="selectCalc('loading_truck')">
+            Loading Model — Truck (ASTM F2787)
+        </button>
+        <button class="calc-nav-item" data-calc="min_cover_burial" onclick="selectCalc('min_cover_burial')">
+            Min Cover / Burial Depth
+        </button>
+        <button class="calc-nav-item" data-calc="min_distance_structure" onclick="selectCalc('min_distance_structure')">
+            Min Distance from Structure
+        </button>
         <button class="calc-nav-item" data-calc="site_overlay" onclick="selectCalc('site_overlay')">
             Site Overlay <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
+        </button>
+        <button class="calc-nav-item" data-calc="stepped_backfill" onclick="selectCalc('stepped_backfill')">
+            Stepped Perimeter Backfill
         </button>
     </div>
 
@@ -1274,7 +1271,7 @@
                 <div id="so_canvas_wrap" style="width:100%; overflow:auto; background:var(--panel-2, #0b1220); border:1px solid var(--border, #1e293b); border-radius:8px;">
                     <canvas id="so_canvas" width="900" height="600" style="display:block; max-width:100%; cursor:crosshair;"></canvas>
                 </div>
-                <div class="empty-state" id="so_empty" style="margin-top:8px;">Upload a plan image to begin.</div>
+                <div class="empty-state" id="so_empty" style="margin-top:8px;">Upload a plan image to begin — or drag &amp; drop a PNG / JPEG here.</div>
             </div>
         </div>
 
@@ -3391,7 +3388,16 @@
 
     function soLoadImage(ev) {
         const file = ev.target.files && ev.target.files[0];
+        soProcessFile(file);
+    }
+
+    // Shared image loader used by both the file input and drag-and-drop.
+    function soProcessFile(file) {
         if (!file) return;
+        if (!/^image\/(png|jpe?g)$/i.test(file.type)) {
+            soSetStatus('Please use a PNG or JPEG image.');
+            return;
+        }
         const reader = new FileReader();
         reader.onload = function (e) {
             const img = new Image();
@@ -3664,6 +3670,33 @@
                 soCanvas().style.cursor = 'crosshair';
             }
         });
+
+        // ── Drag & drop a plan image onto the canvas area ──
+        const dropZone = document.getElementById('so_canvas_wrap');
+        if (dropZone) {
+            const stop = function (ev) { ev.preventDefault(); ev.stopPropagation(); };
+            ['dragenter', 'dragover'].forEach(function (evt) {
+                dropZone.addEventListener(evt, function (ev) {
+                    stop(ev);
+                    dropZone.style.outline = '2px dashed #7c3aed';
+                    dropZone.style.outlineOffset = '-4px';
+                });
+            });
+            ['dragleave', 'dragend'].forEach(function (evt) {
+                dropZone.addEventListener(evt, function (ev) {
+                    stop(ev);
+                    dropZone.style.outline = 'none';
+                });
+            });
+            dropZone.addEventListener('drop', function (ev) {
+                stop(ev);
+                dropZone.style.outline = 'none';
+                const dt = ev.dataTransfer;
+                if (dt && dt.files && dt.files.length > 0) {
+                    soProcessFile(dt.files[0]);
+                }
+            });
+        }
     })();
 
     // ── Composite the current canvas to a JPEG data URL, capping the
