@@ -1224,10 +1224,10 @@
                     Click <strong>Set Scale</strong>, then click two points on a known dimension
                     (a scale bar or a dimensioned line), and enter the real distance.
                 </div>
+                <button type="button" id="so_scale_btn" class="calc-btn secondary" style="width:100%; margin-bottom:6px;" onclick="soStartScale()">Set Scale</button>
                 <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
-                    <button type="button" id="so_scale_btn" class="calc-btn secondary" style="flex:0 0 auto;" onclick="soStartScale()">Set Scale</button>
-                    <input type="number" step="any" id="so_scale_dist" class="calc-input" style="flex:1;" placeholder="Real distance (ft)">
-                    <button type="button" id="so_scale_confirm_btn" class="calc-btn" style="flex:0 0 auto;" onclick="soFinishScale()">Set Distance</button>
+                    <input type="number" step="any" id="so_scale_dist" class="calc-input" style="flex:1 1 auto; min-width:0;" placeholder="Real distance (ft)">
+                    <button type="button" id="so_scale_confirm_btn" class="calc-btn" style="flex:0 0 auto; white-space:nowrap;" onclick="soFinishScale()">Set Distance</button>
                 </div>
                 <div id="so_scale_status" style="font-size:12px; color:var(--muted); margin-bottom:4px;">Scale: not set</div>
 
