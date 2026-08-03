@@ -3985,6 +3985,11 @@ def calc_tank(t):
         'liner_tank_yd2':  liner_tank_yd2,
         'liner_stone_yd2': liner_stone_yd2,
         'liner_total_yd2': liner_total_yd2,
+        # Liner-protection non-woven (AQ-100-03.4 Note C): one matching
+        # non-woven layer per selected liner envelope. Equals the liner qty.
+        # Powers the dashboard rail/cumulative rows; the quote PDF Line I
+        # derives the same value independently from cum_liner_total.
+        'liner_prot_total_yd2': liner_total_yd2,
         # Large pipe
         'large_pipe_qty': large_pipe_qty,
         # Stone backfill
@@ -4035,6 +4040,7 @@ def cumulative_bom(tank_results):
         'ptrow_total_crates': 0, 'ptrow_woven_yd2': 0,
         'geogrid_top_yd2': 0, 'geogrid_bottom_yd2': 0,
         'liner_tank_yd2': 0, 'liner_stone_yd2': 0, 'liner_total_yd2': 0,
+        'liner_prot_total_yd2': 0,
         'large_pipe_qty': 0,
     }
     for r in tank_results:
