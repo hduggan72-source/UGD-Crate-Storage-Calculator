@@ -5046,6 +5046,22 @@ def multi_download_quote():
         else:
             liner_desc = 'WATERTIGHT GEOMEMBRANE LINER (MIN. 30 MIL) \u2014 NOT SPECIFIED'
 
+        # Liner protection non-woven (AQ-100-03.4 Note C) — one matching
+        # non-woven layer per selected liner envelope. cum_liner_total already
+        # equals cum_liner_tank + cum_liner_stone (waste baked in), so it is the
+        # protection quantity. Mirrors the single-tank quote and the dashboard JS.
+        if any_liner_tank and any_liner_stone:
+            liner_prot_desc = (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste_pct}% WASTE '
+                               f'(LINER PROTECTION \u2014 TANK + STONE FACES, AQ-100-03.4)')
+        elif any_liner_tank:
+            liner_prot_desc = (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste_pct}% WASTE '
+                               f'(LINER PROTECTION \u2014 TANK ENVELOPE FACE, AQ-100-03.4)')
+        elif any_liner_stone:
+            liner_prot_desc = (f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste_pct}% WASTE '
+                               f'(LINER PROTECTION \u2014 STONE ENVELOPE FACE, AQ-100-03.4)')
+        else:
+            liner_prot_desc = ''
+
         others_rows_mt = [
             ('A', f'NON-WOVEN GEOTEXTILE (MIN. 6 OZ./YD\u00b2) + {geoWaste_pct}% WASTE (TANK ONLY)',
              cum_geoTank_yd2_adj, 'SQ YD'),
@@ -5060,6 +5076,9 @@ def multi_download_quote():
             ('G', 'STONE BACKFILL OR SELECT BACKFILL ESTIMATED FOR UG SYSTEM + 10%', cum_stone_yd3, 'CU YD'),
             ('H', liner_desc, cum_liner_total, 'SQ YD'),
         ]
+        # Line I — liner protection non-woven, only when a liner is specified.
+        if cum_liner_total > 0 and liner_prot_desc:
+            others_rows_mt.append(('I', liner_prot_desc, cum_liner_total, 'SQ YD'))
 
         max_ds_chars = 90
         for i, (ln, ds, qt, un) in enumerate(others_rows_mt):
