@@ -1268,8 +1268,17 @@
             </div>
 
             <div class="calc-results" id="so_results">
-                <div id="so_canvas_wrap" style="width:100%; overflow:auto; background:var(--panel-2, #0b1220); border:1px solid var(--border, #1e293b); border-radius:8px;">
-                    <canvas id="so_canvas" width="900" height="600" style="display:block; max-width:100%; cursor:crosshair;"></canvas>
+                <div id="so_zoom_bar" style="display:none; align-items:center; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
+                    <span style="font-size:12px; color:var(--muted); margin-right:2px;">Zoom:</span>
+                    <button type="button" class="calc-btn secondary" style="padding:4px 10px; min-width:34px;" onclick="soZoomOut()" title="Zoom out">&minus;</button>
+                    <button type="button" class="calc-btn secondary" style="padding:4px 10px; min-width:34px;" onclick="soZoomIn()" title="Zoom in">+</button>
+                    <button type="button" class="calc-btn secondary" style="padding:4px 10px;" onclick="soZoomFit()" title="Fit plan to viewer width">Fit</button>
+                    <button type="button" class="calc-btn secondary" style="padding:4px 10px;" onclick="soZoom100()" title="Actual pixels (1:1)">1:1</button>
+                    <span id="so_zoom_readout" style="font-size:12px; color:var(--muted); margin-left:2px;">Fit</span>
+                    <span style="font-size:11px; color:var(--muted); margin-left:auto;">Tip: Ctrl/&#8984; + scroll to zoom</span>
+                </div>
+                <div id="so_canvas_wrap" style="width:100%; max-height:70vh; overflow:auto; background:var(--panel-2, #0b1220); border:1px solid var(--border, #1e293b); border-radius:8px;">
+                    <canvas id="so_canvas" width="900" height="600" style="display:block; cursor:crosshair;"></canvas>
                 </div>
                 <div class="empty-state" id="so_empty" style="margin-top:8px;">Upload a plan image to begin — or drag &amp; drop a PNG / JPEG here.</div>
             </div>
@@ -1279,21 +1288,6 @@
 </div>
 
 <script>
-    // ── Shared: build a PDF download filename with the project name appended. ──
-    //    `base` is the fixed report name (e.g. 'AquaCell_Buoyancy_Check');
-    //    the sanitized project name is inserted before the .pdf extension.
-    //    Blank/whitespace-only project names fall back to the base name alone,
-    //    so existing behavior is preserved when the field is empty.
-    function acPdfName(base, projName) {
-        var clean = (projName == null ? '' : String(projName))
-            .trim()
-            .replace(/[^a-zA-Z0-9\-_ ]/g, '_')  // strip filesystem-unsafe chars
-            .replace(/\s+/g, '_')
-            .replace(/_+/g, '_')
-            .replace(/^_+|_+$/g, '');
-        return clean ? (base + '_' + clean + '.pdf') : (base + '.pdf');
-    }
-
     // ── Shared: live ft→in readout for every "Cover Depth (ft)" field.
     //    Exists specifically to catch the mistake of typing an inches
     //    value (e.g. from a workbook labeled "in.") into a feet field —
@@ -1546,7 +1540,7 @@
             const blob = await resp.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; a.download = acPdfName('AquaCell_Crate_Comparison', payload.project_name);
+            a.href = url; a.download = 'AquaCell_Crate_Comparison.pdf';
             a.click(); URL.revokeObjectURL(url);
         } catch (e) {
             alert('PDF error: ' + e.message);
@@ -1796,7 +1790,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = acPdfName('AquaCell_Buoyancy_Check', projectName);
+            a.download = 'AquaCell_Buoyancy_Check.pdf';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2027,7 +2021,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = acPdfName(`AquaCell_Loading_Truck_${ltLastResults.traffic_load}`, projectName);
+            a.download = `AquaCell_Loading_Truck_${ltLastResults.traffic_load}.pdf`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2185,7 +2179,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = acPdfName('AquaCell_Loading_Outrigger', projectName);
+            a.download = 'AquaCell_Loading_Outrigger.pdf';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2394,7 +2388,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = acPdfName('AquaCell_Excavation_Slope', projectName);
+            a.download = 'AquaCell_Excavation_Slope.pdf';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2607,7 +2601,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = acPdfName('AquaCell_Stepped_Backfill', projectName);
+            a.download = 'AquaCell_Stepped_Backfill.pdf';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2810,7 +2804,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = acPdfName('AquaCell_Min_Cover_Burial_Depth', projectName);
+            a.download = 'AquaCell_Min_Cover_Burial_Depth.pdf';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -3017,7 +3011,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = acPdfName('AquaCell_Min_Distance_from_Structure', projectName);
+            a.download = 'AquaCell_Min_Distance_from_Structure.pdf';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -3163,7 +3157,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = acPdfName('AquaCell_Complex_Shape_Schematic', projName);
+            a.download = 'AquaCell_Complex_Shape_Schematic.pdf';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -3382,6 +3376,7 @@
         dragging: false,
         dragDX: 0,
         dragDY: 0,
+        zoom: null,           // CSS display scale of the canvas (null = fit-to-width)
     };
 
     function soCanvas() { return document.getElementById('so_canvas'); }
@@ -3391,6 +3386,89 @@
         const el = document.getElementById('so_status');
         if (el) el.textContent = msg || '';
     }
+
+    // ── ZOOM ─────────────────────────────────────────────────────────
+    // Zoom is purely a CSS display transform of the canvas element. The
+    // canvas backing resolution stays locked to the image, so calibration,
+    // scale-clicking, tank-dragging, and export are all unaffected — the
+    // event→canvas mapping in soEventToCanvas() reads the on-screen size via
+    // getBoundingClientRect(), so it self-corrects at any zoom level.
+    const SO_ZOOM_MIN = 0.1;
+    const SO_ZOOM_MAX = 8;
+
+    // The zoom factor that makes the canvas exactly fill the wrap's width.
+    function soFitZoom() {
+        const cv = soCanvas();
+        const wrap = document.getElementById('so_canvas_wrap');
+        if (!cv || !wrap || !cv.width) return 1;
+        // Available inner width (minus the 1px borders on each side).
+        const avail = Math.max(50, wrap.clientWidth - 2);
+        return avail / cv.width;
+    }
+
+    function soApplyZoom() {
+        const cv = soCanvas();
+        if (!cv || !soState.img) return;
+        const readout = document.getElementById('so_zoom_readout');
+        if (soState.zoom == null) {
+            // Fit-to-width: let the element be fluid so it tracks panel resizes.
+            cv.style.width = '100%';
+            cv.style.height = 'auto';
+            if (readout) readout.textContent = 'Fit';
+        } else {
+            const z = Math.min(SO_ZOOM_MAX, Math.max(SO_ZOOM_MIN, soState.zoom));
+            soState.zoom = z;
+            cv.style.width = (cv.width * z) + 'px';
+            cv.style.height = (cv.height * z) + 'px';
+            if (readout) readout.textContent = Math.round(z * 100) + '%';
+        }
+    }
+
+    // Read the current effective zoom (resolves "Fit" to a real number).
+    function soCurrentZoom() {
+        return (soState.zoom == null) ? soFitZoom() : soState.zoom;
+    }
+
+    function soZoomIn()  { soSetZoom(soCurrentZoom() * 1.25); }
+    function soZoomOut() { soSetZoom(soCurrentZoom() / 1.25); }
+    function soZoom100() { soSetZoom(1); }
+
+    function soZoomFit() {
+        if (!soState.img) { soSetStatus('Load a plan image first.'); return; }
+        soState.zoom = null;
+        soApplyZoom();
+    }
+
+    function soSetZoom(z) {
+        if (!soState.img) { soSetStatus('Load a plan image first.'); return; }
+        soState.zoom = Math.min(SO_ZOOM_MAX, Math.max(SO_ZOOM_MIN, z));
+        soApplyZoom();
+    }
+
+    // Zoom toward a point on the canvas (in canvas-pixel coords), keeping that
+    // point stationary under the cursor by adjusting the wrap's scroll.
+    function soZoomAtPoint(canvasPt, newZoom) {
+        const wrap = document.getElementById('so_canvas_wrap');
+        const cv = soCanvas();
+        if (!wrap || !cv || !soState.img) return;
+        newZoom = Math.min(SO_ZOOM_MAX, Math.max(SO_ZOOM_MIN, newZoom));
+        const rect = cv.getBoundingClientRect();
+        // Cursor position within the displayed canvas, in wrap-content px.
+        const dispX = canvasPt.x * (rect.width / cv.width);
+        const dispY = canvasPt.y * (rect.height / cv.height);
+        const cursorViewX = (rect.left + dispX) - wrap.getBoundingClientRect().left;
+        const cursorViewY = (rect.top + dispY) - wrap.getBoundingClientRect().top;
+
+        soState.zoom = newZoom;
+        soApplyZoom();
+
+        // After resize, place the same canvas point back under the cursor.
+        const newDispX = canvasPt.x * newZoom;
+        const newDispY = canvasPt.y * newZoom;
+        wrap.scrollLeft = newDispX - cursorViewX;
+        wrap.scrollTop  = newDispY - cursorViewY;
+    }
+
 
     // Convert a mouse event to canvas-pixel coords (canvas may be CSS-scaled).
     function soEventToCanvas(ev) {
@@ -3436,6 +3514,11 @@
                 cv.height = h;
                 document.getElementById('so_empty').style.display = 'none';
                 document.getElementById('so_scale_status').textContent = 'Scale: not set';
+                // Reveal zoom controls and start fit-to-width for the new image.
+                const zbar = document.getElementById('so_zoom_bar');
+                if (zbar) zbar.style.display = 'flex';
+                soState.zoom = null;
+                soApplyZoom();
                 soRedraw();
                 soSetStatus('Image loaded. Set the scale next.');
             };
@@ -3686,6 +3769,17 @@
             }
         });
 
+        // Ctrl/⌘ + wheel zooms toward the cursor. Plain wheel still scrolls
+        // the overflow container normally, so panning a large plan is intact.
+        cv.addEventListener('wheel', function (ev) {
+            if (!soState.img) return;
+            if (!(ev.ctrlKey || ev.metaKey)) return;   // only intercept with modifier
+            ev.preventDefault();
+            const p = soEventToCanvas(ev);
+            const factor = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
+            soZoomAtPoint(p, soCurrentZoom() * factor);
+        }, { passive: false });
+
         // ── Drag & drop a plan image onto the canvas area ──
         const dropZone = document.getElementById('so_canvas_wrap');
         if (dropZone) {
@@ -3801,7 +3895,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = acPdfName('AquaCell_Site_Overlay', projName);
+            a.download = 'AquaCell_Site_Overlay.pdf';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
