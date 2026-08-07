@@ -4724,6 +4724,20 @@ def design_tools_download_pdf():
         else:
             return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
 
+        # Append sanitized project name to the filename (kept in sync with the
+        # client-side acPdfName() helper in design_tools.html). Blank names are
+        # a no-op, preserving the original base filename.
+        if project_name:
+            import re as _re
+            _clean = _re.sub(r'[^A-Za-z0-9\-_ ]', '_', str(project_name)).strip()
+            _clean = _re.sub(r'\s+', '_', _clean)
+            _clean = _re.sub(r'_+', '_', _clean).strip('_')
+            if _clean:
+                if download_name.lower().endswith('.pdf'):
+                    download_name = download_name[:-4] + '_' + _clean + '.pdf'
+                else:
+                    download_name = download_name + '_' + _clean
+
         return send_file(
             buffer,
             mimetype='application/pdf',

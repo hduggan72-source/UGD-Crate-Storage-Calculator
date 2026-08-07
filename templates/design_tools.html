@@ -1279,6 +1279,21 @@
 </div>
 
 <script>
+    // ── Shared: build a PDF download filename with the project name appended. ──
+    //    `base` is the fixed report name (e.g. 'AquaCell_Buoyancy_Check');
+    //    the sanitized project name is inserted before the .pdf extension.
+    //    Blank/whitespace-only project names fall back to the base name alone,
+    //    so existing behavior is preserved when the field is empty.
+    function acPdfName(base, projName) {
+        var clean = (projName == null ? '' : String(projName))
+            .trim()
+            .replace(/[^a-zA-Z0-9\-_ ]/g, '_')  // strip filesystem-unsafe chars
+            .replace(/\s+/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_+|_+$/g, '');
+        return clean ? (base + '_' + clean + '.pdf') : (base + '.pdf');
+    }
+
     // ── Shared: live ft→in readout for every "Cover Depth (ft)" field.
     //    Exists specifically to catch the mistake of typing an inches
     //    value (e.g. from a workbook labeled "in.") into a feet field —
@@ -1531,7 +1546,7 @@
             const blob = await resp.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; a.download = 'AquaCell_Crate_Comparison.pdf';
+            a.href = url; a.download = acPdfName('AquaCell_Crate_Comparison', payload.project_name);
             a.click(); URL.revokeObjectURL(url);
         } catch (e) {
             alert('PDF error: ' + e.message);
@@ -1781,7 +1796,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'AquaCell_Buoyancy_Check.pdf';
+            a.download = acPdfName('AquaCell_Buoyancy_Check', projectName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2012,7 +2027,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `AquaCell_Loading_Truck_${ltLastResults.traffic_load}.pdf`;
+            a.download = acPdfName(`AquaCell_Loading_Truck_${ltLastResults.traffic_load}`, projectName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2170,7 +2185,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'AquaCell_Loading_Outrigger.pdf';
+            a.download = acPdfName('AquaCell_Loading_Outrigger', projectName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2379,7 +2394,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'AquaCell_Excavation_Slope.pdf';
+            a.download = acPdfName('AquaCell_Excavation_Slope', projectName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2592,7 +2607,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'AquaCell_Stepped_Backfill.pdf';
+            a.download = acPdfName('AquaCell_Stepped_Backfill', projectName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2795,7 +2810,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'AquaCell_Min_Cover_Burial_Depth.pdf';
+            a.download = acPdfName('AquaCell_Min_Cover_Burial_Depth', projectName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -3002,7 +3017,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'AquaCell_Min_Distance_from_Structure.pdf';
+            a.download = acPdfName('AquaCell_Min_Distance_from_Structure', projectName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -3148,7 +3163,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'AquaCell_Complex_Shape_Schematic.pdf';
+            a.download = acPdfName('AquaCell_Complex_Shape_Schematic', projName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -3786,7 +3801,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'AquaCell_Site_Overlay.pdf';
+            a.download = acPdfName('AquaCell_Site_Overlay', projName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
