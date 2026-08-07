@@ -4028,7 +4028,7 @@
         const url = tmp.toDataURL('image/png');
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'AquaCell_Site_Overlay.png';
+        a.download = acPdfName('AquaCell_Site_Overlay', projName).replace(/\.pdf$/, '.png');
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
