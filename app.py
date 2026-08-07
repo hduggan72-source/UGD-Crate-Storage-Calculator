@@ -4746,6 +4746,7 @@ def multi_download_quote():
         project_name    = data.get('project_name', 'Project')
         project_num     = data.get('project_num', '')
         location        = data.get('location', '')
+        site_address    = data.get('site_address', '')
         client          = data.get('client', '')
         estimator       = data.get('estimator', '')
         estimator_email = data.get('estimator_email', '')
@@ -4865,7 +4866,9 @@ def multi_download_quote():
         q_text(LQ + 60,   y - 32, location or '—',  'Helvetica', 8, BLACK)
         q_text(W / 2,     y - 32, 'EMAIL:',         'Helvetica-Bold', 8, QNY)
         q_text(W/2 + 52,  y - 32, estimator_email or '—', 'Helvetica', 8, BLACK)
-        y -= 44
+        q_text(LQ,        y - 44, 'SITE ADDRESS:',  'Helvetica-Bold', 8, QNY)
+        q_text(LQ + 78,   y - 44, site_address or '—', 'Helvetica', 8, BLACK)
+        y -= 56
         q_rule(y)
         y -= 8
 
@@ -5207,6 +5210,7 @@ def multi_download_price_csv():
         project_num     = data.get('project_num', '')
         client          = data.get('client', '')
         location        = data.get('location', '')
+        site_address    = data.get('site_address', '')
         estimator       = data.get('estimator', '')
         estimator_email = data.get('estimator_email', '')
         generated_str   = datetime.datetime.now().strftime('%m/%d/%Y')
@@ -5225,6 +5229,8 @@ def multi_download_price_csv():
 
         markup_pct   = float(data.get('markup_pct', 0) or 0)
         markup_mult  = 1 / (1 - markup_pct / 100) if markup_pct < 100 else 1
+
+        freight_pct  = float(data.get('freight_pct', 0) or 0)
 
         contingency_override = data.get('contingency_override', None)
         if contingency_override is not None:
@@ -5256,6 +5262,7 @@ def multi_download_price_csv():
         w.writerow(['Project #',    project_num])
         w.writerow(['Client',       client])
         w.writerow(['Location',     location])
+        w.writerow(['Site Address', site_address])
         w.writerow(['Estimator',    estimator])
         w.writerow(['Email',        estimator_email])
         w.writerow([])
@@ -5277,9 +5284,11 @@ def multi_download_price_csv():
         # Totals
         total_floor = sum(r[5] * r[3] for r in rows if r[3] > 0)
         total_sell  = sum(sell_price(r[5]) * r[3] for r in rows if r[3] > 0)
+        freight_est = total_sell * freight_pct / 100
         w.writerow([])
         w.writerow(['', '', '', '', 'TOTAL FLOOR COST', '', '', f'${total_floor:,.2f}', ''])
         w.writerow(['', '', '', '', 'TOTAL SELL PRICE', '', '', '', f'${total_sell:,.2f}'])
+        w.writerow(['', '', '', '', f'ESTIMATED FREIGHT ({freight_pct:.1f}%)', '', '', '', f'${freight_est:,.2f}'])
 
         out.seek(0)
         buf = io.BytesIO(out.getvalue().encode('utf-8'))
@@ -6966,6 +6975,8 @@ def download_price_csv():
         markup_pct  = float(request.form.get('markup_pct', 0) or 0)
         markup_mult = 1 / (1 - markup_pct / 100) if markup_pct < 100 else 1
 
+        freight_pct = float(request.form.get('freight_pct', 0) or 0)
+
         base_units       = int(request.form.get('bom_base_units',    0) or 0)
         side_plates      = int(request.form.get('bom_side_plates',   0) or 0)
         bottom_plates    = int(request.form.get('bom_bottom_plates', 0) or 0)
@@ -7011,9 +7022,11 @@ def download_price_csv():
 
         total_floor = sum(r[5] * r[3] for r in rows if r[3] > 0)
         total_sell  = sum(sell(r[5]) * r[3] for r in rows if r[3] > 0)
+        freight_est = total_sell * freight_pct / 100
         w.writerow([])
         w.writerow(['', '', '', '', 'TOTAL FLOOR COST', '', '', f'${total_floor:,.2f}', ''])
         w.writerow(['', '', '', '', 'TOTAL SELL PRICE', '', '', '', f'${total_sell:,.2f}'])
+        w.writerow(['', '', '', '', f'ESTIMATED FREIGHT ({freight_pct:.1f}%)', '', '', '', f'${freight_est:,.2f}'])
 
         out.seek(0)
         buf = io.BytesIO(out.getvalue().encode('utf-8'))

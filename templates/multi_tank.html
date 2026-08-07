@@ -1310,6 +1310,8 @@
             <input type="text" id="q_client" placeholder="Client Name">
             <label>Location</label>
             <input type="text" id="q_location" placeholder="City, State">
+            <label>Site Address (Project Address)</label>
+            <input type="text" id="q_site_address" placeholder="Street, City, State, ZIP">
             <label>Estimator (Wavin Rep)</label>
             <input type="text" id="q_estimator" placeholder="Your Name">
             <label>Estimator Email</label>
@@ -2116,6 +2118,7 @@ async function downloadQuote() {
         project_num:     document.getElementById('q_project_num').value,
         client:          document.getElementById('q_client').value,
         location:        document.getElementById('q_location').value,
+        site_address:    document.getElementById('q_site_address').value,
         estimator:       document.getElementById('q_estimator').value,
         estimator_email: document.getElementById('q_estimator_email').value,
         project_notes:   document.getElementById('q_notes').value,
@@ -2215,9 +2218,11 @@ async function downloadPriceCSV() {
         project_num:     document.getElementById('q_project_num').value,
         client:          document.getElementById('q_client').value,
         location:        document.getElementById('q_location').value,
+        site_address:    document.getElementById('q_site_address').value,
         estimator:       document.getElementById('q_estimator').value,
         estimator_email: document.getElementById('q_estimator_email').value,
         markup_pct:      parseFloat(document.getElementById('markupPct').value) || 0,
+        freight_pct:     parseFloat(document.getElementById('freightPct').value) || 0,
         unit_prices:     UNIT_PRICES,
         contingency_override: (window._contingencyOverride !== null && window._contingencyOverride !== undefined)
             ? window._contingencyOverride : null,
@@ -2264,6 +2269,7 @@ function exportJSON() {
             num:            document.getElementById('q_project_num').value,
             client:         document.getElementById('q_client').value,
             location:       document.getElementById('q_location').value,
+            site_address:   document.getElementById('q_site_address').value,
             estimator:      document.getElementById('q_estimator').value,
             estimator_email:document.getElementById('q_estimator_email').value,
             notes:          document.getElementById('q_notes').value,
@@ -2304,6 +2310,7 @@ function handleImport(ev, autoCalc) {
                 document.getElementById('q_project_num').value     = data.project.num || '';
                 document.getElementById('q_client').value          = data.project.client || '';
                 document.getElementById('q_location').value        = data.project.location || '';
+                document.getElementById('q_site_address').value    = data.project.site_address || '';
                 document.getElementById('q_estimator').value       = data.project.estimator || '';
                 document.getElementById('q_estimator_email').value = data.project.estimator_email || '';
                 document.getElementById('q_notes').value           = data.project.notes || '';
@@ -2385,7 +2392,7 @@ function clearProjectState() {
     tanks = [];
     results = [];
     activeIdx = null;
-    ['q_project_name','q_project_num','q_client','q_location','q_estimator','q_estimator_email','q_notes'].forEach(function(id){
+    ['q_project_name','q_project_num','q_client','q_location','q_site_address','q_estimator','q_estimator_email','q_notes'].forEach(function(id){
         var el = document.getElementById(id); if (el) el.value = '';
     });
     var mk = document.getElementById('markupPct'); if (mk) mk.value = 10;
