@@ -1203,7 +1203,7 @@
             <div class="calc-inputs">
                 <div class="disclaimer-box">
                     <strong>Site Overlay (BETA) &mdash; conceptual visual only.</strong>
-                    Upload a plan page, set a scale by clicking a known dimension, then drop the
+                    Upload a plan sheet (PDF or image), set a scale by clicking a known dimension, then drop the
                     AquaCell footprint on top and drag it into place. <em>This is a picture, not a
                     measurement tool</em> &mdash; a browser canvas measuring off a raster image is not
                     CAD/Bluebeam. Keep your traced takeoff as the number of record. Every export is
@@ -1214,7 +1214,7 @@
                 <input type="text" id="so_project" class="calc-input" placeholder="e.g. Cape Coral Home Depot">
 
                 <label class="calc-label" style="margin-top:10px;">1. Plan Image (PNG / JPEG)</label>
-                <input type="file" id="so_file" class="calc-input" accept="image/png,image/jpeg,image/jpg" onchange="soLoadImage(event)">
+                <input type="file" id="so_file" class="calc-input" accept="image/png,image/jpeg,image/jpg,application/pdf,.pdf" onchange="soLoadImage(event)">
 
                 <label class="calc-label" style="margin-top:10px;">2. Set Scale</label>
                 <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">
@@ -1277,10 +1277,17 @@
                     <span id="so_zoom_readout" style="font-size:12px; color:var(--muted); margin-left:2px;">Fit</span>
                     <span style="font-size:11px; color:var(--muted); margin-left:auto;">Tip: Ctrl/&#8984; + scroll to zoom</span>
                 </div>
+                <div id="so_page_bar" style="display:none; align-items:center; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
+                    <span style="font-size:12px; color:var(--muted); margin-right:2px;">PDF page:</span>
+                    <button type="button" class="calc-btn secondary" style="padding:4px 12px; min-width:34px;" onclick="soPdfPrevPage()" title="Previous page">&lsaquo;</button>
+                    <span id="so_page_readout" style="font-size:12px; min-width:78px; text-align:center;">Page 1 / 1</span>
+                    <button type="button" class="calc-btn secondary" style="padding:4px 12px; min-width:34px;" onclick="soPdfNextPage()" title="Next page">&rsaquo;</button>
+                    <span style="font-size:11px; color:var(--muted); margin-left:8px;">Switching pages clears the scale — re-set it on the new sheet.</span>
+                </div>
                 <div id="so_canvas_wrap" style="width:100%; max-height:70vh; overflow:auto; background:var(--panel-2, #0b1220); border:1px solid var(--border, #1e293b); border-radius:8px;">
                     <canvas id="so_canvas" width="900" height="600" style="display:block; cursor:crosshair;"></canvas>
                 </div>
-                <div class="empty-state" id="so_empty" style="margin-top:8px;">Upload a plan image to begin — or drag &amp; drop a PNG / JPEG here.</div>
+                <div class="empty-state" id="so_empty" style="margin-top:8px;">Upload a plan image or PDF to begin — or drag &amp; drop a PNG / JPEG / PDF here.</div>
             </div>
         </div>
 
@@ -1288,6 +1295,21 @@
 </div>
 
 <script>
+    // ── Shared: build a PDF download filename with the project name appended. ──
+    //    The exported PDFs use a client-side blob URL, so the browser's saved
+    //    filename comes from a.download here — NOT the server's Content-
+    //    Disposition. That's why the name must be built on the frontend.
+    //    Blank/whitespace-only names fall back to the base name alone.
+    function acPdfName(base, projName) {
+        var clean = (projName == null ? '' : String(projName))
+            .trim()
+            .replace(/[^a-zA-Z0-9\-_ ]/g, '_')  // strip filesystem-unsafe chars
+            .replace(/\s+/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_+|_+$/g, '');
+        return clean ? (base + '_' + clean + '.pdf') : (base + '.pdf');
+    }
+
     // ── Shared: live ft→in readout for every "Cover Depth (ft)" field.
     //    Exists specifically to catch the mistake of typing an inches
     //    value (e.g. from a workbook labeled "in.") into a feet field —
@@ -1540,7 +1562,7 @@
             const blob = await resp.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; a.download = 'AquaCell_Crate_Comparison.pdf';
+            a.href = url; a.download = acPdfName('AquaCell_Crate_Comparison', payload.project_name);
             a.click(); URL.revokeObjectURL(url);
         } catch (e) {
             alert('PDF error: ' + e.message);
@@ -1790,7 +1812,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'AquaCell_Buoyancy_Check.pdf';
+            a.download = acPdfName('AquaCell_Buoyancy_Check', projectName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2021,7 +2043,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `AquaCell_Loading_Truck_${ltLastResults.traffic_load}.pdf`;
+            a.download = acPdfName(`AquaCell_Loading_Truck_${ltLastResults.traffic_load}`, projectName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2179,7 +2201,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'AquaCell_Loading_Outrigger.pdf';
+            a.download = acPdfName('AquaCell_Loading_Outrigger', projectName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2388,7 +2410,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'AquaCell_Excavation_Slope.pdf';
+            a.download = acPdfName('AquaCell_Excavation_Slope', projectName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2601,7 +2623,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'AquaCell_Stepped_Backfill.pdf';
+            a.download = acPdfName('AquaCell_Stepped_Backfill', projectName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2804,7 +2826,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'AquaCell_Min_Cover_Burial_Depth.pdf';
+            a.download = acPdfName('AquaCell_Min_Cover_Burial_Depth', projectName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -3011,7 +3033,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'AquaCell_Min_Distance_from_Structure.pdf';
+            a.download = acPdfName('AquaCell_Min_Distance_from_Structure', projectName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -3157,7 +3179,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'AquaCell_Complex_Shape_Schematic.pdf';
+            a.download = acPdfName('AquaCell_Complex_Shape_Schematic', projName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -3484,47 +3506,206 @@
         soProcessFile(file);
     }
 
-    // Shared image loader used by both the file input and drag-and-drop.
+    // Commit a loaded <img> (from a raster file OR a rendered PDF page) into
+    // the canvas + reset overlay state, then reveal zoom and fit-to-width.
+    // maxEdge caps the canvas backing resolution for performance.
+    function soCommitImage(img, maxEdge) {
+        soState.img = img;
+        soState.pxPerFt = null;
+        soState.scalePts = [];
+        soState.scaling = false;
+        soState.tank = null;
+        const MAXP = maxEdge || 1600;
+        let w = img.width, h = img.height;
+        const longEdge = Math.max(w, h);
+        if (longEdge > MAXP) {
+            const k = MAXP / longEdge;
+            w = Math.round(w * k);
+            h = Math.round(h * k);
+        }
+        const cv = soCanvas();
+        cv.width = w;
+        cv.height = h;
+        document.getElementById('so_empty').style.display = 'none';
+        document.getElementById('so_scale_status').textContent = 'Scale: not set';
+        // Reveal zoom controls and start fit-to-width for the new image.
+        const zbar = document.getElementById('so_zoom_bar');
+        if (zbar) zbar.style.display = 'flex';
+        soState.zoom = null;
+        soApplyZoom();
+        soRedraw();
+    }
+
+    // Shared loader used by both the file input and drag-and-drop.
+    // Accepts PNG/JPEG rasters and PDF (first page auto-rendered; page picker
+    // shown for multi-page documents).
     function soProcessFile(file) {
         if (!file) return;
-        if (!/^image\/(png|jpe?g)$/i.test(file.type)) {
-            soSetStatus('Please use a PNG or JPEG image.');
+        const isPdf = /^application\/pdf$/i.test(file.type) || /\.pdf$/i.test(file.name || '');
+        if (isPdf) {
+            soProcessPdf(file);
             return;
         }
+        if (!/^image\/(png|jpe?g)$/i.test(file.type)) {
+            soSetStatus('Please use a PNG, JPEG, or PDF file.');
+            return;
+        }
+        // Not a PDF — hide any leftover page picker from a prior PDF.
+        soResetPdfState();
         const reader = new FileReader();
         reader.onload = function (e) {
             const img = new Image();
             img.onload = function () {
-                soState.img = img;
-                soState.pxPerFt = null;
-                soState.scalePts = [];
-                soState.scaling = false;
-                soState.tank = null;
-                // Size the canvas to the image (cap long edge for perf).
-                const MAXP = 1600;
-                let w = img.width, h = img.height;
-                const longEdge = Math.max(w, h);
-                if (longEdge > MAXP) {
-                    const k = MAXP / longEdge;
-                    w = Math.round(w * k);
-                    h = Math.round(h * k);
-                }
-                const cv = soCanvas();
-                cv.width = w;
-                cv.height = h;
-                document.getElementById('so_empty').style.display = 'none';
-                document.getElementById('so_scale_status').textContent = 'Scale: not set';
-                // Reveal zoom controls and start fit-to-width for the new image.
-                const zbar = document.getElementById('so_zoom_bar');
-                if (zbar) zbar.style.display = 'flex';
-                soState.zoom = null;
-                soApplyZoom();
-                soRedraw();
+                soCommitImage(img, 1600);
                 soSetStatus('Image loaded. Set the scale next.');
             };
             img.src = e.target.result;
         };
         reader.readAsDataURL(file);
+    }
+
+    // ── PDF SUPPORT ──────────────────────────────────────────────────
+    // Civil plan sheets are frequently PDFs. We rasterize the selected page
+    // with PDF.js (lazy-loaded from cdnjs, matching the Chart.js pattern used
+    // elsewhere in the app) and feed the resulting image into the same overlay
+    // pipeline — so scale-setting, zoom, tank placement, and export all work
+    // exactly as they do for a PNG/JPEG.
+    const SO_PDFJS_VER = '3.11.174';
+    const SO_PDF_MAX_EDGE = 2400;   // high-res render target (long edge, px)
+
+    // Holds the parsed PDF document + current page for the page picker.
+    const soPdf = { doc: null, pageNum: 1, pageCount: 0, rendering: false };
+
+    function soResetPdfState() {
+        soPdf.doc = null;
+        soPdf.pageNum = 1;
+        soPdf.pageCount = 0;
+        soPdf.rendering = false;
+        const bar = document.getElementById('so_page_bar');
+        if (bar) bar.style.display = 'none';
+    }
+
+    // Lazy-load PDF.js once, then run cb(pdfjsLib).
+    function soEnsurePdfJs(cb) {
+        if (window.pdfjsLib) { cb(window.pdfjsLib); return; }
+        if (window._soPdfJsLoading) {
+            // Another load is in flight — poll briefly until it resolves.
+            const t0 = Date.now();
+            const iv = setInterval(function () {
+                if (window.pdfjsLib) { clearInterval(iv); cb(window.pdfjsLib); }
+                else if (Date.now() - t0 > 20000) { clearInterval(iv); soSetStatus('PDF engine failed to load. Check your connection and retry.'); }
+            }, 100);
+            return;
+        }
+        window._soPdfJsLoading = true;
+        soSetStatus('Loading PDF engine…');
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/' + SO_PDFJS_VER + '/pdf.min.js';
+        s.onload = function () {
+            try {
+                if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
+                    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+                        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/' + SO_PDFJS_VER + '/pdf.worker.min.js';
+                }
+            } catch (e) {}
+            window._soPdfJsLoading = false;
+            cb(window.pdfjsLib);
+        };
+        s.onerror = function () {
+            window._soPdfJsLoading = false;
+            soSetStatus('Could not load the PDF engine (network blocked?). Try exporting the sheet as PNG/JPEG instead.');
+        };
+        document.head.appendChild(s);
+    }
+
+    function soProcessPdf(file) {
+        soResetPdfState();
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const data = new Uint8Array(e.target.result);
+            soEnsurePdfJs(function (pdfjsLib) {
+                if (!pdfjsLib) return;
+                soSetStatus('Reading PDF…');
+                pdfjsLib.getDocument({ data: data }).promise.then(function (doc) {
+                    soPdf.doc = doc;
+                    soPdf.pageCount = doc.numPages;
+                    soPdf.pageNum = 1;
+                    soRenderPdfPage(1);
+                }).catch(function (err) {
+                    soSetStatus('Could not open that PDF: ' + (err && err.message ? err.message : 'unknown error'));
+                });
+            });
+        };
+        reader.onerror = function () { soSetStatus('Could not read the PDF file.'); };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function soRenderPdfPage(n) {
+        if (!soPdf.doc || soPdf.rendering) return;
+        n = Math.min(soPdf.pageCount, Math.max(1, n));
+        soPdf.rendering = true;
+        soPdf.pageNum = n;
+        soSetStatus('Rendering page ' + n + ' of ' + soPdf.pageCount + '…');
+        soPdf.doc.getPage(n).then(function (page) {
+            // Scale so the long edge hits our high-res target.
+            const base = page.getViewport({ scale: 1 });
+            const longEdge = Math.max(base.width, base.height);
+            const scale = longEdge > 0 ? (SO_PDF_MAX_EDGE / longEdge) : 1;
+            const viewport = page.getViewport({ scale: scale });
+
+            const tmp = document.createElement('canvas');
+            tmp.width = Math.round(viewport.width);
+            tmp.height = Math.round(viewport.height);
+            const tctx = tmp.getContext('2d');
+            // White backdrop so transparent PDFs don't render on black.
+            tctx.fillStyle = '#ffffff';
+            tctx.fillRect(0, 0, tmp.width, tmp.height);
+
+            const task = page.render({ canvasContext: tctx, viewport: viewport });
+            task.promise.then(function () {
+                const img = new Image();
+                img.onload = function () {
+                    soCommitImage(img, SO_PDF_MAX_EDGE);
+                    soUpdatePageBar();
+                    soPdf.rendering = false;
+                    const multi = soPdf.pageCount > 1;
+                    soSetStatus('Page ' + n + (multi ? ' of ' + soPdf.pageCount : '') +
+                                ' loaded. Set the scale next.' + (multi ? ' (Use the page arrows to switch sheets.)' : ''));
+                };
+                img.onerror = function () { soPdf.rendering = false; soSetStatus('Failed to rasterize the PDF page.'); };
+                img.src = tmp.toDataURL('image/png');
+            }).catch(function (err) {
+                soPdf.rendering = false;
+                soSetStatus('Render failed: ' + (err && err.message ? err.message : 'unknown error'));
+            });
+        }).catch(function (err) {
+            soPdf.rendering = false;
+            soSetStatus('Could not read that page: ' + (err && err.message ? err.message : 'unknown error'));
+        });
+    }
+
+    function soUpdatePageBar() {
+        const bar = document.getElementById('so_page_bar');
+        const readout = document.getElementById('so_page_readout');
+        if (!bar) return;
+        if (soPdf.doc && soPdf.pageCount > 1) {
+            bar.style.display = 'flex';
+            if (readout) readout.textContent = 'Page ' + soPdf.pageNum + ' / ' + soPdf.pageCount;
+        } else {
+            bar.style.display = 'none';
+        }
+    }
+
+    function soPdfPrevPage() {
+        if (!soPdf.doc || soPdf.rendering) return;
+        if (soPdf.pageNum <= 1) return;
+        soRenderPdfPage(soPdf.pageNum - 1);
+    }
+
+    function soPdfNextPage() {
+        if (!soPdf.doc || soPdf.rendering) return;
+        if (soPdf.pageNum >= soPdf.pageCount) return;
+        soRenderPdfPage(soPdf.pageNum + 1);
     }
 
     function soStartScale() {
@@ -3895,7 +4076,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'AquaCell_Site_Overlay.pdf';
+            a.download = acPdfName('AquaCell_Site_Overlay', projName);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
