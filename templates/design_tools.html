@@ -4028,7 +4028,10 @@
         const url = tmp.toDataURL('image/png');
         const a = document.createElement('a');
         a.href = url;
-        a.download = acPdfName('AquaCell_Site_Overlay', projName).replace(/\.pdf$/, '.png');
+        // Match the PDF export: append the sanitized project name, then swap
+        // the .pdf extension acPdfName() produces for .png.
+        const soPngProj = (document.getElementById('so_project').value || '').trim();
+        a.download = acPdfName('AquaCell_Site_Overlay', soPngProj).replace(/\.pdf$/, '.png');
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
