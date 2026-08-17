@@ -4567,6 +4567,335 @@ def build_site_overlay_pdf(image_data_url, project_name=None, meta=None):
 
 
 # ══════════════════════════════════════════════════════════════════
+#  DESIGN VERIFICATION DASHBOARD — PT-ROW™ Transparent Sizing Calculator
+#
+#  Shows the engineer four independent sizing methods side by side rather
+#  than a single black-box number, per James's explicit direction: no
+#  auto-jurisdiction toggle, no method forced as "controlling" — the
+#  engineer picks which governs. Each method computes only from the
+#  inputs it needs; missing inputs mark that method unavailable rather
+#  than blocking the whole calculation, since a user may only have a
+#  flow figure or only a volume figure on hand.
+#
+#  v1 geometry (Filter Area-Based method + fabric takeoff) is Offset
+#  (Side-Car) layout only — AQ-400-01 Sheets 4-8 for Header Row/Inline/
+#  3-Stack have not been provided. Do not fabricate geometry for those;
+#  see spec Section 7/8.
+# ══════════════════════════════════════════════════════════════════
+_PT_ROW_FLOW_COEFF = 0.464   # CFS per crate — Wavin PT-ROW™ Sizing Guidance
+_PT_ROW_NET_STORAGE_CF = {   # ft3 per module, flat (not layer-dependent)
+    # SC: AQ-200-01 Rev 4 "AquaCell Crate With Bottom Plate (1st Layer Only)," SC-1 row.
+    # EX: AQ-200-01 Rev 4 "AquaCell Crate + (2 Base Units)," EX-1 row (same no-side-plate,
+    # single-layer basis as SC).
+    'SC': 10.25,
+    'EX': 10.83,
+}
+_PT_ROW_WOVEN_LAYERS = 2     # AQ-400-01 §1.1 — two layers of woven geotextile wrap the forebay
+
+_PT_ROW_REFERENCE_NOTES = [
+    'Woven geotextile only within the PT-ROW forebay wrap — non-woven is not permitted here '
+    '(non-woven wraps the main storage system only).',
+    'Two layers of woven geotextile required: first layer under the row over supporting stone, '
+    'second layer fully encloses the row.',
+    'Minimum access structures: one at inlet/diversion, one at downstream end; additional access '
+    'required for rows exceeding 300 ft. Minimum 12" diameter openings.',
+    'Aggregate must be non-angular and clean, free of fines, to prevent fabric damage.',
+    'Final row length, width, and height are determined by the Engineer of Record — this tool '
+    'supports sizing, it does not replace EOR judgment.',
+]
+
+_PT_ROW_DISCLAIMER_TEXT = (
+    "DISCLAIMER: This tool shows four independent PT-ROW pretreatment sizing methods side by side "
+    "so the Engineer of Record can see the math behind each and select which governs for their "
+    "jurisdiction — no method is auto-selected as controlling. It does not replace the embedded "
+    "PT-ROW logic in the Single/Multi-Tank calculators, verify the governing method's basis and "
+    "applicable code reference before use. Filter Area-Based sizing and fabric takeoff geometry "
+    "shown here are Offset (Side-Car) layout only; Header Row, Inline, and 3-Stack layouts are not "
+    "yet supported. THE ENGINEER OF RECORD IS SOLELY RESPONSIBLE FOR SELECTING THE GOVERNING SIZING "
+    "METHOD AND VERIFYING FINAL ROW LENGTH, WIDTH, AND HEIGHT against project-specific hydrology, "
+    "jurisdictional requirements, and AQ-400-01."
+)
+_PT_ROW_BOLD_TRIGGERS = ('THE ENGINEER OF RECORD',)
+
+
+def calc_pt_row(payload):
+    config       = payload.get('config', 'SC')
+    if config not in ('SC', 'EX'):
+        config = 'SC'
+    layers       = int(float(payload.get('layers', 1) or 1))
+    layout       = payload.get('layout', 'offset')
+    if layout not in ('offset', 'header_row', 'inline', '3_stack'):
+        layout = 'offset'
+
+    wqf_cfs           = float(payload.get('wqf_cfs', 0) or 0)
+    required_volume_cf = float(payload.get('required_volume_cf', 0) or 0)
+    loading_rate       = float(payload.get('loading_rate_gpm_sf', 1.0) or 1.0)
+    crates_per_row      = int(float(payload.get('crates_per_row', 0) or 0))
+    num_rows            = int(float(payload.get('num_rows', 0) or 0))
+    wrap_ext_ft          = float(payload.get('wrap_extension_ft', 1.5) or 1.5)
+    waste_factor         = float(payload.get('waste_factor', 0.20) or 0.20)
+
+    layer_heights = CONFIG_DATA[config]['layer_heights']
+    layers = max(1, min(layers, len(layer_heights)))
+    layer_height_ft = layer_heights[layers - 1]
+
+    crate_width_ft  = MODULE_WID
+    crate_length_ft = MODULE_LEN
+
+    # ── 3.1 Flow-Based (Legacy Wavin) ───────────────────────────────
+    flow_based = {'available': False, 'crates_required': None,
+                  'formula': 'CEILING(WQf ÷ 0.464, 1)',
+                  'basis': 'Wavin PT-ROW™ Sizing Guidance — 0.464 CFS/crate flow coefficient '
+                           '(same constant used by the embedded Single/Multi-Tank PT-ROW logic).',
+                  'note': None}
+    if wqf_cfs > 0:
+        flow_based['available'] = True
+        flow_based['crates_required'] = math.ceil(wqf_cfs / _PT_ROW_FLOW_COEFF)
+    else:
+        flow_based['note'] = 'Enter Treatment Flow (WQf) to compute.'
+
+    # ── 3.2 Volume-Based ─────────────────────────────────────────────
+    net_storage_cf = _PT_ROW_NET_STORAGE_CF[config]
+    volume_based = {'available': False, 'crates_required': None,
+                     'net_storage_per_module_cf': net_storage_cf,
+                     'formula': 'CEILING(Required Volume ÷ net storage per module, 1)',
+                     'basis': f"AQ-200-01 Rev 4 — {config}-1 water volume at 1 layer, base "
+                              f"configuration, no side plates ({net_storage_cf} ft³/module).",
+                     'note': None}
+    if required_volume_cf > 0:
+        volume_based['available'] = True
+        volume_based['crates_required'] = math.ceil(required_volume_cf / net_storage_cf)
+    else:
+        volume_based['note'] = 'Enter Required Pretreatment Volume to compute.'
+
+    # ── Shared: required filter area (methods 3.3 and 3.4) ─────────
+    filter_area_ok = wqf_cfs > 0 and loading_rate > 0
+    required_filter_area_ft2 = (wqf_cfs * 448.8 / loading_rate) if filter_area_ok else None
+
+    # ── 3.3 Filter Area-Based (Geometric Method) — Offset layout only, v1 ──
+    filter_area_based = {'available': False, 'required_filter_area_ft2': None,
+                          'effective_filter_area_per_crate_ft2': None,
+                          'crates_required_estimate': None,
+                          'provided_filter_area_ft2': None, 'area_margin_ft2': None, 'status': None,
+                          'formula': 'Required area = (WQf × 448.8) ÷ Loading Rate; '
+                                     'crates = CEILING(required area ÷ area per crate, 1)',
+                          'basis': 'AQ-400-01 §3.1–3.3 — filter area sized to pass WQf at the '
+                                   'selected loading rate (default 1.0 gpm/ft²); all woven fabric '
+                                   'surfaces in contact with aggregate count (bottom + two long '
+                                   'sidewalls). Offset (Side-Car) geometry only.',
+                          'note': None}
+    if layout != 'offset':
+        filter_area_based['note'] = 'Filter Area-Based sizing is only available for the Offset (Side-Car) layout in v1.'
+    elif not filter_area_ok:
+        filter_area_based['note'] = 'Enter Treatment Flow (WQf) and Loading Rate to compute.'
+    else:
+        effective_filter_width_ft = crate_width_ft + 2 * layer_height_ft
+        effective_filter_area_per_crate = crate_length_ft * effective_filter_width_ft
+        filter_area_based['available'] = True
+        filter_area_based['required_filter_area_ft2'] = round(required_filter_area_ft2, 1)
+        filter_area_based['effective_filter_area_per_crate_ft2'] = round(effective_filter_area_per_crate, 2)
+        filter_area_based['crates_required_estimate'] = math.ceil(required_filter_area_ft2 / effective_filter_area_per_crate)
+        if crates_per_row > 0 and num_rows > 0:
+            provided = crates_per_row * num_rows * effective_filter_area_per_crate
+            filter_area_based['provided_filter_area_ft2'] = round(provided, 1)
+            filter_area_based['area_margin_ft2'] = round(provided - required_filter_area_ft2, 1)
+            filter_area_based['status'] = 'PASS' if provided >= required_filter_area_ft2 else 'CHECK'
+        else:
+            filter_area_based['note'] = 'Enter Selected Crates per PT Row and # of PT Rows to check provided area against required.'
+
+    # ── 3.4 Quick Estimate (Flat Area Method) — legacy rough estimate ──
+    quick_estimate = {'available': False, 'required_filter_area_ft2': None, 'crates_estimate': None,
+                       'formula': 'CEILING(((WQf × 448.8) ÷ Loading Rate) ÷ 20, 1)',
+                       'basis': 'Legacy rough estimate — flat 20 sf/module approximation, not '
+                                'derived from actual AquaCell crate geometry.',
+                       'note': 'Rough estimate only — does not account for actual crate filter '
+                               'surface geometry. Use Filter Area-Based (Geometric Method) for a '
+                               'verified result.'}
+    if filter_area_ok:
+        quick_estimate['available'] = True
+        quick_estimate['required_filter_area_ft2'] = round(required_filter_area_ft2, 1)
+        quick_estimate['crates_estimate'] = math.ceil(required_filter_area_ft2 / 20.0)
+    else:
+        quick_estimate['note'] = 'Enter Treatment Flow (WQf) and Loading Rate to compute. ' + quick_estimate['note']
+
+    # ── Section 4: Fabric Takeoff — Offset layout only, v1 ──────────
+    fabric_takeoff = {'available': False, 'layout': layout,
+                       'fabric_width_per_row_ft': None, 'fabric_length_per_row_ft': None,
+                       'fabric_per_row_per_layer_sqyd': None, 'woven_layers': _PT_ROW_WOVEN_LAYERS,
+                       'total_woven_fabric_sqyd': None, 'total_woven_fabric_rounded_sqyd': None,
+                       'note': None}
+    if layout != 'offset':
+        fabric_takeoff['note'] = 'Fabric takeoff not yet available for this configuration — drawing detail pending.'
+    elif crates_per_row <= 0 or num_rows <= 0:
+        fabric_takeoff['note'] = 'Enter Selected Crates per PT Row and # of PT Rows to compute fabric takeoff.'
+    else:
+        fabric_width_ft = crate_width_ft + 2 * layer_height_ft + 2 * wrap_ext_ft
+        fabric_length_ft = crates_per_row * crate_length_ft + 2 * wrap_ext_ft
+        fabric_per_row_per_layer_sqyd = (fabric_width_ft * fabric_length_ft * (1 + waste_factor)) / 9.0
+        total_sqyd = fabric_per_row_per_layer_sqyd * num_rows * _PT_ROW_WOVEN_LAYERS
+        fabric_takeoff['available'] = True
+        fabric_takeoff['fabric_width_per_row_ft'] = round(fabric_width_ft, 2)
+        fabric_takeoff['fabric_length_per_row_ft'] = round(fabric_length_ft, 2)
+        fabric_takeoff['fabric_per_row_per_layer_sqyd'] = round(fabric_per_row_per_layer_sqyd, 1)
+        fabric_takeoff['total_woven_fabric_sqyd'] = round(total_sqyd, 1)
+        fabric_takeoff['total_woven_fabric_rounded_sqyd'] = math.ceil(total_sqyd)
+
+    return {
+        'config': config,
+        'layers': layers,
+        'layer_height_ft': round(layer_height_ft, 3),
+        'layout': layout,
+        'crates_per_row': crates_per_row,
+        'num_rows': num_rows,
+        'wrap_extension_ft': round(wrap_ext_ft, 2),
+        'waste_factor': round(waste_factor, 2),
+        'flow_based': flow_based,
+        'volume_based': volume_based,
+        'filter_area_based': filter_area_based,
+        'quick_estimate': quick_estimate,
+        'fabric_takeoff': fabric_takeoff,
+        'reference_notes': _PT_ROW_REFERENCE_NOTES,
+    }
+
+
+_PT_ROW_LAYOUT_LABELS = {
+    'offset': 'Offset (Side-Car)',
+    'header_row': 'Header Row',
+    'inline': 'Inline',
+    '3_stack': '3-Stack',
+}
+
+
+def build_pt_row_pdf(inputs, results, project_name=None):
+    """Single-page submittal-ready PDF for the PT-ROW Transparent Sizing Calculator."""
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
+
+    band_h = 64
+    c.setFillColor(NAVY)
+    c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
+    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    if logo_path and os.path.exists(logo_path):
+        try:
+            img = ImageReader(logo_path)
+            c.drawImage(img, LM, PH - band_h + 8, width=160, height=46,
+                        preserveAspectRatio=True, mask='auto')
+        except Exception:
+            pass
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 14)
+    c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
+    c.setFont('Helvetica', 9)
+    c.setFillColor(colors.HexColor('#93c5fd'))
+    c.drawRightString(PW - RM, PH - 37, 'PT-ROW™ Transparent Sizing Calculator')
+    c.setFont('Helvetica', 7)
+    c.setFillColor(colors.HexColor('#94a3b8'))
+    c.drawRightString(PW - RM, PH - 50, generated_str)
+
+    y = PH - band_h - 10
+    if project_name:
+        c.setFillColor(GRAY)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM, y, f'Project: {project_name}')
+        y -= 16
+
+    input_rows = [
+        ('Configuration', 'SC — Standard' if results['config'] == 'SC' else 'EX — Extra Strong'),
+        ('PT-ROW Layout', _PT_ROW_LAYOUT_LABELS.get(results['layout'], results['layout'])),
+        ('Number of Layers', f"{results['layers']} ({results['layer_height_ft']} ft)"),
+        ('Treatment Flow (WQf)', f"{inputs.get('wqf_cfs', 0)} cfs"),
+        ('Required Pretreatment Volume', f"{inputs.get('required_volume_cf', 0)} ft³"),
+        ('Loading Rate', f"{inputs.get('loading_rate_gpm_sf', 1.0)} gpm/ft²"),
+        ('Selected Crates per PT Row', str(results['crates_per_row'] or '—')),
+        ('Selected # of PT Rows', str(results['num_rows'] or '—')),
+    ]
+    y = _draw_section_kv(c, y, 'INPUTS', input_rows, ncols=2)
+
+    def _m_val(m, key='crates_required', unit=' crates'):
+        if not m['available']:
+            return 'N/A'
+        return f"{m[key]}{unit}"
+
+    fab = results['filter_area_based']
+    fab_val = 'N/A'
+    if fab['available']:
+        fab_val = f"{fab['crates_required_estimate']} crates est."
+        if fab['status']:
+            fab_val += f" — {fab['provided_filter_area_ft2']:,.0f} sf provided vs {fab['required_filter_area_ft2']:,.0f} sf req. ({fab['status']})"
+
+    qe = results['quick_estimate']
+    qe_val = f"{qe['crates_estimate']} crates (rough est.)" if qe['available'] else 'N/A'
+
+    method_rows = [
+        ('Flow-Based (Legacy Wavin)', _m_val(results['flow_based'])),
+        ('Volume-Based', _m_val(results['volume_based'])),
+        ('Filter Area-Based (Geometric Method)', fab_val),
+        ('Quick Estimate (Flat Area Method)', qe_val),
+    ]
+    y = _draw_section_kv(c, y, 'SIZING METHODS — ENGINEER SELECTS GOVERNING METHOD', method_rows, ncols=1)
+
+    ft = results['fabric_takeoff']
+    if ft['available']:
+        fabric_rows = [
+            ('Fabric Width per Row', f"{ft['fabric_width_per_row_ft']} ft"),
+            ('Fabric Length per Row', f"{ft['fabric_length_per_row_ft']} ft"),
+            ('Woven Layers', str(ft['woven_layers'])),
+            ('Total Woven Fabric', f"{ft['total_woven_fabric_rounded_sqyd']} sy (raw {ft['total_woven_fabric_sqyd']} sy)"),
+        ]
+        y = _draw_section_kv(c, y, 'FABRIC TAKEOFF (OFFSET / SIDE-CAR)', fabric_rows, ncols=2)
+
+    # ── Condensed reference notes (bulleted, wrapped) ───────────────
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+    bar_h = 16
+    c.setFillColor(BLUE)
+    c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 9)
+    c.drawString(LM + 8, y - bar_h + 4, 'CONDENSED REFERENCE NOTES (SEE AQ-400-01 FOR FULL SPEC)')
+    notes_top = y - bar_h
+    line_h = 10
+    pad = 8
+    max_w = CW - pad * 2 - 10
+    wrapped = []
+    for note_text in results['reference_notes']:
+        bullet = '• ' + note_text
+        words = bullet.split()
+        cur = ''
+        for wd in words:
+            test = (cur + ' ' + wd).strip()
+            if stringWidth(test, 'Helvetica', 7) <= max_w:
+                cur = test
+            else:
+                if cur:
+                    wrapped.append(cur)
+                cur = wd
+        if cur:
+            wrapped.append(cur)
+    notes_h = len(wrapped) * line_h + pad * 2
+    notes_bottom = notes_top - notes_h
+    c.setFillColor(LGRAY)
+    c.setStrokeColor(MGRAY)
+    c.setLineWidth(0.5)
+    c.rect(LM, notes_bottom, CW, notes_h, fill=1, stroke=1)
+    ty = notes_top - pad - 6
+    c.setFont('Helvetica', 7)
+    c.setFillColor(BLACK)
+    for line in wrapped:
+        c.drawString(LM + pad, ty, line)
+        ty -= line_h
+    y = notes_bottom - 10
+
+    _draw_disclaimer_block(c, 40, disclaimer_lines_raw=_PT_ROW_DISCLAIMER_TEXT,
+                            bold_triggers=_PT_ROW_BOLD_TRIGGERS)
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
+# ══════════════════════════════════════════════════════════════════
 #  ROUTE: /design-tools  —  Design Verification Dashboard (page)
 # ══════════════════════════════════════════════════════════════════
 @app.route('/design-tools', methods=['GET'])
@@ -4621,6 +4950,8 @@ def design_tools_calculate():
             result = calc_min_distance_structure(payload)
         elif calc_type == 'complex_shape_builder':
             result = calc_complex_shape_builder(payload)
+        elif calc_type == 'pt_row':
+            result = calc_pt_row(payload)
         else:
             return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
 
@@ -4721,6 +5052,10 @@ def design_tools_download_pdf():
             meta = data.get('meta', {}) or {}
             buffer = build_site_overlay_pdf(image_data_url, project_name=project_name, meta=meta)
             download_name = 'AquaCell_Site_Overlay.pdf'
+        elif calc_type == 'pt_row':
+            result = calc_pt_row(payload)
+            buffer = build_pt_row_pdf(payload, result, project_name=project_name)
+            download_name = 'AquaCell_PT-ROW_Sizing.pdf'
         else:
             return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
 
