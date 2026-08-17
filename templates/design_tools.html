@@ -453,6 +453,9 @@
         <button class="calc-nav-item" data-calc="min_distance_structure" onclick="selectCalc('min_distance_structure')">
             Min Distance from Structure
         </button>
+        <button class="calc-nav-item" data-calc="pt_row" onclick="selectCalc('pt_row')">
+            PT-ROW™ Sizing Calculator <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
+        </button>
         <button class="calc-nav-item" data-calc="site_overlay" onclick="selectCalc('site_overlay')">
             Site Overlay <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
         </button>
@@ -1298,6 +1301,103 @@
                     <canvas id="so_canvas" width="900" height="600" style="display:block; cursor:crosshair;"></canvas>
                 </div>
                 <div class="empty-state" id="so_empty" style="margin-top:8px;">Upload a plan image or PDF to begin — or drag &amp; drop a PNG / JPEG / PDF here.</div>
+            </div>
+        </div>
+
+        <!-- ── PT-ROW™ TRANSPARENT SIZING CALCULATOR ── -->
+        <div id="panel-pt_row" class="calc-panel" style="display:none;">
+            <div class="calc-inputs">
+                <div class="disclaimer-box">
+                    <strong>PT-ROW™ Transparent Sizing Calculator (BETA).</strong> Shows four independent
+                    pretreatment sizing methods side by side rather than a single black-box number — no
+                    method is auto-selected as "controlling." Review each method's formula and basis and
+                    select the one that governs for your jurisdiction. Filter Area-Based sizing and fabric
+                    takeoff are Offset (Side-Car) layout only in this version; Header Row, Inline, and
+                    3-Stack layouts are not yet supported (drawing detail pending).
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Configuration &amp; Layout</div>
+                    <div class="section-card-body">
+                        <label>Configuration</label>
+                        <select id="ptr_config">
+                            <option value="SC">SC — Standard Capacity</option>
+                            <option value="EX">EX — Extra Strong</option>
+                        </select>
+
+                        <label style="margin-top:8px;">PT-ROW Layout</label>
+                        <select id="ptr_layout">
+                            <option value="offset">Offset (Side-Car)</option>
+                            <option value="header_row" disabled>Header Row (coming soon — drawing detail pending)</option>
+                            <option value="inline" disabled>Inline (coming soon — drawing detail pending)</option>
+                            <option value="3_stack" disabled>3-Stack (coming soon — drawing detail pending)</option>
+                        </select>
+
+                        <label style="margin-top:8px;">Number of Layers<span class="field-hint">sets stack height used by Filter Area-Based sizing &amp; fabric takeoff</span></label>
+                        <select id="ptr_layers">
+                            <option value="1" selected>1 Layer</option>
+                            <option value="2">2 Layers</option>
+                            <option value="3">3 Layers</option>
+                            <option value="4">4 Layers</option>
+                            <option value="5">5 Layers</option>
+                            <option value="6">6 Layers</option>
+                            <option value="7">7 Layers</option>
+                            <option value="8">8 Layers</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Sizing Inputs</div>
+                    <div class="section-card-body">
+                        <label>Treatment Flow, WQf (cfs)<span class="field-hint">required for Flow-Based &amp; Filter Area-Based methods</span></label>
+                        <input type="number" step="any" min="0" id="ptr_wqf" placeholder="e.g. 2.0">
+
+                        <label style="margin-top:8px;">Required Pretreatment Volume (ft³)<span class="field-hint">required for Volume-Based method</span></label>
+                        <input type="number" step="any" min="0" id="ptr_required_volume" placeholder="e.g. 300">
+
+                        <label style="margin-top:8px;">Loading Rate (gpm/ft²)<span class="field-hint">required for Filter Area-Based method — default 1.0 per OEPA Rainwater &amp; Land Development Ch. 2.14 (AQ-400-01 §3.1)</span></label>
+                        <input type="number" step="any" min="0" id="ptr_loading_rate" value="1.0">
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Provided Design (Optional — Checks Sizing Against What's Selected)</div>
+                    <div class="section-card-body">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                            <div><label>Selected Crates per PT Row</label><input type="number" step="1" min="0" id="ptr_crates_per_row" placeholder="e.g. 10"></div>
+                            <div><label>Selected # of PT Rows</label><input type="number" step="1" min="0" id="ptr_num_rows" placeholder="e.g. 2"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Fabric Takeoff Parameters (Offset / Side-Car)</div>
+                    <div class="section-card-body">
+                        <label>Wrap Extension Each End (ft)<span class="field-hint">default per source workbook — not a verified AQ-400-01 minimum, confirm if a hard spec value applies</span></label>
+                        <input type="number" step="any" min="0" id="ptr_wrap_ext" value="1.5">
+
+                        <label style="margin-top:8px;">Fabric Waste Factor</label>
+                        <input type="number" step="0.01" min="0" id="ptr_waste_factor" value="0.20">
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Project (optional — for PDF header)</div>
+                    <div class="section-card-body">
+                        <label>Project Name</label>
+                        <input type="text" id="ptr_project_name" placeholder="e.g. Maple Ridge Retail Site">
+                    </div>
+                </div>
+
+                <button class="calc-btn" onclick="runPtRow()">Calculate PT-ROW Sizing</button>
+                <button class="calc-btn secondary" id="ptr_pdf_btn" onclick="downloadPtRowPDF()" disabled>
+                    ⬇ Download Submittal PDF
+                </button>
+            </div>
+
+            <div class="calc-results" id="ptr_results">
+                <div class="empty-state">Enter treatment flow and/or required volume, then click Calculate PT-ROW Sizing.</div>
             </div>
         </div>
 
@@ -4246,6 +4346,173 @@
             soSetStatus('PDF exported.');
         } catch (err) {
             soSetStatus('PDF export error: ' + err);
+        }
+    }
+
+    // ══════════════ PT-ROW™ TRANSPARENT SIZING CALCULATOR ══════════════
+    let ptrLastInputs  = null;
+    let ptrLastResults = null;
+
+    async function runPtRow() {
+        const resultsDiv = document.getElementById('ptr_results');
+        const pdfBtn = document.getElementById('ptr_pdf_btn');
+        pdfBtn.disabled = true;
+
+        const inputs = {
+            config:               document.getElementById('ptr_config').value,
+            layout:                document.getElementById('ptr_layout').value,
+            layers:                document.getElementById('ptr_layers').value || 1,
+            wqf_cfs:               document.getElementById('ptr_wqf').value || 0,
+            required_volume_cf:     document.getElementById('ptr_required_volume').value || 0,
+            loading_rate_gpm_sf:    document.getElementById('ptr_loading_rate').value || 1.0,
+            crates_per_row:         document.getElementById('ptr_crates_per_row').value || 0,
+            num_rows:               document.getElementById('ptr_num_rows').value || 0,
+            wrap_extension_ft:      document.getElementById('ptr_wrap_ext').value || 1.5,
+            waste_factor:           document.getElementById('ptr_waste_factor').value || 0.20,
+        };
+
+        resultsDiv.innerHTML = '<div class="empty-state">Calculating…</div>';
+
+        try {
+            const resp = await fetch('/design-tools/calculate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calc_type: 'pt_row', inputs: inputs })
+            });
+            const data = await resp.json();
+
+            if (!resp.ok || data.error) {
+                resultsDiv.innerHTML = `<div class="error-box">${data.error || 'Calculation failed.'}</div>`;
+                ptrLastInputs = null; ptrLastResults = null;
+                return;
+            }
+
+            ptrLastInputs  = inputs;
+            ptrLastResults = data;
+            pdfBtn.disabled = false;
+            renderPtRowResults(data);
+        } catch (err) {
+            resultsDiv.innerHTML = `<div class="error-box">Request failed: ${err.message}</div>`;
+            ptrLastInputs = null; ptrLastResults = null;
+        }
+    }
+
+    function ptrFmt(n, dec) {
+        if (n === null || n === undefined || isNaN(n)) return '—';
+        return Number(n).toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    }
+
+    function ptrMethodCard(title, m, extraRowsHtml, badgeHtml) {
+        const headline = m.available
+            ? `<div class="result-row"><span><strong>Crates Required</strong></span><span class="val">${m.crates_required != null ? m.crates_required : (m.crates_required_estimate != null ? m.crates_required_estimate : (m.crates_estimate != null ? m.crates_estimate : '—'))}</span></div>`
+            : '';
+        const noteHtml = m.note
+            ? `<div class="disclaimer-box" style="margin-top:8px; padding:6px 8px; font-size:11px;">${m.note}</div>`
+            : '';
+        return `
+            <div class="result-card">
+                <h3>${title} ${badgeHtml || ''}</h3>
+                ${headline}
+                ${extraRowsHtml || ''}
+                <div style="font-size:11px; color:#6b7280; margin-top:8px; line-height:1.4;">
+                    ${m.formula}<br>Basis: ${m.basis}
+                </div>
+                ${noteHtml}
+            </div>`;
+    }
+
+    function renderPtRowResults(d) {
+        const resultsDiv = document.getElementById('ptr_results');
+
+        const flowCard = ptrMethodCard('Flow-Based (Legacy Wavin)', d.flow_based);
+        const volumeCard = ptrMethodCard('Volume-Based', d.volume_based);
+
+        const fab = d.filter_area_based;
+        let fabBadge = '';
+        let fabExtra = `<div class="result-row"><span>Required Filter Area</span><span class="val">${fab.available ? ptrFmt(fab.required_filter_area_ft2, 1) + ' sf' : '—'}</span></div>`;
+        if (fab.available && fab.status) {
+            fabBadge = `<span class="badge ${fab.status === 'PASS' ? 'badge-pass' : 'badge-na'}" style="font-size:10px; padding:3px 10px; margin-left:6px;">${fab.status}</span>`;
+            fabExtra += `
+                <div class="result-row"><span>Provided Filter Area</span><span class="val">${ptrFmt(fab.provided_filter_area_ft2, 1)} sf</span></div>
+                <div class="result-row"><span>Margin</span><span class="val">${ptrFmt(fab.area_margin_ft2, 1)} sf</span></div>`;
+        }
+        const filterCard = ptrMethodCard('Filter Area-Based (Geometric Method)', fab, fabExtra, fabBadge);
+
+        const qe = d.quick_estimate;
+        const qeExtra = `<div class="result-row"><span>Required Filter Area</span><span class="val">${qe.available ? ptrFmt(qe.required_filter_area_ft2, 1) + ' sf' : '—'}</span></div>`;
+        const quickCard = ptrMethodCard('Quick Estimate (Flat Area Method)', qe, qeExtra);
+
+        const ft = d.fabric_takeoff;
+        const fabricCard = ft.available
+            ? `<div class="result-card">
+                    <h3>Fabric Takeoff (Offset / Side-Car)</h3>
+                    <div class="result-row"><span>Fabric Width per Row</span><span class="val">${ptrFmt(ft.fabric_width_per_row_ft, 2)} ft</span></div>
+                    <div class="result-row"><span>Fabric Length per Row</span><span class="val">${ptrFmt(ft.fabric_length_per_row_ft, 2)} ft</span></div>
+                    <div class="result-row"><span>Woven Layers</span><span class="val">${ft.woven_layers}</span></div>
+                    <div class="result-row"><span><strong>Total Woven Fabric</strong></span><span class="val">${ft.total_woven_fabric_rounded_sqyd} sy (raw ${ptrFmt(ft.total_woven_fabric_sqyd, 1)} sy)</span></div>
+                </div>`
+            : `<div class="result-card">
+                    <h3>Fabric Takeoff</h3>
+                    <div class="disclaimer-box" style="margin-top:0; padding:6px 8px; font-size:11px;">${ft.note}</div>
+                </div>`;
+
+        const notesCard = `
+            <div class="result-card">
+                <h3>Condensed Reference Notes</h3>
+                <ul style="margin:6px 0 0; padding-left:18px; font-size:12px; line-height:1.6;">
+                    ${d.reference_notes.map(n => `<li>${n}</li>`).join('')}
+                </ul>
+                <div style="font-size:11px; color:#6b7280; margin-top:8px;">See AQ-400-01 for complete material specs (grab/tear/puncture strength, permittivity, AOS) and maintenance requirements.</div>
+            </div>`;
+
+        resultsDiv.innerHTML = `
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                ${flowCard}
+                ${volumeCard}
+                ${filterCard}
+                ${quickCard}
+            </div>
+            ${fabricCard}
+            ${notesCard}
+        `;
+    }
+
+    async function downloadPtRowPDF() {
+        if (!ptrLastInputs || !ptrLastResults) return;
+
+        const projectName = document.getElementById('ptr_project_name').value || null;
+        const pdfBtn = document.getElementById('ptr_pdf_btn');
+        const originalText = pdfBtn.textContent;
+        pdfBtn.disabled = true;
+        pdfBtn.textContent = 'Generating…';
+
+        try {
+            const resp = await fetch('/design-tools/download_pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calc_type: 'pt_row', inputs: ptrLastInputs, project_name: projectName })
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                alert(err.error || 'PDF generation failed.');
+                return;
+            }
+
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = acPdfName('AquaCell_PT-ROW_Sizing', projectName);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('PDF generation failed: ' + err.message);
+        } finally {
+            pdfBtn.disabled = false;
+            pdfBtn.textContent = originalText;
         }
     }
 
