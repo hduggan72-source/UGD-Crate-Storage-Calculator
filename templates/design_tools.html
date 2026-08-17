@@ -398,6 +398,13 @@
         .cc-delta-bad  { color:#b91c1c; font-weight:700; }
         .cc-delta-zero { color:var(--muted); }
         .cc-estimate-stamp { background:#92400e; color:#fff; padding:8px 12px; border-radius:6px; font-size:12px; font-weight:700; margin:10px 0; }
+        /* Stage-Storage Calculator */
+        .ss-table { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
+        .ss-table th, .ss-table td { padding:7px 9px; border:1px solid var(--border); text-align:right; }
+        .ss-table th:first-child, .ss-table td:first-child { text-align:left; }
+        .ss-table thead th { background:var(--accent); color:#fff; font-weight:700; position:sticky; top:0; }
+        .ss-table tbody tr:nth-child(even) { background:rgba(0,0,0,0.03); }
+        .ss-table-scroll { max-height:420px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; }
     </style>
 </head>
 <body>
@@ -448,6 +455,9 @@
         </button>
         <button class="calc-nav-item" data-calc="site_overlay" onclick="selectCalc('site_overlay')">
             Site Overlay <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
+        </button>
+        <button class="calc-nav-item" data-calc="stage_storage" onclick="selectCalc('stage_storage')">
+            Stage-Storage Calculator
         </button>
         <button class="calc-nav-item" data-calc="stepped_backfill" onclick="selectCalc('stepped_backfill')">
             Stepped Perimeter Backfill
@@ -1291,6 +1301,148 @@
             </div>
         </div>
 
+        <!-- ── STAGE-STORAGE CALCULATOR ── -->
+        <div id="panel-stage_storage" class="calc-panel" style="display:none;">
+            <div class="calc-inputs">
+                <div class="disclaimer-box">
+                    This calculator provides <strong>preliminary, conceptual estimates only</strong> and is
+                    <strong>not a stamped engineering design</strong>. Base, cover, and perimeter stone
+                    depths/widths, void ratios, and tank geometry are all independently adjustable inputs —
+                    verify every value against project-specific plans. The Engineer of Record is solely
+                    responsible for confirming all design parameters, site conditions, and final storage volumes.
+                    <br><br>
+                    <strong>Note on tank footprint:</strong> AquaCell units interlock in a fixed module grid
+                    (1.9685 ft &times; 3.937 ft per crate) and can only be assembled in whole-crate increments.
+                    Enter your known/measured footprint below — the calculator automatically "snaps" it down to
+                    the nearest whole number of crates in each direction and uses that <strong>snapped</strong>
+                    footprint (not your raw input) for every storage calculation.
+                </div>
+
+                <div id="ss_errorBox" class="error-box"></div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Tank / Crate Geometry</div>
+                    <div class="section-card-body">
+                        <label>AquaCell Configuration<span class="field-hint">sets default crate void ratio</span></label>
+                        <select id="ss_cfg" onchange="ssApplyConfigDefault()">
+                            <option value="SC">SC — Standard Crate (void ratio 0.95486)</option>
+                            <option value="EX">EX — Extra Strong Crate (void ratio 0.92633)</option>
+                        </select>
+
+                        <label style="margin-top:10px;">Footprint Mode</label>
+                        <div style="display:flex; gap:8px; margin:4px 0 8px;">
+                            <button type="button" id="ss_modeRectBtn" class="calc-btn" style="flex:1; padding:9px 10px; font-size:12.5px; margin-top:0;" onclick="ssSetFootprintMode('rect')">Rectangular</button>
+                            <button type="button" id="ss_modeComplexBtn" class="calc-btn secondary" style="flex:1; padding:9px 10px; font-size:12.5px; margin-top:0;" onclick="ssSetFootprintMode('complex')">Complex Shape</button>
+                        </div>
+
+                        <div id="ss_rectFootprintSection">
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                                <div><label>Known Footprint Width (ft)<span class="field-hint">as scaled/measured off plan</span></label><input type="number" step="any" id="ss_knownWidth" value="20" oninput="ssUpdateSnappedDims()"></div>
+                                <div><label>Known Footprint Length (ft)<span class="field-hint">as scaled/measured off plan</span></label><input type="number" step="any" id="ss_knownLength" value="40" oninput="ssUpdateSnappedDims()"></div>
+                            </div>
+                            <div style="background:var(--highlight); border-radius:6px; padding:8px 10px; margin:8px 0 4px;">
+                                <label style="margin-bottom:2px;">Snapped AquaCell Dimensions<span class="field-hint">used for all storage math below</span></label>
+                                <div id="ss_snappedDimsDisplay" style="font-size:13px; font-weight:600;">—</div>
+                            </div>
+                        </div>
+
+                        <div id="ss_complexFootprintSection" style="display:none;">
+                            <div style="background:var(--highlight); border-radius:6px; padding:8px 10px; margin-bottom:10px; font-size:11.5px; line-height:1.5; font-weight:400;">
+                                <strong>Complex Shape Mode</strong> — same method as the Single/Multi Tank sheets
+                                and the Complex Shape Builder tool. Enter the scaled tank footprint area and one
+                                known dimension off the plan; the tool derives the other dimension, then snaps
+                                both to whole crate modules. The scaled perimeter is used directly for perimeter
+                                stone takeoff.
+                            </div>
+                            <label>Scaled Tank Footprint Area (ft²)</label>
+                            <input type="number" step="any" min="0" id="ss_complexScaledArea" value="2500" oninput="ssUpdateComplexFootprintDisplay()">
+                            <label style="margin-top:8px;">Known Width or Length (ft)</label>
+                            <input type="number" step="any" min="0" id="ss_complexKnownDim" value="50" oninput="ssUpdateComplexFootprintDisplay()">
+                            <label style="margin-top:8px;">Scaled Tank Perimeter (ft)<span class="field-hint">used directly, not snapped</span></label>
+                            <input type="number" step="any" min="0" id="ss_complexTankPerim" value="220" oninput="ssUpdateComplexFootprintDisplay()">
+                            <div style="background:var(--highlight); border-radius:6px; padding:8px 10px; margin:8px 0 4px;">
+                                <label style="margin-bottom:2px;">Derived / Snapped Footprint</label>
+                                <div id="ss_complexFootprintDisplay" style="font-size:12.5px; font-weight:600; line-height:1.6;">—</div>
+                            </div>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                                <div><label>Excavation Area (ft²)<span class="field-hint">optional — auto-estimate if blank</span></label><input type="number" step="any" min="0" id="ss_complexExcavArea" placeholder="auto-estimate"></div>
+                                <div><label>Excavation Perimeter (ft)<span class="field-hint">optional — auto-estimate if blank</span></label><input type="number" step="any" min="0" id="ss_complexExcavPerim" placeholder="auto-estimate"></div>
+                            </div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
+                            <div>
+                                <label>Number of Layers</label>
+                                <select id="ss_layers" onchange="ssApplyConfigDefault()">
+                                    <option value="1">1 Layer</option>
+                                    <option value="2" selected>2 Layers</option>
+                                    <option value="3">3 Layers</option>
+                                    <option value="4">4 Layers</option>
+                                    <option value="5">5 Layers</option>
+                                    <option value="6">6 Layers</option>
+                                    <option value="7">7 Layers</option>
+                                    <option value="8">8 Layers</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label>Tank Height (ft)<span class="field-hint">auto-set from config + layers</span></label>
+                                <input type="number" step="any" id="ss_tankHeight" value="2.71" readonly style="background:var(--bg);">
+                            </div>
+                        </div>
+
+                        <label style="margin-top:8px;">Crate Void Ratio (0–1)</label>
+                        <input type="number" step="0.0001" min="0" max="1" id="ss_crateVoid" value="0.95486">
+
+                        <label style="margin-top:8px;">Tank Bottom Elevation (ft)</label>
+                        <input type="number" step="any" id="ss_tankBottomElev" value="100.00">
+
+                        <label style="margin-top:8px;">Finish Grade / Surface Elevation (ft)<span class="field-hint">optional — for cover depth reference only</span></label>
+                        <input type="number" step="any" id="ss_surfaceElev" placeholder="optional">
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-card-header">Stone Backfill Layers</div>
+                    <div class="section-card-body">
+                        <div class="checkbox-row">
+                            <input type="checkbox" id="ss_baseInclude" checked>
+                            <label style="margin:0;">Include Base Stone storage credit</label>
+                        </div>
+                        <label>Base Stone Depth (ft)</label>
+                        <input type="number" step="any" min="0" id="ss_baseDepth" value="0.333">
+
+                        <div class="checkbox-row" style="margin-top:12px;">
+                            <input type="checkbox" id="ss_coverInclude" checked>
+                            <label style="margin:0;">Include Cover Stone storage credit</label>
+                        </div>
+                        <label>Cover Stone Depth (ft)</label>
+                        <input type="number" step="any" min="0" id="ss_coverDepth" value="1.0">
+
+                        <div class="checkbox-row" style="margin-top:12px;">
+                            <input type="checkbox" id="ss_perimInclude" checked>
+                            <label style="margin:0;">Include Perimeter Stone storage credit</label>
+                        </div>
+                        <label>Perimeter Stone Width (ft)</label>
+                        <input type="number" step="any" min="0" id="ss_perimWidth" value="1.0">
+
+                        <label style="margin-top:12px;">Stone Void Ratio (backfill porosity)<span class="field-hint">typically 0.35–0.40</span></label>
+                        <input type="number" step="0.01" min="0" max="1" id="ss_stoneVoid" value="0.40">
+
+                        <label style="margin-top:8px;">Stage Table Increment (inches)</label>
+                        <input type="number" step="0.5" min="0.5" id="ss_stageIncrementIn" value="3">
+                    </div>
+                </div>
+
+                <button class="calc-btn" onclick="ssCalculate()">Calculate Stage-Storage</button>
+                <button class="calc-btn secondary" onclick="ssResetForm()">Reset to Defaults</button>
+                <button class="calc-btn secondary" id="ss_csvBtn" onclick="ssExportCSV()" disabled>Export CSV</button>
+            </div>
+
+            <div class="calc-results" id="ss_results">
+                <div class="empty-state">Set your inputs and click Calculate Stage-Storage to generate the table and curve.</div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -1352,6 +1504,13 @@
         document.querySelectorAll('.calc-panel').forEach(p => p.style.display = 'none');
         const panel = document.getElementById('panel-' + name);
         if (panel) panel.style.display = 'flex';
+        // Stage-Storage ships with example values, like the standalone tool it was
+        // ported from — but only populate them the first time the tab is opened,
+        // not on page load while it's hidden behind the default panel.
+        if (name === 'stage_storage' && !ssInitialized) {
+            ssInitialized = true;
+            ssInit();
+        }
     }
 
     // ══════════════ CRATE COMPARISON (BETA) ══════════════
@@ -4088,6 +4247,453 @@
         } catch (err) {
             soSetStatus('PDF export error: ' + err);
         }
+    }
+
+    // ══════════════ STAGE-STORAGE CALCULATOR ══════════════
+    // Ported from the standalone AquaCell_Stage_Storage_Calculator.html tool —
+    // math and CSV export are carried over intact; only wiring/rendering are
+    // adapted to this dashboard's panel/result-card conventions.
+    const SS_MODULE_WID = 1.9685;   // ft — mirrors app.py MODULE_WID
+    const SS_MODULE_LEN = 3.937;    // ft — mirrors app.py MODULE_LEN
+    const SS_LAYER_HEIGHTS = {
+        SC: [1.39, 2.71, 4.02, 5.33, 6.64, 7.96, 9.27, 10.58],
+        EX: [1.51, 3.02, 4.53, 6.04, 7.55, 9.06, 10.56, 12.07]
+    };
+    let ssFootprintMode = 'rect';
+    let ssChartInstance = null;
+    let ssLastCalc = null;
+    let ssInitialized = false;
+
+    function ssNum(id) {
+        const v = parseFloat(document.getElementById(id).value);
+        return isNaN(v) ? 0 : v;
+    }
+    function ssFmt(n, dec) {
+        if (n === null || n === undefined || isNaN(n)) return '—';
+        return n.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    }
+    function ssShowError(msg) {
+        const box = document.getElementById('ss_errorBox');
+        box.textContent = msg;
+        box.style.display = 'block';
+    }
+    function ssHideError() {
+        document.getElementById('ss_errorBox').style.display = 'none';
+    }
+
+    function ssUpdateSnappedDims() {
+        const knownWidth  = ssNum('ss_knownWidth');
+        const knownLength = ssNum('ss_knownLength');
+        const cratesWide = Math.floor(knownWidth  / SS_MODULE_WID);
+        const cratesLong = Math.floor(knownLength / SS_MODULE_LEN);
+        const snappedWidth  = cratesWide * SS_MODULE_WID;
+        const snappedLength = cratesLong * SS_MODULE_LEN;
+        const display = document.getElementById('ss_snappedDimsDisplay');
+        if (cratesWide <= 0 || cratesLong <= 0) {
+            display.innerHTML = '<span style="color:#dc2626;">Footprint too small — needs at least 1 crate module (1.97 ft &times; 3.94 ft).</span>';
+        } else {
+            display.textContent = `${snappedWidth.toFixed(3)} ft × ${snappedLength.toFixed(3)} ft  (${cratesWide} × ${cratesLong} = ${cratesWide * cratesLong} crates per layer)`;
+        }
+        return { cratesWide, cratesLong, snappedWidth, snappedLength };
+    }
+
+    function ssSetFootprintMode(mode) {
+        ssFootprintMode = mode;
+        document.getElementById('ss_rectFootprintSection').style.display = mode === 'rect' ? '' : 'none';
+        document.getElementById('ss_complexFootprintSection').style.display = mode === 'complex' ? '' : 'none';
+        document.getElementById('ss_modeRectBtn').className = mode === 'rect' ? 'calc-btn' : 'calc-btn secondary';
+        document.getElementById('ss_modeComplexBtn').className = mode === 'complex' ? 'calc-btn' : 'calc-btn secondary';
+        if (mode === 'complex') ssUpdateComplexFootprintDisplay();
+    }
+
+    function ssComputeComplexFootprint() {
+        const scaledArea = ssNum('ss_complexScaledArea');
+        const knownDim   = ssNum('ss_complexKnownDim');
+        const tankPerim  = ssNum('ss_complexTankPerim');
+
+        if (scaledArea <= 0) return { error: 'Enter a valid scaled tank footprint area.' };
+        if (knownDim <= 0)   return { error: 'Enter a valid known width or length.' };
+        if (tankPerim <= 0)  return { error: 'Enter the scaled tank perimeter.' };
+
+        const otherDim = scaledArea / knownDim;
+        const cratesKnown = Math.floor(knownDim / SS_MODULE_WID);
+        const cratesOther = Math.floor(otherDim / SS_MODULE_LEN);
+        if (cratesKnown <= 0 || cratesOther <= 0) {
+            return { error: 'Scaled footprint is too small to fit a whole crate in one or both directions — check the known dimension and area.' };
+        }
+        const snappedKnown = cratesKnown * SS_MODULE_WID;
+        const snappedOther = cratesOther * SS_MODULE_LEN;
+        const grossArea = snappedKnown * snappedOther;
+
+        return { scaledArea, knownDim, tankPerim, otherDim, cratesKnown, cratesOther, snappedKnown, snappedOther, grossArea };
+    }
+
+    function ssUpdateComplexFootprintDisplay() {
+        const geo = ssComputeComplexFootprint();
+        const display = document.getElementById('ss_complexFootprintDisplay');
+        if (geo.error) {
+            display.innerHTML = `<span style="color:#dc2626;">${geo.error}</span>`;
+            return geo;
+        }
+        display.innerHTML =
+            `Derived other dimension: <strong>${geo.otherDim.toFixed(2)} ft</strong>` +
+            `&nbsp;&nbsp;→&nbsp;&nbsp;snapped <strong>${geo.snappedKnown.toFixed(3)} ft × ${geo.snappedOther.toFixed(3)} ft</strong>` +
+            `<br>${geo.cratesKnown} × ${geo.cratesOther} = ${geo.cratesKnown * geo.cratesOther} crates/layer` +
+            `&nbsp;&nbsp;|&nbsp;&nbsp;Gross Snapped Area: ${geo.grossArea.toFixed(1)} ft²`;
+        return geo;
+    }
+
+    function ssUpdateTankHeightFromLayers() {
+        const cfg = document.getElementById('ss_cfg').value;
+        const layers = parseInt(document.getElementById('ss_layers').value, 10);
+        const heights = SS_LAYER_HEIGHTS[cfg] || SS_LAYER_HEIGHTS.SC;
+        const idx = Math.max(1, Math.min(8, layers)) - 1;
+        document.getElementById('ss_tankHeight').value = heights[idx];
+    }
+
+    function ssApplyConfigDefault() {
+        const cfg = document.getElementById('ss_cfg').value;
+        const voidField = document.getElementById('ss_crateVoid');
+        if (cfg === 'SC') voidField.value = 0.95486;
+        else if (cfg === 'EX') voidField.value = 0.92633;
+        ssUpdateTankHeightFromLayers();
+    }
+
+    function ssResetForm() {
+        document.getElementById('ss_cfg').value = 'SC';
+        document.getElementById('ss_layers').value = '2';
+        document.getElementById('ss_knownWidth').value = 20;
+        document.getElementById('ss_knownLength').value = 40;
+        ssUpdateSnappedDims();
+        ssUpdateTankHeightFromLayers();
+        document.getElementById('ss_crateVoid').value = 0.95486;
+        ssSetFootprintMode('rect');
+        document.getElementById('ss_complexScaledArea').value = 2500;
+        document.getElementById('ss_complexKnownDim').value = 50;
+        document.getElementById('ss_complexTankPerim').value = 220;
+        document.getElementById('ss_complexExcavArea').value = '';
+        document.getElementById('ss_complexExcavPerim').value = '';
+        document.getElementById('ss_tankBottomElev').value = 100.00;
+        document.getElementById('ss_surfaceElev').value = '';
+        document.getElementById('ss_baseDepth').value = 0.333;
+        document.getElementById('ss_baseInclude').checked = true;
+        document.getElementById('ss_coverDepth').value = 1.0;
+        document.getElementById('ss_coverInclude').checked = true;
+        document.getElementById('ss_perimWidth').value = 1.0;
+        document.getElementById('ss_perimInclude').checked = true;
+        document.getElementById('ss_stoneVoid').value = 0.40;
+        document.getElementById('ss_stageIncrementIn').value = 3;
+        ssHideError();
+        document.getElementById('ss_csvBtn').disabled = true;
+        document.getElementById('ss_results').innerHTML = '<div class="empty-state">Set your inputs and click Calculate Stage-Storage to generate the table and curve.</div>';
+        ssLastCalc = null;
+    }
+
+    function ssCalculate() {
+        ssHideError();
+
+        const cfg         = document.getElementById('ss_cfg').value;
+        const layers      = parseInt(document.getElementById('ss_layers').value, 10);
+        const tankHeight  = ssNum('ss_tankHeight');
+        const crateVoid   = ssNum('ss_crateVoid');
+        const tankBottomElev = ssNum('ss_tankBottomElev');
+        const surfaceElevRaw = document.getElementById('ss_surfaceElev').value;
+        const surfaceElev = surfaceElevRaw === '' ? null : parseFloat(surfaceElevRaw);
+
+        const baseDepth   = ssNum('ss_baseDepth');
+        const baseIncl    = document.getElementById('ss_baseInclude').checked;
+        const coverDepth  = ssNum('ss_coverDepth');
+        const coverIncl   = document.getElementById('ss_coverInclude').checked;
+        const perimWidth  = ssNum('ss_perimWidth');
+        const perimIncl   = document.getElementById('ss_perimInclude').checked;
+        const stoneVoid   = ssNum('ss_stoneVoid');
+        const stageIncrementIn = ssNum('ss_stageIncrementIn');
+
+        let knownWidth = null, knownLength = null, cratesWide = null, cratesLong = null;
+        let tankWidth = null, tankLength = null, tankFootprintArea, excavArea, perimRingArea;
+        let complexGeo = null;
+
+        if (ssFootprintMode === 'rect') {
+            knownWidth  = ssNum('ss_knownWidth');
+            knownLength = ssNum('ss_knownLength');
+            const snap = ssUpdateSnappedDims();
+            cratesWide = snap.cratesWide;
+            cratesLong = snap.cratesLong;
+            tankWidth  = snap.snappedWidth;
+            tankLength = snap.snappedLength;
+
+            if (knownWidth <= 0)  { ssShowError('Known footprint width must be greater than 0.'); return; }
+            if (knownLength <= 0) { ssShowError('Known footprint length must be greater than 0.'); return; }
+            if (cratesWide <= 0 || cratesLong <= 0) { ssShowError('Known footprint is too small to fit a whole AquaCell crate (minimum 1.97 ft × 3.94 ft) — increase the known width/length.'); return; }
+
+            tankFootprintArea = tankWidth * tankLength;
+            const excavWidth  = tankWidth  + 2 * perimWidth;
+            const excavLength = tankLength + 2 * perimWidth;
+            excavArea = excavWidth * excavLength;
+            perimRingArea = Math.max(0, excavArea - tankFootprintArea);
+        } else {
+            const geo = ssComputeComplexFootprint();
+            if (geo.error) { ssShowError(geo.error); return; }
+            ssUpdateComplexFootprintDisplay();
+
+            tankFootprintArea = geo.grossArea;
+
+            const excavAreaInput  = ssNum('ss_complexExcavArea');
+            const excavPerimInput = ssNum('ss_complexExcavPerim');
+            let excavAreaComplex = excavAreaInput > 0
+                ? excavAreaInput
+                : (geo.snappedKnown + 2 * perimWidth) * (geo.snappedOther + 2 * perimWidth);
+            let excavPerimComplex = excavPerimInput > 0
+                ? excavPerimInput
+                : geo.tankPerim + 8 * perimWidth;
+
+            excavArea = excavAreaComplex;
+            perimRingArea = Math.max(0, excavArea - tankFootprintArea);
+
+            complexGeo = { ...geo, excavAreaComplex, excavPerimComplex,
+                excavAreaAuto: !(excavAreaInput > 0), excavPerimAuto: !(excavPerimInput > 0) };
+        }
+
+        const errs = [];
+        if (tankHeight <= 0) errs.push('Tank height must be greater than 0.');
+        if (crateVoid <= 0 || crateVoid > 1) errs.push('Crate void ratio must be between 0 and 1.');
+        if (stoneVoid < 0 || stoneVoid > 1) errs.push('Stone void ratio must be between 0 and 1.');
+        if (baseDepth < 0)  errs.push('Base stone depth cannot be negative.');
+        if (coverDepth < 0) errs.push('Cover stone depth cannot be negative.');
+        if (perimWidth < 0) errs.push('Perimeter stone width cannot be negative.');
+        if (stageIncrementIn <= 0) errs.push('Stage table increment must be greater than 0.');
+        if (errs.length) { ssShowError(errs.join(' ')); return; }
+
+        const tankStorageTotal   = tankFootprintArea * tankHeight * crateVoid;
+        const baseStoneGross     = excavArea * baseDepth;
+        const baseStoneNetFull   = baseStoneGross * stoneVoid;
+        const coverStoneGross    = excavArea * coverDepth;
+        const coverStoneNetFull  = coverStoneGross * stoneVoid;
+        const perimStoneGross    = perimRingArea * tankHeight;
+        const perimStoneNetFull  = perimStoneGross * stoneVoid;
+
+        const baseStoneNet  = baseIncl  ? baseStoneNetFull  : 0;
+        const coverStoneNet = coverIncl ? coverStoneNetFull : 0;
+        const perimStoneNet = perimIncl ? perimStoneNetFull : 0;
+
+        const stoneStorageTotal = baseStoneNet + coverStoneNet + perimStoneNet;
+        const grandTotalStorage = tankStorageTotal + stoneStorageTotal;
+
+        const totalSystemDepth = baseDepth + tankHeight + coverDepth;
+        const elevBaseStart = tankBottomElev - baseDepth;
+        const elevTankTop   = tankBottomElev + tankHeight;
+        const elevCoverTop  = elevTankTop + coverDepth;
+
+        const incFt = stageIncrementIn / 12.0;
+        const rows = [];
+        let elev = elevBaseStart;
+        const EPS = 1e-6;
+        while (elev <= elevCoverTop + 0.0001) {
+            let baseVol, tankVol, perimVol, coverVol;
+            if (elev <= tankBottomElev - EPS) {
+                const depthIntoBase = Math.max(0, elev - elevBaseStart);
+                baseVol  = baseDepth > 0 ? Math.min(1, depthIntoBase / baseDepth) * baseStoneNet : 0;
+                tankVol  = 0; perimVol = 0; coverVol = 0;
+            } else if (elev <= elevTankTop + EPS) {
+                baseVol = baseStoneNet;
+                const depthIntoTank = Math.max(0, Math.min(tankHeight, elev - tankBottomElev));
+                const ratio = tankHeight > 0 ? depthIntoTank / tankHeight : 0;
+                tankVol  = ratio * tankStorageTotal;
+                perimVol = ratio * perimStoneNet;
+                coverVol = 0;
+            } else {
+                baseVol  = baseStoneNet; tankVol  = tankStorageTotal; perimVol = perimStoneNet;
+                const depthIntoCover = Math.max(0, elev - elevTankTop);
+                coverVol = coverDepth > 0 ? Math.min(1, depthIntoCover / coverDepth) * coverStoneNet : 0;
+            }
+            const stoneVol = baseVol + perimVol + coverVol;
+            const totalVol = tankVol + stoneVol;
+            rows.push({
+                elev: Math.round(elev * 1000) / 1000,
+                tank: Math.round(tankVol * 10) / 10,
+                stone: Math.round(stoneVol * 10) / 10,
+                total: Math.round(totalVol * 10) / 10
+            });
+            elev += incFt;
+        }
+        const lastRowElev = rows.length ? rows[rows.length - 1].elev : null;
+        if (lastRowElev === null || Math.abs(lastRowElev - elevCoverTop) > 0.001) {
+            rows.push({
+                elev: Math.round(elevCoverTop * 1000) / 1000,
+                tank: Math.round(tankStorageTotal * 10) / 10,
+                stone: Math.round(stoneStorageTotal * 10) / 10,
+                total: Math.round(grandTotalStorage * 10) / 10
+            });
+        }
+
+        ssLastCalc = {
+            inputs: { cfg, layers, footprintMode: ssFootprintMode, knownWidth, knownLength, cratesWide, cratesLong,
+                tankWidth, tankLength, tankHeight, crateVoid, tankBottomElev, surfaceElev,
+                baseDepth, baseIncl, coverDepth, coverIncl, perimWidth, perimIncl, stoneVoid, stageIncrementIn },
+            complexGeo, excavArea, tankFootprint: tankFootprintArea, perimRingArea,
+            tankStorageTotal, baseStoneNet, coverStoneNet, perimStoneNet, stoneStorageTotal, grandTotalStorage,
+            totalSystemDepth, elevBaseStart, elevTankTop, elevCoverTop, rows
+        };
+
+        ssRenderResults(ssLastCalc);
+    }
+
+    function ssRenderResults(calc) {
+        const cover = calc.inputs.surfaceElev !== null
+            ? Math.round((calc.inputs.surfaceElev - calc.elevTankTop) * 100) / 100
+            : null;
+
+        const stats = [
+            ['Configuration', calc.inputs.cfg === 'SC' ? 'SC — Standard' : 'EX — Extra Strong'],
+            ['Layers', String(calc.inputs.layers)],
+        ];
+        if (calc.inputs.footprintMode === 'rect') {
+            stats.push(['Known Footprint (entered)', ssFmt(calc.inputs.knownWidth, 2) + ' × ' + ssFmt(calc.inputs.knownLength, 2) + ' ft']);
+            stats.push(['Snapped AquaCell Footprint (used)', ssFmt(calc.inputs.tankWidth, 3) + ' × ' + ssFmt(calc.inputs.tankLength, 3) + ' ft']);
+            stats.push(['Crates per Layer', `${calc.inputs.cratesWide} × ${calc.inputs.cratesLong} = ${calc.inputs.cratesWide * calc.inputs.cratesLong}`]);
+        } else {
+            const g = calc.complexGeo;
+            stats.push(['Footprint Mode', 'Complex Shape (scaled area method)']);
+            stats.push(['Scaled Area ÷ Known Dim', ssFmt(g.scaledArea, 1) + ' ft² ÷ ' + ssFmt(g.knownDim, 2) + ' ft = ' + ssFmt(g.otherDim, 2) + ' ft']);
+            stats.push(['Snapped Footprint (used)', ssFmt(g.snappedKnown, 3) + ' × ' + ssFmt(g.snappedOther, 3) + ' ft']);
+            stats.push(['Crates per Layer', `${g.cratesKnown} × ${g.cratesOther} = ${g.cratesKnown * g.cratesOther}`]);
+            stats.push(['Scaled Tank Perimeter (entered)', ssFmt(g.tankPerim, 1) + ' ft']);
+            stats.push(['Excavation Area' + (g.excavAreaAuto ? ' (auto-estimated)' : ' (entered)'), ssFmt(g.excavAreaComplex, 1) + ' ft²']);
+            stats.push(['Excavation Perimeter' + (g.excavPerimAuto ? ' (auto-estimated)' : ' (entered)'), ssFmt(g.excavPerimComplex, 1) + ' ft']);
+        }
+        stats.push(
+            ['Excavation Area', ssFmt(calc.excavArea, 1) + ' ft²'],
+            ['Tank Footprint', ssFmt(calc.tankFootprint, 1) + ' ft²'],
+            ['Perimeter Ring Area', ssFmt(calc.perimRingArea, 1) + ' ft²'],
+            ['Tank Storage', ssFmt(calc.tankStorageTotal, 1) + ' ft³'],
+            ['Base Stone Storage', ssFmt(calc.baseStoneNet, 1) + ' ft³' + (calc.inputs.baseIncl ? '' : ' (excluded)')],
+            ['Perimeter Stone Storage', ssFmt(calc.perimStoneNet, 1) + ' ft³' + (calc.inputs.perimIncl ? '' : ' (excluded)')],
+            ['Cover Stone Storage', ssFmt(calc.coverStoneNet, 1) + ' ft³' + (calc.inputs.coverIncl ? '' : ' (excluded)')],
+            ['Total Stone Storage', ssFmt(calc.stoneStorageTotal, 1) + ' ft³'],
+            ['Grand Total Storage', ssFmt(calc.grandTotalStorage, 1) + ' ft³'],
+            ['Total System Depth', ssFmt(calc.totalSystemDepth, 2) + ' ft'],
+            ['Bottom of Base Stone Elev.', ssFmt(calc.elevBaseStart, 2) + ' ft'],
+            ['Top of Tank Elev.', ssFmt(calc.elevTankTop, 2) + ' ft'],
+            ['Top of Stone (Surface of Storage) Elev.', ssFmt(calc.elevCoverTop, 2) + ' ft'],
+        );
+        if (cover !== null) stats.push(['Cover Depth Over Tank', ssFmt(cover, 2) + ' ft']);
+
+        const statRows = stats.map(([label, value]) =>
+            `<div class="result-row"><span>${label}</span><span class="val">${value}</span></div>`
+        ).join('');
+
+        const tableRows = calc.rows.map(r =>
+            `<tr><td>${ssFmt(r.elev, 2)}</td><td>${ssFmt(r.tank, 1)}</td><td>${ssFmt(r.stone, 1)}</td><td style="font-weight:bold;color:var(--accent);">${ssFmt(r.total, 1)}</td></tr>`
+        ).join('');
+
+        document.getElementById('ss_results').innerHTML = `
+            <div class="result-card">
+                <h3>Summary</h3>
+                ${statRows}
+            </div>
+            <div class="result-card">
+                <h3>Stage-Storage Volume Curve</h3>
+                <div style="position:relative; height:340px;"><canvas id="ss_chart"></canvas></div>
+            </div>
+            <div class="result-card">
+                <h3>Stage-Storage Table</h3>
+                <div class="ss-table-scroll">
+                    <table class="ss-table">
+                        <thead><tr><th>Elevation (ft)</th><th>Tank Storage (ft³)</th><th>Stone Storage (ft³)</th><th>Total Storage (ft³)</th></tr></thead>
+                        <tbody>${tableRows}</tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('ss_csvBtn').disabled = false;
+        ssRenderChart(calc.rows);
+    }
+
+    function ssRenderChart(rows) {
+        function draw() {
+            const isDark  = document.documentElement.getAttribute('data-theme') === 'dark';
+            const gridClr = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+            const lblClr  = isDark ? '#94a3b8' : '#64748b';
+            const ctx = document.getElementById('ss_chart').getContext('2d');
+            if (ssChartInstance) ssChartInstance.destroy();
+            ssChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [
+                        { label: 'Total Storage', data: rows.map(r => ({ x: r.total, y: r.elev })),
+                          borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.08)', borderWidth: 2.5, pointRadius: 0, tension: 0, fill: true },
+                        { label: 'Tank Storage', data: rows.map(r => ({ x: r.tank, y: r.elev })),
+                          borderColor: '#3b82f6', borderWidth: 1.5, borderDash: [5,3], pointRadius: 0, tension: 0 },
+                        { label: 'Stone Storage', data: rows.map(r => ({ x: r.stone, y: r.elev })),
+                          borderColor: '#10b981', borderWidth: 1.5, borderDash: [2,3], pointRadius: 0, tension: 0 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, parsing: false,
+                    scales: {
+                        x: { type: 'linear', title: { display: true, text: 'Storage Volume (ft³)', color: lblClr }, grid: { color: gridClr }, ticks: { color: lblClr } },
+                        y: { type: 'linear', title: { display: true, text: 'Elevation (ft)', color: lblClr }, grid: { color: gridClr }, ticks: { color: lblClr } }
+                    },
+                    plugins: { legend: { position: 'bottom', labels: { color: lblClr } } }
+                }
+            });
+        }
+        if (typeof Chart !== 'undefined') {
+            draw();
+        } else {
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+            s.onload = draw;
+            document.head.appendChild(s);
+        }
+    }
+
+    function ssExportCSV() {
+        if (!ssLastCalc) return;
+        const c = ssLastCalc;
+        const lines = [];
+        lines.push('# AquaCell Stage-Storage Table');
+        lines.push(`# Generated: ${new Date().toLocaleString()}`);
+        lines.push(`# Configuration: ${c.inputs.cfg}  |  Layers: ${c.inputs.layers}`);
+        if (c.inputs.footprintMode === 'rect') {
+            lines.push(`# Footprint Mode: Rectangular`);
+            lines.push(`# Known Footprint (entered): ${c.inputs.knownWidth} ft x ${c.inputs.knownLength} ft`);
+            lines.push(`# Snapped AquaCell Footprint (used for calc): ${c.inputs.tankWidth.toFixed(3)} ft x ${c.inputs.tankLength.toFixed(3)} ft  (${c.inputs.cratesWide} x ${c.inputs.cratesLong} = ${c.inputs.cratesWide * c.inputs.cratesLong} crates/layer)`);
+        } else {
+            const g = c.complexGeo;
+            lines.push(`# Footprint Mode: Complex Shape (scaled area method)`);
+            lines.push(`# Scaled Area: ${g.scaledArea} ft2  |  Known Dim: ${g.knownDim} ft  |  Derived Other Dim: ${g.otherDim.toFixed(2)} ft`);
+            lines.push(`# Snapped Footprint (used for calc): ${g.snappedKnown.toFixed(3)} ft x ${g.snappedOther.toFixed(3)} ft  (${g.cratesKnown} x ${g.cratesOther} = ${g.cratesKnown * g.cratesOther} crates/layer)`);
+            lines.push(`# Scaled Tank Perimeter (entered): ${g.tankPerim} ft`);
+            lines.push(`# Excavation Area: ${g.excavAreaComplex.toFixed(1)} ft2 (${g.excavAreaAuto ? 'auto-estimated' : 'entered'})  |  Excavation Perimeter: ${g.excavPerimComplex.toFixed(1)} ft (${g.excavPerimAuto ? 'auto-estimated' : 'entered'})`);
+        }
+        lines.push(`# Tank Height: ${c.inputs.tankHeight} ft  |  Crate Void Ratio: ${c.inputs.crateVoid}`);
+        lines.push(`# Base Stone: ${c.inputs.baseDepth} ft (${c.inputs.baseIncl ? 'included' : 'excluded'})  |  Cover Stone: ${c.inputs.coverDepth} ft (${c.inputs.coverIncl ? 'included' : 'excluded'})  |  Perimeter Stone Width: ${c.inputs.perimWidth} ft (${c.inputs.perimIncl ? 'included' : 'excluded'})`);
+        lines.push(`# Stone Void Ratio: ${c.inputs.stoneVoid}  |  Stage Increment: ${c.inputs.stageIncrementIn} in`);
+        lines.push(`# Tank Bottom Elev: ${c.inputs.tankBottomElev} ft  |  Excavation Area: ${c.excavArea.toFixed(1)} ft2`);
+        lines.push(`# Tank Storage: ${c.tankStorageTotal.toFixed(1)} ft3  |  Stone Storage (included layers): ${c.stoneStorageTotal.toFixed(1)} ft3  |  Grand Total: ${c.grandTotalStorage.toFixed(1)} ft3`);
+        lines.push('');
+        lines.push('Elevation (ft),Tank Storage (ft3),Stone Storage (ft3),Total Storage (ft3)');
+        c.rows.forEach(r => { lines.push(`${r.elev},${r.tank},${r.stone},${r.total}`); });
+        const csvContent = lines.join('\r\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const ts = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `StageStorage_${ts}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function ssInit() {
+        ssUpdateSnappedDims();
+        ssUpdateTankHeightFromLayers();
+        ssUpdateComplexFootprintDisplay();
+        ssCalculate();
     }
 </script>
 
