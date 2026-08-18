@@ -2938,14 +2938,33 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const canvas = document.getElementById('sheet');
         const includeSchematic = document.getElementById('include_schematic').checked;
         if (includeSchematic && canvas) {
-            const base64Image = canvas.toDataURL('image/png');
+            // WebP, not PNG — tested against a real dense 120x200ft/8-layer schematic:
+            // PNG 221KB vs WebP@0.85 ~105KB (JPEG was actually worse than PNG here —
+            // line-art/flat-color content compresses better losslessly than via JPEG's
+            // DCT). This is a conceptual "not for construction" sheet, so the quality
+            // loss costs nothing visually but keeps large/complex schematics from
+            // pushing the request past Render's body-size limit. Falls back to PNG
+            // automatically in the rare browser without WebP encoding support (spec
+            // behavior of toDataURL) — no explicit fallback needed. Backend already
+            // decodes this generically via ImageReader (Pillow), verified working.
+            const base64Image = canvas.toDataURL('image/webp', 0.85);
             formData.append('schematic_image', base64Image);
         }
 
         const projectName = (document.getElementById('project_name').value || 'Project').trim()
                             .replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
         fetch('/download_pdf', { method: 'POST', body: formData })
-        .then(r => r.blob())
+        .then(r => {
+            // A rejected request (e.g. 413 Payload Too Large from the platform proxy)
+            // still returns a body — without this check it gets saved as a .pdf file
+            // that every PDF viewer reports as corrupted, with no indication why.
+            if (!r.ok) {
+                return r.text().then(text => {
+                    throw new Error(`Server error ${r.status}${r.statusText ? ' (' + r.statusText + ')' : ''}: ${text || 'no details returned'}`);
+                });
+            }
+            return r.blob();
+        })
         .then(blob => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -2955,7 +2974,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             a.click();
             URL.revokeObjectURL(url);
         })
-        .catch(() => alert('PDF download failed. Try Calculate first.'));
+        .catch(err => alert('PDF download failed: ' + err.message));
     }
 
     // ====================== STONE TOGGLE RECALC ======================
