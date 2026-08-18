@@ -443,6 +443,9 @@
         <button class="calc-nav-item" data-calc="stage_storage" onclick="selectCalc('stage_storage')">
             Stage-Storage Calculator
         </button>
+        <button class="calc-nav-item" data-calc="doc_library" onclick="selectCalc('doc_library')">
+            AquaCell Document Library
+        </button>
     </div>
 
     <!-- ══════════════ MAIN: inputs + results, per calculator ══════════════ -->
@@ -1521,6 +1524,32 @@
             </div>
         </div>
 
+        <!-- ── AQUACELL DOCUMENT LIBRARY ── -->
+        <div id="panel-doc_library" class="calc-panel" style="display:none;">
+            <div class="calc-inputs">
+                <div class="disclaimer-box">
+                    Browse spec sheets, cross sections, and installation guides — click a name to view it,
+                    or check multiple and download as one combined PDF. Native CAD source files (.dwg) are
+                    available as ZIP downloads below.
+                </div>
+
+                <div id="dl_groups"><div class="empty-state">Loading document library…</div></div>
+
+                <button class="calc-btn secondary" id="dl_download_btn" onclick="dlDownloadSelected()" disabled>⬇ Download Selected as PDF</button>
+
+                <div class="section-card" style="margin-top:16px;">
+                    <div class="section-card-header">CAD Source Files (.dwg, ZIP)</div>
+                    <div class="section-card-body" id="dl_cad_list">
+                        <div class="empty-state">Loading…</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="calc-results" id="dl_viewer">
+                <div class="empty-state">Click a document name on the left to view it here.</div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -1588,6 +1617,9 @@
         if (name === 'stage_storage' && !ssInitialized) {
             ssInitialized = true;
             ssInit();
+        }
+        if (name === 'doc_library') {
+            dlInit();
         }
     }
 
@@ -4325,6 +4357,126 @@
         } catch (err) {
             soSetStatus('PDF export error: ' + err);
         }
+    }
+
+    // ══════════════ AQUACELL DOCUMENT LIBRARY ══════════════
+    let dlLoaded = false;
+
+    function dlEsc(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function dlInit() {
+        if (dlLoaded) return;
+        dlLoaded = true;
+        fetch('/api/client-details')
+            .then(r => r.json())
+            .then(data => dlRenderGroups(data.groups || []))
+            .catch(err => {
+                document.getElementById('dl_groups').innerHTML = `<div class="error-box">Could not load document library: ${err.message}</div>`;
+            });
+        fetch('/api/client-details/cad-zips')
+            .then(r => r.json())
+            .then(data => dlRenderCadZips(data.files || []))
+            .catch(() => {
+                document.getElementById('dl_cad_list').innerHTML = '<div class="error-box">Could not load CAD files.</div>';
+            });
+    }
+
+    function dlRenderGroups(groups) {
+        const container = document.getElementById('dl_groups');
+        if (!groups.length) {
+            container.innerHTML = '<div class="empty-state">No documents available.</div>';
+            return;
+        }
+        container.innerHTML = groups.map((g, gi) => `
+            <div class="section-card" style="margin-bottom:10px;">
+                <div class="section-card-header" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>${dlEsc(g.category)} (${g.files.length})</span>
+                    <button type="button" class="calc-btn secondary dl-group-toggle" data-gi="${gi}" style="width:auto; margin:0; padding:3px 10px; font-size:11px;">Select all</button>
+                </div>
+                <div class="section-card-body" style="padding:8px 10px;">
+                    ${g.files.map(f => `
+                        <div style="display:flex; align-items:flex-start; gap:8px; padding:5px 0; border-bottom:1px solid var(--border);">
+                            <input type="checkbox" class="dl-file-check" data-group="${gi}" data-filename="${dlEsc(f.filename)}" style="margin-top:3px; width:auto;">
+                            <a href="#" class="dl-file-link" data-filename="${dlEsc(f.filename)}" style="font-size:12.5px; color:var(--text); text-decoration:none; flex:1;">${dlEsc(f.label)}</a>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `).join('');
+
+        container.querySelectorAll('.dl-file-link').forEach(a => {
+            a.addEventListener('click', (e) => { e.preventDefault(); dlView(a.dataset.filename); });
+        });
+        container.querySelectorAll('.dl-file-check').forEach(cb => {
+            cb.addEventListener('change', dlUpdateCount);
+        });
+        container.querySelectorAll('.dl-group-toggle').forEach(btn => {
+            btn.addEventListener('click', () => dlToggleGroup(btn.dataset.gi));
+        });
+        dlUpdateCount();
+    }
+
+    function dlToggleGroup(gi) {
+        const cbs = document.querySelectorAll(`#dl_groups .dl-file-check[data-group="${gi}"]`);
+        const allChecked = [...cbs].every(cb => cb.checked);
+        cbs.forEach(cb => cb.checked = !allChecked);
+        dlUpdateCount();
+    }
+
+    function dlUpdateCount() {
+        const n = document.querySelectorAll('#dl_groups .dl-file-check:checked').length;
+        const btn = document.getElementById('dl_download_btn');
+        btn.disabled = n === 0;
+        btn.textContent = n > 0 ? `⬇ Download Selected as PDF (${n})` : '⬇ Download Selected as PDF';
+    }
+
+    function dlView(filename) {
+        document.getElementById('dl_viewer').innerHTML =
+            `<iframe src="/api/client-details/view/${encodeURIComponent(filename)}" style="width:100%; height:100%; min-height:70vh; border:1px solid var(--border); border-radius:8px; background:#fff;" title="${dlEsc(filename)}"></iframe>`;
+    }
+
+    function dlDownloadSelected() {
+        const selected = [...document.querySelectorAll('#dl_groups .dl-file-check:checked')].map(cb => cb.dataset.filename);
+        if (!selected.length) return;
+        const btn = document.getElementById('dl_download_btn');
+        const orig = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Generating…';
+        fetch('/api/client-details/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files: selected })
+        })
+        .then(r => { if (!r.ok) return r.json().then(d => Promise.reject(d.error || 'Download failed')); return r.blob(); })
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const ts = new Date().toISOString().slice(0, 10);
+            a.download = `AquaCell_Document_Library_${ts}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        })
+        .catch(err => alert('Download failed: ' + err))
+        .finally(() => { btn.disabled = false; dlUpdateCount(); });
+    }
+
+    function dlRenderCadZips(files) {
+        const container = document.getElementById('dl_cad_list');
+        if (!files.length) {
+            container.innerHTML = '<div class="empty-state">No CAD files available.</div>';
+            return;
+        }
+        container.innerHTML = files.map(f => `
+            <a href="/api/client-details/cad-zip/${encodeURIComponent(f.filename)}" class="calc-btn secondary" style="display:block; text-align:left; text-decoration:none; margin-bottom:8px; padding:8px 10px; font-size:12px;">
+                ⬇ ${dlEsc(f.label)}
+            </a>
+        `).join('');
     }
 
     // ══════════════ PT-ROW™ TRANSPARENT SIZING CALCULATOR ══════════════

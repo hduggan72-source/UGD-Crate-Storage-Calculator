@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, send_file, jsonify
 import io
 import json
+import re
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
@@ -7480,6 +7481,182 @@ def download_details_pdf():
     except Exception as exc:
         import traceback
         return jsonify({"error": str(exc), "trace": traceback.format_exc()}), 500
+
+
+# ══════════════════════════════════════════════════════════════════
+#  CLIENT-FACING DOCUMENT LIBRARY — Design Tools "Document Library" tab
+#
+#  Deliberately narrower, allowlisted subset of the Details/ folder for
+#  the external client build. Separate from the internal Detail Sheet
+#  Exporter above (/api/details, /download_details_pdf) — that one stays
+#  unrestricted for internal estimators. Excludes warranty, CSI spec,
+#  marketing trifold, and the not-yet-updated civil sheet doc, per
+#  James's direction 2026-08-17. Every route here validates requested
+#  filenames against this allowlist server-side — the UI only ever
+#  shows this set, but a direct API call must be blocked from reaching
+#  anything outside it too.
+# ══════════════════════════════════════════════════════════════════
+_CLIENT_DOC_CATEGORIES = ['Spec / Detail Sheets', 'Cross Sections', 'Installation Guides']
+
+_CLIENT_DOC_LIBRARY = [
+    # Spec / Detail Sheets
+    ('AQ-100-01.4 AquaCell Acceptable Backfill Materials Table-Layout1.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-02.5 AquaCell Minimum Load Requirements-Layout.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-03.1.3 AquaCell Infiltration Detail-Layout1.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-03.2.3 AquaCell Detention Detail-LINER ONLY.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-03.2.4 AquaCell Detention Detail-Layout1.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-03a.1 AquaCell Detention Detail with Underdrain-Layout1.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-04.3 AquaCell Top Adapter Connection Detail-Layout1.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-05.2 AquaCell 1-5 Layer Stack w. Measurements.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-06.2 AquaCell Vertical Riser Connection Detail (HS-20)-Layout1.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-06.3 AquaCell Vertical Riser Connection Detail (Non-traffic)-Layout1.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-07.2 AquaCell Connections by Pipe Type -Layout1.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-08.2 AquaCell Cover & Burial Depths - SC & EX Models.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-09 AquaCell Pallet Stack Dimensions.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-10.2 AquaCell Large Diameter Pipe Abutment-Layout 2.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-19 Sediment Bag Installation from a Grated Inlet into AquaCell.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-20 Construction Loads Over AquaCell System.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-21.2 AquaCell with Permeable Block Surface - Layout1.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-22 Six-inch PVC Pipe to AquaCell Side Panel Detail.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-23 AquaCell Extra Strong (EX) Crate Measurements-Layout.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-24 AquaCell Min. Pipe Installation Distance from Manhole.pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-26 Roof Drain Connection to AquaCell Layout1 (1).pdf', 'Spec / Detail Sheets'),
+    ('AQ-100-27 AquaCell System with Underdrain 1.30.26.pdf', 'Spec / Detail Sheets'),
+    ('AQ-200-01.4 AquaCell Volume Calculations.pdf', 'Spec / Detail Sheets'),
+    ('AQ-200-02 AquaCell Compatible Pipe Connections.pdf', 'Spec / Detail Sheets'),
+    ('AQ-300-01.1 8 IN. - 12 IN.AQUACELL PIPE CONNECTOR DETAIL.pdf', 'Spec / Detail Sheets'),
+    ('AQ-300-02.1 12 IN. AQUACELL TOP ADAPTER DETAIL-Layout.pdf', 'Spec / Detail Sheets'),
+    ('AQ-300-03.1 16 IN.AQUACELL TOP ADAPTER DETAIL-Layout.pdf', 'Spec / Detail Sheets'),
+    ('AQ-300-05.1 AQUACELL SIDE PLATE DETAIL-Layout.pdf', 'Spec / Detail Sheets'),
+    ('AQ-300-06.1 AQUACELL BOTTOM PLATE DETAIL-Layout.pdf', 'Spec / Detail Sheets'),
+    ('AQ-300-07.1 AQUACELL BASE UNIT DETAIL-Layout.pdf', 'Spec / Detail Sheets'),
+    ('AQ-300-08.1 AQUACELL SC FULL UNIT DETAIL-Layout.pdf', 'Spec / Detail Sheets'),
+    ('AQ-300-15.1 AQUACELL EX DOUBLE STACK FULL UNIT DETAIL-Layout.pdf', 'Spec / Detail Sheets'),
+    # Cross Sections
+    ('AQ-100-11.2 AquaCell SC-1 Layer Cross Section.pdf', 'Cross Sections'),
+    ('AQ-100-12.2 AquaCell SC-2 Layer Cross Section.pdf', 'Cross Sections'),
+    ('AQ-100-13.2 AquaCell SC-3 Layer Cross Section.pdf', 'Cross Sections'),
+    ('AQ-100-14.2 AquaCell SC-4 Layer Cross Section.pdf', 'Cross Sections'),
+    ('AQ-100-15.2 AquaCell SC-5 Layer Cross Section.pdf', 'Cross Sections'),
+    ('AQ-100-16.1 AquaCell SD-6 Layer Cross Section Layout1 (1).pdf', 'Cross Sections'),
+    ('AQ-100-17.2 AquaCell SC-7 Layer Cross Section.pdf', 'Cross Sections'),
+    ('AQ-100-18.2 AquaCell SC-8 Layer Cross Section.pdf', 'Cross Sections'),
+    ('AquaCell SC-1 thru SC-8 Cross Sections 12.12.25.pdf', 'Cross Sections'),
+    # Installation Guides
+    ('AQ-100-25.3 AquaCell PT-ROW™ Installation Guidance.pdf', 'Installation Guides'),
+    ('Loading and Unloading Guide for Wavin AquaCell Stormwater Products V.1.pdf', 'Installation Guides'),
+    ('PT-ROW™ Technical Note - Woven Fabric 9.26.25.pdf', 'Installation Guides'),
+    ('Wavin AquaCell PT-ROW™ Sizing and Design Guidance.pdf', 'Installation Guides'),
+    ('Wavin Standard Maintenance Recommendation Letter 1.19.26.pdf', 'Installation Guides'),
+    ('WA_Aquacell-Installation-Guide_digital_10.25.pdf', 'Installation Guides'),
+]
+_CLIENT_DOC_FILENAMES = {f for f, _ in _CLIENT_DOC_LIBRARY}
+
+
+def _client_doc_friendly_name(filename):
+    name = re.sub(r'\.pdf$', '', filename, flags=re.IGNORECASE)
+    name = re.sub(r'-?\s*Layout\d*(\s*\(\d+\))?$', '', name, flags=re.IGNORECASE)
+    name = re.sub(r'\s{2,}', ' ', name).strip()
+    return name
+
+
+@app.route('/api/client-details')
+def api_client_details():
+    """Curated, categorized document list for the client-facing library tab."""
+    groups = []
+    for cat in _CLIENT_DOC_CATEGORIES:
+        files = [{'filename': f, 'label': _client_doc_friendly_name(f)}
+                 for f, c in _CLIENT_DOC_LIBRARY if c == cat]
+        if files:
+            groups.append({'category': cat, 'files': files})
+    return jsonify({'groups': groups})
+
+
+@app.route('/api/client-details/view/<path:filename>')
+def api_client_details_view(filename):
+    """Stream one allowlisted PDF inline (for the in-page viewer)."""
+    if filename not in _CLIENT_DOC_FILENAMES:
+        return jsonify({'error': 'Document not found.'}), 404
+    raw_url = (
+        f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}"
+        f"/{GITHUB_BRANCH}/{GITHUB_FOLDER}/{filename}"
+    )
+    try:
+        r = requests.get(raw_url, timeout=20, headers=_github_headers())
+        r.raise_for_status()
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 502
+    return send_file(BytesIO(r.content), mimetype='application/pdf',
+                      as_attachment=False, download_name=filename)
+
+
+@app.route('/api/client-details/download', methods=['POST'])
+def api_client_details_download():
+    """Merge selected allowlisted PDFs into one download."""
+    try:
+        data = request.get_json(force=True)
+        selected = data.get('files', [])
+        if not selected:
+            return jsonify({'error': 'No files selected'}), 400
+        invalid = [f for f in selected if f not in _CLIENT_DOC_FILENAMES]
+        if invalid:
+            return jsonify({'error': f'Unknown document(s): {", ".join(invalid)}'}), 400
+
+        base_raw = (
+            f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}"
+            f"/{GITHUB_BRANCH}/{GITHUB_FOLDER}/"
+        )
+        writer = PdfWriter()
+        for filename in selected:
+            r = requests.get(base_raw + filename, timeout=30, headers=_github_headers())
+            r.raise_for_status()
+            reader = PyPdfReader(BytesIO(r.content))
+            for page in reader.pages:
+                writer.add_page(page)
+
+        output = BytesIO()
+        writer.write(output)
+        output.seek(0)
+        date_str = datetime.datetime.now().strftime("%m%d%Y")
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name=f"AquaCell_Document_Library_{date_str}.pdf",
+            mimetype="application/pdf"
+        )
+    except Exception as exc:
+        import traceback
+        return jsonify({"error": str(exc), "trace": traceback.format_exc()}), 500
+
+
+_CLIENT_CAD_ZIPS = [
+    ('AquaCell SC-1 thru SC-8 Layer Cross Sections.zip', 'Cross Sections (8 DWG files)'),
+    ('AquaCell Standard Details_August_2026.zip', 'Standard Details (DWG files)'),
+]
+_CLIENT_CAD_ZIP_FILENAMES = {f for f, _ in _CLIENT_CAD_ZIPS}
+
+
+@app.route('/api/client-details/cad-zips')
+def api_client_cad_zips():
+    return jsonify({'files': [{'filename': f, 'label': label} for f, label in _CLIENT_CAD_ZIPS]})
+
+
+@app.route('/api/client-details/cad-zip/<path:filename>')
+def api_client_cad_zip_download(filename):
+    """Passthrough download of an allowlisted CAD source ZIP."""
+    if filename not in _CLIENT_CAD_ZIP_FILENAMES:
+        return jsonify({'error': 'File not found.'}), 404
+    raw_url = (
+        f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}"
+        f"/{GITHUB_BRANCH}/{GITHUB_FOLDER}/{filename}"
+    )
+    try:
+        r = requests.get(raw_url, timeout=60, headers=_github_headers())
+        r.raise_for_status()
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 502
+    return send_file(BytesIO(r.content), mimetype='application/zip',
+                      as_attachment=True, download_name=filename)
 
 
 if __name__ == '__main__':
