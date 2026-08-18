@@ -1514,9 +1514,18 @@
                     </div>
                 </div>
 
+                <div class="section-card">
+                    <div class="section-card-header">Project (optional — for PDF header)</div>
+                    <div class="section-card-body">
+                        <label>Project Name</label>
+                        <input type="text" id="ss_project_name" placeholder="e.g. Maple Ridge Retail Site">
+                    </div>
+                </div>
+
                 <button class="calc-btn" onclick="ssCalculate()">Calculate Stage-Storage</button>
                 <button class="calc-btn secondary" onclick="ssResetForm()">Reset to Defaults</button>
                 <button class="calc-btn secondary" id="ss_csvBtn" onclick="ssExportCSV()" disabled>Export CSV</button>
+                <button class="calc-btn secondary" id="ss_pdfBtn" onclick="ssDownloadPDF()" disabled>⬇ Download Submittal PDF</button>
             </div>
 
             <div class="calc-results" id="ss_results">
@@ -4782,6 +4791,7 @@
         document.getElementById('ss_stageIncrementIn').value = 3;
         ssHideError();
         document.getElementById('ss_csvBtn').disabled = true;
+        document.getElementById('ss_pdfBtn').disabled = true;
         document.getElementById('ss_results').innerHTML = '<div class="empty-state">Set your inputs and click Calculate Stage-Storage to generate the table and curve.</div>';
         ssLastCalc = null;
     }
@@ -5004,6 +5014,7 @@
         `;
 
         document.getElementById('ss_csvBtn').disabled = false;
+        document.getElementById('ss_pdfBtn').disabled = false;
         ssRenderChart(calc.rows);
     }
 
@@ -5078,12 +5089,50 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         const ts = new Date().toISOString().slice(0, 10);
+        const cleanProj = (document.getElementById('ss_project_name').value || '')
+            .trim().replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_')
+            .replace(/_+/g, '_').replace(/^_+|_+$/g, '');
         a.href = url;
-        a.download = `StageStorage_${ts}.csv`;
+        a.download = cleanProj ? `StageStorage_${cleanProj}_${ts}.csv` : `StageStorage_${ts}.csv`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    }
+
+    async function ssDownloadPDF() {
+        if (!ssLastCalc) return;
+        const projectName = document.getElementById('ss_project_name').value || null;
+        const btn = document.getElementById('ss_pdfBtn');
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Generating…';
+        try {
+            const resp = await fetch('/design-tools/download_pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calc_type: 'stage_storage', inputs: ssLastCalc, project_name: projectName })
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                alert(err.error || 'PDF generation failed.');
+                return;
+            }
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = acPdfName('AquaCell_Stage_Storage', projectName);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('PDF generation failed: ' + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
     }
 
     function ssInit() {

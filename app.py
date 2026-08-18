@@ -4897,6 +4897,166 @@ def build_pt_row_pdf(inputs, results, project_name=None):
 
 
 # ══════════════════════════════════════════════════════════════════
+#  PDF BUILDER — Stage-Storage Calculator
+#
+#  Stage-Storage is 100% client-side by design (no backend dependency —
+#  see the original standalone-tool spec). Unlike every other Design
+#  Tools PDF, this one does NOT recompute from raw inputs server-side:
+#  the browser sends its already-computed result object (ssLastCalc)
+#  directly and this just formats it. The full elevation-by-elevation
+#  table stays on the Export CSV button — this sheet is summary-only,
+#  matching the one-page density of every other submittal PDF here.
+# ══════════════════════════════════════════════════════════════════
+_STAGE_STORAGE_DISCLAIMER_TEXT = (
+    "DISCLAIMER: This calculator provides preliminary, conceptual estimates only and is not a "
+    "stamped engineering design. Base, cover, and perimeter stone depths/widths, void ratios, and "
+    "tank geometry are all independently adjustable inputs — verify every value against "
+    "project-specific plans. The full elevation-by-elevation stage-storage table is available via "
+    "the Export CSV button in the dashboard, not reproduced on this sheet. THE ENGINEER OF RECORD "
+    "IS SOLELY RESPONSIBLE FOR CONFIRMING ALL DESIGN PARAMETERS, SITE CONDITIONS, AND FINAL "
+    "STORAGE VOLUMES."
+)
+_STAGE_STORAGE_BOLD_TRIGGERS = ('THE ENGINEER OF RECORD',)
+
+
+def build_stage_storage_pdf(calc, project_name=None):
+    """Single-page submittal-ready PDF for the Stage-Storage Calculator.
+
+    `calc` is the client's already-computed ssLastCalc object (inputs +
+    results), not raw form inputs — see module docstring above.
+    """
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
+
+    band_h = 64
+    c.setFillColor(NAVY)
+    c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
+    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    if logo_path and os.path.exists(logo_path):
+        try:
+            img = ImageReader(logo_path)
+            c.drawImage(img, LM, PH - band_h + 8, width=160, height=46,
+                        preserveAspectRatio=True, mask='auto')
+        except Exception:
+            pass
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 14)
+    c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
+    c.setFont('Helvetica', 9)
+    c.setFillColor(colors.HexColor('#93c5fd'))
+    c.drawRightString(PW - RM, PH - 37, 'Stage-Storage Calculator')
+    c.setFont('Helvetica', 7)
+    c.setFillColor(colors.HexColor('#94a3b8'))
+    c.drawRightString(PW - RM, PH - 50, generated_str)
+
+    y = PH - band_h - 10
+    if project_name:
+        c.setFillColor(GRAY)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM, y, f'Project: {project_name}')
+        y -= 16
+
+    inputs = calc.get('inputs', {}) or {}
+    cfg = inputs.get('cfg', 'SC')
+    footprint_mode = inputs.get('footprintMode', 'rect')
+
+    if footprint_mode == 'rect':
+        footprint_str = (
+            f"{float(inputs.get('tankWidth', 0) or 0):.3f} x {float(inputs.get('tankLength', 0) or 0):.3f} ft "
+            f"(snapped from {inputs.get('knownWidth', 0)} x {inputs.get('knownLength', 0)} ft)"
+        )
+    else:
+        geo = calc.get('complexGeo', {}) or {}
+        footprint_str = (
+            f"{float(geo.get('snappedKnown', 0) or 0):.3f} x {float(geo.get('snappedOther', 0) or 0):.3f} ft "
+            f"(Complex Shape method)"
+        )
+
+    geom_rows = [
+        ('Configuration', 'SC — Standard' if cfg == 'SC' else 'EX — Extra Strong'),
+        ('Layers', str(inputs.get('layers', ''))),
+        ('AquaCell Footprint', footprint_str),
+        ('Tank Height', f"{inputs.get('tankHeight', 0)} ft"),
+        ('Tank Bottom Elevation', f"{inputs.get('tankBottomElev', 0)} ft"),
+        ('Base Stone', f"{inputs.get('baseDepth', 0)} ft" + ('' if inputs.get('baseIncl') else ' (excluded)')),
+        ('Cover Stone', f"{inputs.get('coverDepth', 0)} ft" + ('' if inputs.get('coverIncl') else ' (excluded)')),
+        ('Perimeter Stone', f"{inputs.get('perimWidth', 0)} ft" + ('' if inputs.get('perimIncl') else ' (excluded)')),
+        ('Stone Void Ratio', str(inputs.get('stoneVoid', ''))),
+        ('Stage Table Increment', f"{inputs.get('stageIncrementIn', 0)} in"),
+    ]
+    y = _draw_section_kv(c, y, 'TANK / CRATE GEOMETRY', geom_rows, ncols=2)
+
+    def _n(key):
+        return float(calc.get(key, 0) or 0)
+
+    result_rows = [
+        ('Tank Storage', f"{_n('tankStorageTotal'):,.1f} ft³"),
+        ('Base Stone Storage', f"{_n('baseStoneNet'):,.1f} ft³"),
+        ('Cover Stone Storage', f"{_n('coverStoneNet'):,.1f} ft³"),
+        ('Perimeter Stone Storage', f"{_n('perimStoneNet'):,.1f} ft³"),
+        ('Total Stone Storage', f"{_n('stoneStorageTotal'):,.1f} ft³"),
+        ('Grand Total Storage', f"{_n('grandTotalStorage'):,.1f} ft³"),
+        ('Total System Depth', f"{_n('totalSystemDepth'):,.2f} ft"),
+        ('Bottom of Base Stone Elev.', f"{_n('elevBaseStart'):,.2f} ft"),
+        ('Top of Tank Elev.', f"{_n('elevTankTop'):,.2f} ft"),
+        ('Top of Stone Elev.', f"{_n('elevCoverTop'):,.2f} ft"),
+    ]
+    y = _draw_section_kv(c, y, 'RESULTS', result_rows, ncols=2)
+
+    note = (
+        f"Full elevation-by-elevation stage-storage table (every {inputs.get('stageIncrementIn', 3)} in) "
+        "is available via the Export CSV button in the dashboard — not reproduced here to keep this "
+        "submittal sheet to one page."
+    )
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+    bar_h = 16
+    c.setFillColor(BLUE)
+    c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 9)
+    c.drawString(LM + 8, y - bar_h + 4, 'STAGE-STORAGE TABLE')
+    note_top = y - bar_h
+    line_h = 10
+    pad = 8
+    max_w = CW - pad * 2
+    words = note.split()
+    lines = []
+    cur = ''
+    for wd in words:
+        test = (cur + ' ' + wd).strip()
+        if stringWidth(test, 'Helvetica', 7.5) <= max_w:
+            cur = test
+        else:
+            if cur:
+                lines.append(cur)
+            cur = wd
+    if cur:
+        lines.append(cur)
+    note_h = len(lines) * line_h + pad * 2
+    note_bottom = note_top - note_h
+    c.setFillColor(LGRAY)
+    c.setStrokeColor(MGRAY)
+    c.setLineWidth(0.5)
+    c.rect(LM, note_bottom, CW, note_h, fill=1, stroke=1)
+    ty = note_top - pad - 6
+    c.setFont('Helvetica', 7.5)
+    c.setFillColor(BLACK)
+    for line in lines:
+        c.drawString(LM + pad, ty, line)
+        ty -= line_h
+    y = note_bottom - 10
+
+    _draw_disclaimer_block(c, 40, disclaimer_lines_raw=_STAGE_STORAGE_DISCLAIMER_TEXT,
+                            bold_triggers=_STAGE_STORAGE_BOLD_TRIGGERS)
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
+# ══════════════════════════════════════════════════════════════════
 #  ROUTE: /design-tools  —  Design Verification Dashboard (page)
 # ══════════════════════════════════════════════════════════════════
 @app.route('/design-tools', methods=['GET'])
@@ -5057,6 +5217,11 @@ def design_tools_download_pdf():
             result = calc_pt_row(payload)
             buffer = build_pt_row_pdf(payload, result, project_name=project_name)
             download_name = 'AquaCell_PT-ROW_Sizing.pdf'
+        elif calc_type == 'stage_storage':
+            # Stage-Storage is client-side by design — payload IS the browser's
+            # already-computed result object, not raw inputs to recompute from.
+            buffer = build_stage_storage_pdf(payload, project_name=project_name)
+            download_name = 'AquaCell_Stage_Storage.pdf'
         else:
             return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
 
