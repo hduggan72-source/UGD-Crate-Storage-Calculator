@@ -429,41 +429,19 @@
     <!-- ══════════════ CALCULATOR PICKER SIDEBAR ══════════════ -->
     <div class="calc-nav">
         <div class="calc-nav-heading">Calculators</div>
-        <button class="calc-nav-item active" data-calc="buoyancy" onclick="selectCalc('buoyancy')">
-            Buoyancy / Uplift
-        </button>
-        <button class="calc-nav-item" data-calc="complex_shape_builder" onclick="selectCalc('complex_shape_builder')">
-            Complex Shape Builder <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
-        </button>
-        <button class="calc-nav-item" data-calc="crate_comparison" onclick="selectCalc('crate_comparison')">
-            Crate Comparison <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
-        </button>
-        <button class="calc-nav-item" data-calc="excavation_slope" onclick="selectCalc('excavation_slope')">
-            Excavation Slope
-        </button>
-        <button class="calc-nav-item" data-calc="loading_outrigger" onclick="selectCalc('loading_outrigger')">
-            Loading Model — Outrigger
-        </button>
-        <button class="calc-nav-item" data-calc="loading_truck" onclick="selectCalc('loading_truck')">
-            Loading Model — Truck (ASTM F2787)
-        </button>
-        <button class="calc-nav-item" data-calc="min_cover_burial" onclick="selectCalc('min_cover_burial')">
+        <!-- Client-facing BETA build: only AquaCell-specific tools an external
+             engineer would use without needing internal crate-dimension lookups.
+             Everything else (generic OSHA/geotechnical formulas, and the Loading
+             Model tools pending further review) stays on Pricing_Engine_v1's
+             internal build — see feat/client-facing-trim. -->
+        <button class="calc-nav-item active" data-calc="min_cover_burial" onclick="selectCalc('min_cover_burial')">
             Min Cover / Burial Depth
-        </button>
-        <button class="calc-nav-item" data-calc="min_distance_structure" onclick="selectCalc('min_distance_structure')">
-            Min Distance from Structure
         </button>
         <button class="calc-nav-item" data-calc="pt_row" onclick="selectCalc('pt_row')">
             PT-ROW™ Sizing Calculator <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
         </button>
-        <button class="calc-nav-item" data-calc="site_overlay" onclick="selectCalc('site_overlay')">
-            Site Overlay <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
-        </button>
         <button class="calc-nav-item" data-calc="stage_storage" onclick="selectCalc('stage_storage')">
             Stage-Storage Calculator
-        </button>
-        <button class="calc-nav-item" data-calc="stepped_backfill" onclick="selectCalc('stepped_backfill')">
-            Stepped Perimeter Backfill
         </button>
     </div>
 
@@ -471,7 +449,7 @@
     <div class="calc-main" id="calcMain">
 
         <!-- ── BUOYANCY CALCULATOR ── -->
-        <div id="panel-buoyancy" class="calc-panel">
+        <div id="panel-buoyancy" class="calc-panel" style="display:none;">
             <div class="calc-inputs">
 
                 <div class="disclaimer-box">
@@ -886,7 +864,7 @@
         </div>
 
         <!-- ── MIN COVER / BURIAL DEPTH ── -->
-        <div id="panel-min_cover_burial" class="calc-panel" style="display:none;">
+        <div id="panel-min_cover_burial" class="calc-panel">
             <div class="calc-inputs">
 
                 <div class="disclaimer-box">
