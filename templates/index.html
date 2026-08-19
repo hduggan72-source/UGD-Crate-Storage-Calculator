@@ -2043,6 +2043,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         // ── Method toggle ──────────────────────────────────────────
                         window.setPtrowMethod = function(m) {
                             _method = m;
+                            window._ptrowMethod = m;
                             var volBtn  = document.getElementById('ptrowMethodVol');
                             var flowBtn = document.getElementById('ptrowMethodFlow');
                             var note    = document.getElementById('ptrowMethodNote');
@@ -2341,6 +2342,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         };
 
                         window._ptrowRows = rows;
+                        window._ptrowFlowRows = flowRows;
 
                         window.recalcPtrow = function() { window.updateOutputs(); };
 
@@ -3974,18 +3976,34 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             ...(linerOnStone ? [`WT Liner on Stone Envelope (sq yd):               ${linerStoneQty}${geoWasteLabel}`] : []),
         ];
 
-        // PT-ROW™ section — only if enabled
+        // PT-ROW™ section — only if enabled. Reads from whichever sizing
+        // method is currently active (Flow-Based uses the separate
+        // window._ptrowFlowRows closure array; Volume-Based uses
+        // window._ptrowRows) — using the wrong one silently prints zeros.
         const ptrowToggle = document.getElementById('ptrowToggle');
-        if (ptrowToggle && ptrowToggle.checked && window._ptrowRows && window._ptrowRows.length > 0) {
-            const CRATE_VOL = {{ results.ptrow_crate_vol if results else 0 }};
+        const ptrowMethod = window._ptrowMethod || 'volume';
+        const ptrowHasVolRows  = window._ptrowRows && window._ptrowRows.length > 0;
+        const ptrowHasFlowRows = window._ptrowFlowRows && window._ptrowFlowRows.length > 0;
+        if (ptrowToggle && ptrowToggle.checked &&
+            ((ptrowMethod === 'flow' && ptrowHasFlowRows) || (ptrowMethod !== 'flow' && ptrowHasVolRows))) {
+            const CRATE_VOL  = {{ results.ptrow_crate_vol if results else 0 }};
+            const FLOW_COEFF = 0.464;
             var ptrowTotal = 0;
             var ptrowLines = ['\n--- PT-ROW™ Pre-Treatment ---'];
-            window._ptrowRows.forEach(function(r) {
-                var ptVol   = r.wqv * r.pct / 100.0;
-                var nCrates = CRATE_VOL > 0 ? Math.ceil(ptVol / CRATE_VOL) : 0;
-                ptrowTotal += nCrates;
-                ptrowLines.push(`  ${r.label}: WQV=${r.wqv} ft³ @ ${r.pct}% → ${Math.round(ptVol*100)/100} ft³ PT vol → ${nCrates} crates`);
-            });
+            if (ptrowMethod === 'flow') {
+                window._ptrowFlowRows.forEach(function(r) {
+                    var nCrates = FLOW_COEFF > 0 ? Math.ceil(r.cfs / FLOW_COEFF) : 0;
+                    ptrowTotal += nCrates;
+                    ptrowLines.push(`  ${r.label}: Q=${r.cfs} CFS ÷ ${FLOW_COEFF} → ${nCrates} crates`);
+                });
+            } else {
+                window._ptrowRows.forEach(function(r) {
+                    var ptVol   = r.wqv * r.pct / 100.0;
+                    var nCrates = CRATE_VOL > 0 ? Math.ceil(ptVol / CRATE_VOL) : 0;
+                    ptrowTotal += nCrates;
+                    ptrowLines.push(`  ${r.label}: WQV=${r.wqv} ft³ @ ${r.pct}% → ${Math.round(ptVol*100)/100} ft³ PT vol → ${nCrates} crates`);
+                });
+            }
             ptrowLines.push(`  TOTAL PT-ROW™ CRATES:                          ${ptrowTotal}`);
             var fabYd2El = document.getElementById('ptrowFabYd2');
             if (fabYd2El && fabYd2El.textContent !== '—') {
