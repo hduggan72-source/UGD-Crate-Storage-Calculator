@@ -39,15 +39,15 @@
         .topbar {
             background: #0f1e3c;
             color: #fff;
-            padding: 0 20px;
+            padding: 10px 20px;
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            height: 60px;
+            flex-direction: column;
+            gap: 10px;
             flex-shrink: 0;
             border-bottom: 2px solid #1a3260;
             z-index: 100;
         }
+        .topbar-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
         .topbar-left { display: flex; align-items: center; gap: 14px; }
         .topbar-left img { height: 38px; }
         .topbar-title { font-size: 17px; font-weight: bold; color: #60a5fa; }
@@ -57,7 +57,49 @@
             padding: 7px 14px; border: none; border-radius: 4px;
             cursor: pointer; font-size: 13px; font-weight: bold;
         }
-       
+        .topbar-btn-stack { display: flex; flex-direction: column; gap: 4px; }
+        .topbar-btn-stack .topbar-btn { padding: 4px 14px; }
+
+        /* ── Top-bar quick-glance dashboard (updates on Calculate System) ── */
+        .topbar-dash { display: flex; gap: 14px; flex-wrap: wrap; }
+        .tb-box {
+            flex: 1; min-width: 260px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 6px;
+            padding: 8px 12px;
+        }
+        .tb-box-title {
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.05em; color: rgba(255,255,255,0.55); margin-bottom: 6px;
+        }
+        .tb-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+        .tb-metric { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+        .tb-label { color: rgba(255,255,255,0.7); }
+        .tb-value { font-weight: 700; color: #fff; }
+        .tb-dash-empty { font-size: 12px; color: rgba(255,255,255,0.5); font-style: italic; padding: 6px 0; }
+
+        /* ── Bottom command bar ── */
+        .bottombar {
+            background: #0f1e3c;
+            border-top: 2px solid #1a3260;
+            flex-shrink: 0;
+            display: flex;
+            gap: 10px;
+            padding: 8px 20px;
+            z-index: 100;
+        }
+        .bottombar-btn {
+            flex: 1;
+            padding: 10px 8px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            text-align: center;
+        }
+
         /* ══ DETAIL SHEET EXPORTER MODAL ══ */
         .details-overlay {
             display: none;
@@ -372,9 +414,10 @@
         .result-card-body.hidden { display: none; }
 
         /* ── Floating scroll buttons ── */
+        /* bottom offset clears the fixed bottom command bar (~64px tall) */
         .float-nav {
             position: fixed;
-            bottom: 24px;
+            bottom: 80px;
             display: flex;
             flex-direction: column;
             gap: 6px;
@@ -554,34 +597,83 @@
 
 <!-- ══════════════ TOP BAR ══════════════ -->
 <div class="topbar">
-    <div class="topbar-left">
-        <img src="/static/aquacell-logo.png" alt="AquaCell Logo" onerror="this.style.display='none';">
-        <div>
-            <div class="topbar-title">AquaCell V14 — Underground Stormwater System Calculator</div>
-            <div class="topbar-sub">This calculator provides preliminary estimates only. The Engineer of Record is responsible for final design and verification.</div>
+    <div class="topbar-row">
+        <div class="topbar-left">
+            <img src="/static/aquacell-logo.png" alt="AquaCell Logo" onerror="this.style.display='none';">
+            <div>
+                <div class="topbar-title">AquaCell Calculator — Internal (Beta)</div>
+                <div class="topbar-sub">This calculator provides preliminary estimates only. The Engineer of Record is responsible for final design and verification.</div>
+            </div>
+        </div>
+        <div class="topbar-actions">
+            <button class="topbar-btn" onclick="newProject()" style="background:#dc3545;color:white;" title="Clear the dashboard and start a fresh project">🆕 New Project</button>
+            <div class="topbar-btn-stack">
+                <button class="topbar-btn" onclick="document.getElementById('importFile').click()" style="background:#ffc107;color:#212529;">Import</button>
+                <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importProject(event)">
+                <button class="topbar-btn" onclick="exportProject()" style="background:#17a2b8;color:white;">Export</button>
+            </div>
+            <a href="/multi" class="topbar-btn" style="background:#0891b2;color:white;text-decoration:none;"
+               onclick="return confirm('Heads up: switching to Multi-Tank will leave this single-tank session. Any unsaved entries here will be lost unless you\'ve exported. Continue?');">
+                🏗️ Multi-Tank
+            </a>
+            <a href="/design-tools" class="topbar-btn" style="background:#7c3aed;color:white;text-decoration:none;"
+               onclick="return confirm('Heads up: switching to Design Tools will leave this session. Any unsaved entries here will be lost unless you\'ve exported. Continue?');">
+                🧮 Design Tools
+            </a>
+            <button id="themeToggle" class="topbar-btn" title="Toggle Theme" style="background:transparent;color:white;font-size:20px;padding:4px 10px;">☀️</button>
         </div>
     </div>
-    <div class="topbar-actions">
-        <button class="topbar-btn" onclick="downloadPDF()" style="background:#28a745;color:white;">⬇ Report</button>
-        <button class="topbar-btn" onclick="downloadQuote()" style="background:#e67e22;color:white;">📄 Quote</button>
-        <button class="topbar-btn" onclick="downloadPriceCSV()" style="background:#0d9488;color:white;">💲 CS Export</button>
-        <button class="topbar-btn" onclick="downloadStageCSV()" style="background:#0891b2;color:white;">📊 Stage CSV</button>
-        <button class="topbar-btn" onclick="downloadStagePNG()" style="background:#28a745;color:white;">📈 Stage PNG</button>
-        <button class="topbar-btn" onclick="openDetailsModal()" style="background:#0f4c81;color:white;border:1px solid #3b82f6;">📋 Details</button>
-        <button class="topbar-btn" onclick="copyToEmail()" style="background:#6f42c1;color:white;">📋 Copy</button>
-        <button class="topbar-btn" onclick="exportProject()" style="background:#17a2b8;color:white;">Export</button>
-        <button class="topbar-btn" onclick="document.getElementById('importFile').click()" style="background:#ffc107;color:#212529;">Import</button>
-        <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importProject(event)">
-        <button class="topbar-btn" onclick="newProject()" style="background:#dc3545;color:white;" title="Clear the dashboard and start a fresh project">🆕 New Project</button>
-        <a href="/multi" class="topbar-btn" style="background:#0891b2;color:white;text-decoration:none;"
-           onclick="return confirm('Heads up: switching to Multi-Tank will leave this single-tank session. Any unsaved entries here will be lost unless you\'ve exported. Continue?');">
-            🏗️ Multi-Tank
-        </a>
-        <a href="/design-tools" class="topbar-btn" style="background:#7c3aed;color:white;text-decoration:none;"
-           onclick="return confirm('Heads up: switching to Design Tools will leave this session. Any unsaved entries here will be lost unless you\'ve exported. Continue?');">
-            🧮 Design Tools
-        </a>
-        <button id="themeToggle" class="topbar-btn" title="Toggle Theme" style="background:transparent;color:white;font-size:20px;padding:4px 10px;">☀️</button>
+
+    <!-- Quick-glance dashboard — mirrors Storage Summary / Cover & Load Verification cards -->
+    <div class="topbar-dash">
+        {% if results %}
+        <div class="tb-box">
+            <div class="tb-box-title">💧 Storage Summary</div>
+            <div class="tb-metrics">
+                {% if results.min_storage is not none %}
+                <div class="tb-metric">
+                    <span class="tb-label">Min Required</span>
+                    <span class="tb-value" id="tb_min_storage">{{ results.min_storage }} ft³ → <span id="tb_storage_status" class="{{ 'pass' if results.storage_status == 'PASS' else 'fail' }}">{{ results.storage_status }}</span></span>
+                </div>
+                {% endif %}
+                <div class="tb-metric">
+                    <span class="tb-label">Tank Storage</span>
+                    <span class="tb-value" id="tb_tank_storage">{{ results.tank_storage }} ft³</span>
+                </div>
+                <div class="tb-metric">
+                    <span class="tb-label">Stone Storage</span>
+                    <span class="tb-value" id="tb_stone_storage">{{ results.stone_storage }} ft³</span>
+                </div>
+                <div class="tb-metric">
+                    <span class="tb-label">Total System</span>
+                    <span class="tb-value" id="tb_total_storage">{{ results.total_storage }} ft³</span>
+                </div>
+            </div>
+        </div>
+        <div class="tb-box">
+            <div class="tb-box-title">🛡 Cover &amp; Load Verification</div>
+            <div class="tb-metrics">
+                <div class="tb-metric">
+                    <span class="tb-label">Actual Cover Depth</span>
+                    <span class="tb-value {{ 'pass' if results.cover_status == 'PASS' else 'fail' }}">{{ results.cover_depth }} ft</span>
+                </div>
+                <div class="tb-metric">
+                    <span class="tb-label">Max Allowable Cover</span>
+                    <span class="tb-value {{ 'pass' if results.max_cover_status == 'PASS' else 'fail' }}">{{ results.max_cover_req }} ft</span>
+                </div>
+                <div class="tb-metric">
+                    <span class="tb-label">FOS — Live Load</span>
+                    <span class="tb-value {{ 'pass' if results.fos_live_load and results.fos_live_load >= 1.75 else 'fail' }}">{{ results.fos_live_load if results.fos_live_load else '—' }}</span>
+                </div>
+                <div class="tb-metric">
+                    <span class="tb-label">FOS — Dead Load</span>
+                    <span class="tb-value {{ 'pass' if results.fos_dead and results.fos_dead >= 1.95 else 'fail' }}">{{ results.fos_dead if results.fos_dead else '—' }}</span>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="tb-dash-empty">Run <strong>Calculate System</strong> to see the storage and cover/load summary here.</div>
+        {% endif %}
     </div>
 </div>
 
@@ -888,10 +980,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 </div>
             </div>
 
-            <!-- Calculate button -->
-            <button type="submit" style="width:100%;padding:14px;background:#007bff;color:white;border:none;border-radius:6px;font-size:16px;font-weight:bold;cursor:pointer;margin-bottom:10px;">
-                ▶ Calculate System
-            </button>
+            <!-- Calculate button now lives in the bottom command bar (form="mainForm") -->
             <button type="button" onclick="resetForm()" style="width:100%;padding:10px;background:#6c757d;color:white;border:none;border-radius:6px;font-size:14px;cursor:pointer;margin-bottom:20px;">
                 Reset Form
             </button>
@@ -2867,12 +2956,24 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     </div>
 
     <!-- ── Floating nav: COLLAPSE / EXPAND ALL CARDS ── -->
-    <div class="float-nav" id="floatNavCollapse" style="left:50%;transform:translateX(-50%);bottom:24px;">
+    <div class="float-nav" id="floatNavCollapse" style="left:50%;transform:translateX(-50%);bottom:80px;">
         <button class="float-btn" onclick="collapseAllCards()" title="Collapse all cards" style="background:#b91c1c;">▬</button>
         <button class="float-btn" onclick="expandAllCards()" title="Expand all cards" style="background:#15803d;">▭</button>
     </div>
 
 </div><!-- /split-layout -->
+
+<!-- ══════════════ BOTTOM COMMAND BAR ══════════════ -->
+<div class="bottombar">
+    <button type="submit" form="mainForm" class="bottombar-btn" style="background:#007bff;color:white;">▶ Calculate</button>
+    <button type="button" class="bottombar-btn" onclick="downloadQuote()" style="background:#e67e22;color:white;">📄 Quote</button>
+    <button type="button" class="bottombar-btn" onclick="downloadPDF()" style="background:#28a745;color:white;">⬇ Report</button>
+    <button type="button" class="bottombar-btn" onclick="downloadPriceCSV()" style="background:#0d9488;color:white;">💲 CS Export</button>
+    <button type="button" class="bottombar-btn" onclick="downloadStageCSV()" style="background:#0891b2;color:white;">📊 Stage CSV</button>
+    <button type="button" class="bottombar-btn" onclick="downloadStagePNG()" style="background:#28a745;color:white;">📈 Stage PNG</button>
+    <button type="button" class="bottombar-btn" onclick="openDetailsModal()" style="background:#0f4c81;color:white;border:1px solid #3b82f6;">📋 Details</button>
+    <button type="button" class="bottombar-btn" onclick="copyToEmail()" style="background:#6f42c1;color:white;">📋 Copy</button>
+</div>
 
 <script>
     // Theme Toggle
@@ -2998,18 +3099,29 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             return v.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1});
         };
 
-        // ── Storage Summary card ──────────────────────────────────────
+        // ── Storage Summary card (+ top-bar quick-glance mirror) ───────
         var stoneEl = document.getElementById('rv_stone_storage');
         if (stoneEl) stoneEl.textContent = fmt(stoneNet) + ' ft³';
         var totalEl = document.getElementById('rv_total_storage');
         if (totalEl) totalEl.textContent = fmt(totalSys) + ' ft³';
+        var tbStoneEl = document.getElementById('tb_stone_storage');
+        if (tbStoneEl) tbStoneEl.textContent = fmt(stoneNet) + ' ft³';
+        var tbTotalEl = document.getElementById('tb_total_storage');
+        if (tbTotalEl) tbTotalEl.textContent = fmt(totalSys) + ' ft³';
 
         // Live-update PASS/FAIL if min required storage is present
         var statusEl = document.getElementById('rv_storage_status');
-        if (statusEl && raw.minStorage !== undefined && raw.minStorage > 0) {
+        var tbStatusEl = document.getElementById('tb_storage_status');
+        if ((statusEl || tbStatusEl) && raw.minStorage !== undefined && raw.minStorage > 0) {
             var passes = totalSys >= raw.minStorage;
-            statusEl.textContent = passes ? 'PASS' : 'FAIL';
-            statusEl.className   = passes ? 'pass' : 'fail';
+            if (statusEl) {
+                statusEl.textContent = passes ? 'PASS' : 'FAIL';
+                statusEl.className   = passes ? 'pass' : 'fail';
+            }
+            if (tbStatusEl) {
+                tbStatusEl.textContent = passes ? 'PASS' : 'FAIL';
+                tbStatusEl.className   = passes ? 'pass' : 'fail';
+            }
         }
 
         // ── Stone backfill table total net cell ───────────────────────
