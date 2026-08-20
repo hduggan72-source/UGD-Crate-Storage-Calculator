@@ -671,6 +671,27 @@
                 </div>
             </div>
         </div>
+        <div class="tb-box">
+            <div class="tb-box-title">💲 AquaCell Price Estimation</div>
+            <div class="tb-metrics">
+                <div class="tb-metric">
+                    <span class="tb-label">Selling Price</span>
+                    <span class="tb-value" id="tb_price_selling">—</span>
+                </div>
+                <div class="tb-metric">
+                    <span class="tb-label">Est. Freight</span>
+                    <span class="tb-value" id="tb_price_freight">—</span>
+                </div>
+                <div class="tb-metric">
+                    <span class="tb-label" style="color:#2ecc71;">Total to Customer</span>
+                    <span class="tb-value" id="tb_price_total" style="color:#2ecc71;">—</span>
+                </div>
+                <div class="tb-metric">
+                    <span class="tb-label">Price per ft³</span>
+                    <span class="tb-value" id="tb_price_perft3">—</span>
+                </div>
+            </div>
+        </div>
         {% else %}
         <div class="tb-dash-empty">Run <strong>Calculate System</strong> to see the storage and cover/load summary here.</div>
         {% endif %}
@@ -3286,6 +3307,16 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             + (freightPct > 0 ? '  (' + freightPct + '%)' : '');
         document.getElementById('priceTotalCost').textContent  = fmt(totalToCustomer);
         document.getElementById('priceCostPerFt3').textContent = tankFt3 > 0 ? fmtFt3(costPerFt3) : '— (run Calculate first)';
+
+        // ── Top-bar quick-glance mirror ─────────────────────────────
+        var tbSellingEl = document.getElementById('tb_price_selling');
+        if (tbSellingEl) tbSellingEl.textContent = fmt(sellingPrice);
+        var tbFreightEl = document.getElementById('tb_price_freight');
+        if (tbFreightEl) tbFreightEl.textContent = fmt(freightCost);
+        var tbTotalEl = document.getElementById('tb_price_total');
+        if (tbTotalEl) tbTotalEl.textContent = fmt(totalToCustomer);
+        var tbPerFt3El = document.getElementById('tb_price_perft3');
+        if (tbPerFt3El) tbPerFt3El.textContent = tankFt3 > 0 ? fmtFt3(costPerFt3) : '—';
 
         // Store for quote export
         document.getElementById('hiddenFloorCost').value        = floorCost.toFixed(2);
