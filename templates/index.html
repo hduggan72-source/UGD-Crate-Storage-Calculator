@@ -625,7 +625,7 @@
     </div>
 
     <!-- Quick-glance dashboard — mirrors Storage Summary / Cover & Load Verification cards -->
-    <div class="topbar-dash">
+    <div class="topbar-dash" id="topbarDash">
         {% if results %}
         <div class="tb-box">
             <div class="tb-box-title">💧 Storage Summary</div>
@@ -3028,6 +3028,13 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         form.querySelectorAll('input[type="checkbox"]').forEach(el => { el.checked = true; });
         const resultsDiv = document.querySelector('.results');
         if (resultsDiv) resultsDiv.innerHTML = '';
+        // Top-bar quick-glance dashboard isn't inside .results (it's server-
+        // rendered once into the topbar) — clear it back to the empty state
+        // too, or it keeps showing the previous project's numbers.
+        const topbarDash = document.getElementById('topbarDash');
+        if (topbarDash) {
+            topbarDash.innerHTML = '<div class="tb-dash-empty">Run <strong>Calculate System</strong> to see the storage and cover/load summary here.</div>';
+        }
         ['priceCrateStorage','priceFloorCost','priceSubtotal',
          'priceFreight','priceTotalCost','priceCostPerFt3'].forEach(id => {
             const el = document.getElementById(id);
