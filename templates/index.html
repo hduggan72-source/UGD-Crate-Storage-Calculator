@@ -2772,27 +2772,11 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
 
             {% if results.stage_storage %}
             <!-- ── CARD 8: Stage Storage Table + Volume Curve ── -->
+            <!-- Chart is static (outside the scroll box); only the table below it scrolls. -->
             <div class="result-card">
                 <div class="result-card-header" onclick="toggleResultCard(this)"><span>📈 Stage Storage Table ({{ results.stage_increment_in }}-inch increments)</span><span class="rc-arrow">▼</span></div>
                 <div class="result-card-body" style="padding:0;">
-                    <table style="margin-top:0;" id="stageStorageTable">
-                        <tr>
-                            <th>Elevation (ft)</th>
-                            <th style="text-align:right;">Tank (ft³)</th>
-                            <th style="text-align:right;">Stone (ft³)</th>
-                            <th style="text-align:right;">Total (ft³)</th>
-                        </tr>
-                        {% for row in results.stage_storage %}
-                        <tr>
-                            <td>{{ row.elevation_ft }}</td>
-                            <td style="text-align:right;">{{ row.tank_storage }}</td>
-                            <td style="text-align:right;" class="ss-stone-cell" data-raw-stone="{{ row.stone_storage }}" data-raw-tank="{{ row.tank_storage }}">{{ row.stone_storage }}</td>
-                            <td style="text-align:right;font-weight:bold;color:var(--accent);" class="ss-total-cell">{{ row.total_storage }}</td>
-                        </tr>
-                        {% endfor %}
-                    </table>
-
-                    <!-- Volume Curve Chart -->
+                    <!-- Volume Curve Chart — stays put; does not scroll with the table -->
                     <div style="padding:16px 12px 8px;">
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
                             <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.55;">Stage-Storage Volume Curve</div>
@@ -2801,6 +2785,26 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         <div style="position:relative;height:320px;">
                             <canvas id="stageCurveChart"></canvas>
                         </div>
+                    </div>
+
+                    <!-- Stage Storage Table — its own scrollable window, sticky header -->
+                    <div style="max-height:380px;overflow-y:auto;border-top:1px solid var(--border);">
+                        <table style="margin-top:0;" id="stageStorageTable">
+                            <tr>
+                                <th style="position:sticky;top:0;background:var(--card);z-index:1;">Elevation (ft)</th>
+                                <th style="position:sticky;top:0;background:var(--card);z-index:1;text-align:right;">Tank (ft³)</th>
+                                <th style="position:sticky;top:0;background:var(--card);z-index:1;text-align:right;">Stone (ft³)</th>
+                                <th style="position:sticky;top:0;background:var(--card);z-index:1;text-align:right;">Total (ft³)</th>
+                            </tr>
+                            {% for row in results.stage_storage %}
+                            <tr>
+                                <td>{{ row.elevation_ft }}</td>
+                                <td style="text-align:right;">{{ row.tank_storage }}</td>
+                                <td style="text-align:right;" class="ss-stone-cell" data-raw-stone="{{ row.stone_storage }}" data-raw-tank="{{ row.tank_storage }}">{{ row.stone_storage }}</td>
+                                <td style="text-align:right;font-weight:bold;color:var(--accent);" class="ss-total-cell">{{ row.total_storage }}</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
                     </div>
                 </div>
             </div>
@@ -3449,9 +3453,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     });
 
     // ====================== SCHEMATIC ENGINE ======================
-    const CL_IN = 47.2; const CW_IN = 23.6;
-    const CRATE_LEN_FT = 3.94;
-    const CRATE_WID_FT = 1.97;
+    // Exact module dimensions (matches MODULE_WID/MODULE_LEN in app.py — do not
+    // round these; the previous 3.94/1.97 approximation let this schematic's
+    // crate count silently disagree with the server's calculated footprint
+    // at many tank sizes, since floor() is sensitive to the exact divisor).
+    const CRATE_LEN_FT = 3.937;
+    const CRATE_WID_FT = 1.9685;
 
     const LAYER_HT = {
         SC: [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581],
@@ -3459,8 +3466,11 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     };
 
     function snapGrid(L, W) {
-        const crates_long = Math.floor(L * 12 / CL_IN);
-        const crates_wide = Math.floor(W * 12 / CW_IN);
+        // Same formula as app.py's crates_long/crates_wide (floor of raw feet
+        // ÷ exact module dimension) — no unit round-trip, so this always
+        // agrees with the server's calculated crate count.
+        const crates_long = Math.floor(L / CRATE_LEN_FT);
+        const crates_wide = Math.floor(W / CRATE_WID_FT);
         return {
             crates_long, crates_wide,
             used_L: crates_long * CRATE_LEN_FT,
@@ -3477,7 +3487,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     // ring on the right. Called only when the cell is large enough to read.
     // (cx,cy) = top-left of the cell in px; (cw,ch) = cell size in px.
     function drawCrateGlyph(ctx, cx, cy, cw, ch) {
-        const gStroke = '#5f7fb0';   // muted blue-grey, reads on crateFill
+        const gStroke = '#000000';   // literal hex — canvas doesn't resolve CSS vars
         const midY = cy + ch / 2;
 
         // Three zones across the long axis: cross | pill | ring
@@ -3514,15 +3524,6 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         ctx.arc(pillX + r, pillY + r, r, Math.PI/2, -Math.PI/2);
         ctx.closePath();
         ctx.stroke();
-        // pill end-nubs (short connector stubs + end dots)
-        const nub = zoneW * 0.10;
-        ctx.beginPath();
-        ctx.moveTo(pillX - nub, midY); ctx.lineTo(pillX, midY);
-        ctx.moveTo(pillX + pillW, midY); ctx.lineTo(pillX + pillW + nub, midY);
-        ctx.stroke();
-        const dotR = Math.max(1, r * 0.55);
-        ctx.beginPath(); ctx.arc(pillX - nub, midY, dotR, 0, Math.PI*2); ctx.stroke();
-        ctx.beginPath(); ctx.arc(pillX + pillW + nub, midY, dotR, 0, Math.PI*2); ctx.stroke();
 
         // ---- RING (right) ----
         const ringCx = x2 + zoneW / 2;
