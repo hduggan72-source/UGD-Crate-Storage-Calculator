@@ -80,10 +80,12 @@
             font-size: 10px; font-weight: 700; text-transform: uppercase;
             letter-spacing: 0.05em; color: rgba(255,255,255,0.55); margin-bottom: 6px;
         }
-        .tb-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px 16px; }
-        .tb-metric { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+        .tb-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px 16px; }
+        .tb-metric { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
         .tb-label { color: rgba(255,255,255,0.7); }
-        .tb-value { font-weight: 700; color: #fff; }
+        .tb-value { font-weight: 700; color: #fff; font-size: 15px; }
+        .tb-value.pass { color: #2ecc71; }
+        .tb-value.fail { color: #e74c3c; }
 
         /* ══ BOTTOM COMMAND BAR ══ */
         .bottombar {
@@ -637,6 +639,10 @@
             <div class="tb-box-title">💧 Cumulative System Totals</div>
             <div class="tb-metrics">
                 <div class="tb-metric">
+                    <span class="tb-label">Min Required</span>
+                    <span class="tb-value" id="tb_cum_min_storage">—</span>
+                </div>
+                <div class="tb-metric">
                     <span class="tb-label">Tank Storage</span>
                     <span class="tb-value" id="tb_cum_tank_storage">— ft³</span>
                 </div>
@@ -689,7 +695,7 @@
             <button type="button" onclick="resetForm()"
                 style="width:100%;padding:9px;background:#6c757d;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:bold;cursor:pointer;margin-bottom:8px;"
                 title="Clear the currently selected tank's inputs back to blank">
-                Reset Form
+                Reset Tank
             </button>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
                 <button type="button" onclick="importJSON()"
@@ -1404,7 +1410,7 @@
 
         <!-- Project Info (for Quote) relocated to the left sidebar -->
         <!-- Quote / Tank Summary / CS Export now live in the bottom command bar -->
-        <button class="btn-json" onclick="exportJSON()" style="margin-top:14px;">⬇ Export Project JSON</button>
+        <!-- Export Project JSON removed -- redundant with the sidebar's Export button (same exportJSON()) -->
     </div>
 
 </div><!-- /main-split -->
@@ -2065,6 +2071,26 @@ function renderCumulative(data) {
     setEl('tb_cum_tank_storage',  fmtNum(cum.tank_storage, 1) + ' ft³');
     setEl('tb_cum_stone_storage', fmtNum(cum.total_storage - cum.tank_storage, 1) + ' ft³');
     setEl('tb_cum_total_storage', fmtNum(cum.total_storage, 1) + ' ft³');
+
+    // Min Required — sum of each calculated tank's own minimum, compared
+    // against the cumulative total. Mirrors single-tank's Storage Summary
+    // green/red convention; only colored when at least one tank has a
+    // minimum set (matches the totMinStorage pattern already used in
+    // copyToClipboard()).
+    const totMinStorage = results.filter(Boolean).reduce((s, r) => s + (r.min_storage || 0), 0);
+    const tbMinEl   = document.getElementById('tb_cum_min_storage');
+    const tbTotalEl = document.getElementById('tb_cum_total_storage');
+    if (totMinStorage > 0) {
+        const meetsMin = cum.total_storage >= totMinStorage;
+        if (tbMinEl) {
+            tbMinEl.textContent = fmtNum(totMinStorage, 1) + ' ft³ → ' + (meetsMin ? 'PASS' : 'FAIL');
+            tbMinEl.className   = 'tb-value ' + (meetsMin ? 'pass' : 'fail');
+        }
+        if (tbTotalEl) tbTotalEl.className = 'tb-value ' + (meetsMin ? 'pass' : 'fail');
+    } else {
+        if (tbMinEl)   { tbMinEl.textContent = '—'; tbMinEl.className = 'tb-value'; }
+        if (tbTotalEl) tbTotalEl.className = 'tb-value';
+    }
     setEl('cum_base_units',     cum.base_units.toLocaleString());
     setEl('cum_side_plates',    cum.side_plates.toLocaleString());
     setEl('cum_bottom_plates',  cum.bottom_plates.toLocaleString());
@@ -2108,13 +2134,15 @@ function renderCumulative(data) {
 
 function clearCumulative() {
     window._lastCumData = null;
-    ['tb_cum_tank_storage','tb_cum_stone_storage','tb_cum_total_storage','cum_base_units','cum_side_plates',
+    ['tb_cum_min_storage','tb_cum_tank_storage','tb_cum_stone_storage','tb_cum_total_storage','cum_base_units','cum_side_plates',
      'cum_bottom_plates','cum_pipe_connectors','cum_top_adapters_12','cum_top_adapters_16',
      'cum_weight','cum_pallets',
      'cum_geo_tank_yd2','cum_geo_stone_yd2','cum_geo',
      'cum_ptrow_woven_yd2','cum_geogrid_total','cum_liner_total','cum_liner_prot','cum_large_pipe',
      'cum_stone_yd3','priceFloorCost','priceSubtotal','priceFreight','priceTotal',
      'priceCostPerFt3'].forEach(id => setEl(id, '—'));
+    const tbTotalElClear = document.getElementById('tb_cum_total_storage');
+    if (tbTotalElClear) tbTotalElClear.className = 'tb-value';
     document.getElementById('cum_contingency').value = '';
     window._contingencyOverride = null;
     document.getElementById('cum_contingency_auto_link').style.display = 'none';
