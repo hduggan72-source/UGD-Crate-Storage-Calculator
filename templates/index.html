@@ -57,9 +57,6 @@
             padding: 7px 14px; border: none; border-radius: 4px;
             cursor: pointer; font-size: 13px; font-weight: bold;
         }
-        .topbar-btn-stack { display: flex; flex-direction: column; gap: 4px; }
-        .topbar-btn-stack .topbar-btn { padding: 4px 14px; }
-
         /* ── Top-bar quick-glance dashboard (updates on Calculate System) ── */
         .topbar-dash { display: flex; gap: 14px; flex-wrap: wrap; }
         .tb-box {
@@ -607,11 +604,6 @@
         </div>
         <div class="topbar-actions">
             <button class="topbar-btn" onclick="newProject()" style="background:#dc3545;color:white;" title="Clear the dashboard and start a fresh project">🆕 New Project</button>
-            <div class="topbar-btn-stack">
-                <button class="topbar-btn" onclick="document.getElementById('importFile').click()" style="background:#ffc107;color:#212529;">Import</button>
-                <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importProject(event)">
-                <button class="topbar-btn" onclick="exportProject()" style="background:#17a2b8;color:white;">Export</button>
-            </div>
             <a href="/multi" class="topbar-btn" style="background:#0891b2;color:white;text-decoration:none;"
                onclick="return confirm('Heads up: switching to Multi-Tank will leave this single-tank session. Any unsaved entries here will be lost unless you\'ve exported. Continue?');">
                 🏗️ Multi-Tank
@@ -646,7 +638,7 @@
                 </div>
                 <div class="tb-metric">
                     <span class="tb-label">Total System</span>
-                    <span class="tb-value" id="tb_total_storage">{{ results.total_storage }} ft³</span>
+                    <span class="tb-value {{ ('pass' if results.storage_status == 'PASS' else 'fail') if results.min_storage is not none else '' }}" id="tb_total_storage">{{ results.total_storage }} ft³</span>
                 </div>
             </div>
         </div>
@@ -1002,9 +994,16 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             </div>
 
             <!-- Calculate button now lives in the bottom command bar (form="mainForm") -->
-            <button type="button" onclick="resetForm()" style="width:100%;padding:10px;background:#6c757d;color:white;border:none;border-radius:6px;font-size:14px;cursor:pointer;margin-bottom:20px;">
+            <button type="button" onclick="resetForm()" style="width:100%;padding:10px;background:#6c757d;color:white;border:none;border-radius:6px;font-size:14px;cursor:pointer;margin-bottom:10px;">
                 Reset Form
             </button>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
+                <button type="button" onclick="document.getElementById('importFile').click()"
+                    style="padding:10px;background:#ffc107;color:#212529;border:none;border-radius:6px;font-size:14px;cursor:pointer;">Import</button>
+                <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importProject(event)">
+                <button type="button" onclick="exportProject()"
+                    style="padding:10px;background:#17a2b8;color:white;border:none;border-radius:6px;font-size:14px;cursor:pointer;">Export</button>
+            </div>
 
             <!-- Geogrid quantities — live-synced from the results card display inputs.
                  Kept inside the form so they POST correctly on Calculate and export. -->
@@ -3153,6 +3152,9 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             if (tbStatusEl) {
                 tbStatusEl.textContent = passes ? 'PASS' : 'FAIL';
                 tbStatusEl.className   = passes ? 'pass' : 'fail';
+            }
+            if (tbTotalEl) {
+                tbTotalEl.className = 'tb-value ' + (passes ? 'pass' : 'fail');
             }
         }
 
