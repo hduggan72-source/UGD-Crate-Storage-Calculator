@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file, jsonify
+from flask import Flask, render_template, request, send_file, jsonify, abort
 import io
 import json
 from reportlab.lib.pagesizes import letter
@@ -33,6 +33,10 @@ GITHUB_PAT    = os.environ.get("GITHUB_PAT", "")   # set in Render environment
 _details_cache      = []          # cached list of filenames
 _details_cache_time = 0.0         # epoch timestamp of last fetch
 _CACHE_TTL_SECONDS  = 600         # refresh every 10 minutes
+
+# ── Internal Document Library cache (full Details folder, all filetypes) ──
+_internal_lib_cache      = []
+_internal_lib_cache_time = 0.0
 
 # ── ASTM F2787 Live Load Model constants ──
 # Faithful port of the verified "AQUACELL Loading Model_AquaCell_v1.xlsx" workbook
@@ -7480,6 +7484,83 @@ def download_details_pdf():
     except Exception as exc:
         import traceback
         return jsonify({"error": str(exc), "trace": traceback.format_exc()}), 500
+
+
+# ══════════════════════════════════════════════════════════════════
+#  INTERNAL DOCUMENT LIBRARY — Design Tools 4th tab (full internal set)
+#  Separate from /api/details + /download_details_pdf (PDF-only Details
+#  modal on index.html/multi_tank.html — left untouched) and from the
+#  47-file client-facing allowlist on the external build. This lists
+#  EVERY file in the GitHub Details folder, split by extension, for
+#  internal estimators only. Uses /download_details_pdf for the
+#  multi-select merge download so the merge logic isn't duplicated.
+# ══════════════════════════════════════════════════════════════════
+
+@app.route('/api/internal-doc-library')
+def api_internal_doc_library():
+    """Full Details-folder listing (all filetypes) for the internal Document Library tab."""
+    import time
+    global _internal_lib_cache, _internal_lib_cache_time
+
+    if _internal_lib_cache and (time.time() - _internal_lib_cache_time) < _CACHE_TTL_SECONDS:
+        files = _internal_lib_cache
+    else:
+        url = (
+            f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
+            f"/contents/{GITHUB_FOLDER}?ref={GITHUB_BRANCH}"
+        )
+        try:
+            resp = requests.get(url, timeout=12, headers=_github_headers())
+            resp.raise_for_status()
+            files = sorted(
+                f["name"] for f in resp.json()
+                if isinstance(f, dict) and f.get("name")
+            )
+            _internal_lib_cache      = files
+            _internal_lib_cache_time = time.time()
+        except Exception as exc:
+            if _internal_lib_cache:
+                files = _internal_lib_cache
+            else:
+                return jsonify({"error": str(exc), "pdfs": [], "zips": [], "other": []}), 500
+
+    pdfs  = [f for f in files if f.lower().endswith('.pdf')]
+    zips  = [f for f in files if f.lower().endswith('.zip')]
+    other = [f for f in files if not f.lower().endswith('.pdf') and not f.lower().endswith('.zip')]
+    return jsonify({"pdfs": pdfs, "zips": zips, "other": other})
+
+
+@app.route('/api/internal-doc-library/view/<path:filename>')
+def api_internal_doc_library_view(filename):
+    """Stream a single PDF from the Details folder inline for the library viewer."""
+    if '/' in filename or '\\' in filename or not filename.lower().endswith('.pdf'):
+        abort(404)
+    raw_url = (
+        f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}"
+        f"/{GITHUB_BRANCH}/{GITHUB_FOLDER}/{filename}"
+    )
+    r = requests.get(raw_url, timeout=30, headers=_github_headers())
+    if r.status_code != 200:
+        abort(404)
+    return send_file(BytesIO(r.content), mimetype="application/pdf",
+                      as_attachment=False, download_name=filename)
+
+
+@app.route('/api/internal-doc-library/download/<path:filename>')
+def api_internal_doc_library_download(filename):
+    """Direct download for a single non-PDF file (ZIP or other) from the Details folder."""
+    if '/' in filename or '\\' in filename:
+        abort(404)
+    raw_url = (
+        f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}"
+        f"/{GITHUB_BRANCH}/{GITHUB_FOLDER}/{filename}"
+    )
+    r = requests.get(raw_url, timeout=30, headers=_github_headers())
+    if r.status_code != 200:
+        abort(404)
+    mimetype = "application/zip" if filename.lower().endswith('.zip') else "application/octet-stream"
+    return send_file(BytesIO(r.content), mimetype=mimetype,
+                      as_attachment=True, download_name=filename)
 
 
 if __name__ == '__main__':

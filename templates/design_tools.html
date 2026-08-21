@@ -438,6 +438,9 @@
         <button class="calc-nav-item" data-calc="crate_comparison" onclick="selectCalc('crate_comparison')">
             Crate Comparison <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
         </button>
+        <button class="calc-nav-item" data-calc="doc_library" onclick="selectCalc('doc_library')">
+            AquaCell Document Library
+        </button>
         <button class="calc-nav-item" data-calc="excavation_slope" onclick="selectCalc('excavation_slope')">
             Excavation Slope
         </button>
@@ -1543,6 +1546,26 @@
             </div>
         </div>
 
+        <!-- ── AQUACELL DOCUMENT LIBRARY (internal, full set) ── -->
+        <div id="panel-doc_library" class="calc-panel" style="display:none;">
+            <div class="calc-inputs">
+                <div class="disclaimer-box">
+                    Full internal document set, pulled live from the same Details folder as the 📋 Details
+                    button on Single-Tank and Multi-Tank — this is just a friendlier way to browse it. Click a
+                    PDF name to view it, or check multiple and download as one combined PDF. Non-PDF files
+                    (ZIPs, etc.) download directly.
+                </div>
+
+                <div id="idl_groups"><div class="empty-state">Loading document library…</div></div>
+
+                <button class="calc-btn secondary" id="idl_download_btn" onclick="idlDownloadSelected()" disabled>⬇ Download Selected as PDF</button>
+            </div>
+
+            <div class="calc-results" id="idl_viewer">
+                <div class="empty-state">Click a PDF name on the left to view it here.</div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -1610,6 +1633,9 @@
         if (name === 'stage_storage' && !ssInitialized) {
             ssInitialized = true;
             ssInit();
+        }
+        if (name === 'doc_library') {
+            idlInit();
         }
     }
 
@@ -4961,6 +4987,127 @@
         ssUpdateTankHeightFromLayers();
         ssUpdateComplexFootprintDisplay();
         ssCalculate();
+    }
+
+    // ══════════════ AQUACELL DOCUMENT LIBRARY (internal, full set) ══════════════
+    // Full GitHub Details-folder listing, split by filetype. Separate from the
+    // existing 📋 Details modal (/api/details, PDF-only) on index.html/multi_tank.html
+    // — that route and modal are untouched. The merge-download below reuses that
+    // same modal's /download_details_pdf endpoint rather than duplicating it.
+    let idlLoaded = false;
+
+    function idlEsc(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function idlInit() {
+        if (idlLoaded) return;
+        idlLoaded = true;
+        fetch('/api/internal-doc-library')
+            .then(r => r.json())
+            .then(data => idlRender(data))
+            .catch(err => {
+                document.getElementById('idl_groups').innerHTML = `<div class="error-box">Could not load document library: ${err.message}</div>`;
+            });
+    }
+
+    function idlRender(data) {
+        const pdfs  = data.pdfs  || [];
+        const other = [...(data.zips || []), ...(data.other || [])];
+        const container = document.getElementById('idl_groups');
+
+        if (!pdfs.length && !other.length) {
+            container.innerHTML = '<div class="empty-state">No documents available.</div>';
+            return;
+        }
+
+        let html = '';
+        if (pdfs.length) {
+            html += `
+                <div class="section-card" style="margin-bottom:10px;">
+                    <div class="section-card-header" style="display:flex; justify-content:space-between; align-items:center;">
+                        <span>Documents (${pdfs.length})</span>
+                        <button type="button" class="calc-btn secondary" id="idl_select_all_btn" style="width:auto; margin:0; padding:3px 10px; font-size:11px;">Select all</button>
+                    </div>
+                    <div class="section-card-body" style="padding:8px 10px;">
+                        ${pdfs.map(f => `
+                            <div style="display:flex; align-items:flex-start; gap:8px; padding:5px 0; border-bottom:1px solid var(--border);">
+                                <input type="checkbox" class="idl-file-check" data-filename="${idlEsc(f)}" style="margin-top:3px; width:auto;">
+                                <a href="#" class="idl-file-link" data-filename="${idlEsc(f)}" style="font-size:12.5px; color:var(--text); text-decoration:none; flex:1;">${idlEsc(f)}</a>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+        }
+        if (other.length) {
+            html += `
+                <div class="section-card" style="margin-bottom:10px;">
+                    <div class="section-card-header">Other Files (${other.length})</div>
+                    <div class="section-card-body" style="padding:8px 10px;">
+                        ${other.map(f => `
+                            <a href="/api/internal-doc-library/download/${encodeURIComponent(f)}" style="display:block; font-size:12.5px; color:var(--text); text-decoration:none; padding:5px 0; border-bottom:1px solid var(--border);">⬇ ${idlEsc(f)}</a>
+                        `).join('')}
+                    </div>
+                </div>`;
+        }
+        container.innerHTML = html;
+
+        container.querySelectorAll('.idl-file-link').forEach(a => {
+            a.addEventListener('click', (e) => { e.preventDefault(); idlView(a.dataset.filename); });
+        });
+        container.querySelectorAll('.idl-file-check').forEach(cb => {
+            cb.addEventListener('change', idlUpdateCount);
+        });
+        const selectAllBtn = document.getElementById('idl_select_all_btn');
+        if (selectAllBtn) selectAllBtn.addEventListener('click', idlToggleAll);
+        idlUpdateCount();
+    }
+
+    function idlToggleAll() {
+        const cbs = document.querySelectorAll('#idl_groups .idl-file-check');
+        const allChecked = [...cbs].every(cb => cb.checked);
+        cbs.forEach(cb => cb.checked = !allChecked);
+        idlUpdateCount();
+    }
+
+    function idlUpdateCount() {
+        const n = document.querySelectorAll('#idl_groups .idl-file-check:checked').length;
+        const btn = document.getElementById('idl_download_btn');
+        btn.disabled = n === 0;
+        btn.textContent = n > 0 ? `⬇ Download Selected as PDF (${n})` : '⬇ Download Selected as PDF';
+    }
+
+    function idlView(filename) {
+        document.getElementById('idl_viewer').innerHTML =
+            `<iframe src="/api/internal-doc-library/view/${encodeURIComponent(filename)}" style="width:100%; height:100%; min-height:70vh; border:1px solid var(--border); border-radius:8px; background:#fff;" title="${idlEsc(filename)}"></iframe>`;
+    }
+
+    function idlDownloadSelected() {
+        const selected = [...document.querySelectorAll('#idl_groups .idl-file-check:checked')].map(cb => cb.dataset.filename);
+        if (!selected.length) return;
+        const btn = document.getElementById('idl_download_btn');
+        btn.disabled = true;
+        btn.textContent = 'Generating…';
+        fetch('/download_details_pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files: selected })
+        })
+        .then(r => { if (!r.ok) return r.json().then(d => Promise.reject(d.error || 'Download failed')); return r.blob(); })
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const ts = new Date().toISOString().slice(0, 10);
+            a.download = `AquaCell_Document_Library_${ts}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        })
+        .catch(err => alert('Download failed: ' + err))
+        .finally(() => { btn.disabled = false; idlUpdateCount(); });
     }
 </script>
 
