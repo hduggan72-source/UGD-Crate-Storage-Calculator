@@ -2073,15 +2073,18 @@ function renderCumulative(data) {
 
     // Cumulative storage totals — top-bar quick-glance dashboard
     setEl('tb_cum_tank_storage',  fmtNum(cum.tank_storage, 1) + ' ft³');
-    setEl('tb_cum_stone_storage', fmtNum(cum.total_storage - cum.tank_storage, 1) + ' ft³');
+    setEl('tb_cum_stone_storage', fmtNum(cum.stone_storage, 1) + ' ft³');
     setEl('tb_cum_total_storage', fmtNum(cum.total_storage, 1) + ' ft³');
 
-    // Min Required — sum of each calculated tank's own minimum, compared
-    // against the cumulative total. Mirrors single-tank's Storage Summary
-    // green/red convention; only colored when at least one tank has a
-    // minimum set (matches the totMinStorage pattern already used in
-    // copyToClipboard()).
-    const totMinStorage = results.filter(Boolean).reduce((s, r) => s + (r.min_storage || 0), 0);
+    // Min Required — sum of each freshly-calculated tank's own minimum
+    // (data.tank_results, not the global results[] array, which can be
+    // stale here: rebuildCumulative() sends the current draft inputs for
+    // every calculated tank, so an edited-but-not-recalculated minimum
+    // must come from this same response, not the last-saved results[]).
+    // Mirrors single-tank's Storage Summary green/red convention; only
+    // colored when at least one tank has a minimum set (matches the
+    // totMinStorage pattern already used in copyToClipboard()).
+    const totMinStorage = (data.tank_results || []).filter(Boolean).reduce((s, r) => s + (r.min_storage || 0), 0);
     const tbMinEl   = document.getElementById('tb_cum_min_storage');
     const tbTotalEl = document.getElementById('tb_cum_total_storage');
     if (totMinStorage > 0) {
@@ -2474,6 +2477,12 @@ function handleImport(ev, autoCalc) {
             const data = JSON.parse(e.target.result);
             if (data.tanks) tanks = data.tanks;
             if (data.results) results = data.results;
+            let trimmedImport = false;
+            if (tanks.length > MAX_TANKS_PER_PROJECT) {
+                tanks = tanks.slice(0, MAX_TANKS_PER_PROJECT);
+                results = results.slice(0, MAX_TANKS_PER_PROJECT);
+                trimmedImport = true;
+            }
             if (data.project) {
                 document.getElementById('q_project_name').value    = data.project.name || '';
                 document.getElementById('q_project_num').value     = data.project.num || '';
@@ -2498,7 +2507,12 @@ function handleImport(ev, autoCalc) {
             } else {
                 rebuildCumulative();
             }
-            showToast('✓ Project imported');
+            if (trimmedImport) {
+                alert(`This project file has more than ${MAX_TANKS_PER_PROJECT} tanks, the maximum for one project. Only the first ${MAX_TANKS_PER_PROJECT} were imported.`);
+                showToast(`✓ Project imported (trimmed to ${MAX_TANKS_PER_PROJECT} tanks)`);
+            } else {
+                showToast('✓ Project imported');
+            }
         } catch (err) {
             alert('Failed to import JSON: ' + err.message);
         }
