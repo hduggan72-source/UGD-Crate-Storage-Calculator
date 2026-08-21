@@ -80,7 +80,7 @@
             font-size: 10px; font-weight: 700; text-transform: uppercase;
             letter-spacing: 0.05em; color: rgba(255,255,255,0.55); margin-bottom: 6px;
         }
-        .tb-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px 16px; }
+        .tb-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 4px 16px; }
         .tb-metric { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
         .tb-label { color: rgba(255,255,255,0.7); }
         .tb-value { font-weight: 700; color: #fff; font-size: 15px; }
@@ -653,6 +653,10 @@
                 <div class="tb-metric">
                     <span class="tb-label">Total System</span>
                     <span class="tb-value" id="tb_cum_total_storage">— ft³</span>
+                </div>
+                <div class="tb-metric">
+                    <span class="tb-label">Total to Customer</span>
+                    <span class="tb-value" style="color:#2ecc71;" id="tb_cum_total_customer">—</span>
                 </div>
             </div>
         </div>
@@ -2140,7 +2144,7 @@ function clearCumulative() {
      'cum_geo_tank_yd2','cum_geo_stone_yd2','cum_geo',
      'cum_ptrow_woven_yd2','cum_geogrid_total','cum_liner_total','cum_liner_prot','cum_large_pipe',
      'cum_stone_yd3','priceFloorCost','priceSubtotal','priceFreight','priceTotal',
-     'priceCostPerFt3'].forEach(id => setEl(id, '—'));
+     'priceCostPerFt3','tb_cum_total_customer'].forEach(id => setEl(id, '—'));
     const tbTotalElClear = document.getElementById('tb_cum_total_storage');
     if (tbTotalElClear) tbTotalElClear.className = 'tb-value';
     document.getElementById('cum_contingency').value = '';
@@ -2194,7 +2198,7 @@ function calcPrice() {
     const fPct      = parseFloat(document.getElementById('freightPct').value) || 0;
     const floorCost = cumFloorCost();
     if (floorCost <= 0) {
-        ['priceFloorCost','priceSubtotal','priceFreight','priceTotal','priceCostPerFt3'].forEach(id => setEl(id, '—'));
+        ['priceFloorCost','priceSubtotal','priceFreight','priceTotal','priceCostPerFt3','tb_cum_total_customer'].forEach(id => setEl(id, '—'));
         return;
     }
     const divisor  = markupPct > 0 ? (1 - markupPct / 100) : 1;
@@ -2210,6 +2214,7 @@ function calcPrice() {
     setEl('priceFreight',    fmt(freight) + (fPct > 0 ? '  (' + fPct + '%)' : ''));
     setEl('priceTotal',      fmt(total));
     setEl('priceCostPerFt3', tankFt3 > 0 ? fmtF3(cpf3) : '— (calculate first)');
+    setEl('tb_cum_total_customer', fmt(total));
 }
 
 // ══════════════════════════════════════════════════════════════════
