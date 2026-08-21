@@ -42,15 +42,15 @@
         .topbar {
             background: var(--navy);
             color: #fff;
-            padding: 0 18px;
+            padding: 8px 18px;
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            height: 56px;
+            flex-direction: column;
+            gap: 8px;
             flex-shrink: 0;
             border-bottom: 2px solid #1a3260;
             z-index: 100;
         }
+        .topbar-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
         .topbar-left { display: flex; align-items: center; gap: 14px; }
         .topbar-left img { height: 34px; }
         .topbar-title { font-size: 15px; font-weight: bold; color: #60a5fa; }
@@ -66,6 +66,24 @@
             transition: opacity 0.15s;
         }
         .topbar-btn:hover { opacity: 0.85; }
+
+        /* ══ Top-bar quick-glance dashboard (cumulative, updates live) ══ */
+        .topbar-dash { display: flex; gap: 14px; }
+        .tb-box {
+            flex: 1;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 6px;
+            padding: 8px 12px;
+        }
+        .tb-box-title {
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.05em; color: rgba(255,255,255,0.55); margin-bottom: 6px;
+        }
+        .tb-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px 16px; }
+        .tb-metric { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+        .tb-label { color: rgba(255,255,255,0.7); }
+        .tb-value { font-weight: 700; color: #fff; }
 
         /* ══ BOTTOM COMMAND BAR ══ */
         .bottombar {
@@ -149,14 +167,37 @@
         }
         .btn-add-tank:hover { background: #1d4ed8; }
 
-        .tank-list {
+        .sidebar-scroll {
             flex: 1;
             overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .tank-list {
+            flex-shrink: 0;
             padding: 8px;
             display: flex;
             flex-direction: column;
             gap: 6px;
         }
+        .sidebar-project-info {
+            flex-shrink: 0;
+            padding: 10px 12px 14px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .sidebar-project-info .section-label-sm {
+            font-size: 11px; font-weight: bold; text-transform: uppercase;
+            letter-spacing: 0.04em; color: #93c5fd; margin-bottom: 8px;
+        }
+        .sidebar-project-info label {
+            display: block; font-size: 10.5px; font-weight: bold; color: #94a3b8;
+            text-transform: uppercase; letter-spacing: 0.03em; margin: 8px 0 3px;
+        }
+        .sidebar-project-info input {
+            width: 100%; padding: 6px 8px; border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 4px; background: rgba(255,255,255,0.06); color: #fff; font-size: 12px;
+        }
+        .sidebar-project-info input::placeholder { color: rgba(255,255,255,0.35); }
         .tank-card {
             background: #1a2f5e;
             border-radius: 6px;
@@ -208,16 +249,6 @@
         }
         .tank-status-pass { color: #4ade80; }
         .tank-status-fail { color: #f87171; }
-
-        .sidebar-footer {
-            padding: 10px 12px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            font-size: 11px;
-            color: #94a3b8;
-        }
-        .sidebar-footer .cum-total {
-            font-size: 13px; font-weight: bold; color: #60a5fa;
-        }
 
         /* ══ CENTER: INPUTS + RESULTS ══ */
         .center-panel {
@@ -397,15 +428,6 @@
         .cum-bom-row:last-child { border-bottom: none; }
         .cum-bom-label { color: var(--text); opacity: 0.75; }
         .cum-bom-val { font-weight: bold; color: var(--accent); }
-        .cum-highlight {
-            background: var(--ltblue);
-            border-radius: 6px;
-            padding: 10px;
-            margin: 10px 0;
-            text-align: center;
-        }
-        .cum-highlight-label { font-size: 10px; opacity: 0.7; margin-bottom: 3px; }
-        .cum-highlight-val { font-size: 18px; font-weight: bold; color: var(--accent); }
 
         /* Pricing */
         .price-box {
@@ -587,24 +609,47 @@
 
 <!-- ══ TOP BAR ══ -->
 <div class="topbar">
-    <div class="topbar-left">
-        <img src="/static/aquacell-logo.png" alt="AquaCell" onerror="this.style.display='none'">
-        <div>
-            <div class="topbar-title">
-                AquaCell Multi-Tank Calculator
-                <span class="topbar-badge" id="tankCountBadge">0 Tanks</span>
+    <div class="topbar-row">
+        <div class="topbar-left">
+            <img src="/static/aquacell-logo.png" alt="AquaCell" onerror="this.style.display='none'">
+            <div>
+                <div class="topbar-title">
+                    AquaCell Multi-Tank Calculator - External (Beta)
+                    <span class="topbar-badge" id="tankCountBadge">0 Tanks</span>
+                </div>
+                <div class="topbar-sub">Aggregate multi-tank BOMs into one cumulative order</div>
             </div>
-            <div class="topbar-sub">Aggregate multi-tank BOMs into one cumulative order</div>
+        </div>
+        <div class="topbar-actions">
+            <button class="topbar-btn" onclick="newProject()" style="background:#dc3545;color:#fff;" title="Clear the dashboard and start a fresh project">🆕 New Project</button>
+            <a href="/" class="back-link">← Single Tank</a>
+            <a href="/design-tools" class="topbar-btn" style="background:#7c3aed;color:#fff;text-decoration:none;"
+               onclick="return confirm('Heads up: switching to Design Tools will leave this session. Any unsaved entries here will be lost unless you\'ve exported. Continue?');">
+                🧮 Design Tools
+            </a>
+            <button id="themeToggle" class="topbar-btn" style="background:transparent;color:#fff;font-size:18px;padding:4px 9px;">☀️</button>
         </div>
     </div>
-    <div class="topbar-actions">
-        <button class="topbar-btn" onclick="newProject()" style="background:#dc3545;color:#fff;" title="Clear the dashboard and start a fresh project">🆕 New Project</button>
-        <a href="/" class="back-link">← Single Tank</a>
-        <a href="/design-tools" class="topbar-btn" style="background:#7c3aed;color:#fff;text-decoration:none;"
-           onclick="return confirm('Heads up: switching to Design Tools will leave this session. Any unsaved entries here will be lost unless you\'ve exported. Continue?');">
-            🧮 Design Tools
-        </a>
-        <button id="themeToggle" class="topbar-btn" style="background:transparent;color:#fff;font-size:18px;padding:4px 9px;">☀️</button>
+
+    <!-- Quick-glance dashboard — cumulative totals across all calculated tanks -->
+    <div class="topbar-dash">
+        <div class="tb-box">
+            <div class="tb-box-title">💧 Cumulative System Totals</div>
+            <div class="tb-metrics">
+                <div class="tb-metric">
+                    <span class="tb-label">Tank Storage</span>
+                    <span class="tb-value" id="tb_cum_tank_storage">— ft³</span>
+                </div>
+                <div class="tb-metric">
+                    <span class="tb-label">Stone Storage</span>
+                    <span class="tb-value" id="tb_cum_stone_storage">— ft³</span>
+                </div>
+                <div class="tb-metric">
+                    <span class="tb-label">Total System</span>
+                    <span class="tb-value" id="tb_cum_total_storage">— ft³</span>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -614,16 +659,31 @@
     <div class="sidebar">
         <div class="sidebar-header">
             <div class="sidebar-header-title">Tanks in Project</div>
-            <button class="btn-add-tank" onclick="addTank()">+ Add Tank</button>
+            <button class="btn-add-tank" id="btnAddTank" onclick="addTank()">+ Add Tank</button>
         </div>
-        <div class="tank-list" id="tankList">
-            <!-- Tank cards injected by JS -->
-        </div>
-        <div class="sidebar-footer" id="sidebarFooter" style="display:none;">
-            <div style="margin-bottom:4px;">Combined Tank Storage</div>
-            <div class="cum-total" id="sfTankStorage">— ft³</div>
-            <div style="margin-top:6px;opacity:0.7;">Total System Storage (+ stone)</div>
-            <div class="cum-total" style="color:#4ade80;" id="sfTotalStorage">— ft³</div>
+        <div class="sidebar-scroll">
+            <div class="tank-list" id="tankList">
+                <!-- Tank cards injected by JS -->
+            </div>
+            <div class="sidebar-project-info">
+                <div class="section-label-sm">Project Info (for Quote)</div>
+                <label>Project Name</label>
+                <input type="text" id="q_project_name" placeholder="My Project">
+                <label>Project Number</label>
+                <input type="text" id="q_project_num" placeholder="2025-001">
+                <label>Client</label>
+                <input type="text" id="q_client" placeholder="Client Name">
+                <label>Location</label>
+                <input type="text" id="q_location" placeholder="City, State">
+                <label>Site Address (Project Address)</label>
+                <input type="text" id="q_site_address" placeholder="Street, City, State, ZIP">
+                <label>Estimator (Wavin Rep)</label>
+                <input type="text" id="q_estimator" placeholder="Your Name">
+                <label>Estimator Email</label>
+                <input type="text" id="q_estimator_email" placeholder="you@wavin.com">
+                <label>Project Notes</label>
+                <input type="text" id="q_notes" placeholder="Optional notes for header">
+            </div>
         </div>
         <div style="padding:10px 12px;border-top:1px solid rgba(255,255,255,0.1);">
             <button type="button" onclick="resetForm()"
@@ -1226,18 +1286,25 @@
         <div class="cum-title">📋 Cumulative BOM</div>
         <div style="font-size:11px;opacity:0.6;margin-bottom:10px;">Aggregated across all calculated tanks</div>
 
-        <div class="cum-highlight">
-            <div class="cum-highlight-label">Combined AquaCell Tank Storage</div>
-            <div class="cum-highlight-val" id="cum_tank_storage">— ft³</div>
+        <!-- ── Pricing (hard-coded component costing — mirrors single-tank) ── -->
+        <!-- Moved to top per spec -->
+        <div style="font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;opacity:0.65;margin:0 0 6px;">💲 Price Estimation</div>
+        <div class="price-box">
+            <label>Markup % <span style="font-weight:normal;opacity:0.6;">(÷ method: 10% agent · 20% market)</span></label>
+            <input type="number" id="markupPct" step="0.1" value="10" oninput="calcPrice()">
+            <label>Freight % of Selling Price</label>
+            <input type="number" id="freightPct" step="0.1" value="10" oninput="calcPrice()">
+            <div class="price-row"><span>Calculated Cost (floor)</span><strong id="priceFloorCost" style="color:#00b0ff;">—</strong></div>
+            <div class="price-row"><span>Selling Price (w/ markup)</span><strong id="priceSubtotal" style="color:#2ecc71;">—</strong></div>
+            <div class="price-row"><span>Est. Freight</span><strong id="priceFreight" style="color:#e67e22;">—</strong></div>
+            <div class="price-total">
+                <span>Total to Customer</span>
+                <span id="priceTotal">—</span>
+            </div>
+            <div class="price-row" style="margin-top:6px;border-top:1px dashed var(--border);padding-top:8px;">
+                <span>Selling Price / ft³ tank storage</span><strong id="priceCostPerFt3" style="color:#00b0ff;">—</strong>
+            </div>
         </div>
-        <div class="cum-highlight" style="background:var(--ltgrn);">
-            <div class="cum-highlight-label">Combined Total System Storage</div>
-            <div class="cum-highlight-val" style="color:var(--green);" id="cum_total_storage">— ft³</div>
-        </div>
-
-        <!-- Tank summary table -->
-        <div style="font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;opacity:0.65;margin:12px 0 6px;">Tank Breakdown</div>
-        <div id="cum_tank_summary" style="font-size:11px;opacity:0.5;">Add and calculate tanks to see summary.</div>
 
         <!-- BOM rows -->
         <div style="font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;opacity:0.65;margin:14px 0 6px;">AquaCell Components</div>
@@ -1331,48 +1398,13 @@
             <span class="cum-bom-val" id="cum_stone_yd3">—</span>
         </div>
 
-        <!-- ── Pricing (hard-coded component costing — mirrors single-tank) ── -->
-        <div style="font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;opacity:0.65;margin:14px 0 6px;">💲 Price Estimation</div>
-        <div class="price-box">
-            <label>Markup % <span style="font-weight:normal;opacity:0.6;">(÷ method: 10% agent · 20% market)</span></label>
-            <input type="number" id="markupPct" step="0.1" value="10" oninput="calcPrice()">
-            <label>Freight % of Selling Price</label>
-            <input type="number" id="freightPct" step="0.1" value="10" oninput="calcPrice()">
-            <div class="price-row"><span>Calculated Cost (floor)</span><strong id="priceFloorCost" style="color:#00b0ff;">—</strong></div>
-            <div class="price-row"><span>Selling Price (w/ markup)</span><strong id="priceSubtotal" style="color:#2ecc71;">—</strong></div>
-            <div class="price-row"><span>Est. Freight</span><strong id="priceFreight" style="color:#e67e22;">—</strong></div>
-            <div class="price-total">
-                <span>Total to Customer</span>
-                <span id="priceTotal">—</span>
-            </div>
-            <div class="price-row" style="margin-top:6px;border-top:1px dashed var(--border);padding-top:8px;">
-                <span>Selling Price / ft³ tank storage</span><strong id="priceCostPerFt3" style="color:#00b0ff;">—</strong>
-            </div>
-        </div>
+        <!-- Tank summary table — moved to bottom per spec -->
+        <div style="font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;opacity:0.65;margin:14px 0 6px;">Tank Breakdown</div>
+        <div id="cum_tank_summary" style="font-size:11px;opacity:0.5;">Add and calculate tanks to see summary.</div>
 
-        <!-- ── Project Info for Quote ── -->
-        <div style="font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.04em;opacity:0.65;margin:14px 0 6px;">Project Info (for Quote)</div>
-        <div class="price-box">
-            <label>Project Name</label>
-            <input type="text" id="q_project_name" placeholder="My Project">
-            <label>Project Number</label>
-            <input type="text" id="q_project_num" placeholder="2025-001">
-            <label>Client</label>
-            <input type="text" id="q_client" placeholder="Client Name">
-            <label>Location</label>
-            <input type="text" id="q_location" placeholder="City, State">
-            <label>Site Address (Project Address)</label>
-            <input type="text" id="q_site_address" placeholder="Street, City, State, ZIP">
-            <label>Estimator (Wavin Rep)</label>
-            <input type="text" id="q_estimator" placeholder="Your Name">
-            <label>Estimator Email</label>
-            <input type="text" id="q_estimator_email" placeholder="you@wavin.com">
-            <label>Project Notes</label>
-            <input type="text" id="q_notes" placeholder="Optional notes for header">
-        </div>
-
+        <!-- Project Info (for Quote) relocated to the left sidebar -->
         <!-- Quote / Tank Summary / CS Export now live in the bottom command bar -->
-        <button class="btn-json" onclick="exportJSON()">⬇ Export Project JSON</button>
+        <button class="btn-json" onclick="exportJSON()" style="margin-top:14px;">⬇ Export Project JSON</button>
     </div>
 
 </div><!-- /main-split -->
@@ -1446,7 +1478,13 @@ function defaultTankData(label) {
     };
 }
 
+const MAX_TANKS_PER_PROJECT = 5;
+
 function addTank() {
+    if (tanks.length >= MAX_TANKS_PER_PROJECT) {
+        alert(`This project already has ${MAX_TANKS_PER_PROJECT} tanks, the maximum for one project.\n\nBeyond ${MAX_TANKS_PER_PROJECT} tanks the results get too dense to review at a glance — export this project, then start a second project for the remaining tanks.`);
+        return;
+    }
     const idx = tanks.length;
     const label = `Tank ${idx + 1}`;
     tanks.push(defaultTankData(label));
@@ -1505,6 +1543,15 @@ function renderSidebar() {
     const list = document.getElementById('tankList');
     list.innerHTML = '';
 
+    const addBtn = document.getElementById('btnAddTank');
+    if (addBtn) {
+        const atCap = tanks.length >= MAX_TANKS_PER_PROJECT;
+        addBtn.disabled = atCap;
+        addBtn.style.opacity = atCap ? '0.5' : '';
+        addBtn.style.cursor = atCap ? 'not-allowed' : '';
+        addBtn.title = atCap ? `Maximum ${MAX_TANKS_PER_PROJECT} tanks per project` : '';
+    }
+
     tanks.forEach((t, i) => {
         const r = results[i];
         const div = document.createElement('div');
@@ -1547,18 +1594,9 @@ function renderSidebar() {
     });
 
     document.getElementById('tankCountBadge').textContent = tanks.length + ' Tank' + (tanks.length !== 1 ? 's' : '');
-
-    // Sidebar footer storage totals
-    const calcedTanks = results.filter(Boolean);
-    if (calcedTanks.length > 0) {
-        const totTank  = calcedTanks.reduce((s, r) => s + r.tank_storage,  0);
-        const totTotal = calcedTanks.reduce((s, r) => s + r.total_storage, 0);
-        document.getElementById('sfTankStorage').textContent  = totTank.toFixed(1)  + ' ft³';
-        document.getElementById('sfTotalStorage').textContent = totTotal.toFixed(1) + ' ft³';
-        document.getElementById('sidebarFooter').style.display = '';
-    } else {
-        document.getElementById('sidebarFooter').style.display = 'none';
-    }
+    // Cumulative storage totals now live in the top-bar dashboard (see
+    // renderCumulative()/clearCumulative()), fed from the authoritative
+    // server `cum` object rather than a separate client-side reduce.
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -2023,8 +2061,10 @@ function renderCumulative(data) {
     const cum = data.cumulative;
     const det = data.bom_detail;
 
-    setEl('cum_tank_storage',   fmtNum(cum.tank_storage, 1) + ' ft³');
-    setEl('cum_total_storage',  fmtNum(cum.total_storage, 1) + ' ft³');
+    // Cumulative storage totals — top-bar quick-glance dashboard
+    setEl('tb_cum_tank_storage',  fmtNum(cum.tank_storage, 1) + ' ft³');
+    setEl('tb_cum_stone_storage', fmtNum(cum.total_storage - cum.tank_storage, 1) + ' ft³');
+    setEl('tb_cum_total_storage', fmtNum(cum.total_storage, 1) + ' ft³');
     setEl('cum_base_units',     cum.base_units.toLocaleString());
     setEl('cum_side_plates',    cum.side_plates.toLocaleString());
     setEl('cum_bottom_plates',  cum.bottom_plates.toLocaleString());
@@ -2068,7 +2108,7 @@ function renderCumulative(data) {
 
 function clearCumulative() {
     window._lastCumData = null;
-    ['cum_tank_storage','cum_total_storage','cum_base_units','cum_side_plates',
+    ['tb_cum_tank_storage','tb_cum_stone_storage','tb_cum_total_storage','cum_base_units','cum_side_plates',
      'cum_bottom_plates','cum_pipe_connectors','cum_top_adapters_12','cum_top_adapters_16',
      'cum_weight','cum_pallets',
      'cum_geo_tank_yd2','cum_geo_stone_yd2','cum_geo',
