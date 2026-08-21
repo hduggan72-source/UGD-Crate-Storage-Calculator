@@ -1201,6 +1201,65 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         {% if results %}
         <div class="results">
 
+            <!-- ══ CARD 0: Price Estimation (moved to top per F) ══ -->
+            <div class="result-card">
+                <div class="result-card-header" onclick="toggleResultCard(this)"><span>💲 AquaCell Price Estimation</span><span class="rc-arrow">▼</span></div>
+                <div class="result-card-body">
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+                        <div>
+                            <label style="display:block;font-size:12px;opacity:0.7;margin-bottom:4px;">Markup % <span style="font-size:10px;color:#64748b;">(÷ method: 10% agent · 20% market)</span></label>
+                            <input type="number" id="markupPct" step="0.1" placeholder="e.g., 10 or 20" value="10"
+                                style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:12px;opacity:0.7;margin-bottom:4px;">Freight % of Selling Price</label>
+                            <input type="number" id="freightPct" step="0.1" placeholder="e.g., 10" value="10"
+                                style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
+                        </div>
+                        <div style="align-self:end;">
+                            <button type="button" onclick="calculateAquaCellPrice()"
+                                style="width:100%;padding:10px;background:#00b0ff;color:white;border:none;border-radius:4px;font-size:14px;font-weight:bold;cursor:pointer;">
+                                Calculate Price
+                            </button>
+                        </div>
+                    </div>
+                    <div class="result-grid2" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
+                        <div class="result-stat">
+                            <div class="result-stat-label">Calculated Cost</div>
+                            <div id="priceFloorCost" class="result-stat-value" style="color:#00b0ff;">—</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Selling Price</div>
+                            <div id="priceSubtotal" class="result-stat-value" style="color:#2ecc71;">—</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">Est. Freight</div>
+                            <div id="priceFreight" class="result-stat-value" style="color:#f39c12;">—</div>
+                        </div>
+                        <div class="result-stat" style="border:1px solid #2ecc71;border-radius:6px;">
+                            <div class="result-stat-label" style="color:#2ecc71;">Total to Customer</div>
+                            <div id="priceTotalCost" class="result-stat-value" style="color:#2ecc71;">—</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:8px;">
+                        <div class="result-stat" style="border:1px solid #00b0ff;border-radius:6px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                            <div>
+                                <div class="result-stat-label" style="color:#00b0ff;">Selling Price per ft³ of AquaCell Tank Storage</div>
+                                <div style="font-size:10px;opacity:0.55;margin-top:2px;">Selling Price ÷ Tank ft³ &nbsp;|&nbsp; set Markup % = 0 for floor cost/ft³</div>
+                            </div>
+                            <div id="priceCostPerFt3" class="result-stat-value" style="color:#00b0ff;font-size:20px;white-space:nowrap;">—</div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="hiddenFloorCost"        name="floorCost"        value="">
+                    <input type="hidden" id="hiddenTotalAquaCellCost" name="totalAquaCellCost" value="">
+                    <input type="hidden" id="hiddenFreightCost"      name="freightCost"      value="">
+                    <input type="hidden" id="hiddenTotalWithFreight" name="totalWithFreight" value="">
+                    <input type="hidden" id="hiddenFreightPct"       name="freightPct"       value="">
+                    <input type="hidden" id="hiddenMarkupPct"        name="markupPct"        value="">
+                </div>
+            </div>
+
             <!-- ══ CARD 1: Storage Summary (TOP — estimator's primary check) ══ -->
             <div class="result-card">
                 <div class="result-card-header" onclick="toggleResultCard(this)"><span>💧 Storage Summary</span><span class="rc-arrow">▼</span></div>
@@ -1399,65 +1458,6 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 setEl('bom_total_pallets', totalPallets.toLocaleString() + ' pallets');
             })();
             </script>
-
-            <!-- ══ CARD 3: Price Estimation ══ -->
-            <div class="result-card">
-                <div class="result-card-header" onclick="toggleResultCard(this)"><span>💲 AquaCell Price Estimation</span><span class="rc-arrow">▼</span></div>
-                <div class="result-card-body">
-
-                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
-                        <div>
-                            <label style="display:block;font-size:12px;opacity:0.7;margin-bottom:4px;">Markup % <span style="font-size:10px;color:#64748b;">(÷ method: 10% agent · 20% market)</span></label>
-                            <input type="number" id="markupPct" step="0.1" placeholder="e.g., 10 or 20" value="10"
-                                style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
-                        </div>
-                        <div>
-                            <label style="display:block;font-size:12px;opacity:0.7;margin-bottom:4px;">Freight % of Selling Price</label>
-                            <input type="number" id="freightPct" step="0.1" placeholder="e.g., 10" value="10"
-                                style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
-                        </div>
-                        <div style="align-self:end;">
-                            <button type="button" onclick="calculateAquaCellPrice()"
-                                style="width:100%;padding:10px;background:#00b0ff;color:white;border:none;border-radius:4px;font-size:14px;font-weight:bold;cursor:pointer;">
-                                Calculate Price
-                            </button>
-                        </div>
-                    </div>
-                    <div class="result-grid2" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
-                        <div class="result-stat">
-                            <div class="result-stat-label">Calculated Cost</div>
-                            <div id="priceFloorCost" class="result-stat-value" style="color:#00b0ff;">—</div>
-                        </div>
-                        <div class="result-stat">
-                            <div class="result-stat-label">Selling Price</div>
-                            <div id="priceSubtotal" class="result-stat-value" style="color:#2ecc71;">—</div>
-                        </div>
-                        <div class="result-stat">
-                            <div class="result-stat-label">Est. Freight</div>
-                            <div id="priceFreight" class="result-stat-value" style="color:#f39c12;">—</div>
-                        </div>
-                        <div class="result-stat" style="border:1px solid #2ecc71;border-radius:6px;">
-                            <div class="result-stat-label" style="color:#2ecc71;">Total to Customer</div>
-                            <div id="priceTotalCost" class="result-stat-value" style="color:#2ecc71;">—</div>
-                        </div>
-                    </div>
-                    <div style="margin-top:8px;">
-                        <div class="result-stat" style="border:1px solid #00b0ff;border-radius:6px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-                            <div>
-                                <div class="result-stat-label" style="color:#00b0ff;">Selling Price per ft³ of AquaCell Tank Storage</div>
-                                <div style="font-size:10px;opacity:0.55;margin-top:2px;">Selling Price ÷ Tank ft³ &nbsp;|&nbsp; set Markup % = 0 for floor cost/ft³</div>
-                            </div>
-                            <div id="priceCostPerFt3" class="result-stat-value" style="color:#00b0ff;font-size:20px;white-space:nowrap;">—</div>
-                        </div>
-                    </div>
-                    <input type="hidden" id="hiddenFloorCost"        name="floorCost"        value="">
-                    <input type="hidden" id="hiddenTotalAquaCellCost" name="totalAquaCellCost" value="">
-                    <input type="hidden" id="hiddenFreightCost"      name="freightCost"      value="">
-                    <input type="hidden" id="hiddenTotalWithFreight" name="totalWithFreight" value="">
-                    <input type="hidden" id="hiddenFreightPct"       name="freightPct"       value="">
-                    <input type="hidden" id="hiddenMarkupPct"        name="markupPct"        value="">
-                </div>
-            </div>
 
             <!-- ══ CARD 4: Stone Backfill ══ -->
             <div class="result-card">
