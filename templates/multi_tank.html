@@ -67,6 +67,56 @@
         }
         .topbar-btn:hover { opacity: 0.85; }
 
+        /* ══ BOTTOM COMMAND BAR ══ */
+        .bottombar {
+            background: var(--navy);
+            border-top: 2px solid #1a3260;
+            flex-shrink: 0;
+            display: flex;
+            gap: 10px;
+            padding: 8px 18px;
+            z-index: 100;
+        }
+        .bottombar-btn {
+            flex: 1;
+            padding: 10px 8px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            text-align: center;
+            color: #fff;
+        }
+
+        /* ══ Floating scroll buttons (center panel) ══ */
+        .float-nav {
+            position: fixed;
+            bottom: 80px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 200;
+        }
+        .float-nav.center { right: 322px; }
+        .float-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--accent);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+            opacity: 0.85;
+            transition: opacity 0.15s, transform 0.15s;
+        }
+        .float-btn:hover { opacity: 1; transform: scale(1.1); }
+
         /* ══ MAIN SPLIT ══ */
         .main-split {
             display: flex;
@@ -411,7 +461,7 @@
 
         /* Toast */
         .toast {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
             background: #1e3a8a; color: #fff; padding: 10px 20px;
             border-radius: 6px; font-size: 13px; font-weight: bold;
             opacity: 0; pointer-events: none; transition: opacity 0.3s;
@@ -548,25 +598,12 @@
         </div>
     </div>
     <div class="topbar-actions">
+        <button class="topbar-btn" onclick="newProject()" style="background:#dc3545;color:#fff;" title="Clear the dashboard and start a fresh project">🆕 New Project</button>
         <a href="/" class="back-link">← Single Tank</a>
         <a href="/design-tools" class="topbar-btn" style="background:#7c3aed;color:#fff;text-decoration:none;"
            onclick="return confirm('Heads up: switching to Design Tools will leave this session. Any unsaved entries here will be lost unless you\'ve exported. Continue?');">
             🧮 Design Tools
         </a>
-        <select id="stageIncrementIn" title="Stage-storage increment for the per-tank CSVs"
-            style="background:#0d2438;color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:5px 6px;font-size:12px;cursor:pointer;">
-            <option value="1">1 in</option>
-            <option value="3">3 in</option>
-            <option value="6">6 in</option>
-            <option value="12" selected>12 in (1 ft)</option>
-        </select>
-        <button class="topbar-btn" onclick="downloadStageCSVs()" style="background:#16a34a;color:#fff;" title="Download a stage-storage CSV for each calculated tank (bundled as a ZIP)">📊 Stage CSVs</button>
-        <button class="topbar-btn" onclick="openDetailsModal()" style="background:#0f4c81;color:white;border:1px solid #3b82f6;" title="Browse and export AquaCell detail sheets from the GitHub repository">📋 Details</button>
-        <button class="topbar-btn" onclick="copyToClipboard()" style="background:#6f42c1;color:#fff;">📋 Copy</button>
-        <button class="topbar-btn" onclick="exportJSON()" style="background:#0891b2;color:#fff;">⬇ Export JSON</button>
-        <button class="topbar-btn" onclick="importJSON()" style="background:#ffc107;color:#212529;">Import JSON</button>
-        <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImport(event)">
-        <button class="topbar-btn" onclick="newProject()" style="background:#dc3545;color:#fff;" title="Clear the dashboard and start a fresh project">🆕 New Project</button>
         <button id="themeToggle" class="topbar-btn" style="background:transparent;color:#fff;font-size:18px;padding:4px 9px;">☀️</button>
     </div>
 </div>
@@ -587,6 +624,20 @@
             <div class="cum-total" id="sfTankStorage">— ft³</div>
             <div style="margin-top:6px;opacity:0.7;">Total System Storage (+ stone)</div>
             <div class="cum-total" style="color:#4ade80;" id="sfTotalStorage">— ft³</div>
+        </div>
+        <div style="padding:10px 12px;border-top:1px solid rgba(255,255,255,0.1);">
+            <button type="button" onclick="resetForm()"
+                style="width:100%;padding:9px;background:#6c757d;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:bold;cursor:pointer;margin-bottom:8px;"
+                title="Clear the currently selected tank's inputs back to blank">
+                Reset Form
+            </button>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <button type="button" onclick="importJSON()"
+                    style="padding:9px;background:#ffc107;color:#212529;border:none;border-radius:5px;font-size:13px;font-weight:bold;cursor:pointer;">Import</button>
+                <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImport(event)">
+                <button type="button" onclick="exportJSON()"
+                    style="padding:9px;background:#0891b2;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:bold;cursor:pointer;">Export</button>
+            </div>
         </div>
     </div>
 
@@ -1000,7 +1051,7 @@
                 </div>
             </div>
 
-            <button class="calc-btn" onclick="calculateCurrentTank()">▶ Calculate This Tank</button>
+            <!-- Calculate button now lives in the bottom command bar -->
         </div>
 
         <!-- ══ RESULTS for selected tank ══ -->
@@ -1320,13 +1371,37 @@
             <input type="text" id="q_notes" placeholder="Optional notes for header">
         </div>
 
-        <button class="btn-quote" onclick="downloadQuote()">📄 Download Quote PDF</button>
-                <button class="btn-quote" onclick="downloadTankSummary()" style="margin-left:8px;background:#1a7a3a;">📋 Download Tank Summary PDF</button>
-                <button class="btn-quote" onclick="downloadPriceCSV()" style="margin-left:8px;background:#0d9488;">💲 CS Export CSV</button>
+        <!-- Quote / Tank Summary / CS Export now live in the bottom command bar -->
         <button class="btn-json" onclick="exportJSON()">⬇ Export Project JSON</button>
     </div>
 
 </div><!-- /main-split -->
+
+<!-- ══ BOTTOM COMMAND BAR ══ -->
+<div class="bottombar">
+    <button type="button" class="bottombar-btn" onclick="calculateCurrentTank()" style="background:#007bff;">▶ Calculate Tank</button>
+    <button type="button" class="bottombar-btn" onclick="downloadQuote()" style="background:#e67e22;">📄 Quote</button>
+    <button type="button" class="bottombar-btn" onclick="downloadTankSummary()" style="background:#1a7a3a;">📋 Report</button>
+    <button type="button" class="bottombar-btn" onclick="downloadPriceCSV()" style="background:#0d9488;">💲 CS Export</button>
+    <div style="flex:1;display:flex;gap:6px;">
+        <button type="button" class="bottombar-btn" onclick="downloadStageCSVs()" style="background:#16a34a;" title="Download a stage-storage CSV for each calculated tank (bundled as a ZIP)">📊 Stage CSVs</button>
+        <select id="stageIncrementIn" title="Stage-storage increment for the per-tank CSVs"
+            style="background:#0d2438;color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:5px 6px;font-size:12px;cursor:pointer;">
+            <option value="1">1 in</option>
+            <option value="3">3 in</option>
+            <option value="6">6 in</option>
+            <option value="12" selected>12 in (1 ft)</option>
+        </select>
+    </div>
+    <button type="button" class="bottombar-btn" onclick="openDetailsModal()" style="background:#0f4c81;border:1px solid #3b82f6;" title="Browse and export AquaCell detail sheets from the GitHub repository">📋 Details</button>
+    <button type="button" class="bottombar-btn" onclick="copyToClipboard()" style="background:#6f42c1;">📋 Copy</button>
+</div>
+
+<!-- ══ Floating scroll buttons: CENTER panel ══ -->
+<div class="float-nav center" id="floatNavCenter" style="display:none;">
+    <button class="float-btn" onclick="document.getElementById('centerPanel').scrollTo({top:0,behavior:'smooth'})" title="Top of tank editor">▲</button>
+    <button class="float-btn" onclick="document.getElementById('centerPanel').scrollTo({top:99999,behavior:'smooth'})" title="Bottom of tank editor">▼</button>
+</div>
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
@@ -1346,10 +1421,8 @@ const WEIGHTS = { base:25.18, side:4.91, bottom:7.86, pipe:2.70, adapter12:11.02
 // ══════════════════════════════════════════════════════════════════
 //  TANK LIFECYCLE
 // ══════════════════════════════════════════════════════════════════
-function addTank() {
-    const idx = tanks.length;
-    const label = `Tank ${idx + 1}`;
-    tanks.push({
+function defaultTankData(label) {
+    return {
         tank_label: label,
         config: 'SC', layers: '3', traffic_load: 'HS20',
         known_width: '', known_length: '',
@@ -1370,11 +1443,34 @@ function addTank() {
         ptrow_flow_areas: [{label:'Area 1', cfs:0}], ptrow_method: 'volume',
         liner_on_tank: false, liner_on_stone: false,
         geogrid_enabled: false, liner_enabled: false,
-    });
+    };
+}
+
+function addTank() {
+    const idx = tanks.length;
+    const label = `Tank ${idx + 1}`;
+    tanks.push(defaultTankData(label));
     results.push(null);
     renderSidebar();
     selectTank(idx);
     showToast(`✓ ${label} added`);
+}
+
+// Resets the currently selected tank's inputs back to blank -- the
+// multi-tank analog of single-tank's Reset Form. Clears only the active
+// tank's fields/results; does not touch other tanks or remove it from
+// the list (that's what the tank card's delete button is for).
+function resetForm() {
+    if (activeIdx === null) { showToast('Select a tank first'); return; }
+    const label = tanks[activeIdx].tank_label || `Tank ${activeIdx + 1}`;
+    if (!confirm(`Reset "${label}" back to blank inputs? This clears everything entered for this tank.`)) return;
+    tanks[activeIdx] = defaultTankData(`Tank ${activeIdx + 1}`);
+    results[activeIdx] = null;
+    renderSidebar();
+    loadEditor(activeIdx);
+    clearResults();
+    rebuildCumulative();
+    showToast(`✓ ${label} reset`);
 }
 
 function deleteTank(idx, ev) {
@@ -2431,6 +2527,21 @@ toggleBtn.addEventListener('click', () => {
         localStorage.setItem('ac_theme', 'dark');
     }
 });
+
+// ══════════════════════════════════════════════════════════════════
+//  FLOATING SCROLL NAV — center panel
+// ══════════════════════════════════════════════════════════════════
+(function initFloatNavCenter() {
+    const centerPanel = document.getElementById('centerPanel');
+    const navCenter    = document.getElementById('floatNavCenter');
+    if (!centerPanel || !navCenter) return;
+    function check() {
+        navCenter.style.display = centerPanel.scrollHeight > centerPanel.clientHeight + 20 ? 'flex' : 'none';
+    }
+    check();
+    centerPanel.addEventListener('scroll', check, { passive: true });
+    new MutationObserver(check).observe(centerPanel, { childList: true, subtree: true });
+})();
 
 
 // ══════════════════════════════════════════════════════════════════
