@@ -33,6 +33,17 @@ def _check_beta_enabled():
     return render_template('beta_unavailable.html'), 503
 
 
+@app.before_request
+def _check_multi_tank_beta_scope():
+    # Multi-tank is explicitly out of scope for the client-facing BETA (single-
+    # tank only) — PRICING_ENABLED=False is the same flag that marks this
+    # deployment as the BETA build. Block every /multi* route (page, calculate,
+    # and all downloads) rather than just stripping pricing from multi_tank.html,
+    # since that template is otherwise untouched.
+    if not PRICING_ENABLED and request.path.startswith('/multi'):
+        abort(404)
+
+
 # ── Module-level crate dimensions (used by all calc functions) ──
 MODULE_WID = 1.9685   # ft
 MODULE_LEN = 3.937    # ft
