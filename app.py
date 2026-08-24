@@ -15,6 +15,24 @@ from pypdf import PdfWriter, PdfReader as PyPdfReader
 
 app = Flask(__name__)
 
+# ══════════════════════════════════════════════════════════════════
+#  CLIENT-FACING BETA CONFIG
+#  PRICING_ENABLED : set to "False" in Render env to strip all cost/quote
+#                     UI, JS, and routes for the client-facing BETA build.
+#  BETA_ENABLED    : manual kill switch — set to "False" in Render env to
+#                     take the BETA offline. No auto-expiry.
+# ══════════════════════════════════════════════════════════════════
+PRICING_ENABLED = os.environ.get("PRICING_ENABLED", "True").strip().lower() != "false"
+BETA_ENABLED    = os.environ.get("BETA_ENABLED", "True").strip().lower() != "false"
+
+
+@app.before_request
+def _check_beta_enabled():
+    if BETA_ENABLED or request.path.startswith('/static'):
+        return None
+    return render_template('beta_unavailable.html'), 503
+
+
 # ── Module-level crate dimensions (used by all calc functions) ──
 MODULE_WID = 1.9685   # ft
 MODULE_LEN = 3.937    # ft
@@ -1408,7 +1426,7 @@ def index():
         }
         form_data = request.form
 
-    return render_template('index.html', results=results, form_data=form_data)
+    return render_template('index.html', results=results, form_data=form_data, pricing_enabled=PRICING_ENABLED)
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -6709,6 +6727,8 @@ def download_stage_csv():
 
 @app.route('/download_quote', methods=['POST'])
 def download_quote():
+  if not PRICING_ENABLED:
+      abort(404)
   try:
 
       # ── Collect form fields ──────────────────────────────────────
@@ -7308,6 +7328,8 @@ def download_quote():
 # ══════════════════════════════════════════════════════════════════
 @app.route('/download_price_csv', methods=['POST'])
 def download_price_csv():
+    if not PRICING_ENABLED:
+        abort(404)
     try:
         import csv, io as _io
 
