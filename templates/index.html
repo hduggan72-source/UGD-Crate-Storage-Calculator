@@ -663,6 +663,7 @@
                 </div>
             </div>
         </div>
+        {% if pricing_enabled %}
         <div class="tb-box">
             <div class="tb-box-title">💲 AquaCell Price Estimation</div>
             <div class="tb-metrics">
@@ -684,6 +685,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
         {% else %}
         <div class="tb-dash-empty">Run <strong>Calculate System</strong> to see the storage and cover/load summary here.</div>
         {% endif %}
@@ -1200,6 +1202,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         {% if results %}
         <div class="results">
 
+            {% if pricing_enabled %}
             <!-- ══ CARD 0: Price Estimation (moved to top per F) ══ -->
             <div class="result-card">
                 <div class="result-card-header" onclick="toggleResultCard(this)"><span>💲 AquaCell Price Estimation</span><span class="rc-arrow">▼</span></div>
@@ -1258,6 +1261,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     <input type="hidden" id="hiddenMarkupPct"        name="markupPct"        value="">
                 </div>
             </div>
+            {% endif %}
 
             <!-- ══ CARD 1: Storage Summary (TOP — estimator's primary check) ══ -->
             <div class="result-card">
@@ -2990,9 +2994,13 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
 <!-- ══════════════ BOTTOM COMMAND BAR ══════════════ -->
 <div class="bottombar">
     <button type="submit" form="mainForm" class="bottombar-btn" style="background:#007bff;color:white;">▶ Calculate</button>
+    {% if pricing_enabled %}
     <button type="button" class="bottombar-btn" onclick="downloadQuote()" style="background:#e67e22;color:white;">📄 Quote</button>
+    {% endif %}
     <button type="button" class="bottombar-btn" onclick="downloadPDF()" style="background:#28a745;color:white;">⬇ Report</button>
+    {% if pricing_enabled %}
     <button type="button" class="bottombar-btn" onclick="downloadPriceCSV()" style="background:#0d9488;color:white;">💲 CS Export</button>
+    {% endif %}
     <button type="button" class="bottombar-btn" onclick="downloadStageCSV()" style="background:#0891b2;color:white;">📊 Stage CSV</button>
     <button type="button" class="bottombar-btn" onclick="downloadStagePNG()" style="background:#28a745;color:white;">📈 Stage PNG</button>
     <button type="button" class="bottombar-btn" onclick="openDetailsModal()" style="background:#0f4c81;color:white;border:1px solid #3b82f6;">📋 Details</button>
@@ -3049,7 +3057,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     function downloadPDF() {
         const form = document.getElementById('mainForm');
         const formData = new FormData(form);
-        formData.append('totalAquaCellCost', document.getElementById('hiddenTotalAquaCellCost').value || '—');
+        formData.append('totalAquaCellCost', document.getElementById('hiddenTotalAquaCellCost')?.value || '—');
 
         // Stone layer inclusion toggles — always pass explicitly so Flask gets them
         // even if the Stone Backfill card is collapsed (collapsed inputs can be skipped by FormData)
@@ -3256,6 +3264,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         }
     }
 
+    {% if pricing_enabled %}
     function calculateAquaCellPrice() {
         // ── Hardcoded floor unit prices (update here on price increase) ──
         const UNIT_PRICES = {
@@ -3385,6 +3394,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         })
         .catch(() => alert('Quote download failed. Run Calculate System and Calculate Price first.'));
     }
+    {% endif %}
 
     function exportProject() {
         const data = {};
@@ -3883,6 +3893,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     document.getElementById('base_stone').addEventListener('input', renderSheet);
 
     // ====================== CS PRICE CSV EXPORT ======================
+    {% if pricing_enabled %}
     function downloadPriceCSV() {
         const UNIT_PRICES = { base:42.47, side:21.31, bottom:18.71, pipe:28.53, adapter12:96.54, adapter16:170.60 };
         const form = document.getElementById('mainForm');
@@ -3921,6 +3932,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             })
             .catch(err => alert('CSV export failed: ' + err.message));
     }
+    {% endif %}
 
     // ====================== STAGE PNG/CSV ======================
     function downloadStagePNG() {
