@@ -604,10 +604,12 @@
         </div>
         <div class="topbar-actions">
             <button class="topbar-btn" onclick="newProject()" style="background:#dc3545;color:white;" title="Clear the dashboard and start a fresh project">🆕 New Project</button>
+            {% if pricing_enabled %}
             <a href="/multi" class="topbar-btn" style="background:#0891b2;color:white;text-decoration:none;"
                onclick="return confirm('Heads up: switching to Multi-Tank will leave this single-tank session. Any unsaved entries here will be lost unless you\'ve exported. Continue?');">
                 🏗️ Multi-Tank
             </a>
+            {% endif %}
             <a href="/design-tools" class="topbar-btn" style="background:#7c3aed;color:white;text-decoration:none;"
                onclick="return confirm('Heads up: switching to Design Tools will leave this session. Any unsaved entries here will be lost unless you\'ve exported. Continue?');">
                 🧮 Design Tools
