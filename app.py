@@ -1463,6 +1463,46 @@ RM = 45           # right margin
 PW, PH = letter   # 612 x 792
 CW = PW - LM - RM # usable content width = 522
 
+# ══════════════════════════════════════════════════════════════════
+#  BETA EXPORT WATERMARK
+#  WATERMARK_EXPORTS : set to "True" in Render env to stamp every tool-
+#                       generated PDF with a diagonal "beta" notice.
+#                       Defaults off so this is a no-op anywhere it isn't
+#                       explicitly turned on. Does not apply to Document
+#                       Library downloads — those are pre-existing detail
+#                       sheets, not tool output.
+# ══════════════════════════════════════════════════════════════════
+WATERMARK_EXPORTS = os.environ.get("WATERMARK_EXPORTS", "False").strip().lower() == "true"
+
+
+def _draw_beta_watermark(c):
+    """Diagonal translucent BETA stamp, drawn once per page just before it's
+    finalized. Only called when WATERMARK_EXPORTS is on."""
+    c.saveState()
+    c.translate(PW / 2.0, PH / 2.0)
+    c.rotate(45)
+    c.setFillColor(RED)
+    c.setFillAlpha(0.14)
+    c.setFont('Helvetica-Bold', 40)
+    c.drawCentredString(0, 10, 'BETA — SUBJECT TO CHANGE')
+    c.setFont('Helvetica-Bold', 15)
+    c.drawCentredString(0, -34, 'Tool in Beta Testing / Development — Not for Construction')
+    c.restoreState()
+
+
+def _new_pdf_canvas(buffer):
+    """canvas.Canvas factory used by every PDF builder in this file. Wraps
+    showPage() on the instance so every page gets the BETA watermark stamped
+    on it before it's finalized, with zero changes needed in each builder."""
+    c = canvas.Canvas(buffer, pagesize=letter)
+    if WATERMARK_EXPORTS:
+        _orig_show_page = c.showPage
+        def _show_page_with_watermark():
+            _draw_beta_watermark(c)
+            _orig_show_page()
+        c.showPage = _show_page_with_watermark
+    return c
+
 # ── Multi-Tank shared constants ──
 CONFIG_DATA = {
     'SC': {
@@ -2114,7 +2154,7 @@ def build_buoyancy_pdf(inputs, results, project_name=None):
     Returns a BytesIO buffer positioned at 0.
     """
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = _new_pdf_canvas(buffer)
     generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
 
     # ── Header band ──
@@ -2365,7 +2405,7 @@ def _draw_fos_hero(c, y_top, value_display, sub_label, status, hero_h=64):
 def build_loading_truck_pdf(inputs, results, project_name=None):
     """Single-page submittal-ready PDF for the ASTM F2787 Truck Load Model."""
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = _new_pdf_canvas(buffer)
     generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
 
     band_h = 64
@@ -2524,7 +2564,7 @@ _LOADING_OUTRIGGER_BOLD_TRIGGERS = ('THE ENGINEER OF RECORD',)
 def build_loading_outrigger_pdf(inputs, results, project_name=None):
     """Single-page submittal-ready PDF for the AquaCell Outrigger Load Model."""
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = _new_pdf_canvas(buffer)
     generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
 
     band_h = 64
@@ -2714,7 +2754,7 @@ _EXCAVATION_SLOPE_BOLD_TRIGGERS = ('THE ENGINEER OF RECORD AND THE JOBSITE',)
 def build_excavation_slope_pdf(inputs, results, project_name=None):
     """Single-page submittal-ready PDF for the Excavation Slope calculator."""
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = _new_pdf_canvas(buffer)
     generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
 
     band_h = 64
@@ -2950,7 +2990,7 @@ _STEPPED_BACKFILL_BOLD_TRIGGERS = ('THE ENGINEER OF RECORD AND THE JOBSITE',)
 def build_stepped_backfill_pdf(inputs, results, project_name=None):
     """Single-page submittal-ready PDF for the Stepped Perimeter Backfill calculator."""
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = _new_pdf_canvas(buffer)
     generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
 
     band_h = 64
@@ -3154,7 +3194,7 @@ _MIN_COVER_BURIAL_BOLD_TRIGGERS = ('THE ENGINEER OF RECORD',)
 def build_min_cover_burial_pdf(inputs, results, project_name=None):
     """Single-page submittal-ready PDF for the Min Cover / Burial Depth calculator."""
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = _new_pdf_canvas(buffer)
     generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
 
     band_h = 64
@@ -3365,7 +3405,7 @@ def build_min_dist_struct_pdf(inputs, results, project_name=None):
     """Single-page submittal-ready PDF for the Min Distance from Structure
     (building / footing / retaining-wall setback) calculator."""
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = _new_pdf_canvas(buffer)
     generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
 
     band_h = 64
@@ -3615,7 +3655,7 @@ def build_complex_shape_pdf(inputs, results, project_name=None):
     """Two-page conceptual submittal PDF for the Complex Shape Builder.
     Page 1: configuration + derived quantities. Page 2: scaled plan-view."""
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = _new_pdf_canvas(buffer)
     generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
 
     def header(subtitle):
@@ -4328,7 +4368,7 @@ def calc_crate_comparison(payload):
 def build_crate_comparison_pdf(inputs, results, project_name=None):
     """Single-page quantities-only comparison submittal PDF."""
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = _new_pdf_canvas(buffer)
     generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
 
     band_h = 64
@@ -4502,7 +4542,7 @@ def build_site_overlay_pdf(image_data_url, project_name=None, meta=None):
     import base64 as _b64
     meta = meta or {}
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = _new_pdf_canvas(buffer)
     generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
 
     # ── header band (matches other submittal PDFs) ──
@@ -4802,7 +4842,7 @@ _PT_ROW_LAYOUT_LABELS = {
 def build_pt_row_pdf(inputs, results, project_name=None):
     """Single-page submittal-ready PDF for the PT-ROW Transparent Sizing Calculator."""
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = _new_pdf_canvas(buffer)
     generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
 
     band_h = 64
@@ -5164,7 +5204,7 @@ def multi_download_quote():
 
         # ── PDF Canvas ──────────────────────────────────────────────
         buffer = io.BytesIO()
-        c = canvas.Canvas(buffer, pagesize=letter)
+        c = _new_pdf_canvas(buffer)
         W, H = letter
 
         # ── Quote helpers ────────────────────────────────────────────
@@ -5703,7 +5743,7 @@ def multi_download_tank_summary():
         tank_results = [calc_tank(t) for t in tanks_in]
 
         buffer = io.BytesIO()
-        c = canvas.Canvas(buffer, pagesize=letter)
+        c = _new_pdf_canvas(buffer)
         W, H = letter
 
         QNY  = colors.HexColor('#003366')
@@ -6295,7 +6335,7 @@ def download_pdf():
     #  BUILD PDF
     # ════════════════════════════════════════════════════════════
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = _new_pdf_canvas(buffer)
 
     # ─────────────────────────────────────────────────────────
     #  PAGE 1 — Technical Summary (NO disclaimer here)
@@ -6982,7 +7022,7 @@ def download_quote():
 
       # ── Build PDF using canvas (matching template layout) ────────
       buffer = io.BytesIO()
-      c = canvas.Canvas(buffer, pagesize=letter)
+      c = _new_pdf_canvas(buffer)
       W, H = letter   # 612 x 792
 
       # ── Helpers local to quote ────────────────────────────────────
