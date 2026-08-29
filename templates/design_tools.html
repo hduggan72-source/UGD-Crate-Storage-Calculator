@@ -4119,8 +4119,9 @@
         if (!soState.img) { soSetStatus('Load a plan image first.'); return; }
         if (!soState.pxPerFt) { soSetStatus('Set the scale before adding a tank.'); return; }
         const f = soReadEditorFields();
-        const wFt = f.wFt > 0 ? f.wFt : 40;
-        const lFt = f.lFt > 0 ? f.lFt : 80;
+        if (!f.wFt || !f.lFt || f.wFt <= 0 || f.lFt <= 0) { soSetStatus('Enter valid tank width and length.'); return; }
+        const wFt = f.wFt;
+        const lFt = f.lFt;
         const cv = soCanvas();
         const wPx = wFt * soState.pxPerFt;
         const hPx = lFt * soState.pxPerFt;
