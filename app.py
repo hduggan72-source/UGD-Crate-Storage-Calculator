@@ -4973,7 +4973,7 @@ def build_pt_row_pdf(inputs, results, project_name=None):
 # ══════════════════════════════════════════════════════════════════
 @app.route('/design-tools', methods=['GET'])
 def design_tools_index():
-    return render_template('design_tools.html')
+    return render_template('design_tools.html', pricing_enabled=PRICING_ENABLED)
 
 
 # ══════════════════════════════════════════════════════════════════
