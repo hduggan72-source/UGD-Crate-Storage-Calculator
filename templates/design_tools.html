@@ -1242,37 +1242,52 @@
                 <button type="button" id="so_scale_confirm_btn" class="calc-btn" style="width:100%; margin-bottom:6px;" onclick="soFinishScale()">Set Distance</button>
                 <div id="so_scale_status" style="font-size:12px; color:var(--muted); margin-bottom:4px;">Scale: not set</div>
 
-                <label class="calc-label" style="margin-top:10px;">3. Tank Footprint</label>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                    <div><label class="calc-label">Width (ft)</label><input type="number" step="any" id="so_tank_w" class="calc-input" value="40"></div>
-                    <div><label class="calc-label">Length (ft)</label><input type="number" step="any" id="so_tank_l" class="calc-input" value="80"></div>
+                <label class="calc-label" style="margin-top:10px;">3. Tanks</label>
+                <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">
+                    Add one or more tanks when a plan has more than one AquaCell system on it. Each tank
+                    keeps its own label, dimensions, config, and rotation — click a tank (in the list or on
+                    the plan) to select it for editing.
                 </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;">
-                    <div>
-                        <label class="calc-label">Config</label>
-                        <select id="so_config" class="calc-input">
-                            <option value="SC">SC — Standard</option>
-                            <option value="EX">EX — Extra Strong</option>
-                        </select>
+                <div id="so_tank_list" style="display:flex; flex-direction:column; gap:4px; margin-bottom:8px;"></div>
+                <button type="button" class="calc-btn secondary" style="width:100%; margin-bottom:8px;" onclick="soAddTank()">+ Add Tank</button>
+
+                <div id="so_tank_editor" style="padding-top:8px; border-top:1px dashed var(--border);">
+                    <label class="calc-label">Label</label>
+                    <input type="text" id="so_tank_label" class="calc-input" placeholder="e.g. Tank A — North Lot">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;">
+                        <div><label class="calc-label">Width (ft)</label><input type="number" step="any" id="so_tank_w" class="calc-input" value="40"></div>
+                        <div><label class="calc-label">Length (ft)</label><input type="number" step="any" id="so_tank_l" class="calc-input" value="80"></div>
                     </div>
-                    <div>
-                        <label class="calc-label">View</label>
-                        <select id="so_view_mode" class="calc-input" onchange="soRedraw()">
-                            <option value="grid">Crate grid</option>
-                            <option value="box">Clean box</option>
-                        </select>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;">
+                        <div>
+                            <label class="calc-label">Config</label>
+                            <select id="so_config" class="calc-input">
+                                <option value="SC">SC — Standard</option>
+                                <option value="EX">EX — Extra Strong</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="calc-label">View</label>
+                            <select id="so_view_mode" class="calc-input">
+                                <option value="grid">Crate grid</option>
+                                <option value="box">Clean box</option>
+                            </select>
+                        </div>
+                    </div>
+                    <label class="calc-label" style="margin-top:6px;">Overlay Rotation (° — visual only, does not change W/L)</label>
+                    <input type="number" step="any" id="so_rot" class="calc-input" style="width:100%; box-sizing:border-box; margin-bottom:6px;" value="0" oninput="soApplyRotation()">
+                    <div style="display:flex; gap:8px; margin-bottom:6px;">
+                        <button type="button" class="calc-btn secondary" style="flex:1 1 0; min-width:0;" onclick="soRotate90(-1)">↺ 90° CCW</button>
+                        <button type="button" class="calc-btn secondary" style="flex:1 1 0; min-width:0;" onclick="soRotate90(1)">↻ 90° CW</button>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" class="calc-btn" style="flex:1;" onclick="soUpdateActiveTank()">Update Tank</button>
+                        <button type="button" class="calc-btn secondary" style="flex:0 0 auto; background:#b91c1c;" onclick="soDeleteActiveTank()" title="Delete this tank">🗑</button>
                     </div>
                 </div>
-                <label class="calc-label" style="margin-top:6px;">Overlay Rotation (° — visual only, does not change W/L)</label>
-                <input type="number" step="any" id="so_rot" class="calc-input" style="width:100%; box-sizing:border-box; margin-bottom:6px;" value="0" oninput="soApplyRotation()">
-                <div style="display:flex; gap:8px; margin-bottom:6px;">
-                    <button type="button" class="calc-btn secondary" style="flex:1 1 0; min-width:0;" onclick="soRotate90(-1)">↺ 90° CCW</button>
-                    <button type="button" class="calc-btn secondary" style="flex:1 1 0; min-width:0;" onclick="soRotate90(1)">↻ 90° CW</button>
-                </div>
-                <button type="button" class="calc-btn" style="width:100%; margin-top:2px;" onclick="soPlaceTank()">Place / Update Tank</button>
 
                 <div style="font-size:12px; color:var(--muted); margin-top:8px;">
-                    Drag the footprint on the plan to reposition. Long axis of the crate module runs
+                    Drag the selected tank on the plan to reposition. Long axis of the crate module runs
                     down the <em>length</em>.
                 </div>
 
@@ -3679,12 +3694,18 @@
         pxPerFt: null,        // calibration
         scaling: false,       // in scale-click mode
         scalePts: [],         // [{x,y}, {x,y}] in canvas px
-        tank: null,           // {x,y,w,h} in canvas px (top-left + size)
+        tanks: [],             // [{id,label,x,y,w,h,wFt,lFt,rot,config,viewMode}, ...] in canvas px
+        activeTankId: null,    // id of the tank currently selected for editing/dragging
+        nextTankNum: 1,        // for auto-generated "Tank N" labels
         dragging: false,
         dragDX: 0,
         dragDY: 0,
         zoom: null,           // CSS display scale of the canvas (null = fit-to-width)
     };
+
+    function soActiveTank() {
+        return soState.tanks.find(function (t) { return t.id === soState.activeTankId; }) || null;
+    }
 
     function soCanvas() { return document.getElementById('so_canvas'); }
     function soCtx() { return soCanvas().getContext('2d'); }
@@ -3799,7 +3820,9 @@
         soState.pxPerFt = null;
         soState.scalePts = [];
         soState.scaling = false;
-        soState.tank = null;
+        soState.tanks = [];
+        soState.activeTankId = null;
+        soState.nextTankNum = 1;
         const MAXP = maxEdge || 1600;
         let w = img.width, h = img.height;
         const longEdge = Math.max(w, h);
@@ -3818,6 +3841,7 @@
         if (zbar) zbar.style.display = 'flex';
         soState.zoom = null;
         soApplyZoom();
+        soRenderTankList();
         soRedraw();
     }
 
@@ -4032,36 +4056,128 @@
         soRedraw();
     }
 
-    function soPlaceTank() {
+    // ── multi-tank list management ──
+    function soReadEditorFields() {
+        return {
+            label: (document.getElementById('so_tank_label').value || '').trim(),
+            wFt: parseFloat(document.getElementById('so_tank_w').value),
+            lFt: parseFloat(document.getElementById('so_tank_l').value),
+            config: document.getElementById('so_config').value,
+            viewMode: document.getElementById('so_view_mode').value,
+            rot: parseFloat(document.getElementById('so_rot').value) || 0,
+        };
+    }
+
+    function soSyncEditorFromTank(t) {
+        document.getElementById('so_tank_label').value = t.label || '';
+        document.getElementById('so_tank_w').value = t.wFt;
+        document.getElementById('so_tank_l').value = t.lFt;
+        document.getElementById('so_config').value = t.config;
+        document.getElementById('so_view_mode').value = t.viewMode;
+        document.getElementById('so_rot').value = t.rot;
+    }
+
+    function soRenderTankList() {
+        const box = document.getElementById('so_tank_list');
+        if (!box) return;
+        box.innerHTML = '';
+        soState.tanks.forEach(function (t) {
+            const row = document.createElement('div');
+            const active = t.id === soState.activeTankId;
+            row.style.cssText = 'display:flex; align-items:center; gap:6px; padding:6px 8px; ' +
+                'border-radius:6px; cursor:pointer; font-size:12.5px; ' +
+                (active ? 'background:rgba(30,58,138,0.18); border:1px solid #1e3a8a;'
+                        : 'background:var(--highlight); border:1px solid transparent;');
+            const dims = (t.wFt && t.lFt) ? (t.wFt + ' × ' + t.lFt + ' ft') : '';
+            const nameSpan = document.createElement('span');
+            nameSpan.style.cssText = 'flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+            nameSpan.textContent = (t.label || 'Tank') + (dims ? ' — ' + dims : '');
+            row.appendChild(nameSpan);
+            row.addEventListener('click', function () { soSelectTank(t.id); });
+            box.appendChild(row);
+        });
+    }
+
+    function soSelectTank(id) {
+        soState.activeTankId = id;
+        const t = soActiveTank();
+        if (t) soSyncEditorFromTank(t);
+        soRenderTankList();
+        soRedraw();
+    }
+
+    function soAddTank() {
         if (!soState.img) { soSetStatus('Load a plan image first.'); return; }
-        if (!soState.pxPerFt) { soSetStatus('Set the scale before placing the tank.'); return; }
-        const wFt = parseFloat(document.getElementById('so_tank_w').value);
-        const lFt = parseFloat(document.getElementById('so_tank_l').value);
-        if (!wFt || !lFt || wFt <= 0 || lFt <= 0) { soSetStatus('Enter valid tank width and length.'); return; }
+        if (!soState.pxPerFt) { soSetStatus('Set the scale before adding a tank.'); return; }
+        const f = soReadEditorFields();
+        const wFt = f.wFt > 0 ? f.wFt : 40;
+        const lFt = f.lFt > 0 ? f.lFt : 80;
         const cv = soCanvas();
         const wPx = wFt * soState.pxPerFt;
         const hPx = lFt * soState.pxPerFt;
-        // Center it if new; otherwise keep top-left and resize.
-        if (soState.tank) {
-            soState.tank.w = wPx;
-            soState.tank.h = hPx;
-        } else {
-            soState.tank = { x: (cv.width - wPx) / 2, y: (cv.height - hPx) / 2, w: wPx, h: hPx, rot: 0 };
-        }
-        if (typeof soState.tank.rot !== 'number') soState.tank.rot = 0;
-        soState.tank.wFt = wFt;
-        soState.tank.lFt = lFt;
+        // Stagger new tanks a bit so they don't perfectly overlap and are
+        // each individually clickable right away.
+        const offset = (soState.tanks.length % 5) * 24;
+        const id = 'so_t' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+        const label = f.label || ('Tank ' + soState.nextTankNum);
+        soState.nextTankNum++;
+        const t = {
+            id: id, label: label,
+            x: (cv.width - wPx) / 2 + offset, y: (cv.height - hPx) / 2 + offset,
+            w: wPx, h: hPx, wFt: wFt, lFt: lFt,
+            rot: 0, config: f.config || 'SC', viewMode: f.viewMode || 'grid',
+        };
+        soState.tanks.push(t);
+        soState.activeTankId = id;
+        soSyncEditorFromTank(t);
+        soRenderTankList();
         soRedraw();
-        soSetStatus('Tank placed. Drag it on the plan to reposition.');
+        soSetStatus('Tank added. Drag it on the plan to reposition.');
+    }
+
+    function soUpdateActiveTank() {
+        const t = soActiveTank();
+        if (!t) { soSetStatus('Add or select a tank first.'); return; }
+        if (!soState.pxPerFt) { soSetStatus('Set the scale before editing a tank.'); return; }
+        const f = soReadEditorFields();
+        if (!f.wFt || !f.lFt || f.wFt <= 0 || f.lFt <= 0) { soSetStatus('Enter valid tank width and length.'); return; }
+        // Keep the tank centered in place while resizing.
+        const cx = t.x + t.w / 2, cy = t.y + t.h / 2;
+        t.w = f.wFt * soState.pxPerFt;
+        t.h = f.lFt * soState.pxPerFt;
+        t.x = cx - t.w / 2;
+        t.y = cy - t.h / 2;
+        t.wFt = f.wFt;
+        t.lFt = f.lFt;
+        t.config = f.config;
+        t.viewMode = f.viewMode;
+        t.rot = f.rot;
+        t.label = f.label || t.label;
+        soRenderTankList();
+        soRedraw();
+        soSetStatus('Tank updated.');
+    }
+
+    function soDeleteActiveTank() {
+        const t = soActiveTank();
+        if (!t) return;
+        soState.tanks = soState.tanks.filter(function (x) { return x.id !== t.id; });
+        soState.activeTankId = soState.tanks.length ? soState.tanks[soState.tanks.length - 1].id : null;
+        const active = soActiveTank();
+        if (active) soSyncEditorFromTank(active);
+        soRenderTankList();
+        soRedraw();
+        soSetStatus('Tank deleted.');
     }
 
     // Rotation is a VISUAL transform of the overlay only. It never changes
     // the entered Width/Length or how the crate grid is generated.
     function soApplyRotation() {
-        if (!soState.tank) return;
+        const t = soActiveTank();
+        if (!t) return;
         let deg = parseFloat(document.getElementById('so_rot').value);
         if (isNaN(deg)) deg = 0;
-        soState.tank.rot = deg;
+        t.rot = deg;
         soRedraw();
     }
 
@@ -4072,8 +4188,9 @@
         if (isNaN(deg)) deg = 0;
         deg = ((deg + step) % 360 + 360) % 360;
         el.value = deg;
-        if (soState.tank) {
-            soState.tank.rot = deg;
+        const t = soActiveTank();
+        if (t) {
+            t.rot = deg;
             soRedraw();
         }
     }
@@ -4103,14 +4220,14 @@
                 ctx.stroke();
             }
         }
-        // tank
-        if (soState.tank) {
-            soDrawTank(ctx, soState.tank);
-        }
+        // tanks — active one drawn last so it's on top
+        soState.tanks.forEach(function (t) {
+            soDrawTank(ctx, t, t.id === soState.activeTankId);
+        });
     }
 
-    function soDrawTank(ctx, t) {
-        const mode = document.getElementById('so_view_mode').value;
+    function soDrawTank(ctx, t, active) {
+        const mode = t.viewMode || 'grid';
         const rot = (typeof t.rot === 'number' ? t.rot : 0) * Math.PI / 180;
         const cx = t.x + t.w / 2;
         const cy = t.y + t.h / 2;
@@ -4126,10 +4243,13 @@
         // translucent fill
         ctx.fillStyle = 'rgba(30, 58, 138, 0.28)';
         ctx.fillRect(lx0, ly0, t.w, t.h);
-        // border
+        // border — the selected/active tank gets a heavier dashed border so
+        // it's obvious which tank dragging or Update Tank will affect.
         ctx.strokeStyle = '#1e3a8a';
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = active ? 3.5 : 2.5;
+        if (active) ctx.setLineDash([8, 5]);
         ctx.strokeRect(lx0, ly0, t.w, t.h);
+        ctx.setLineDash([]);
 
         if (mode === 'grid' && soState.pxPerFt) {
             // Draw the crate grid: long axis (MODULE_LEN) runs down the length.
@@ -4156,12 +4276,14 @@
             ctx.restore();
         }
 
-        // dimension label — drawn upright regardless of tank angle so it
-        // stays readable (counter-rotate around the center).
-        if (t.wFt && t.lFt) {
+        // label — drawn upright regardless of tank angle so it stays readable
+        // (counter-rotate around the center). Shows the tank's name plus its
+        // dimensions when both are set.
+        const dims = (t.wFt && t.lFt) ? (t.wFt + ' ft x ' + t.lFt + ' ft') : '';
+        const label = t.label ? (dims ? (t.label + ' — ' + dims) : t.label) : dims;
+        if (label) {
             ctx.save();
             ctx.rotate(-rot);
-            const label = t.wFt + ' ft x ' + t.lFt + ' ft';
             ctx.font = 'bold 14px Helvetica, Arial, sans-serif';
             const tw = ctx.measureText(label).width;
             ctx.fillStyle = 'rgba(255,255,255,0.85)';
@@ -4197,8 +4319,10 @@
                 }
                 return;
             }
-            if (soState.tank) {
-                const t = soState.tank;
+            // Hit-test tanks topmost-first (last in the array = drawn last =
+            // on top). A hit both selects that tank and starts dragging it.
+            for (let i = soState.tanks.length - 1; i >= 0; i--) {
+                const t = soState.tanks[i];
                 const rot = (typeof t.rot === 'number' ? t.rot : 0) * Math.PI / 180;
                 const cx = t.x + t.w / 2;
                 const cy = t.y + t.h / 2;
@@ -4209,18 +4333,26 @@
                 const lx = dx * cos - dy * sin;
                 const ly = dx * sin + dy * cos;
                 if (Math.abs(lx) <= t.w / 2 && Math.abs(ly) <= t.h / 2) {
+                    if (soState.activeTankId !== t.id) {
+                        soState.activeTankId = t.id;
+                        soSyncEditorFromTank(t);
+                        soRenderTankList();
+                        soRedraw();
+                    }
                     soState.dragging = true;
                     // Store the offset from tank CENTER to the mouse, in canvas px.
                     soState.dragDX = p.x - cx;
                     soState.dragDY = p.y - cy;
                     cv.style.cursor = 'grabbing';
+                    break;
                 }
             }
         });
         cv.addEventListener('mousemove', function (ev) {
-            if (!soState.dragging || !soState.tank) return;
+            if (!soState.dragging) return;
+            const t = soActiveTank();
+            if (!t) return;
             const p = soEventToCanvas(ev);
-            const t = soState.tank;
             // Move so the tank CENTER follows the mouse (minus grab offset).
             const newCx = p.x - soState.dragDX;
             const newCy = p.y - soState.dragDY;
@@ -4327,11 +4459,15 @@
         if (!soState.img) { soSetStatus('Load a plan image first.'); return; }
         soSetStatus('Building PDF…');
         const projName = (document.getElementById('so_project').value || '').trim();
-        const config = document.getElementById('so_config').value;
-        const viewMode = document.getElementById('so_view_mode').value === 'grid' ? 'Crate grid view' : 'Clean box view';
-        const tank = soState.tank;
-        const tankWL = (tank && tank.wFt) ? (tank.wFt + ' ft x ' + tank.lFt + ' ft') : null;
         const imageDataUrl = soCompositeJPEG(1600, 0.72);
+        const tanksMeta = soState.tanks.map(function (t) {
+            return {
+                label: t.label || null,
+                config: t.config,
+                tank_wl: (t.wFt && t.lFt) ? (t.wFt + ' ft x ' + t.lFt + ' ft') : null,
+                view_mode: t.viewMode === 'grid' ? 'Crate grid view' : 'Clean box view',
+            };
+        });
         try {
             const r = await fetch('/design-tools/download_pdf', {
                 method: 'POST',
@@ -4340,7 +4476,7 @@
                     calc_type: 'site_overlay',
                     project_name: projName || null,
                     image: imageDataUrl,
-                    meta: { config: config, tank_wl: tankWL, view_mode: viewMode }
+                    meta: { tanks: tanksMeta }
                 })
             });
             if (!r.ok) {
