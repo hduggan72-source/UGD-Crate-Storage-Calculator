@@ -4536,8 +4536,10 @@ _SITE_OVERLAY_BOLD_TRIGGERS = ['NOT TO SCALE FOR MEASUREMENT', 'NOT', 'MUST NOT'
 def build_site_overlay_pdf(image_data_url, project_name=None, meta=None):
     """One-page conceptual submittal PDF wrapping a client-composited
     site overlay image. image_data_url is a 'data:image/jpeg;base64,...'
-    string produced by the browser canvas. meta is an optional dict with
-    keys like tank_wl, config, scale_note, view_mode for a caption line.
+    string produced by the browser canvas. meta is an optional dict; its
+    'tanks' key is a list of {label, config, tank_wl, view_mode} dicts, one
+    per tank on the plan, each rendered as its own caption line. Flat
+    meta.config/tank_wl/view_mode keys are a legacy single-tank fallback.
     Returns a BytesIO buffer positioned at 0."""
     import base64 as _b64
     meta = meta or {}
@@ -4574,19 +4576,36 @@ def build_site_overlay_pdf(image_data_url, project_name=None, meta=None):
         c.drawString(LM, y, f'Project: {project_name}')
         y -= 15
 
-    # ── caption line (config / tank W x L / view mode) ──
-    cap_bits = []
-    if meta.get('config'):
-        cap_bits.append(f"AquaCell {meta['config']}")
-    if meta.get('tank_wl'):
-        cap_bits.append(str(meta['tank_wl']))
-    if meta.get('view_mode'):
-        cap_bits.append(str(meta['view_mode']))
-    if cap_bits:
+    # ── caption block: one line per tank when the plan has more than one.
+    #    meta['tanks'] is a list of {label, config, tank_wl, view_mode} dicts;
+    #    the flat meta.config/tank_wl/view_mode keys are a legacy single-tank
+    #    fallback for any caller that hasn't been updated to the list form. ──
+    tanks_meta = meta.get('tanks')
+    if tanks_meta is None:
+        tanks_meta = [meta] if (meta.get('config') or meta.get('tank_wl') or meta.get('view_mode')) else []
+
+    caption_lines = []
+    for t in tanks_meta:
+        cap_bits = []
+        if t.get('config'):
+            cap_bits.append(f"AquaCell {t['config']}")
+        if t.get('tank_wl'):
+            cap_bits.append(str(t['tank_wl']))
+        if t.get('view_mode'):
+            cap_bits.append(str(t['view_mode']))
+        line = '  |  '.join(cap_bits)
+        if t.get('label'):
+            line = f"{t['label']}:  {line}" if line else str(t['label'])
+        if line:
+            caption_lines.append(line)
+
+    if caption_lines:
         c.setFillColor(GRAY)
         c.setFont('Helvetica-Bold', 10)
-        c.drawString(LM, y, '  |  '.join(cap_bits))
-        y -= 6
+        for line in caption_lines:
+            c.drawString(LM, y, line)
+            y -= 13
+        y -= 2
 
     # ── title bar over the image ──
     bar_h = 16
