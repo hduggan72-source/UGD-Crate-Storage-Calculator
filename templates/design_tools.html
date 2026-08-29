@@ -3707,6 +3707,32 @@
         return soState.tanks.find(function (t) { return t.id === soState.activeTankId; }) || null;
     }
 
+    // Find the tank under canvas point p, topmost-first. The active tank is
+    // always drawn last (see soRedraw), so it's checked first here too —
+    // otherwise a selected tank fully covered by a later one could never be
+    // dragged without first moving the tank on top of it.
+    function soHitTestTank(p) {
+        const ordered = [];
+        const activeT = soActiveTank();
+        if (activeT) ordered.push(activeT);
+        for (let i = soState.tanks.length - 1; i >= 0; i--) {
+            if (soState.tanks[i].id !== soState.activeTankId) ordered.push(soState.tanks[i]);
+        }
+        for (const t of ordered) {
+            const rot = (typeof t.rot === 'number' ? t.rot : 0) * Math.PI / 180;
+            const cx = t.x + t.w / 2;
+            const cy = t.y + t.h / 2;
+            // Inverse-rotate the point into the tank's local frame.
+            const dx = p.x - cx;
+            const dy = p.y - cy;
+            const cos = Math.cos(-rot), sin = Math.sin(-rot);
+            const lx = dx * cos - dy * sin;
+            const ly = dx * sin + dy * cos;
+            if (Math.abs(lx) <= t.w / 2 && Math.abs(ly) <= t.h / 2) return t;
+        }
+        return null;
+    }
+
     function soCanvas() { return document.getElementById('so_canvas'); }
     function soCtx() { return soCanvas().getContext('2d'); }
 
@@ -4125,11 +4151,15 @@
             id: id, label: label,
             x: (cv.width - wPx) / 2 + offset, y: (cv.height - hPx) / 2 + offset,
             w: wPx, h: hPx, wFt: wFt, lFt: lFt,
-            rot: 0, config: f.config || 'SC', viewMode: f.viewMode || 'grid',
+            rot: f.rot, config: f.config || 'SC', viewMode: f.viewMode || 'grid',
         };
         soState.tanks.push(t);
         soState.activeTankId = id;
         soSyncEditorFromTank(t);
+        // Clear just the label field (dims/config/rotation are reasonable to
+        // reuse for the next tank, but an unedited label would otherwise be
+        // silently reused verbatim on the next Add Tank click).
+        document.getElementById('so_tank_label').value = '';
         soRenderTankList();
         soRedraw();
         soSetStatus('Tank added. Drag it on the plan to reposition.');
@@ -4195,7 +4225,12 @@
         }
     }
 
-    function soRedraw() {
+    // suppressActive: when true, draw the active tank without its selection
+    // decoration (used right before compositing an export, so the exported
+    // image never shows whichever tank happened to be selected — that
+    // selection has no design meaning). The active tank still draws last
+    // either way, so it's on top for both the live view and exports.
+    function soRedraw(suppressActive) {
         const cv = soCanvas();
         const ctx = soCtx();
         ctx.clearRect(0, 0, cv.width, cv.height);
@@ -4220,10 +4255,13 @@
                 ctx.stroke();
             }
         }
-        // tanks — active one drawn last so it's on top
+        // tanks — non-active ones first, then the active tank last so it's
+        // always drawn on top (matches the hit-test order in soWireCanvas).
+        const activeT = soActiveTank();
         soState.tanks.forEach(function (t) {
-            soDrawTank(ctx, t, t.id === soState.activeTankId);
+            if (t.id !== soState.activeTankId) soDrawTank(ctx, t, false);
         });
+        if (activeT) soDrawTank(ctx, activeT, !suppressActive);
     }
 
     function soDrawTank(ctx, t, active) {
@@ -4319,33 +4357,26 @@
                 }
                 return;
             }
-            // Hit-test tanks topmost-first (last in the array = drawn last =
-            // on top). A hit both selects that tank and starts dragging it.
-            for (let i = soState.tanks.length - 1; i >= 0; i--) {
-                const t = soState.tanks[i];
+            // Hit-test topmost-first: the active tank draws on top of every
+            // other tank (see soRedraw), so check it first, then the rest in
+            // reverse insertion order. A hit both selects that tank and
+            // starts dragging it.
+            const t = soHitTestTank(p);
+            if (t) {
                 const rot = (typeof t.rot === 'number' ? t.rot : 0) * Math.PI / 180;
                 const cx = t.x + t.w / 2;
                 const cy = t.y + t.h / 2;
-                // Inverse-rotate the click into the tank's local frame.
-                const dx = p.x - cx;
-                const dy = p.y - cy;
-                const cos = Math.cos(-rot), sin = Math.sin(-rot);
-                const lx = dx * cos - dy * sin;
-                const ly = dx * sin + dy * cos;
-                if (Math.abs(lx) <= t.w / 2 && Math.abs(ly) <= t.h / 2) {
-                    if (soState.activeTankId !== t.id) {
-                        soState.activeTankId = t.id;
-                        soSyncEditorFromTank(t);
-                        soRenderTankList();
-                        soRedraw();
-                    }
-                    soState.dragging = true;
-                    // Store the offset from tank CENTER to the mouse, in canvas px.
-                    soState.dragDX = p.x - cx;
-                    soState.dragDY = p.y - cy;
-                    cv.style.cursor = 'grabbing';
-                    break;
+                if (soState.activeTankId !== t.id) {
+                    soState.activeTankId = t.id;
+                    soSyncEditorFromTank(t);
+                    soRenderTankList();
+                    soRedraw();
                 }
+                soState.dragging = true;
+                // Store the offset from tank CENTER to the mouse, in canvas px.
+                soState.dragDX = p.x - cx;
+                soState.dragDY = p.y - cy;
+                cv.style.cursor = 'grabbing';
             }
         });
         cv.addEventListener('mousemove', function (ev) {
@@ -4426,6 +4457,10 @@
 
     function soExportPNG() {
         if (!soState.img) { soSetStatus('Load a plan image first.'); return; }
+        // Redraw without the active-tank selection border — that highlight
+        // is an editor affordance with no design meaning and shouldn't end
+        // up baked into the exported file.
+        soRedraw(true);
         // Add a bottom watermark strip onto a copy before exporting.
         const src = soCanvas();
         const tmp = document.createElement('canvas');
@@ -4452,6 +4487,7 @@
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        soRedraw();   // restore the normal on-screen selection highlight
         soSetStatus('PNG exported.');
     }
 
@@ -4459,7 +4495,10 @@
         if (!soState.img) { soSetStatus('Load a plan image first.'); return; }
         soSetStatus('Building PDF…');
         const projName = (document.getElementById('so_project').value || '').trim();
+        // Same as PNG export: composite without the selection-only highlight.
+        soRedraw(true);
         const imageDataUrl = soCompositeJPEG(1600, 0.72);
+        soRedraw();
         const tanksMeta = soState.tanks.map(function (t) {
             return {
                 label: t.label || null,
