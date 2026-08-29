@@ -4584,6 +4584,19 @@ def build_site_overlay_pdf(image_data_url, project_name=None, meta=None):
     if tanks_meta is None:
         tanks_meta = [meta] if (meta.get('config') or meta.get('tank_wl') or meta.get('view_mode')) else []
 
+    CAPTION_FONT, CAPTION_SIZE, CAPTION_LINE_H = 'Helvetica-Bold', 10, 13
+    caption_max_width = CW - 4  # small margin so text never touches the edge
+
+    def _fit_caption_line(text):
+        """Truncate with an ellipsis so a long user-entered label can never
+        run past the page's usable width (labels are arbitrary-length input,
+        unlike the bounded config/dimension text)."""
+        if c.stringWidth(text, CAPTION_FONT, CAPTION_SIZE) <= caption_max_width:
+            return text
+        while text and c.stringWidth(text + '...', CAPTION_FONT, CAPTION_SIZE) > caption_max_width:
+            text = text[:-1]
+        return (text + '...') if text else '...'
+
     caption_lines = []
     for t in tanks_meta:
         cap_bits = []
@@ -4597,18 +4610,37 @@ def build_site_overlay_pdf(image_data_url, project_name=None, meta=None):
         if t.get('label'):
             line = f"{t['label']}:  {line}" if line else str(t['label'])
         if line:
-            caption_lines.append(line)
+            caption_lines.append(_fit_caption_line(line))
+
+    # Title bar height + image box floor are fixed regardless of how many
+    # caption lines there are, so the caption block can be bounded against
+    # them -- otherwise enough tanks could push the image (and even the
+    # disclaimer) off the bottom of the page.
+    bar_h = 16
+    disc_h = _disclaimer_box_height(_SITE_OVERLAY_DISCLAIMER_TEXT)
+    box_bottom = 40 + disc_h + 10
+    MIN_IMG_H = 160  # smallest the overlay image box is allowed to shrink to
+    caption_budget = y - bar_h - box_bottom - MIN_IMG_H
+    max_caption_lines = max(0, int(caption_budget // CAPTION_LINE_H))
+
+    if len(caption_lines) > max_caption_lines:
+        if max_caption_lines >= 1:
+            kept = caption_lines[:max_caption_lines - 1] if max_caption_lines > 1 else []
+            hidden = len(caption_lines) - len(kept)
+            kept.append(f'+ {hidden} more tank{"s" if hidden != 1 else ""} (see canvas labels)')
+            caption_lines = kept
+        else:
+            caption_lines = []  # no room at all -- protect the image over the caption
 
     if caption_lines:
         c.setFillColor(GRAY)
-        c.setFont('Helvetica-Bold', 10)
+        c.setFont(CAPTION_FONT, CAPTION_SIZE)
         for line in caption_lines:
             c.drawString(LM, y, line)
-            y -= 13
+            y -= CAPTION_LINE_H
         y -= 2
 
     # ── title bar over the image ──
-    bar_h = 16
     c.setFillColor(BLUE)
     c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
     c.setFillColor(WHITE)
@@ -4618,8 +4650,6 @@ def build_site_overlay_pdf(image_data_url, project_name=None, meta=None):
     box_top = y - bar_h
 
     # ── image box, sized to leave room for the disclaimer ──
-    disc_h = _disclaimer_box_height(_SITE_OVERLAY_DISCLAIMER_TEXT)
-    box_bottom = 40 + disc_h + 10
     box_h = box_top - box_bottom
     c.setFillColor(WHITE)
     c.setStrokeColor(MGRAY)
