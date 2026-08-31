@@ -3,3 +3,4 @@ reportlab
 pypdf
 requests
 gunicorn
+ezdxf
