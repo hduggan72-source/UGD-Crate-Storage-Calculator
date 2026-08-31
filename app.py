@@ -9,9 +9,11 @@ import datetime
 import math
 import os
 import base64
+import textwrap
 from io import BytesIO
 import requests
 from pypdf import PdfWriter, PdfReader as PyPdfReader
+import ezdxf
 
 app = Flask(__name__)
 
@@ -6641,6 +6643,162 @@ def download_pdf():
                      mimetype='application/pdf')
 
 
+
+
+# ══════════════════════════════════════════════════════════════════
+#  DOWNLOAD SINGLE-TANK DXF  —  computed module-grid CAD export (v1)
+#  Rectangular footprint only. Complex-shape tanks are out of scope
+#  for this version (see DXF_EXPORT_SCOPE.md).
+# ══════════════════════════════════════════════════════════════════
+
+_DXF_MODULE_WID = 1.9685
+_DXF_MODULE_LEN = 3.937
+
+_DXF_DISCLAIMER = (
+    "DISCLAIMER: This is a computed conceptual layout only, not a stamped "
+    "construction drawing. Native AquaCell DWG detail sheets remain the "
+    "manufacturer source of truth for module, plate, and connector geometry. "
+    "The Engineer of Record must verify all design parameters and site "
+    "conditions before use."
+)
+
+
+def _dxf_dimstyle(doc):
+    name = 'AQUACELL_FT'
+    if name in doc.dimstyles:
+        return doc.dimstyles.get(name)
+    dimstyle = doc.dimstyles.new(name)
+    dimstyle.dxf.dimtxt = 1.0   # text height, ft
+    dimstyle.dxf.dimasz = 0.6   # arrow size, ft
+    dimstyle.dxf.dimexe = 0.3   # extension line extension, ft
+    dimstyle.dxf.dimexo = 0.3   # extension line offset, ft
+    dimstyle.dxf.dimdec = 2     # decimal places
+    dimstyle.dxf.dimtad = 1     # text above dimension line
+    return dimstyle
+
+
+@app.route('/download_dxf', methods=['POST'])
+def download_dxf():
+
+    project_name   = request.form.get('project_name', 'Project')
+    config         = request.form.get('config', 'SC')
+    if config not in ('SC', 'EX'):
+        config = 'SC'
+    layers         = int(request.form.get('layers', 3) or 3)
+    shape_mode     = request.form.get('shape_mode', 'rectangle')
+    known_width    = float(request.form.get('known_width', 0) or 0)
+    known_length   = float(request.form.get('known_length', 0) or 0)
+    liner_on_tank  = request.form.get('liner_on_tank',  '0') == '1'
+    liner_on_stone = request.form.get('liner_on_stone', '0') == '1'
+
+    if shape_mode == 'complex':
+        return ('DXF export currently supports rectangular tanks only — '
+                'complex-shape layouts are not yet supported.'), 400
+
+    crates_wide = math.floor(known_width  / _DXF_MODULE_WID)
+    crates_long = math.floor(known_length / _DXF_MODULE_LEN)
+    if crates_wide <= 0 or crates_long <= 0:
+        return 'Enter valid tank dimensions before exporting a DXF.', 400
+
+    tank_width  = crates_wide * _DXF_MODULE_WID
+    tank_length = crates_long * _DXF_MODULE_LEN
+    num_crates  = crates_wide * crates_long * layers
+
+    doc = ezdxf.new('R2010', setup=True)
+    doc.header['$INSUNITS'] = 2  # feet
+    msp = doc.modelspace()
+
+    for name, color in (
+        ('AQUACELL-FOOTPRINT',  5),
+        ('AQUACELL-MODULES',    3),
+        ('AQUACELL-DIMS',       1),
+        ('AQUACELL-TEXT',       7),
+        ('AQUACELL-TITLEBLOCK', 8),
+    ):
+        if name not in doc.layers:
+            doc.layers.add(name=name, color=color)
+
+    block_name = f'AQUACELL_MODULE_{config}'
+    if block_name not in doc.blocks:
+        block = doc.blocks.new(name=block_name)
+        block.add_lwpolyline(
+            [(0, 0), (_DXF_MODULE_WID, 0), (_DXF_MODULE_WID, _DXF_MODULE_LEN), (0, _DXF_MODULE_LEN)],
+            format='xy', dxfattribs={'layer': 'AQUACELL-MODULES', 'closed': True},
+        )
+
+    # Origin at the bottom-left corner of the footprint; columns run along X
+    # (module width), rows run along Y (module length) — matches the
+    # crates_wide/crates_long convention used everywhere else in this app.
+    for row in range(crates_long):
+        for col in range(crates_wide):
+            msp.add_blockref(
+                block_name, (col * _DXF_MODULE_WID, row * _DXF_MODULE_LEN),
+                dxfattribs={'layer': 'AQUACELL-MODULES'},
+            )
+
+    msp.add_lwpolyline(
+        [(0, 0), (tank_width, 0), (tank_width, tank_length), (0, tank_length)],
+        format='xy', dxfattribs={'layer': 'AQUACELL-FOOTPRINT', 'closed': True},
+    )
+
+    _dxf_dimstyle(doc)
+    dim_offset = max(tank_width, tank_length) * 0.08 + 1.0
+
+    dim_w = msp.add_linear_dim(
+        base=(0, -dim_offset), p1=(0, 0), p2=(tank_width, 0),
+        dimstyle='AQUACELL_FT', dxfattribs={'layer': 'AQUACELL-DIMS'},
+    )
+    dim_w.render()
+
+    dim_l = msp.add_linear_dim(
+        base=(-dim_offset, 0), p1=(0, 0), p2=(0, tank_length), angle=90,
+        dimstyle='AQUACELL_FT', dxfattribs={'layer': 'AQUACELL-DIMS'},
+    )
+    dim_l.render()
+
+    generated_str = datetime.datetime.now().strftime('%m/%d/%Y')
+    config_label  = 'SC - Standard Capacity' if config == 'SC' else 'EX - Extra Strong'
+    modules_per_layer = crates_wide * crates_long
+    text_lines = [
+        f'PROJECT: {(project_name or "Project").strip()}',
+        f'CONFIGURATION: {config_label}',
+        f'MODULES PER LAYER (AS DRAWN): {modules_per_layer:,} ({crates_wide} wide x {crates_long} long)',
+        f'TOTAL MODULES, ALL LAYERS: {num_crates:,} ({layers}-LAYER {config} — stacking not shown in plan view)',
+        f'FOOTPRINT: {tank_width:.2f} ft x {tank_length:.2f} ft',
+        f'GENERATED: {generated_str}',
+    ]
+    if liner_on_tank or liner_on_stone:
+        if liner_on_tank and liner_on_stone:
+            scope = 'tank + stone envelope'
+        elif liner_on_tank:
+            scope = 'tank envelope'
+        else:
+            scope = 'stone envelope'
+        text_lines.append(f'LINER: Selected ({scope}) — geometry not shown, callout only')
+
+    line_h = 1.2
+    text_y = tank_length + dim_offset + 2.0
+    for i, line in enumerate(text_lines):
+        msp.add_text(line, height=0.9, dxfattribs={'layer': 'AQUACELL-TEXT'}) \
+           .set_placement((0, text_y + (len(text_lines) - 1 - i) * line_h))
+
+    disc_lines = textwrap.wrap(_DXF_DISCLAIMER, width=110)
+    disc_y = -dim_offset - 2.0
+    for i, line in enumerate(disc_lines):
+        msp.add_text(line, height=0.5, dxfattribs={'layer': 'AQUACELL-TEXT'}) \
+           .set_placement((0, disc_y - i * 0.7))
+
+    stream = io.StringIO()
+    doc.write(stream)
+    buffer = BytesIO(stream.getvalue().encode('utf-8'))
+    buffer.seek(0)
+
+    safe_name = (project_name or 'Project').strip().replace(' ', '_')
+    return send_file(
+        buffer, as_attachment=True,
+        download_name=f'AquaCell_Layout_{safe_name}_{datetime.datetime.now().strftime("%m%d%Y")}.dxf',
+        mimetype='application/dxf',
+    )
 
 
 # ══════════════════════════════════════════════════════════════════
