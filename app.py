@@ -1383,6 +1383,8 @@ def index():
             'tank_storage': round(tank_storage, 1),
             'stone_storage': round(total_stone_storage, 1),
             'total_storage': round(total_storage, 1),
+            'est_install_hours': round(tank_storage / 1413, 1),
+            'recommended_top_adapters': int(tank_storage // 3532),
             'shape_mode': shape_mode,
             'complex_scaled_area':  complex_scaled_area  if shape_mode == 'complex' else None,
             'complex_tank_area':    round(complex_tank_area, 2) if shape_mode == 'complex' else None,
@@ -3981,6 +3983,8 @@ def calc_tank(t):
         'tank_storage':    round(tank_storage, 1),
         'stone_storage':   round(total_stone_stor, 1),
         'total_storage':   round(total_storage, 1),
+        'est_install_hours': round(tank_storage / 1413, 1),
+        'recommended_top_adapters': int(tank_storage // 3532),
         'min_storage':     min_storage,
         'storage_ok':      storage_ok,
         # BOM

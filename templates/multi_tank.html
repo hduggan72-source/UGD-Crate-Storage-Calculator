@@ -1146,6 +1146,14 @@
                             <div class="stat-lbl">Total System Storage</div>
                             <div class="stat-val blue" id="r_total_storage">—</div>
                         </div>
+                        <div class="stat-box">
+                            <div class="stat-lbl">⏱ Est. Installation Time (per person)</div>
+                            <div class="stat-val" id="r_est_install_hours">—</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-lbl">🔩 Recommended Top Adapters</div>
+                            <div class="stat-val" id="r_recommended_top_adapters">—</div>
+                        </div>
                     </div>
                     <div id="r_storage_check" style="font-size:12px;margin-top:6px;"></div>
                 </div>
@@ -1802,6 +1810,8 @@ function showResults(r) {
     setEl('r_tank_storage',  fmtNum(r.tank_storage) + ' ft³');
     setEl('r_stone_storage', fmtNum(r.stone_storage) + ' ft³');
     setEl('r_total_storage', fmtNum(r.total_storage) + ' ft³');
+    setEl('r_est_install_hours', fmtNum(r.est_install_hours) + ' hrs');
+    setEl('r_recommended_top_adapters', fmtNum(r.recommended_top_adapters, 0));
     if (r.min_storage > 0) {
         const ok = r.storage_ok;
         document.getElementById('r_storage_check').innerHTML =
