@@ -1293,6 +1293,18 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         <div style="font-size:11px;opacity:0.7;margin-bottom:4px;">Total System Storage</div>
                         <div style="font-size:22px;font-weight:bold;color:var(--accent);" id="rv_total_storage">{{ results.total_storage }} ft³</div>
                     </div>
+                    {% if results.est_install_hours is not none %}
+                    <div class="result-grid2" style="margin-top:8px;">
+                        <div class="result-stat">
+                            <div class="result-stat-label">⏱ Est. Installation Time <span style="font-size:10px;opacity:0.6;">(per person)</span></div>
+                            <div class="result-stat-value" id="rv_install_time">{{ results.est_install_hours }} hrs</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">🔩 Recommended Top Adapters</div>
+                            <div class="result-stat-value" id="rv_rec_adapters">{{ results.recommended_top_adapters }}</div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
