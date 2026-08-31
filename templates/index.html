@@ -934,9 +934,11 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     <input type="number" name="pipe_connectors" min="0" value="{{ form_data.get('pipe_connectors', '') }}">
                     <label>12" Top Adapter (3085857)</label>
                     <input type="number" name="top_adapters_12" id="top_adapters_12" min="0" value="{{ form_data.get('top_adapters_12', '') }}">
-                    <div id="topAdapterSuggestion" class="suggested"></div>
                     <label>16" Top Adapter (2476842000)</label>
                     <input type="number" name="top_adapters_16" id="top_adapters_16" min="0" value="{{ form_data.get('top_adapters_16', '') }}">
+                    {% if results and results.recommended_top_adapters is not none %}
+                    <div id="topAdapterSuggestion" class="suggested">Recommended Top Adapters Based on Tank Volume: {{ results.recommended_top_adapters }}</div>
+                    {% endif %}
                     <label style="margin-top:10px;">Large Diameter Pipe Connection
                         <span style="font-size:11px;opacity:0.65;font-weight:normal;"> — geotextile boot / abutment (No Wavin adapter &gt; 18" available)</span>
                     </label>
@@ -1293,18 +1295,6 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         <div style="font-size:11px;opacity:0.7;margin-bottom:4px;">Total System Storage</div>
                         <div style="font-size:22px;font-weight:bold;color:var(--accent);" id="rv_total_storage">{{ results.total_storage }} ft³</div>
                     </div>
-                    {% if results.est_install_hours is not none %}
-                    <div class="result-grid2" style="margin-top:8px;">
-                        <div class="result-stat">
-                            <div class="result-stat-label">⏱ Est. Installation Time <span style="font-size:10px;opacity:0.6;">(per person)</span></div>
-                            <div class="result-stat-value" id="rv_install_time">{{ results.est_install_hours }} hrs</div>
-                        </div>
-                        <div class="result-stat">
-                            <div class="result-stat-label">🔩 Recommended Top Adapters</div>
-                            <div class="result-stat-value" id="rv_rec_adapters">{{ results.recommended_top_adapters }}</div>
-                        </div>
-                    </div>
-                    {% endif %}
                 </div>
             </div>
 
@@ -2732,6 +2722,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             &nbsp;({{ ((results.tank_height + (form_data.get('base_stone',0.333)|float) + (form_data.get('cover_stone',1.0)|float)) * 12)|round(1) }} in)
                         </span>
                     </div>
+                    {% if results.est_install_hours is not none %}
+                    <div class="result-row">
+                        <span class="result-label">Estimated Installation Time (per person)</span>
+                        <span class="result-value" id="rv_install_time">{{ results.est_install_hours }} hrs</span>
+                    </div>
+                    {% endif %}
                     {% if results.void_active %}
                     <div style="margin-top:10px;padding:10px 12px;background:rgba(180,83,9,0.08);border:1px solid rgba(180,83,9,0.3);border-radius:6px;">
                         <div style="font-size:11px;font-weight:bold;color:#b45309;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">Void Fill — Provided by Others (No Storage Credit)</div>
@@ -3473,19 +3469,6 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             window.location.href = '/';
         }
     }
-
-    function updateSuggestion() {
-        const div = document.getElementById('topAdapterSuggestion');
-        const m = document.body.innerText.match(/AquaCell Tank Storage:\s*([\d,]+)/i);
-        if (m) {
-            const v = parseFloat(m[1].replace(/,/g,''));
-            if (v > 0) div.textContent = `Suggested: ${Math.max(1, Math.floor(v/3500))} (1 per ~3500 ft³)`;
-        }
-    }
-
-    window.addEventListener('load', () => {
-        if (document.querySelector('.results')) updateSuggestion();
-    });
 
     // ====================== SCHEMATIC ENGINE ======================
     // Exact module dimensions (matches MODULE_WID/MODULE_LEN in app.py — do not
