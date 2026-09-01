@@ -4715,6 +4715,9 @@ _PT_ROW_REFERENCE_NOTES = [
     'Minimum access structures: one at inlet/diversion, one at downstream end; additional access '
     'required for rows exceeding 300 ft. Minimum 12" diameter openings.',
     'Aggregate must be non-angular and clean, free of fines, to prevent fabric damage.',
+    'Each PT-ROW row is wrapped individually (its own bottom + both long sides up to the top '
+    'deck) — Fabric Width/Length per Row describe one row only and do not scale with # of PT '
+    'Rows; Total Woven Fabric already multiplies by # of PT Rows × Woven Layers.',
     'PT-ROW woven fabric is not installed in stacks/sections taller than 3 layers (48" max wrap '
     'height — SC-3 = 4.02 ft, EX-3 = 4.53 ft); Filter Area-Based sizing and fabric takeoff are '
     'unavailable above 3 layers.',
@@ -4847,7 +4850,8 @@ def calc_pt_row(payload):
     # ── Section 4: Fabric Takeoff — Offset & Inline, v1 ─────────────
     fabric_takeoff = {'available': False, 'layout': layout,
                        'fabric_width_per_row_ft': None, 'fabric_length_per_row_ft': None,
-                       'fabric_per_row_per_layer_sqyd': None, 'woven_layers': woven_layers,
+                       'fabric_per_row_per_layer_sqft': None, 'fabric_per_row_per_layer_sqyd': None,
+                       'woven_layers': woven_layers, 'num_rows': num_rows,
                        'total_woven_fabric_sqft': None, 'total_woven_fabric_rounded_sqft': None,
                        'total_woven_fabric_sqyd': None, 'total_woven_fabric_rounded_sqyd': None,
                        'note': None}
@@ -4866,6 +4870,7 @@ def calc_pt_row(payload):
         fabric_takeoff['available'] = True
         fabric_takeoff['fabric_width_per_row_ft'] = round(fabric_width_ft, 2)
         fabric_takeoff['fabric_length_per_row_ft'] = round(fabric_length_ft, 2)
+        fabric_takeoff['fabric_per_row_per_layer_sqft'] = round(fabric_per_row_per_layer_sqft, 1)
         fabric_takeoff['fabric_per_row_per_layer_sqyd'] = round(fabric_per_row_per_layer_sqft / 9.0, 1)
         fabric_takeoff['total_woven_fabric_sqft'] = round(total_sqft, 1)
         fabric_takeoff['total_woven_fabric_rounded_sqft'] = math.ceil(total_sqft)
@@ -4970,9 +4975,10 @@ def build_pt_row_pdf(inputs, results, project_name=None):
     ft = results['fabric_takeoff']
     if ft['available']:
         fabric_rows = [
-            ('Fabric Width per Row', f"{ft['fabric_width_per_row_ft']} ft"),
+            ('Fabric Width per Row (single row)', f"{ft['fabric_width_per_row_ft']} ft"),
             ('Fabric Length per Row', f"{ft['fabric_length_per_row_ft']} ft"),
-            ('Woven Layers', str(ft['woven_layers'])),
+            ('Fabric per Row per Layer', f"{ft['fabric_per_row_per_layer_sqft']} sf ({ft['fabric_per_row_per_layer_sqyd']} sy)"),
+            ('Woven Layers × Rows', f"{ft['woven_layers']} × {ft['num_rows']}"),
             ('Total Woven Fabric (sf)', f"{ft['total_woven_fabric_rounded_sqft']} sf (raw {ft['total_woven_fabric_sqft']})"),
             ('Total Woven Fabric (sy)', f"{ft['total_woven_fabric_rounded_sqyd']} sy (raw {ft['total_woven_fabric_sqyd']})"),
         ]
