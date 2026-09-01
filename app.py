@@ -4701,10 +4701,13 @@ def build_site_overlay_pdf(image_data_url, project_name=None, meta=None):
 #  than blocking the whole calculation, since a user may only have a
 #  flow figure or only a volume figure on hand.
 #
-#  v1 geometry (Filter Area-Based method + fabric takeoff) is Offset
-#  (Side-Car) layout only — AQ-400-01 Sheets 4-8 for Header Row/Inline/
-#  3-Stack have not been provided. Do not fabricate geometry for those;
-#  see spec Section 7/8.
+#  v1 geometry (Filter Area-Based method + fabric takeoff) covers Offset
+#  (Side-Car) and Inline layouts — AQ-100-25.3 wraps the entire PT-ROW row
+#  (bottom + both long sides up to the top deck + back-end overlap) as one
+#  universal procedure regardless of row position, so Inline reuses the
+#  same per-row formula as Offset (confirmed with James, 2026-09-01).
+#  Header Row/3-Stack geometry has not been provided — do not fabricate
+#  geometry for those; see spec Section 7/8.
 # ══════════════════════════════════════════════════════════════════
 _PT_ROW_FLOW_COEFF = 0.464   # CFS per crate — Wavin PT-ROW™ Sizing Guidance
 _PT_ROW_NET_STORAGE_CF = {   # ft3 per module, flat (not layer-dependent)
@@ -4734,8 +4737,8 @@ _PT_ROW_DISCLAIMER_TEXT = (
     "jurisdiction — no method is auto-selected as controlling. It does not replace the embedded "
     "PT-ROW logic in the Single/Multi-Tank calculators, verify the governing method's basis and "
     "applicable code reference before use. Filter Area-Based sizing and fabric takeoff geometry "
-    "shown here are Offset (Side-Car) layout only; Header Row, Inline, and 3-Stack layouts are not "
-    "yet supported. THE ENGINEER OF RECORD IS SOLELY RESPONSIBLE FOR SELECTING THE GOVERNING SIZING "
+    "shown here cover Offset (Side-Car) and Inline layouts only; Header Row and 3-Stack layouts are "
+    "not yet supported. THE ENGINEER OF RECORD IS SOLELY RESPONSIBLE FOR SELECTING THE GOVERNING SIZING "
     "METHOD AND VERIFYING FINAL ROW LENGTH, WIDTH, AND HEIGHT against project-specific hydrology, "
     "jurisdictional requirements, and AQ-400-01."
 )
@@ -4796,7 +4799,7 @@ def calc_pt_row(payload):
     filter_area_ok = wqf_cfs > 0 and loading_rate > 0
     required_filter_area_ft2 = (wqf_cfs * 448.8 / loading_rate) if filter_area_ok else None
 
-    # ── 3.3 Filter Area-Based (Geometric Method) — Offset layout only, v1 ──
+    # ── 3.3 Filter Area-Based (Geometric Method) — Offset & Inline, v1 ──
     filter_area_based = {'available': False, 'required_filter_area_ft2': None,
                           'effective_filter_area_per_crate_ft2': None,
                           'crates_required_estimate': None,
@@ -4806,10 +4809,11 @@ def calc_pt_row(payload):
                           'basis': 'AQ-400-01 §3.1–3.3 — filter area sized to pass WQf at the '
                                    'selected loading rate (default 1.0 gpm/ft²); all woven fabric '
                                    'surfaces in contact with aggregate count (bottom + two long '
-                                   'sidewalls). Offset (Side-Car) geometry only.',
+                                   'sidewalls). Offset (Side-Car) and Inline geometry — AQ-100-25.3 '
+                                   'wraps the entire row the same way regardless of position.',
                           'note': None}
-    if layout != 'offset':
-        filter_area_based['note'] = 'Filter Area-Based sizing is only available for the Offset (Side-Car) layout in v1.'
+    if layout not in ('offset', 'inline'):
+        filter_area_based['note'] = 'Filter Area-Based sizing is only available for Offset (Side-Car) and Inline layouts in v1.'
     elif not filter_area_ok:
         filter_area_based['note'] = 'Enter Treatment Flow (WQf) and Loading Rate to compute.'
     else:
@@ -4842,13 +4846,13 @@ def calc_pt_row(payload):
     else:
         quick_estimate['note'] = 'Enter Treatment Flow (WQf) and Loading Rate to compute. ' + quick_estimate['note']
 
-    # ── Section 4: Fabric Takeoff — Offset layout only, v1 ──────────
+    # ── Section 4: Fabric Takeoff — Offset & Inline, v1 ─────────────
     fabric_takeoff = {'available': False, 'layout': layout,
                        'fabric_width_per_row_ft': None, 'fabric_length_per_row_ft': None,
                        'fabric_per_row_per_layer_sqyd': None, 'woven_layers': _PT_ROW_WOVEN_LAYERS,
                        'total_woven_fabric_sqyd': None, 'total_woven_fabric_rounded_sqyd': None,
                        'note': None}
-    if layout != 'offset':
+    if layout not in ('offset', 'inline'):
         fabric_takeoff['note'] = 'Fabric takeoff not yet available for this configuration — drawing detail pending.'
     elif crates_per_row <= 0 or num_rows <= 0:
         fabric_takeoff['note'] = 'Enter Selected Crates per PT Row and # of PT Rows to compute fabric takeoff.'
@@ -4967,7 +4971,8 @@ def build_pt_row_pdf(inputs, results, project_name=None):
             ('Woven Layers', str(ft['woven_layers'])),
             ('Total Woven Fabric', f"{ft['total_woven_fabric_rounded_sqyd']} sy (raw {ft['total_woven_fabric_sqyd']} sy)"),
         ]
-        y = _draw_section_kv(c, y, 'FABRIC TAKEOFF (OFFSET / SIDE-CAR)', fabric_rows, ncols=2)
+        fabric_header = f"FABRIC TAKEOFF ({_PT_ROW_LAYOUT_LABELS.get(results['layout'], results['layout']).upper()})"
+        y = _draw_section_kv(c, y, fabric_header, fabric_rows, ncols=2)
 
     # ── Condensed reference notes (bulleted, wrapped) ───────────────
     from reportlab.pdfbase.pdfmetrics import stringWidth
