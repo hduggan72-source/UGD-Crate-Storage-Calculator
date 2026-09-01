@@ -1313,8 +1313,8 @@
                     pretreatment sizing methods side by side rather than a single black-box number — no
                     method is auto-selected as "controlling." Review each method's formula and basis and
                     select the one that governs for your jurisdiction. Filter Area-Based sizing and fabric
-                    takeoff are Offset (Side-Car) layout only in this version; Header Row, Inline, and
-                    3-Stack layouts are not yet supported (drawing detail pending).
+                    takeoff are supported for Offset (Side-Car) and Inline layouts in this version; Header
+                    Row and 3-Stack layouts are not yet supported (drawing detail pending).
                 </div>
 
                 <div class="section-card">
@@ -1329,8 +1329,8 @@
                         <label style="margin-top:8px;">PT-ROW Layout</label>
                         <select id="ptr_layout">
                             <option value="offset">Offset (Side-Car)</option>
+                            <option value="inline">Inline</option>
                             <option value="header_row" disabled>Header Row (coming soon — drawing detail pending)</option>
-                            <option value="inline" disabled>Inline (coming soon — drawing detail pending)</option>
                             <option value="3_stack" disabled>3-Stack (coming soon — drawing detail pending)</option>
                         </select>
 
@@ -1373,7 +1373,7 @@
                 </div>
 
                 <div class="section-card">
-                    <div class="section-card-header">Fabric Takeoff Parameters (Offset / Side-Car)</div>
+                    <div class="section-card-header">Fabric Takeoff Parameters (Offset / Inline)</div>
                     <div class="section-card-body">
                         <label>Wrap Extension Each End (ft)<span class="field-hint">default per source workbook — not a verified AQ-400-01 minimum, confirm if a hard spec value applies</span></label>
                         <input type="number" step="any" min="0" id="ptr_wrap_ext" value="1.5">
@@ -4606,6 +4606,10 @@
             </div>`;
     }
 
+    const PTR_LAYOUT_LABELS = {
+        offset: 'Offset (Side-Car)', inline: 'Inline', header_row: 'Header Row', '3_stack': '3-Stack'
+    };
+
     function renderPtRowResults(d) {
         const resultsDiv = document.getElementById('ptr_results');
 
@@ -4628,9 +4632,10 @@
         const quickCard = ptrMethodCard('Quick Estimate (Flat Area Method)', qe, qeExtra);
 
         const ft = d.fabric_takeoff;
+        const fabricLayoutLabel = PTR_LAYOUT_LABELS[ft.layout] || ft.layout;
         const fabricCard = ft.available
             ? `<div class="result-card">
-                    <h3>Fabric Takeoff (Offset / Side-Car)</h3>
+                    <h3>Fabric Takeoff (${fabricLayoutLabel})</h3>
                     <div class="result-row"><span>Fabric Width per Row</span><span class="val">${ptrFmt(ft.fabric_width_per_row_ft, 2)} ft</span></div>
                     <div class="result-row"><span>Fabric Length per Row</span><span class="val">${ptrFmt(ft.fabric_length_per_row_ft, 2)} ft</span></div>
                     <div class="result-row"><span>Woven Layers</span><span class="val">${ft.woven_layers}</span></div>
