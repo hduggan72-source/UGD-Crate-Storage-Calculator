@@ -4664,12 +4664,12 @@
         const fabricCard = ft.available
             ? `<div class="result-card">
                     <h3>Fabric Takeoff (${fabricLayoutLabel})</h3>
-                    <div class="result-row"><span>Fabric Width per Row (single row)</span><span class="val">${ptrFmt(ft.fabric_width_per_row_ft, 2)} ft</span></div>
-                    <div class="result-row"><span>Fabric Length per Row</span><span class="val">${ptrFmt(ft.fabric_length_per_row_ft, 2)} ft</span></div>
-                    <div class="result-row"><span>Fabric per Row per Layer</span><span class="val">${ptrFmt(ft.fabric_per_row_per_layer_sqft, 1)} sf (${ptrFmt(ft.fabric_per_row_per_layer_sqyd, 1)} sy)</span></div>
+                    <div class="result-row"><span>Fabric Width (spans ${ft.num_rows} row${ft.num_rows === 1 ? '' : 's'})</span><span class="val">${ptrFmt(ft.fabric_width_ft, 2)} ft</span></div>
+                    <div class="result-row"><span>Fabric Length</span><span class="val">${ptrFmt(ft.fabric_length_ft, 2)} ft</span></div>
+                    <div class="result-row"><span>Fabric per Layer</span><span class="val">${ptrFmt(ft.fabric_per_layer_sqft, 1)} sf (${ptrFmt(ft.fabric_per_layer_sqyd, 1)} sy)</span></div>
                     <div class="result-row"><span>Woven Layers</span><span class="val">${ft.woven_layers}</span></div>
                     <div class="result-row"><span><strong>Total Woven Fabric</strong></span><span class="val">${ft.total_woven_fabric_rounded_sqft} sf (raw ${ptrFmt(ft.total_woven_fabric_sqft, 1)} sf) — ${ft.total_woven_fabric_rounded_sqyd} sy (raw ${ptrFmt(ft.total_woven_fabric_sqyd, 1)} sy)</span></div>
-                    <div style="font-size:11px; color:#6b7280; margin-top:6px;">Total = Fabric per Row per Layer × ${ft.num_rows} Row${ft.num_rows === 1 ? '' : 's'} × ${ft.woven_layers} Layer${ft.woven_layers === 1 ? '' : 's'} — each row is wrapped individually, so width doesn't scale with row count; the total below does.</div>
+                    <div style="font-size:11px; color:#6b7280; margin-top:6px;">Total = Fabric per Layer × ${ft.woven_layers} Layer${ft.woven_layers === 1 ? '' : 's'} — adjacent rows share one bottom and only the two outer long sides wrap up, so Fabric Width already spans all ${ft.num_rows} row${ft.num_rows === 1 ? '' : 's'} (not multiplied again in the total).</div>
                 </div>`
             : `<div class="result-card">
                     <h3>Fabric Takeoff</h3>
