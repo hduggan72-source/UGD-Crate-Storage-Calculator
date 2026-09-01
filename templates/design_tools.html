@@ -1375,7 +1375,13 @@
                 <div class="section-card">
                     <div class="section-card-header">Fabric Takeoff Parameters (Offset / Inline)</div>
                     <div class="section-card-body">
-                        <label>Wrap Extension Each End (ft)<span class="field-hint">auto-set per AQ-100-25.3 note 1.2 (18"/36"/48" for 1/2/3+ layers) when Number of Layers changes — edit manually to override</span></label>
+                        <label>Woven Fabric Layers<span class="field-hint">1 = AQ-100-25.3 typical installation; 2 = project-specific treatment-flow sizing (e.g. some OEPA-based methods) that calls for a second layer</span></label>
+                        <select id="ptr_woven_layers">
+                            <option value="1" selected>1 Layer (AQ-100-25.3 typical)</option>
+                            <option value="2">2 Layers</option>
+                        </select>
+
+                        <label style="margin-top:8px;">Wrap Extension Each End (ft)<span class="field-hint">auto-set per AQ-100-25.3 note 1.2 (18"/36"/48" for 1/2/3+ layers) when Number of Layers changes — edit manually to override</span></label>
                         <input type="number" step="any" min="0" id="ptr_wrap_ext" value="1.5">
 
                         <label style="margin-top:8px;">Fabric Waste Factor</label>
@@ -4573,6 +4579,7 @@
             loading_rate_gpm_sf:    document.getElementById('ptr_loading_rate').value || 1.0,
             crates_per_row:         document.getElementById('ptr_crates_per_row').value || 0,
             num_rows:               document.getElementById('ptr_num_rows').value || 0,
+            woven_layers:           document.getElementById('ptr_woven_layers').value || 1,
             wrap_extension_ft:      document.getElementById('ptr_wrap_ext').value || 1.5,
             waste_factor:           document.getElementById('ptr_waste_factor').value || 0.20,
         };

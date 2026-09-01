@@ -4717,7 +4717,9 @@ _PT_ROW_NET_STORAGE_CF = {   # ft3 per module, flat (not layer-dependent)
     'SC': 10.25,
     'EX': 10.83,
 }
-_PT_ROW_WOVEN_LAYERS = 2     # AQ-400-01 §1.1 — two layers of woven geotextile wrap the forebay
+_PT_ROW_WOVEN_LAYERS_DEFAULT = 1   # AQ-100-25.3 typical installation — single woven layer wraps the
+                                    # forebay; a second layer is project-specific (e.g. some OEPA-based
+                                    # treatment-flow sizing calls for two) and selectable in the UI.
 
 # Wrap extension each end, per AQ-100-25.3 note 1.2: 18"/36"/48" for 1/2/3-layer
 # stacks. Held at 48" for 4+ layers — the drawing doesn't define anything past
@@ -4733,8 +4735,9 @@ def _pt_row_wrap_ext_default(layers):
 _PT_ROW_REFERENCE_NOTES = [
     'Woven geotextile only within the PT-ROW forebay wrap — non-woven is not permitted here '
     '(non-woven wraps the main storage system only).',
-    'Two layers of woven geotextile required: first layer under the row over supporting stone, '
-    'second layer fully encloses the row.',
+    'AQ-100-25.3 typical installation uses one layer of woven geotextile under the row over '
+    'supporting stone, fully enclosing it. A second layer may be required by project-specific '
+    'treatment-flow sizing (e.g. some OEPA-based methods) — select Woven Fabric Layers accordingly.',
     'Minimum access structures: one at inlet/diversion, one at downstream end; additional access '
     'required for rows exceeding 300 ft. Minimum 12" diameter openings.',
     'Aggregate must be non-angular and clean, free of fines, to prevent fabric damage.',
@@ -4764,6 +4767,10 @@ def calc_pt_row(payload):
     layout       = payload.get('layout', 'offset')
     if layout not in ('offset', 'header_row', 'inline', '3_stack'):
         layout = 'offset'
+    woven_layers = int(float(payload.get('woven_layers', _PT_ROW_WOVEN_LAYERS_DEFAULT)
+                              or _PT_ROW_WOVEN_LAYERS_DEFAULT))
+    if woven_layers not in (1, 2):
+        woven_layers = _PT_ROW_WOVEN_LAYERS_DEFAULT
 
     layer_heights = CONFIG_DATA[config]['layer_heights']
     layers = max(1, min(layers, len(layer_heights)))
@@ -4861,7 +4868,7 @@ def calc_pt_row(payload):
     # ── Section 4: Fabric Takeoff — Offset & Inline, v1 ─────────────
     fabric_takeoff = {'available': False, 'layout': layout,
                        'fabric_width_per_row_ft': None, 'fabric_length_per_row_ft': None,
-                       'fabric_per_row_per_layer_sqyd': None, 'woven_layers': _PT_ROW_WOVEN_LAYERS,
+                       'fabric_per_row_per_layer_sqyd': None, 'woven_layers': woven_layers,
                        'total_woven_fabric_sqyd': None, 'total_woven_fabric_rounded_sqyd': None,
                        'note': None}
     if layout not in ('offset', 'inline'):
@@ -4872,7 +4879,7 @@ def calc_pt_row(payload):
         fabric_width_ft = crate_width_ft + 2 * layer_height_ft + 2 * wrap_ext_ft
         fabric_length_ft = crates_per_row * crate_length_ft + 2 * wrap_ext_ft
         fabric_per_row_per_layer_sqyd = (fabric_width_ft * fabric_length_ft * (1 + waste_factor)) / 9.0
-        total_sqyd = fabric_per_row_per_layer_sqyd * num_rows * _PT_ROW_WOVEN_LAYERS
+        total_sqyd = fabric_per_row_per_layer_sqyd * num_rows * woven_layers
         fabric_takeoff['available'] = True
         fabric_takeoff['fabric_width_per_row_ft'] = round(fabric_width_ft, 2)
         fabric_takeoff['fabric_length_per_row_ft'] = round(fabric_length_ft, 2)
