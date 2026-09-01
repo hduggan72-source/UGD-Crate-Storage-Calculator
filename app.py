@@ -4722,11 +4722,21 @@ _PT_ROW_WOVEN_LAYERS_DEFAULT = 1   # AQ-100-25.3 typical installation — single
                                     # treatment-flow sizing calls for two) and selectable in the UI.
 
 # Wrap extension each end, per AQ-100-25.3 note 1.2: 18"/36"/48" for 1/2/3-layer
-# stacks. Held at 48" for 4+ layers — the drawing doesn't define anything past
-# triple layer (confirmed with James, 2026-09-01). Mirrors ptrWrapExtDefault()
-# in design_tools.html so a payload that omits wrap_extension_ft (e.g. a direct
-# API call) gets the same default the UI would have sent.
+# stacks. Mirrors ptrWrapExtDefault() in design_tools.html so a payload that
+# omits wrap_extension_ft (e.g. a direct API call) gets the same default the
+# UI would have sent.
 _PT_ROW_WRAP_EXT_DEFAULTS_FT = {1: 1.5, 2: 3.0}
+
+# PT-ROW woven fabric is not installed in stacks/sections taller than 3 layers
+# (48" max wrap height — SC-3 = 4.02 ft, EX-3 = 4.53 ft). Confirmed with James,
+# 2026-09-01: this is an installation limit, not just an unverified extension
+# value — Filter Area-Based sizing and fabric takeoff are unavailable above it.
+_PT_ROW_MAX_FABRIC_LAYERS = 3
+_PT_ROW_MAX_LAYERS_NOTE = (
+    'PT-ROW woven fabric is not installed in stacks/sections taller than 3 layers '
+    '(48" max wrap height — SC-3 = 4.02 ft, EX-3 = 4.53 ft). Reduce Number of Layers '
+    'to 3 or fewer to compute this method.'
+)
 
 
 def _pt_row_wrap_ext_default(layers):
@@ -4741,6 +4751,9 @@ _PT_ROW_REFERENCE_NOTES = [
     'Minimum access structures: one at inlet/diversion, one at downstream end; additional access '
     'required for rows exceeding 300 ft. Minimum 12" diameter openings.',
     'Aggregate must be non-angular and clean, free of fines, to prevent fabric damage.',
+    'PT-ROW woven fabric is not installed in stacks/sections taller than 3 layers (48" max wrap '
+    'height — SC-3 = 4.02 ft, EX-3 = 4.53 ft); Filter Area-Based sizing and fabric takeoff are '
+    'unavailable above 3 layers.',
     'Final row length, width, and height are determined by the Engineer of Record — this tool '
     'supports sizing, it does not replace EOR judgment.',
 ]
@@ -4833,6 +4846,8 @@ def calc_pt_row(payload):
                           'note': None}
     if layout not in ('offset', 'inline'):
         filter_area_based['note'] = 'Filter Area-Based sizing is only available for Offset (Side-Car) and Inline layouts in v1.'
+    elif layers > _PT_ROW_MAX_FABRIC_LAYERS:
+        filter_area_based['note'] = _PT_ROW_MAX_LAYERS_NOTE
     elif not filter_area_ok:
         filter_area_based['note'] = 'Enter Treatment Flow (WQf) and Loading Rate to compute.'
     else:
@@ -4873,6 +4888,8 @@ def calc_pt_row(payload):
                        'note': None}
     if layout not in ('offset', 'inline'):
         fabric_takeoff['note'] = 'Fabric takeoff not yet available for this configuration — drawing detail pending.'
+    elif layers > _PT_ROW_MAX_FABRIC_LAYERS:
+        fabric_takeoff['note'] = _PT_ROW_MAX_LAYERS_NOTE
     elif crates_per_row <= 0 or num_rows <= 0:
         fabric_takeoff['note'] = 'Enter Selected Crates per PT Row and # of PT Rows to compute fabric takeoff.'
     else:
