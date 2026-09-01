@@ -6695,10 +6695,22 @@ def download_dxf():
         return ('DXF export currently supports rectangular tanks only — '
                 'complex-shape layouts are not yet supported.'), 400
 
+    if layers < 1 or layers > 8:
+        return 'Layer count must be between 1 and 8.', 400
+
     crates_wide = math.floor(known_width  / _DXF_MODULE_WID)
     crates_long = math.floor(known_length / _DXF_MODULE_LEN)
     if crates_wide <= 0 or crates_long <= 0:
         return 'Enter valid tank dimensions before exporting a DXF.', 400
+
+    # Hard cap on per-layer module count — this route builds one in-memory
+    # BLOCKREF entity per module, so unbounded input dimensions (e.g. a
+    # stray/malicious 10,000 x 10,000 ft request) could otherwise generate
+    # millions of entities and exhaust a web worker. 20,000 modules/layer is
+    # far beyond any real AquaCell project footprint.
+    if crates_wide * crates_long > 20000:
+        return ('Footprint is too large for DXF export (over 20,000 modules per '
+                'layer). Contact Wavin for large-project CAD support.'), 400
 
     tank_width  = crates_wide * _DXF_MODULE_WID
     tank_length = crates_long * _DXF_MODULE_LEN
@@ -6723,7 +6735,7 @@ def download_dxf():
         block = doc.blocks.new(name=block_name)
         block.add_lwpolyline(
             [(0, 0), (_DXF_MODULE_WID, 0), (_DXF_MODULE_WID, _DXF_MODULE_LEN), (0, _DXF_MODULE_LEN)],
-            format='xy', dxfattribs={'layer': 'AQUACELL-MODULES', 'closed': True},
+            format='xy', close=True, dxfattribs={'layer': 'AQUACELL-MODULES'},
         )
 
     # Origin at the bottom-left corner of the footprint; columns run along X
@@ -6738,7 +6750,7 @@ def download_dxf():
 
     msp.add_lwpolyline(
         [(0, 0), (tank_width, 0), (tank_width, tank_length), (0, tank_length)],
-        format='xy', dxfattribs={'layer': 'AQUACELL-FOOTPRINT', 'closed': True},
+        format='xy', close=True, dxfattribs={'layer': 'AQUACELL-FOOTPRINT'},
     )
 
     _dxf_dimstyle(doc)
