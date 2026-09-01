@@ -4719,6 +4719,17 @@ _PT_ROW_NET_STORAGE_CF = {   # ft3 per module, flat (not layer-dependent)
 }
 _PT_ROW_WOVEN_LAYERS = 2     # AQ-400-01 §1.1 — two layers of woven geotextile wrap the forebay
 
+# Wrap extension each end, per AQ-100-25.3 note 1.2: 18"/36"/48" for 1/2/3-layer
+# stacks. Held at 48" for 4+ layers — the drawing doesn't define anything past
+# triple layer (confirmed with James, 2026-09-01). Mirrors ptrWrapExtDefault()
+# in design_tools.html so a payload that omits wrap_extension_ft (e.g. a direct
+# API call) gets the same default the UI would have sent.
+_PT_ROW_WRAP_EXT_DEFAULTS_FT = {1: 1.5, 2: 3.0}
+
+
+def _pt_row_wrap_ext_default(layers):
+    return _PT_ROW_WRAP_EXT_DEFAULTS_FT.get(layers, 4.0)
+
 _PT_ROW_REFERENCE_NOTES = [
     'Woven geotextile only within the PT-ROW forebay wrap — non-woven is not permitted here '
     '(non-woven wraps the main storage system only).',
@@ -4754,17 +4765,18 @@ def calc_pt_row(payload):
     if layout not in ('offset', 'header_row', 'inline', '3_stack'):
         layout = 'offset'
 
+    layer_heights = CONFIG_DATA[config]['layer_heights']
+    layers = max(1, min(layers, len(layer_heights)))
+    layer_height_ft = layer_heights[layers - 1]
+
     wqf_cfs           = float(payload.get('wqf_cfs', 0) or 0)
     required_volume_cf = float(payload.get('required_volume_cf', 0) or 0)
     loading_rate       = float(payload.get('loading_rate_gpm_sf', 1.0) or 1.0)
     crates_per_row      = int(float(payload.get('crates_per_row', 0) or 0))
     num_rows            = int(float(payload.get('num_rows', 0) or 0))
-    wrap_ext_ft          = float(payload.get('wrap_extension_ft', 1.5) or 1.5)
+    _wrap_ext_default    = _pt_row_wrap_ext_default(layers)
+    wrap_ext_ft          = float(payload.get('wrap_extension_ft', _wrap_ext_default) or _wrap_ext_default)
     waste_factor         = float(payload.get('waste_factor', 0.20) or 0.20)
-
-    layer_heights = CONFIG_DATA[config]['layer_heights']
-    layers = max(1, min(layers, len(layer_heights)))
-    layer_height_ft = layer_heights[layers - 1]
 
     crate_width_ft  = MODULE_WID
     crate_length_ft = MODULE_LEN
