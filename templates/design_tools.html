@@ -1394,7 +1394,7 @@
                 <div class="section-card">
                     <div class="section-card-header">Fabric Takeoff Parameters (Offset / Inline)</div>
                     <div class="section-card-body">
-                        <label>Wrap Extension Each End (ft)<span class="field-hint">default per source workbook — not a verified AQ-400-01 minimum, confirm if a hard spec value applies</span></label>
+                        <label>Wrap Extension Each End (ft)<span class="field-hint">auto-set per AQ-100-25.3 note 1.2 (18"/36"/48" for 1/2/3+ layers) when Number of Layers changes — edit manually to override</span></label>
                         <input type="number" step="any" min="0" id="ptr_wrap_ext" value="1.5">
 
                         <label style="margin-top:8px;">Fabric Waste Factor</label>
@@ -4556,6 +4556,27 @@
     // ══════════════ PT-ROW™ TRANSPARENT SIZING CALCULATOR ══════════════
     let ptrLastInputs  = null;
     let ptrLastResults = null;
+
+    // Wrap extension each end, per AQ-100-25.3 note 1.2: 18" single layer,
+    // 36" double layer, 48" triple layer. Held at 48" for 4+ layers — the
+    // drawing doesn't define anything past triple layer.
+    function ptrWrapExtDefault(layers) {
+        if (layers <= 1) return 1.5;
+        if (layers === 2) return 3.0;
+        return 4.0;
+    }
+
+    let ptrWrapExtAuto = true;
+    (function ptrInitWrapExtAutoScale() {
+        const layersEl = document.getElementById('ptr_layers');
+        const wrapExtEl = document.getElementById('ptr_wrap_ext');
+        if (!layersEl || !wrapExtEl) return;
+        wrapExtEl.addEventListener('input', () => { ptrWrapExtAuto = false; });
+        layersEl.addEventListener('change', () => {
+            if (!ptrWrapExtAuto) return;
+            wrapExtEl.value = ptrWrapExtDefault(parseInt(layersEl.value, 10) || 1);
+        });
+    })();
 
     async function runPtRow() {
         const resultsDiv = document.getElementById('ptr_results');
