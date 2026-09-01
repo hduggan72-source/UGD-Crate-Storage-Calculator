@@ -4848,6 +4848,7 @@ def calc_pt_row(payload):
     fabric_takeoff = {'available': False, 'layout': layout,
                        'fabric_width_per_row_ft': None, 'fabric_length_per_row_ft': None,
                        'fabric_per_row_per_layer_sqyd': None, 'woven_layers': woven_layers,
+                       'total_woven_fabric_sqft': None, 'total_woven_fabric_rounded_sqft': None,
                        'total_woven_fabric_sqyd': None, 'total_woven_fabric_rounded_sqyd': None,
                        'note': None}
     if layout not in ('offset', 'inline'):
@@ -4859,12 +4860,15 @@ def calc_pt_row(payload):
     else:
         fabric_width_ft = crate_width_ft + 2 * layer_height_ft + 2 * wrap_ext_ft
         fabric_length_ft = crates_per_row * crate_length_ft + 2 * wrap_ext_ft
-        fabric_per_row_per_layer_sqyd = (fabric_width_ft * fabric_length_ft * (1 + waste_factor)) / 9.0
-        total_sqyd = fabric_per_row_per_layer_sqyd * num_rows * woven_layers
+        fabric_per_row_per_layer_sqft = fabric_width_ft * fabric_length_ft * (1 + waste_factor)
+        total_sqft = fabric_per_row_per_layer_sqft * num_rows * woven_layers
+        total_sqyd = total_sqft / 9.0
         fabric_takeoff['available'] = True
         fabric_takeoff['fabric_width_per_row_ft'] = round(fabric_width_ft, 2)
         fabric_takeoff['fabric_length_per_row_ft'] = round(fabric_length_ft, 2)
-        fabric_takeoff['fabric_per_row_per_layer_sqyd'] = round(fabric_per_row_per_layer_sqyd, 1)
+        fabric_takeoff['fabric_per_row_per_layer_sqyd'] = round(fabric_per_row_per_layer_sqft / 9.0, 1)
+        fabric_takeoff['total_woven_fabric_sqft'] = round(total_sqft, 1)
+        fabric_takeoff['total_woven_fabric_rounded_sqft'] = math.ceil(total_sqft)
         fabric_takeoff['total_woven_fabric_sqyd'] = round(total_sqyd, 1)
         fabric_takeoff['total_woven_fabric_rounded_sqyd'] = math.ceil(total_sqyd)
 
@@ -4969,7 +4973,8 @@ def build_pt_row_pdf(inputs, results, project_name=None):
             ('Fabric Width per Row', f"{ft['fabric_width_per_row_ft']} ft"),
             ('Fabric Length per Row', f"{ft['fabric_length_per_row_ft']} ft"),
             ('Woven Layers', str(ft['woven_layers'])),
-            ('Total Woven Fabric', f"{ft['total_woven_fabric_rounded_sqyd']} sy (raw {ft['total_woven_fabric_sqyd']} sy)"),
+            ('Total Woven Fabric (sf)', f"{ft['total_woven_fabric_rounded_sqft']} sf (raw {ft['total_woven_fabric_sqft']})"),
+            ('Total Woven Fabric (sy)', f"{ft['total_woven_fabric_rounded_sqyd']} sy (raw {ft['total_woven_fabric_sqyd']})"),
         ]
         fabric_header = f"FABRIC TAKEOFF ({_PT_ROW_LAYOUT_LABELS.get(results['layout'], results['layout']).upper()})"
         y = _draw_section_kv(c, y, fabric_header, fabric_rows, ncols=2)
