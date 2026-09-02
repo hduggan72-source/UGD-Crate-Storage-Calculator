@@ -1903,17 +1903,32 @@ function showResults(r) {
     fosLLEl.textContent = r.fos_ll ? fmtNum(r.fos_ll, 2) : '—';
     fosLLEl.className = 'rv ' + (r.fos_ll && r.fos_ll >= 1.75 ? 'pass' : 'fail');
 
-    // Elevations
+    // Elevations — surface_elev/tank_bottom_elev are optional inputs; the
+    // backend coerces a blank field to 0 (calc_tank does `float(x or 0)`),
+    // which would otherwise render as a fabricated elevation stack (e.g. a
+    // positive "Top of Tank" or negative "Bottom of Stone" the user never
+    // entered). Gate on the raw saved input string so a blank field shows
+    // "—" while an explicitly entered 0 still displays normally.
     const trafficLbl = { H10: 'H-10', HS20: 'HS-20', HS25: 'HS-25' }[r.traffic_load] || r.traffic_load;
-    setEl('r_elev_surface',      fmtNum(r.surface_elev, 2) + ' ft');
-    setEl('r_elev_top_stone',    fmtNum(r.tank_top_elev + r.cover_stone, 2) + ' ft');
-    setEl('r_elev_top_tank',     fmtNum(r.tank_top_elev, 2) + ' ft');
-    setEl('r_elev_bottom_tank',  fmtNum(r.tank_bottom_elev, 2) + ' ft');
-    setEl('r_elev_bottom_stone', fmtNum(r.tank_bottom_elev - r.base_stone, 2) + ' ft');
+    const rawTank = tanks[activeIdx] || {};
+    const isBlank = v => v === '' || v === undefined || v === null;
+    const surfaceProvided = !isBlank(rawTank.surface_elev);
+    const bottomProvided  = !isBlank(rawTank.tank_bottom_elev);
+
+    setEl('r_elev_surface',      surfaceProvided ? fmtNum(r.surface_elev, 2) + ' ft' : '— (enter Surface Elevation)');
+    setEl('r_elev_top_stone',    bottomProvided ? fmtNum(r.tank_top_elev + r.cover_stone, 2) + ' ft' : '—');
+    setEl('r_elev_top_tank',     bottomProvided ? fmtNum(r.tank_top_elev, 2) + ' ft' : '—');
+    setEl('r_elev_bottom_tank',  bottomProvided ? fmtNum(r.tank_bottom_elev, 2) + ' ft' : '— (enter Tank Bottom Elevation)');
+    setEl('r_elev_bottom_stone', bottomProvided ? fmtNum(r.tank_bottom_elev - r.base_stone, 2) + ' ft' : '—');
     setEl('r_elev_min_cover_lbl', `Min. Cover Required (${trafficLbl})`);
     const minCovEl = document.getElementById('r_elev_min_cover');
-    minCovEl.textContent = fmtNum(r.min_cover, 2) + ' ft';
-    minCovEl.className = 'rv ' + (r.cover_ok ? 'pass' : 'fail');
+    if (surfaceProvided && bottomProvided) {
+        minCovEl.textContent = fmtNum(r.min_cover, 2) + ' ft';
+        minCovEl.className = 'rv ' + (r.cover_ok ? 'pass' : 'fail');
+    } else {
+        minCovEl.textContent = fmtNum(r.min_cover, 2) + ' ft (enter elevations to verify)';
+        minCovEl.className = 'rv';
+    }
 
     // Dimensions
     setEl('r_dims',      `${fmtNum(r.tank_width, 2)} ft × ${fmtNum(r.tank_length, 2)} ft`);
