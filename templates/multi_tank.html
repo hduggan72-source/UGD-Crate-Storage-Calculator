@@ -1159,6 +1159,37 @@
                 </div>
             </div>
 
+            <!-- Elevations -->
+            <div class="result-card">
+                <div class="result-card-hdr" onclick="toggleRC(this)" style="background:#1e40af;">📏 Tank Elevations <span class="rcarrow">▼</span></div>
+                <div class="result-card-body">
+                    <div class="result-row">
+                        <span class="rl">Surface Elevation</span>
+                        <span class="rv" id="r_elev_surface">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">Top of Stone (Cover)</span>
+                        <span class="rv" id="r_elev_top_stone">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">Top of Tank</span>
+                        <span class="rv" id="r_elev_top_tank">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">Bottom of Tank</span>
+                        <span class="rv" id="r_elev_bottom_tank">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl">Bottom of Stone (Base)</span>
+                        <span class="rv" id="r_elev_bottom_stone">—</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="rl" id="r_elev_min_cover_lbl">Min. Cover Required</span>
+                        <span class="rv" id="r_elev_min_cover">—</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- BOM -->
             <div class="result-card">
                 <div class="result-card-hdr" onclick="toggleRC(this)">📦 Bill of Materials — This Tank <span class="rcarrow">▼</span></div>
@@ -1871,6 +1902,18 @@ function showResults(r) {
     const fosLLEl = document.getElementById('r_fos_ll');
     fosLLEl.textContent = r.fos_ll ? fmtNum(r.fos_ll, 2) : '—';
     fosLLEl.className = 'rv ' + (r.fos_ll && r.fos_ll >= 1.75 ? 'pass' : 'fail');
+
+    // Elevations
+    const trafficLbl = { H10: 'H-10', HS20: 'HS-20', HS25: 'HS-25' }[r.traffic_load] || r.traffic_load;
+    setEl('r_elev_surface',      fmtNum(r.surface_elev, 2) + ' ft');
+    setEl('r_elev_top_stone',    fmtNum(r.tank_top_elev + r.cover_stone, 2) + ' ft');
+    setEl('r_elev_top_tank',     fmtNum(r.tank_top_elev, 2) + ' ft');
+    setEl('r_elev_bottom_tank',  fmtNum(r.tank_bottom_elev, 2) + ' ft');
+    setEl('r_elev_bottom_stone', fmtNum(r.tank_bottom_elev - r.base_stone, 2) + ' ft');
+    setEl('r_elev_min_cover_lbl', `Min. Cover Required (${trafficLbl})`);
+    const minCovEl = document.getElementById('r_elev_min_cover');
+    minCovEl.textContent = fmtNum(r.min_cover, 2) + ' ft';
+    minCovEl.className = 'rv ' + (r.cover_ok ? 'pass' : 'fail');
 
     // Dimensions
     setEl('r_dims',      `${fmtNum(r.tank_width, 2)} ft × ${fmtNum(r.tank_length, 2)} ft`);
