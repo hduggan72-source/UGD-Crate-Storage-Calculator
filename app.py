@@ -6725,6 +6725,20 @@ def download_pdf():
 _DXF_MODULE_WID = 1.9685
 _DXF_MODULE_LEN = 3.937
 
+# Cumulative stack height (ft) for N layers — identical to the layer_heights
+# tables used everywhere else in this app (download_pdf, the main calculate
+# route, and the LAYER_HT table in index.html's client-side schematic).
+_DXF_LAYER_HEIGHTS = {
+    'SC': [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581],
+    'EX': [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073],
+}
+
+_DXF_SECTION_WIDTH = 8.0  # ft — representative stack width, not to scale
+                          # horizontally (matches the "CROSS-SECTION (NOT TO
+                          # SCALE)" convention used by this app's other
+                          # schematic diagrams); only the vertical/elevation
+                          # axis is drawn to scale.
+
 _DXF_DISCLAIMER = (
     "DISCLAIMER: This is a computed conceptual layout only, not a stamped "
     "construction drawing. Native AquaCell DWG detail sheets remain the "
@@ -6748,6 +6762,24 @@ def _dxf_dimstyle(doc):
     return dimstyle
 
 
+def _dxf_section_dimstyle(doc):
+    # Separate, smaller-scale dimstyle for the section view's cover-depth
+    # callout — that dimension typically spans only 1-5 ft, versus the plan
+    # view's tens-to-hundreds-of-feet spans, so the plan dimstyle's 1.0 ft
+    # text / 0.6 ft arrows would read oversized here.
+    name = 'AQUACELL_FT_SECTION'
+    if name in doc.dimstyles:
+        return doc.dimstyles.get(name)
+    dimstyle = doc.dimstyles.new(name)
+    dimstyle.dxf.dimtxt = 0.35
+    dimstyle.dxf.dimasz = 0.2
+    dimstyle.dxf.dimexe = 0.1
+    dimstyle.dxf.dimexo = 0.1
+    dimstyle.dxf.dimdec = 2
+    dimstyle.dxf.dimtad = 1
+    return dimstyle
+
+
 @app.route('/download_dxf', methods=['POST'])
 def download_dxf():
 
@@ -6761,6 +6793,10 @@ def download_dxf():
     known_length   = float(request.form.get('known_length', 0) or 0)
     liner_on_tank  = request.form.get('liner_on_tank',  '0') == '1'
     liner_on_stone = request.form.get('liner_on_stone', '0') == '1'
+    surface_elev     = float(request.form.get('surface_elev', 0) or 0)
+    tank_bottom_elev = float(request.form.get('tank_bottom_elev', 0) or 0)
+    cover_stone      = float(request.form.get('cover_stone', 1.0) or 1.0)
+    base_stone       = float(request.form.get('base_stone', 0.333) or 0.333)
 
     if shape_mode == 'complex':
         return ('DXF export currently supports rectangular tanks only — '
@@ -6786,6 +6822,13 @@ def download_dxf():
     tank_width  = crates_wide * _DXF_MODULE_WID
     tank_length = crates_long * _DXF_MODULE_LEN
     num_crates  = crates_wide * crates_long * layers
+
+    layer_heights = _DXF_LAYER_HEIGHTS[config]
+    tank_height   = layer_heights[layers - 1] if layers <= len(layer_heights) else layer_heights[-1]
+    tank_top_elev        = tank_bottom_elev + tank_height
+    top_of_stone_elev    = tank_top_elev + cover_stone
+    bottom_of_stone_elev = tank_bottom_elev - base_stone
+    cover_depth           = surface_elev - tank_top_elev
 
     doc = ezdxf.new('R2010', setup=True)
     doc.header['$INSUNITS'] = 2  # feet
@@ -6870,6 +6913,98 @@ def download_dxf():
     for i, line in enumerate(disc_lines):
         msp.add_text(line, height=0.5, dxfattribs={'layer': 'AQUACELL-TEXT'}) \
            .set_placement((0, disc_y - i * 0.7))
+
+    # ══════════════════════════════════════════════════════════════
+    #  CROSS-SECTION VIEW — elevation-based, offset to the right of the
+    #  plan view. Real project elevations are used directly as Y coordinates
+    #  (not a local 0-based frame), so a CAD user can read elevations
+    #  straight off the drawing. Horizontal width is a fixed representative
+    #  value, not tied to tank_width — this view is "to scale" vertically
+    #  only, matching the existing schematic conventions elsewhere in this
+    #  app (see the "CROSS-SECTION (NOT TO SCALE)" diagrams and index.html's
+    #  own client-side drawSection()).
+    # ══════════════════════════════════════════════════════════════
+
+    for name, color in (
+        ('AQUACELL-SECTION-SURFACE', 4),
+        ('AQUACELL-SECTION-STONE',   8),
+        ('AQUACELL-SECTION-TANK',    3),
+        ('AQUACELL-SECTION-DIMS',    1),
+        ('AQUACELL-SECTION-TEXT',    7),
+    ):
+        if name not in doc.layers:
+            doc.layers.add(name=name, color=color)
+
+    _dxf_section_dimstyle(doc)
+
+    sec_x0 = tank_width + max(dim_offset * 2, 10.0)
+    sec_x1 = sec_x0 + _DXF_SECTION_WIDTH
+    label_x = sec_x1 + 0.5
+
+    # Tank envelope (bottom to top) + interior stack boundaries. The
+    # envelope's own top/bottom edges already mark tank_bottom_elev and
+    # tank_top_elev, so only the *interior* boundaries (between stacked
+    # layers) get a separate line — avoids drawing a duplicate coincident
+    # line on top of the envelope edge.
+    msp.add_lwpolyline(
+        [(sec_x0, tank_bottom_elev), (sec_x1, tank_bottom_elev),
+         (sec_x1, tank_top_elev), (sec_x0, tank_top_elev)],
+        format='xy', close=True, dxfattribs={'layer': 'AQUACELL-SECTION-TANK'},
+    )
+    for k in range(layers - 1):
+        boundary_elev = tank_bottom_elev + layer_heights[k]
+        msp.add_line((sec_x0, boundary_elev), (sec_x1, boundary_elev),
+                      dxfattribs={'layer': 'AQUACELL-SECTION-TANK'})
+        msp.add_text(f'EL. {boundary_elev:.2f}', height=0.3, dxfattribs={'layer': 'AQUACELL-SECTION-TANK'}) \
+           .set_placement((label_x, boundary_elev - 0.1))
+    msp.add_text(f'TOP OF TANK  EL. {tank_top_elev:.2f}', height=0.3, dxfattribs={'layer': 'AQUACELL-SECTION-TANK'}) \
+       .set_placement((label_x, tank_top_elev - 0.1))
+    msp.add_text(f'BOTTOM OF TANK  EL. {tank_bottom_elev:.2f}', height=0.3, dxfattribs={'layer': 'AQUACELL-SECTION-TANK'}) \
+       .set_placement((label_x, tank_bottom_elev - 0.1))
+
+    # Stone lines — always drawn (cover_stone/base_stone are plain thickness
+    # inputs with sensible defaults, not gated behind an inclusion toggle;
+    # the stone_*_included flags elsewhere in this app only affect whether
+    # stone volume counts toward storage totals, not whether it physically
+    # exists in the section).
+    msp.add_line((sec_x0, top_of_stone_elev), (sec_x1, top_of_stone_elev),
+                  dxfattribs={'layer': 'AQUACELL-SECTION-STONE'})
+    msp.add_text(f'TOP OF STONE  EL. {top_of_stone_elev:.2f}', height=0.3, dxfattribs={'layer': 'AQUACELL-SECTION-STONE'}) \
+       .set_placement((label_x, top_of_stone_elev - 0.1))
+
+    msp.add_line((sec_x0, bottom_of_stone_elev), (sec_x1, bottom_of_stone_elev),
+                  dxfattribs={'layer': 'AQUACELL-SECTION-STONE'})
+    msp.add_text(f'BOTTOM OF STONE  EL. {bottom_of_stone_elev:.2f}', height=0.3, dxfattribs={'layer': 'AQUACELL-SECTION-STONE'}) \
+       .set_placement((label_x, bottom_of_stone_elev - 0.1))
+
+    # Proposed surface line — drawn wider than the stack so it reads as a
+    # ground line, not just another stack boundary.
+    surface_overhang = _DXF_SECTION_WIDTH * 0.25
+    msp.add_line((sec_x0 - surface_overhang, surface_elev), (sec_x1 + surface_overhang, surface_elev),
+                  dxfattribs={'layer': 'AQUACELL-SECTION-SURFACE'})
+    msp.add_text(f'PROPOSED SURFACE  EL. {surface_elev:.2f}', height=0.3, dxfattribs={'layer': 'AQUACELL-SECTION-SURFACE'}) \
+       .set_placement((label_x, surface_elev - 0.1))
+
+    # Actual cover-depth callout (Surface − Top of Tank) — a real DXF linear
+    # dimension (auto-computes/displays the measured distance) plus an
+    # explicit text value alongside it for readability at any zoom level.
+    cover_dim = msp.add_linear_dim(
+        base=(sec_x0 - 2.0, (surface_elev + tank_top_elev) / 2),
+        p1=(sec_x0, surface_elev), p2=(sec_x0, tank_top_elev), angle=90,
+        dimstyle='AQUACELL_FT_SECTION', dxfattribs={'layer': 'AQUACELL-SECTION-DIMS'},
+    )
+    cover_dim.render()
+    msp.add_text(f'ACTUAL COVER DEPTH: {cover_depth:.2f} FT', height=0.35, dxfattribs={'layer': 'AQUACELL-SECTION-DIMS'}) \
+       .set_placement((sec_x0 - 2.0, (surface_elev + tank_top_elev) / 2 + 0.4))
+
+    # Section-view text block — generation date + disclaimer, duplicated
+    # here (not just on the plan view) so the section reads standalone if
+    # a viewer zooms/pans to it without the plan view in frame.
+    msp.add_text(f'GENERATED: {generated_str}', height=0.4, dxfattribs={'layer': 'AQUACELL-SECTION-TEXT'}) \
+       .set_placement((sec_x0, surface_elev + 2.0))
+    for i, line in enumerate(disc_lines):
+        msp.add_text(line, height=0.3, dxfattribs={'layer': 'AQUACELL-SECTION-TEXT'}) \
+           .set_placement((sec_x0, bottom_of_stone_elev - 1.5 - i * 0.5))
 
     stream = io.StringIO()
     doc.write(stream)
