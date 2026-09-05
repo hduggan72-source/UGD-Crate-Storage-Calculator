@@ -1,5 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style></head><body>
-<title>Single-Tank Calculator Guide</title>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style><title>Single-Tank Calculator Guide</title></head><body>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
@@ -504,8 +503,8 @@
 
     <ol class="steps">
       <li><div><b>📄 Quote</b> — the client-facing quote PDF. Run <b>Calculate</b> and then <b>Calculate
-        Price</b> first; Quote reads both, and will tell you which one it's missing if you skip
-        ahead.</div></li>
+        Price</b> first — Quote does not check for you, and skipping Calculate Price will silently
+        produce a PDF with $0 pricing instead of a warning.</div></li>
       <li><div><b>⬇ Report</b> — the internal design summary PDF: full inputs, storage/BOM/load results, and
         the schematic if included. No pricing on it — that's what Quote is for.</div></li>
       <li><div><b>💲 CS Export</b> — a per-line-item unit-cost CSV built from the same floor prices as Quote,
