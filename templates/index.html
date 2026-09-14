@@ -4623,10 +4623,10 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     </div>
     <div class="details-modal-body">
       <label class="feedback-label" for="fb_name">Name</label>
-      <input type="text" class="feedback-field" id="fb_name" placeholder="Your name">
+      <input type="text" class="feedback-field" id="fb_name" placeholder="Your name" maxlength="200">
 
       <label class="feedback-label" for="fb_company">Company</label>
-      <input type="text" class="feedback-field" id="fb_company" placeholder="Your company">
+      <input type="text" class="feedback-field" id="fb_company" placeholder="Your company" maxlength="200">
 
       <label class="feedback-label" for="fb_rating">Overall Rating</label>
       <select class="feedback-field" id="fb_rating">
@@ -4639,13 +4639,13 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
       </select>
 
       <label class="feedback-label" for="fb_bugs">Bugs Found / Notes</label>
-      <textarea class="feedback-field" id="fb_bugs" placeholder="Anything that didn't work as expected"></textarea>
+      <textarea class="feedback-field" id="fb_bugs" placeholder="Anything that didn't work as expected" maxlength="5000"></textarea>
 
       <label class="feedback-label" for="fb_features">Feature Requests</label>
-      <textarea class="feedback-field" id="fb_features" placeholder="Anything you wish this tool could do"></textarea>
+      <textarea class="feedback-field" id="fb_features" placeholder="Anything you wish this tool could do" maxlength="5000"></textarea>
 
       <label class="feedback-label" for="fb_comments">Additional Comments</label>
-      <textarea class="feedback-field" id="fb_comments" placeholder="Anything else you'd like us to know"></textarea>
+      <textarea class="feedback-field" id="fb_comments" placeholder="Anything else you'd like us to know" maxlength="5000"></textarea>
 
       <div class="feedback-status" id="feedbackStatus"></div>
     </div>

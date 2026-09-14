@@ -10,6 +10,7 @@ import math
 import os
 import base64
 import textwrap
+import time
 from io import BytesIO
 import requests
 from pypdf import PdfWriter, PdfReader as PyPdfReader
@@ -64,6 +65,23 @@ GITHUB_PAT    = os.environ.get("GITHUB_PAT", "")   # set in Render environment
 SENDGRID_API_KEY    = os.environ.get("SENDGRID_API_KEY", "")       # set in Render environment
 FEEDBACK_FROM_EMAIL = os.environ.get("FEEDBACK_FROM_EMAIL", "")    # must be a SendGrid-verified sender
 FEEDBACK_TO_EMAIL   = os.environ.get("FEEDBACK_TO_EMAIL", "WavinTechSupport@orbia.com")
+FEEDBACK_NAME_MAX    = 200    # Name / Company
+FEEDBACK_LONGTEXT_MAX = 5000  # Bugs/Notes, Feature Requests, Additional Comments
+_FEEDBACK_RATE_LIMIT_MAX    = 5     # submissions
+_FEEDBACK_RATE_LIMIT_WINDOW = 600   # seconds, per IP
+_feedback_rate_limit_hits = {}      # ip -> list[epoch timestamps], in-memory best-effort throttle
+
+def _feedback_rate_limited(ip):
+    """True if this IP has hit the submission cap within the rolling window.
+    In-memory per-process — good enough as an abuse deterrent on a single
+    Render dyno; not a substitute for a shared store under multiple workers."""
+    now = time.time()
+    hits = _feedback_rate_limit_hits.setdefault(ip, [])
+    hits[:] = [t for t in hits if now - t < _FEEDBACK_RATE_LIMIT_WINDOW]
+    if len(hits) >= _FEEDBACK_RATE_LIMIT_MAX:
+        return True
+    hits.append(now)
+    return False
 
 # ── File list cache (avoids repeated GitHub API calls) ──
 _details_cache      = []          # cached list of filenames
@@ -7967,12 +7985,24 @@ def beta_feedback():
     if not SENDGRID_API_KEY or not FEEDBACK_FROM_EMAIL:
         return jsonify({'error': 'Feedback email is not configured on the server yet.'}), 503
 
-    data = request.get_json(force=True, silent=True) or {}
-    name    = (data.get('name') or '').strip()[:200]
-    company = (data.get('company') or '').strip()[:200]
-    bugs     = (data.get('bugs_notes') or '').strip()[:5000]
-    features = (data.get('feature_requests') or '').strip()[:5000]
-    comments = (data.get('additional_comments') or '').strip()[:5000]
+    if not request.is_json:
+        return jsonify({'error': 'Invalid request.'}), 400
+
+    if _feedback_rate_limited(request.remote_addr or 'unknown'):
+        return jsonify({'error': 'Too many submissions from this connection. Please wait a few minutes and try again.'}), 429
+
+    data = request.get_json(silent=True) or {}
+    name    = (data.get('name') or '').strip()
+    company = (data.get('company') or '').strip()
+    bugs     = (data.get('bugs_notes') or '').strip()
+    features = (data.get('feature_requests') or '').strip()
+    comments = (data.get('additional_comments') or '').strip()
+
+    if (len(name) > FEEDBACK_NAME_MAX or len(company) > FEEDBACK_NAME_MAX or
+            len(bugs) > FEEDBACK_LONGTEXT_MAX or len(features) > FEEDBACK_LONGTEXT_MAX or
+            len(comments) > FEEDBACK_LONGTEXT_MAX):
+        return jsonify({'error': f'Name/Company must be {FEEDBACK_NAME_MAX} characters or fewer; '
+                                  f'Notes/Requests/Comments must be {FEEDBACK_LONGTEXT_MAX} characters or fewer.'}), 400
 
     rating = None
     rating_raw = data.get('rating')
