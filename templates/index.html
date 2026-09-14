@@ -250,6 +250,37 @@
             text-decoration: underline;
             display: block;
         }
+        /* ── Feedback modal form fields (shares .details-* modal chrome) ── */
+        .feedback-label {
+            display: block;
+            font-size: 12px;
+            font-weight: bold;
+            color: #93c5fd;
+            margin: 14px 0 5px;
+        }
+        .feedback-label:first-child { margin-top: 0; }
+        .feedback-field {
+            width: 100%;
+            background: #1a2f5e;
+            border: 1px solid #2c4a8a;
+            border-radius: 5px;
+            color: #e2e8f0;
+            font-size: 13px;
+            font-family: inherit;
+            padding: 8px 10px;
+            box-sizing: border-box;
+        }
+        .feedback-field::placeholder { color: #64748b; }
+        .feedback-field:focus { outline: none; border-color: #3b82f6; }
+        textarea.feedback-field { resize: vertical; min-height: 64px; }
+        .feedback-status {
+            font-size: 12px;
+            margin-top: 10px;
+            display: none;
+        }
+        .feedback-status.visible { display: block; }
+        .feedback-status.error   { color: #fca5a5; }
+        .feedback-status.success { color: #86efac; }
         /* ── SPLIT LAYOUT ── */
         .split-layout {
             display: flex;
@@ -616,6 +647,7 @@
             </a>
             <a href="/static/guides/single_tank_guide.html" target="_blank" rel="noopener"
                class="topbar-btn" style="background:#059669;color:white;text-decoration:none;" title="Opens in a new tab">📖 Guide</a>
+            <button class="topbar-btn" onclick="openFeedbackModal()" style="background:#e67e22;color:white;">💬 Submit Feedback</button>
             <button id="themeToggle" class="topbar-btn" title="Toggle Theme" style="background:transparent;color:white;font-size:20px;padding:4px 10px;">☀️</button>
         </div>
     </div>
@@ -4414,6 +4446,64 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         if (e.target === document.getElementById('detailsOverlay')) closeDetailsModal();
     }
 
+    /* ---- Submit Feedback modal ---- */
+    function openFeedbackModal() {
+        document.getElementById('feedbackOverlay').classList.add('open');
+    }
+
+    function closeFeedbackModal() {
+        document.getElementById('feedbackOverlay').classList.remove('open');
+    }
+
+    function closeFeedbackIfBg(e) {
+        if (e.target === document.getElementById('feedbackOverlay')) closeFeedbackModal();
+    }
+
+    function submitFeedback() {
+        var statusEl = document.getElementById('feedbackStatus');
+        var btn = document.getElementById('feedbackSubmitBtn');
+        var payload = {
+            name:                document.getElementById('fb_name').value,
+            company:             document.getElementById('fb_company').value,
+            rating:              document.getElementById('fb_rating').value,
+            bugs_notes:          document.getElementById('fb_bugs').value,
+            feature_requests:    document.getElementById('fb_features').value,
+            additional_comments: document.getElementById('fb_comments').value,
+        };
+
+        statusEl.className = 'feedback-status';
+        btn.disabled = true;
+        btn.textContent = 'Sending…';
+
+        fetch('/beta-feedback', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(payload)
+        })
+        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, body: d }; }); })
+        .then(function(res) {
+            btn.disabled = false;
+            btn.textContent = '📨 Send Feedback';
+            if (!res.ok) {
+                statusEl.textContent = '⚠ ' + (res.body.error || 'Something went wrong. Please try again.');
+                statusEl.className = 'feedback-status visible error';
+                return;
+            }
+            statusEl.textContent = '✓ Thanks! Your feedback was sent.';
+            statusEl.className = 'feedback-status visible success';
+            ['fb_name','fb_company','fb_rating','fb_bugs','fb_features','fb_comments'].forEach(function(id) {
+                document.getElementById(id).value = '';
+            });
+            setTimeout(closeFeedbackModal, 1800);
+        })
+        .catch(function() {
+            btn.disabled = false;
+            btn.textContent = '📨 Send Feedback';
+            statusEl.textContent = '⚠ Could not reach the server. Please check your connection and try again.';
+            statusEl.className = 'feedback-status visible error';
+        });
+    }
+
     function generateDetailsPDF() {
         var selected = Array.from(document.querySelectorAll('#detailsGroups input[type=checkbox]:checked'))
                            .map(function(cb) { return cb.value; });
@@ -4520,6 +4610,50 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
       <button class="details-btn details-btn-secondary" onclick="closeDetailsModal()">Cancel</button>
       <button class="details-btn details-btn-primary" id="detailsGenBtn"
               onclick="generateDetailsPDF()" disabled>⬇ Generate PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SUBMIT FEEDBACK MODAL ══ -->
+<div class="details-overlay" id="feedbackOverlay" onclick="closeFeedbackIfBg(event)">
+  <div class="details-modal">
+    <div class="details-modal-header">
+      <h3>💬 Submit Feedback</h3>
+      <button class="details-close" onclick="closeFeedbackModal()" title="Close">✕</button>
+    </div>
+    <div class="details-modal-body">
+      <label class="feedback-label" for="fb_name">Name</label>
+      <input type="text" class="feedback-field" id="fb_name" placeholder="Your name">
+
+      <label class="feedback-label" for="fb_company">Company</label>
+      <input type="text" class="feedback-field" id="fb_company" placeholder="Your company">
+
+      <label class="feedback-label" for="fb_rating">Overall Rating</label>
+      <select class="feedback-field" id="fb_rating">
+        <option value="">— Select a rating —</option>
+        <option value="5">5 — Excellent</option>
+        <option value="4">4 — Good</option>
+        <option value="3">3 — Average</option>
+        <option value="2">2 — Below Average</option>
+        <option value="1">1 — Poor</option>
+      </select>
+
+      <label class="feedback-label" for="fb_bugs">Bugs Found / Notes</label>
+      <textarea class="feedback-field" id="fb_bugs" placeholder="Anything that didn't work as expected"></textarea>
+
+      <label class="feedback-label" for="fb_features">Feature Requests</label>
+      <textarea class="feedback-field" id="fb_features" placeholder="Anything you wish this tool could do"></textarea>
+
+      <label class="feedback-label" for="fb_comments">Additional Comments</label>
+      <textarea class="feedback-field" id="fb_comments" placeholder="Anything else you'd like us to know"></textarea>
+
+      <div class="feedback-status" id="feedbackStatus"></div>
+    </div>
+    <div class="details-modal-footer">
+      <span class="details-count">Sent directly to the Wavin team</span>
+      <button class="details-btn details-btn-secondary" onclick="closeFeedbackModal()">Cancel</button>
+      <button class="details-btn details-btn-primary" id="feedbackSubmitBtn"
+              onclick="submitFeedback()">📨 Send Feedback</button>
     </div>
   </div>
 </div>
