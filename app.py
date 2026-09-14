@@ -60,6 +60,11 @@ GITHUB_BRANCH = "Pricing_Engine_v1"
 GITHUB_FOLDER = "Details"
 GITHUB_PAT    = os.environ.get("GITHUB_PAT", "")   # set in Render environment
 
+# ── BETA feedback button (Submit Feedback -> email via SendGrid) ──
+SENDGRID_API_KEY    = os.environ.get("SENDGRID_API_KEY", "")       # set in Render environment
+FEEDBACK_FROM_EMAIL = os.environ.get("FEEDBACK_FROM_EMAIL", "")    # must be a SendGrid-verified sender
+FEEDBACK_TO_EMAIL   = os.environ.get("FEEDBACK_TO_EMAIL", "WavinTechSupport@orbia.com")
+
 # ── File list cache (avoids repeated GitHub API calls) ──
 _details_cache      = []          # cached list of filenames
 _details_cache_time = 0.0         # epoch timestamp of last fetch
@@ -7950,6 +7955,75 @@ def _github_headers():
     if GITHUB_PAT:
         h["Authorization"] = f"Bearer {GITHUB_PAT}"
     return h
+
+
+# ══════════════════════════════════════════════════════════════════
+#  ROUTE: /beta-feedback  —  Submit Feedback button (BETA build)
+# ══════════════════════════════════════════════════════════════════
+@app.route('/beta-feedback', methods=['POST'])
+def beta_feedback():
+    """Email a BETA feedback submission via SendGrid. UI-only feature —
+    nothing here is persisted server-side; email is the record."""
+    if not SENDGRID_API_KEY or not FEEDBACK_FROM_EMAIL:
+        return jsonify({'error': 'Feedback email is not configured on the server yet.'}), 503
+
+    data = request.get_json(force=True, silent=True) or {}
+    name    = (data.get('name') or '').strip()[:200]
+    company = (data.get('company') or '').strip()[:200]
+    bugs     = (data.get('bugs_notes') or '').strip()[:5000]
+    features = (data.get('feature_requests') or '').strip()[:5000]
+    comments = (data.get('additional_comments') or '').strip()[:5000]
+
+    rating = None
+    rating_raw = data.get('rating')
+    if rating_raw not in (None, ''):
+        try:
+            rating_val = int(rating_raw)
+            if 1 <= rating_val <= 5:
+                rating = rating_val
+        except (TypeError, ValueError):
+            pass
+
+    if not any([name, company, bugs, features, comments, rating]):
+        return jsonify({'error': 'Please fill in at least one field before submitting.'}), 400
+
+    body_text = "\n".join([
+        f"AquaCell BETA feedback submission — {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        "",
+        f"Name: {name or '(not provided)'}",
+        f"Company: {company or '(not provided)'}",
+        f"Rating: {rating if rating is not None else '(not provided)'} / 5",
+        "",
+        "Bugs Found / Notes:",
+        bugs or '(none)',
+        "",
+        "Feature Requests:",
+        features or '(none)',
+        "",
+        "Additional Comments:",
+        comments or '(none)',
+    ])
+
+    payload = {
+        "personalizations": [{"to": [{"email": FEEDBACK_TO_EMAIL}]}],
+        "from":    {"email": FEEDBACK_FROM_EMAIL, "name": "AquaCell BETA Feedback"},
+        "subject": f"AquaCell BETA Feedback — {company or name or 'Anonymous'}",
+        "content": [{"type": "text/plain", "value": body_text}],
+    }
+
+    try:
+        resp = requests.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+            json=payload, timeout=10,
+        )
+        if resp.status_code not in (200, 202):
+            return jsonify({'error': f'Email service returned an error (status {resp.status_code}).'}), 502
+    except requests.RequestException:
+        return jsonify({'error': 'Could not reach the email service. Please try again.'}), 502
+
+    return jsonify({'ok': True})
+
 
 @app.route('/api/details')
 def api_details():
