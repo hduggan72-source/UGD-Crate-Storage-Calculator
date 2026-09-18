@@ -1,0 +1,2 @@
+# Keep the CAD title block template byte-for-byte (it is CRLF as exported by AutoCAD)
+static/cad/*.dxf -text
