@@ -168,6 +168,15 @@
             cursor: pointer; transition: background 0.15s;
         }
         .btn-add-tank:hover { background: #1d4ed8; }
+        .btn-clone-tank {
+            width: 100%; padding: 8px; margin-top: 6px;
+            background: transparent; color: #93c5fd;
+            border: 1px solid #3b82f6; border-radius: 5px;
+            font-size: 12px; font-weight: bold;
+            cursor: pointer; transition: background 0.15s, color 0.15s;
+        }
+        .btn-clone-tank:hover:not(:disabled) { background: #1e40af; color: #fff; }
+        .btn-clone-tank:disabled { opacity: 0.4; cursor: not-allowed; }
 
         .sidebar-scroll {
             flex: 1;
@@ -672,6 +681,8 @@
         <div class="sidebar-header">
             <div class="sidebar-header-title">Tanks in Project</div>
             <button class="btn-add-tank" id="btnAddTank" onclick="addTank()">+ Add Tank</button>
+            <button class="btn-clone-tank" id="btnCloneTank" onclick="cloneTank()" disabled
+                    title="Select a tank first">⧉ Clone Tank</button>
         </div>
         <div class="sidebar-scroll">
             <div class="tank-list" id="tankList">
@@ -1504,10 +1515,13 @@ const WEIGHTS = { base:25.18, side:4.91, bottom:7.86, pipe:2.70, adapter12:11.02
 // ══════════════════════════════════════════════════════════════════
 //  TANK LIFECYCLE
 // ══════════════════════════════════════════════════════════════════
-function defaultTankData(label) {
+// `idx` is the tank's position in the project. The first tank (idx 0)
+// defaults to 3 layers; every additional tank defaults to 1 layer.
+function defaultTankData(label, idx) {
+    const defaultLayers = (idx === undefined || idx === 0) ? '3' : '1';
     return {
         tank_label: label,
-        config: 'SC', layers: '3', traffic_load: 'HS20',
+        config: 'SC', layers: defaultLayers, traffic_load: 'HS20',
         known_width: '', known_length: '',
         shape_mode: 'rectangle',
         complex_scaled_area: '', complex_known_dim: '',
@@ -1538,11 +1552,38 @@ function addTank() {
     }
     const idx = tanks.length;
     const label = `Tank ${idx + 1}`;
-    tanks.push(defaultTankData(label));
+    tanks.push(defaultTankData(label, idx));
     results.push(null);
     renderSidebar();
     selectTank(idx);
     showToast(`✓ ${label} added`);
+}
+
+// Duplicates the currently selected tank as a new tank at the end of the
+// list: every input (config, layers, footprint, elevations, stone, PT-ROW
+// areas, accessories, notes) is deep-copied. Results are NOT copied -- the
+// clone starts as "Not calculated" so the user runs Calculate on it after
+// tweaking whatever differs.
+function cloneTank() {
+    if (activeIdx === null) { showToast('Select a tank to clone first'); return; }
+    if (tanks.length >= MAX_TANKS_PER_PROJECT) {
+        alert(`This project already has ${MAX_TANKS_PER_PROJECT} tanks, the maximum for one project.\n\nBeyond ${MAX_TANKS_PER_PROJECT} tanks the results get too dense to review at a glance — export this project, then start a second project for the remaining tanks.`);
+        return;
+    }
+    saveDraft();   // make sure any in-progress edits on the source tank are captured
+    const src = tanks[activeIdx];
+    const srcName = (src.tank_label || '').trim() || `Tank ${activeIdx + 1}`;
+    const idx = tanks.length;
+    const copy = JSON.parse(JSON.stringify(src));
+    // Name: default "Tank N" labels get the next number; custom labels get "(Copy)".
+    copy.tank_label = /^Tank \d+$/.test(srcName)
+        ? `Tank ${idx + 1}`
+        : `${srcName} (Copy)`;
+    tanks.push(copy);
+    results.push(null);
+    renderSidebar();
+    selectTank(idx);
+    showToast(`✓ ${srcName} cloned as ${copy.tank_label}`);
 }
 
 // Resets the currently selected tank's inputs back to blank -- the
@@ -1553,7 +1594,7 @@ function resetForm() {
     if (activeIdx === null) { showToast('Select a tank first'); return; }
     const label = tanks[activeIdx].tank_label || `Tank ${activeIdx + 1}`;
     if (!confirm(`Reset "${label}" back to blank inputs? This clears everything entered for this tank.`)) return;
-    tanks[activeIdx] = defaultTankData(`Tank ${activeIdx + 1}`);
+    tanks[activeIdx] = defaultTankData(`Tank ${activeIdx + 1}`, activeIdx);
     results[activeIdx] = null;
     renderSidebar();
     loadEditor(activeIdx);
@@ -1601,6 +1642,15 @@ function renderSidebar() {
         addBtn.style.opacity = atCap ? '0.5' : '';
         addBtn.style.cursor = atCap ? 'not-allowed' : '';
         addBtn.title = atCap ? `Maximum ${MAX_TANKS_PER_PROJECT} tanks per project` : '';
+    }
+    const cloneBtn = document.getElementById('btnCloneTank');
+    if (cloneBtn) {
+        const atCap = tanks.length >= MAX_TANKS_PER_PROJECT;
+        const noSel = activeIdx === null;
+        cloneBtn.disabled = atCap || noSel;
+        cloneBtn.title = atCap ? `Maximum ${MAX_TANKS_PER_PROJECT} tanks per project`
+                       : noSel ? 'Select a tank first'
+                       : 'Duplicate the selected tank as a new tank';
     }
 
     tanks.forEach((t, i) => {
