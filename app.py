@@ -6801,8 +6801,9 @@ def _dxf_text_w(text, height):
     return len(text) * height * _DXF_TEXT_WIDTH_FACTOR
 
 
-def _dxf_scale_label(scale_ft_per_in):
-    return f'1" = {scale_ft_per_in}\''
+def _dxf_scale_label(scale_ft_per_in, standard=True):
+    label = f'1" = {scale_ft_per_in:g}\''
+    return label if standard else f'{label} (NON-STANDARD, FIT TO SHEET)'
 
 
 def _dxf_dimstyle(doc, name, scale_ft_per_in):
@@ -6824,16 +6825,50 @@ def _dxf_dimstyle(doc, name, scale_ft_per_in):
 
 
 def _dxf_pick_scale(geometry_fn, box_w_in, box_h_in):
-    """Return (scale, geometry) for the largest standard scale at which the
-    content described by geometry_fn(scale) fits a box_w_in x box_h_in
-    viewport. geometry_fn returns a dict with model-space extents
-    x0/y0/x1/y1 (ft) for the annotation sizes that scale implies."""
+    """Return (scale, geometry, is_standard) for the largest standard scale at
+    which the content described by geometry_fn(scale) fits a box_w_in x
+    box_h_in viewport. geometry_fn returns a dict with model-space extents
+    x0/y0/x1/y1 (ft) for the annotation sizes that scale implies.
+
+    If no standard scale fits (a pathological footprint such as 2 ft x
+    4,000 ft is still under the module cap), fall back to the smallest
+    multiple of 10 ft/in that does fit, so the sheet is never silently
+    clipped. The caption and title block then say the scale is non-standard.
+    """
+    def fits(geo, s):
+        return ((geo['x1'] - geo['x0']) / s <= box_w_in
+                and (geo['y1'] - geo['y0']) / s <= box_h_in)
+
     for s in _DXF_STD_SCALES_FT_PER_IN:
         geo = geometry_fn(s)
-        if (geo['x1'] - geo['x0']) / s <= box_w_in and (geo['y1'] - geo['y0']) / s <= box_h_in:
-            return s, geo
+        if fits(geo, s):
+            return s, geo, True
     s = _DXF_STD_SCALES_FT_PER_IN[-1]
-    return s, geometry_fn(s)
+    for _ in range(12):
+        geo = geometry_fn(s)
+        if fits(geo, s):
+            return s, geo, False
+        required = max((geo['x1'] - geo['x0']) / box_w_in,
+                       (geo['y1'] - geo['y0']) / box_h_in)
+        s = max(s + 10, int(math.ceil(required / 10.0)) * 10)
+    return s, geometry_fn(s), False
+
+
+def _dxf_stack_labels(items, text_height):
+    """Place right-hand section labels top down. `items` is an iterable of
+    (anchor_elev, text, layer); the result is a list of (y, text, layer)
+    with each label centred on its anchor line unless the label above it
+    forces it lower, so two lines closer together than a text height
+    (a 4" base stone, an inverted surface) never overprint."""
+    placed = []
+    prev_y = None
+    for elev, text, layer in sorted(items, key=lambda item: -item[0]):
+        y = elev - text_height / 2.0
+        if prev_y is not None and y > prev_y - text_height * 1.3:
+            y = prev_y - text_height * 1.3
+        placed.append((y, text, layer))
+        prev_y = y
+    return placed
 
 
 def _dxf_titleblock_template():
@@ -6940,10 +6975,11 @@ def _dxf_add_titleblock(doc, layout, tb, k, ox, oy, values):
     return ref
 
 
-def _dxf_add_view(layout, box, geo, scale_ft_per_in, caption_lines):
+def _dxf_add_view(layout, box, geo, scale_ft_per_in, caption_lines, frozen_layers=()):
     """Add a locked paper-space viewport filling `box` (paper inches) that
     shows the model-space region `geo` at the given scale, with caption
-    lines underneath."""
+    lines underneath. `frozen_layers` are hidden in this viewport only, so
+    the plan and section views cannot bleed into each other's window."""
     bx0, by0, bx1, by1 = box
     w, h = bx1 - bx0, by1 - by0
     vp = layout.add_viewport(
@@ -6954,6 +6990,8 @@ def _dxf_add_view(layout, box, geo, scale_ft_per_in, caption_lines):
         dxfattribs={'layer': 'AQUACELL-VPORT'},
     )
     vp.dxf.flags = vp.dxf.flags | _dxf_const.VSF_LOCK_ZOOM
+    if frozen_layers:
+        vp.frozen_layers = list(frozen_layers)
     _dxf_add_caption(layout, bx0, by0, caption_lines)
     return vp
 
@@ -7156,7 +7194,7 @@ def download_dxf():
             'y1': text_y + len(text_lines) * line_h + 0.1 * s,
         }
 
-    plan_scale, plan = _dxf_pick_scale(
+    plan_scale, plan, plan_scale_std = _dxf_pick_scale(
         plan_geometry,
         (plan_box[2] - plan_box[0]) - _DXF_VIEW_FIT_SLACK_IN,
         (plan_box[3] - plan_box[1]) - _DXF_VIEW_FIT_SLACK_IN,
@@ -7236,34 +7274,65 @@ def download_dxf():
         section_title = ('CROSS-SECTION — VERTICAL TO SCALE, HORIZONTAL NOT TO SCALE — '
                          f'GENERATED: {generated_str}')
         section_disc_lines = textwrap.wrap(_DXF_DISCLAIMER, width=60)
-        section_labels = [top_label, bottom_label, surface_label, *cover_lines,
-                          'TOP OF STONE  EL. 0000.00', 'BOTTOM OF STONE  EL. 0000.00']
+
+        # Model-space placement: to the right of everything the PLAN viewport
+        # can see (its paper width times its scale, centred on the plan
+        # extents), not merely past the plan's drawn extents, so the section
+        # never appears inside the plan view. The viewports additionally
+        # freeze each other's layers (see the sheet composition below).
+        plan_visible_right = ((plan['x0'] + plan['x1']) / 2.0
+                              + (plan_box[2] - plan_box[0]) * plan_scale / 2.0)
 
         def section_geometry(s):
             th = _DXF_PAPER_TEXT_IN * s
             ts = _DXF_PAPER_TEXT_SMALL_IN * s
             sec_w    = _DXF_SECTION_WIDTH_IN * s
-            sec_x0   = plan['x1'] + max(2 * plan['dim_off'], 10.0)
-            sec_x1   = sec_x0 + sec_w
             overhang = sec_w * 0.25
+            # Everything drawn left of the stack: surface overhang, the
+            # cover-depth dimension line and its rotated text.
+            left_reach = overhang + 0.3 * s + 0.6 * s
+            sec_x0   = plan_visible_right + 0.5 * s + left_reach
+            sec_x1   = sec_x0 + sec_w
             dim_base_x = sec_x0 - overhang - 0.3 * s
             label_x  = sec_x1 + 0.1 * s
-            title_y  = max(surface_elev, top_of_stone_elev) + 0.3 * s   # clear of the highest line even with inverted elevations
-            disc_y   = bottom_of_stone_elev - 0.4 * s
-            widest   = max(_dxf_text_w(max(section_labels, key=len), th),
-                           _dxf_text_w(max(section_disc_lines, key=len), ts),
-                           _dxf_text_w(section_title, ts) - (label_x - sec_x0))
+            items = [
+                (tank_top_elev,    top_label,     'AQUACELL-SECTION-TANK'),
+                (tank_bottom_elev, bottom_label,  'AQUACELL-SECTION-TANK'),
+                (surface_elev,     surface_label, 'AQUACELL-SECTION-SURFACE'),
+            ]
+            for k in range(layers - 1):
+                boundary_elev = tank_bottom_elev + layer_heights[k]
+                items.append((boundary_elev, f'EL. {boundary_elev:.2f}', 'AQUACELL-SECTION-TANK'))
+            if not top_coincides:
+                items.append((top_of_stone_elev, f'TOP OF STONE  EL. {top_of_stone_elev:.2f}',
+                              'AQUACELL-SECTION-STONE'))
+            if not bottom_coincides:
+                items.append((bottom_of_stone_elev, f'BOTTOM OF STONE  EL. {bottom_of_stone_elev:.2f}',
+                              'AQUACELL-SECTION-STONE'))
+            # Cover-depth value directly under the surface label, on the label side.
+            for i, line in enumerate(cover_lines):
+                items.append((surface_elev - th * (1.6 + 1.3 * i), line, 'AQUACELL-SECTION-DIMS'))
+            labels = _dxf_stack_labels(items, th)
+            lowest_label_y = min(y for y, _, _ in labels)
+            # Title sits above the highest line; the disclaimer below the
+            # lowest of the stone, the surface (which may be far below the
+            # tank when elevations are inverted) and the last stacked label.
+            title_y = max(surface_elev, top_of_stone_elev) + 0.3 * s
+            disc_y  = min(bottom_of_stone_elev, surface_elev, lowest_label_y) - 0.4 * s
+            widest  = max(max(_dxf_text_w(text, th) for _, text, _ in labels),
+                          _dxf_text_w(max(section_disc_lines, key=len), ts),
+                          _dxf_text_w(section_title, ts) - (label_x - sec_x0))
             return {
                 's': s, 'th': th, 'ts': ts, 'sec_x0': sec_x0, 'sec_x1': sec_x1,
                 'overhang': overhang, 'dim_base_x': dim_base_x, 'label_x': label_x,
-                'title_y': title_y, 'disc_y': disc_y,
-                'x0': dim_base_x - 0.35 * s,
+                'title_y': title_y, 'disc_y': disc_y, 'labels': labels,
+                'x0': sec_x0 - left_reach,
                 'y0': disc_y - len(section_disc_lines) * ts * 1.4,
                 'x1': label_x + widest,
                 'y1': title_y + ts * 1.2,
             }
 
-        section_scale, sec = _dxf_pick_scale(
+        section_scale, sec, section_scale_std = _dxf_pick_scale(
             section_geometry,
             (section_box[2] - section_box[0]) - _DXF_VIEW_FIT_SLACK_IN,
             (section_box[3] - section_box[1]) - _DXF_VIEW_FIT_SLACK_IN,
@@ -7272,16 +7341,6 @@ def download_dxf():
 
         sec_x0, sec_x1, label_x = sec['sec_x0'], sec['sec_x1'], sec['label_x']
         th, ts = sec['th'], sec['ts']
-
-        # Right-hand labels are collected first and placed afterwards, top
-        # down, so two lines closer together than a text height (e.g. a 4"
-        # base stone under the tank bottom) get stacked instead of drawn on
-        # top of each other. Each label stays as close to its line as the
-        # label above it allows.
-        section_labels_to_place = []   # (elev, text, layer)
-
-        def section_label(text, elev, layer):
-            section_labels_to_place.append((elev, text, layer))
 
         # Tank envelope (bottom to top) + interior stack boundaries. The
         # envelope's own top/bottom edges already mark tank_bottom_elev and
@@ -7297,7 +7356,6 @@ def download_dxf():
             boundary_elev = tank_bottom_elev + layer_heights[k]
             msp.add_line((sec_x0, boundary_elev), (sec_x1, boundary_elev),
                           dxfattribs={'layer': 'AQUACELL-SECTION-TANK'})
-            section_label(f'EL. {boundary_elev:.2f}', boundary_elev, 'AQUACELL-SECTION-TANK')
 
         # Stone lines are always drawn (cover_stone/base_stone are plain
         # thickness inputs with sensible defaults, not gated behind an
@@ -7305,25 +7363,16 @@ def download_dxf():
         # only affect whether stone volume counts toward storage totals, not
         # whether it physically exists in the section). When a thickness is
         # exactly zero, the stone line coincides with the tank envelope edge
-        # — merge the two labels instead of stacking unreadable overlapping
-        # text at the same point.
+        # — the labels were merged above instead of stacking two at one point.
         msp.add_line((sec_x0, top_of_stone_elev), (sec_x1, top_of_stone_elev),
                       dxfattribs={'layer': 'AQUACELL-SECTION-STONE'})
         msp.add_line((sec_x0, bottom_of_stone_elev), (sec_x1, bottom_of_stone_elev),
                       dxfattribs={'layer': 'AQUACELL-SECTION-STONE'})
 
-        section_label(top_label, tank_top_elev, 'AQUACELL-SECTION-TANK')
-        if not top_coincides:
-            section_label(f'TOP OF STONE  EL. {top_of_stone_elev:.2f}', top_of_stone_elev, 'AQUACELL-SECTION-STONE')
-        section_label(bottom_label, tank_bottom_elev, 'AQUACELL-SECTION-TANK')
-        if not bottom_coincides:
-            section_label(f'BOTTOM OF STONE  EL. {bottom_of_stone_elev:.2f}', bottom_of_stone_elev, 'AQUACELL-SECTION-STONE')
-
         # Proposed surface line — drawn wider than the stack so it reads as a
         # ground line, not just another stack boundary.
         msp.add_line((sec_x0 - sec['overhang'], surface_elev), (sec_x1 + sec['overhang'], surface_elev),
                       dxfattribs={'layer': 'AQUACELL-SECTION-SURFACE'})
-        section_label(surface_label, surface_elev, 'AQUACELL-SECTION-SURFACE')
 
         cover_dim = msp.add_linear_dim(
             base=(sec['dim_base_x'], (surface_elev + tank_top_elev) / 2),
@@ -7331,18 +7380,11 @@ def download_dxf():
             dimstyle='AQUACELL_FT_SECTION', dxfattribs={'layer': 'AQUACELL-SECTION-DIMS'},
         )
         cover_dim.render()
-        # Cover-depth value directly under the surface label, on the label side.
-        for i, line in enumerate(cover_lines):
-            section_label(line, surface_elev - th * (1.6 + 1.3 * i), 'AQUACELL-SECTION-DIMS')
 
-        prev_y = None
-        for elev, text, layer in sorted(section_labels_to_place, key=lambda item: -item[0]):
-            y = elev - th / 2.0                       # centred on its line
-            if prev_y is not None and y > prev_y - th * 1.3:
-                y = prev_y - th * 1.3                 # pushed below the label above
+        # Right-hand labels, already stacked by section_geometry().
+        for y, text, layer in sec['labels']:
             msp.add_text(text, height=th, dxfattribs={'layer': layer}) \
                .set_placement((label_x, y))
-            prev_y = y
 
         # Section-view text block — title/generation date + disclaimer,
         # duplicated here (not just on the plan view) so the section reads
@@ -7358,23 +7400,30 @@ def download_dxf():
     #  SHEET COMPOSITION — viewports, captions, title block attributes
     # ══════════════════════════════════════════════════════════════
 
+    # Each viewport freezes the other view's layers so neither can bleed
+    # into the other's window whatever region the viewport aspect exposes.
+    plan_layers    = ['AQUACELL-FOOTPRINT', 'AQUACELL-MODULES', 'AQUACELL-DIMS', 'AQUACELL-TEXT']
+    section_layers = [layer.dxf.name for layer in doc.layers
+                      if layer.dxf.name.startswith('AQUACELL-SECTION-')]
     _dxf_add_view(sheet, plan_box, plan, plan_scale, [
-        f'PLAN VIEW    SCALE: {_dxf_scale_label(plan_scale)}',
+        f'PLAN VIEW    SCALE: {_dxf_scale_label(plan_scale, plan_scale_std)}',
         f'{config}-{layers} AQUACELL — {crates_wide} x {crates_long} MODULES PER LAYER — '
         f'FOOTPRINT {tank_width:.2f} FT x {tank_length:.2f} FT',
-    ])
+    ], frozen_layers=section_layers)
     if section_elevations_provided:
         _dxf_add_view(sheet, section_box, sec, section_scale, [
-            f'CROSS-SECTION    SCALE: {_dxf_scale_label(section_scale)} (VERTICAL)',
+            f'CROSS-SECTION    SCALE: {_dxf_scale_label(section_scale, section_scale_std)} (VERTICAL)',
             'HORIZONTAL WIDTH NOT TO SCALE — ELEVATIONS AS ENTERED',
-        ])
+        ], frozen_layers=plan_layers)
     else:
         _dxf_add_caption(sheet, cx1 - _DXF_SECTION_COLUMN_IN + pad, view_y0, [
             'CROSS-SECTION OMITTED',
             'Surface and/or tank bottom elevation not entered.',
         ])
 
-    if section_scale is None or section_scale == plan_scale:
+    # Title block SCALE: the one standard scale when every view shares it,
+    # otherwise "AS NOTED" and the captions carry each view's scale.
+    if plan_scale_std and (section_scale is None or (section_scale == plan_scale and section_scale_std)):
         scale_text = _dxf_scale_label(plan_scale)
     else:
         scale_text = 'AS NOTED'
