@@ -15,6 +15,8 @@ from io import BytesIO
 import requests
 from pypdf import PdfWriter, PdfReader as PyPdfReader
 import ezdxf
+from ezdxf.addons import Importer
+from ezdxf.lldxf import const as _dxf_const
 
 app = Flask(__name__)
 
@@ -6778,9 +6780,20 @@ def download_pdf():
 
 
 # ══════════════════════════════════════════════════════════════════
-#  DOWNLOAD SINGLE-TANK DXF  —  computed module-grid CAD export (v1)
+#  DOWNLOAD SINGLE-TANK DXF  —  computed module-grid CAD export (v2)
 #  Rectangular footprint only. Complex-shape tanks are out of scope
-#  for this version (see DXF_EXPORT_SCOPE.md).
+#  for this version.
+#
+#  v2 adds a plot-ready 24x36 paper-space sheet on top of the v1 model
+#  space drawing: the Wavin title block (imported from the template DXF
+#  in static/cad/), a plan-view viewport and a cross-section viewport,
+#  each at the largest standard engineering scale that fits its area of
+#  the sheet, and a page setup that names AutoCAD's built-in PDF plotter
+#  so "Plot to PDF" is a one-click job for the recipient.
+#
+#  Model space stays 1:1 in feet. Only the annotation (text, dimension
+#  text, arrowheads) is sized from the chosen plot scale so it prints at
+#  a readable height; the tank geometry itself is never scaled.
 # ══════════════════════════════════════════════════════════════════
 
 _DXF_MODULE_WID = 1.9685
@@ -6794,12 +6807,6 @@ _DXF_LAYER_HEIGHTS = {
     'EX': [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073],
 }
 
-_DXF_SECTION_WIDTH = 8.0  # ft — representative stack width, not to scale
-                          # horizontally (matches the "CROSS-SECTION (NOT TO
-                          # SCALE)" convention used by this app's other
-                          # schematic diagrams); only the vertical/elevation
-                          # axis is drawn to scale.
-
 _DXF_DISCLAIMER = (
     "DISCLAIMER: This is a computed conceptual layout only, not a stamped "
     "construction drawing. Native AquaCell DWG detail sheets remain the "
@@ -6808,43 +6815,226 @@ _DXF_DISCLAIMER = (
     "conditions before use."
 )
 
+# ── Sheet / plot settings ──────────────────────────────────────────
+# These mirror the page setup stored in the title block template so the
+# layout opens against a paper size AutoCAD's PDF plotter knows by name:
+# "ARCH D (24.00 x 36.00 Inches)", rotated 90° to landscape. Margins are the
+# template's own (5 mm on the 24" edges, 17 mm on the 36" edges).
+_DXF_SHEET_LAYOUT_NAME = 'AquaCell 24x36'
+_DXF_SHEET_PAPER_IN    = (24.0, 36.0)   # unrotated (portrait) paper size, inches
+_DXF_SHEET_ROTATION    = 1              # 90° CCW → 36" wide x 24" tall on screen/paper
+_DXF_SHEET_MARGINS_MM  = (17.0, 5.0, 17.0, 5.0)   # top, right, bottom, left of the unrotated paper
+_DXF_SHEET_DEVICE      = 'AutoCAD PDF (General Documentation).pc3'
+_DXF_SHEET_STYLE_SHEET = 'DWF Virtual Pens.ctb'
+_DXF_SHEET_PLOT_FLAGS  = 672   # PlotPlotStyles | PrintLineweights | DrawViewportsFirst (as stored in the template)
+_DXF_SHEET_PLOT_TYPE   = 5     # plot the layout (paper) extents
 
-def _dxf_dimstyle(doc):
-    name = 'AQUACELL_FT'
+_DXF_TITLEBLOCK_PATH  = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     'static', 'cad', 'CRATE_CALC_DXF_EXPORT_TEMPLATE_00.dxf')
+_DXF_TITLEBLOCK_BLOCK = 'AQUACELL_TITLEBLOCK_24X36'
+_DXF_SHEET_BORDER_GAP_IN = 0.2   # gap between the printable-area edge and the template border
+
+# Standard engineering scales (feet per paper inch). Each viewport gets the
+# largest one — i.e. the first in this list — at which its content fits.
+_DXF_STD_SCALES_FT_PER_IN = (5, 10, 20, 30, 40, 50, 60, 80, 100, 150, 200)
+
+# Printed annotation sizes, in paper inches. Model-space text and dimension
+# sizes are these values multiplied by the chosen scale (ft per inch).
+_DXF_PAPER_TEXT_IN       = 0.10
+_DXF_PAPER_TEXT_SMALL_IN = 0.08
+_DXF_PAPER_CAPTION_IN    = 0.16
+_DXF_PAPER_DIM_TEXT_IN   = 0.10
+_DXF_PAPER_DIM_ARROW_IN  = 0.10
+_DXF_TEXT_WIDTH_FACTOR   = 0.80   # average glyph width / height, for extent estimates
+
+# Cross-section: vertical axis is to scale; the horizontal width is a fixed
+# representative width ON PAPER (matches the "CROSS-SECTION (NOT TO SCALE)"
+# convention used by this app's other schematic diagrams).
+_DXF_SECTION_WIDTH_IN  = 1.5
+_DXF_SECTION_COLUMN_IN = 9.0    # sheet column reserved for the section view
+_DXF_VIEW_PAD_IN       = 0.4    # padding between title block border and viewports
+_DXF_VIEW_FIT_SLACK_IN = 0.3    # content must fit the viewport with this much room
+_DXF_CAPTION_BAND_IN   = 0.7    # strip under each viewport for its title/scale
+
+
+def _dxf_text_w(text, height):
+    """Rough printed width of a single-line TEXT entity (drawing units)."""
+    return len(text) * height * _DXF_TEXT_WIDTH_FACTOR
+
+
+def _dxf_scale_label(scale_ft_per_in):
+    return f'1" = {scale_ft_per_in}\''
+
+
+def _dxf_dimstyle(doc, name, scale_ft_per_in):
+    """Dimension style sized so text and arrowheads print at the standard
+    paper heights at the given plot scale."""
     if name in doc.dimstyles:
         return doc.dimstyles.get(name)
+    s = scale_ft_per_in
     dimstyle = doc.dimstyles.new(name)
-    dimstyle.dxf.dimtxt = 1.0   # text height, ft
-    dimstyle.dxf.dimasz = 0.6   # arrow size, ft
-    dimstyle.dxf.dimexe = 0.3   # extension line extension, ft
-    dimstyle.dxf.dimexo = 0.3   # extension line offset, ft
-    dimstyle.dxf.dimdec = 2     # decimal places
-    dimstyle.dxf.dimtad = 1     # text above dimension line
+    dimstyle.dxf.dimtxt = _DXF_PAPER_DIM_TEXT_IN * s    # text height, ft
+    dimstyle.dxf.dimasz = _DXF_PAPER_DIM_ARROW_IN * s   # arrow size, ft
+    dimstyle.dxf.dimexe = 0.06 * s   # extension line extension, ft
+    dimstyle.dxf.dimexo = 0.06 * s   # extension line offset, ft
+    dimstyle.dxf.dimgap = 0.04 * s   # gap between dimension line and text, ft
+    dimstyle.dxf.dimdec = 2          # decimal places
+    dimstyle.dxf.dimdsep = 46        # '.' decimal separator (ezdxf's default is ',')
+    dimstyle.dxf.dimtad = 1          # text above dimension line
     return dimstyle
 
 
-def _dxf_section_dimstyle(doc):
-    # Separate, smaller-scale dimstyle for the section view's cover-depth
-    # callout — that dimension typically spans only 1-5 ft, versus the plan
-    # view's tens-to-hundreds-of-feet spans, so the plan dimstyle's 1.0 ft
-    # text / 0.6 ft arrows would read oversized here.
-    name = 'AQUACELL_FT_SECTION'
-    if name in doc.dimstyles:
-        return doc.dimstyles.get(name)
-    dimstyle = doc.dimstyles.new(name)
-    dimstyle.dxf.dimtxt = 0.35
-    dimstyle.dxf.dimasz = 0.2
-    dimstyle.dxf.dimexe = 0.1
-    dimstyle.dxf.dimexo = 0.1
-    dimstyle.dxf.dimdec = 2
-    dimstyle.dxf.dimtad = 1
-    return dimstyle
+def _dxf_pick_scale(geometry_fn, box_w_in, box_h_in):
+    """Return (scale, geometry) for the largest standard scale at which the
+    content described by geometry_fn(scale) fits a box_w_in x box_h_in
+    viewport. geometry_fn returns a dict with model-space extents
+    x0/y0/x1/y1 (ft) for the annotation sizes that scale implies."""
+    for s in _DXF_STD_SCALES_FT_PER_IN:
+        geo = geometry_fn(s)
+        if (geo['x1'] - geo['x0']) / s <= box_w_in and (geo['y1'] - geo['y0']) / s <= box_h_in:
+            return s, geo
+    s = _DXF_STD_SCALES_FT_PER_IN[-1]
+    return s, geometry_fn(s)
+
+
+def _dxf_titleblock_template():
+    """Load the title block template DXF and measure it.
+
+    The template (drawn by Wavin's European team, so in millimetres) carries
+    the full 24x36 sheet border, title strip, logo linework and the eight
+    fill-in ATTDEFs in MODEL space. Returns the entities to import plus the
+    border box, the top edge of the title strip, and each attribute's cell
+    width so long values can be shrunk to fit their box.
+    """
+    tpl = ezdxf.readfile(_DXF_TITLEBLOCK_PATH)
+    msp = tpl.modelspace()
+    # IMAGE entities are deliberately excluded: a DXF can only reference a
+    # raster file by path, which does not travel with the export.
+    entities = list(msp.query('LINE ARC CIRCLE HATCH MTEXT ATTDEF'))
+    lines = [e for e in entities if e.dxftype() == 'LINE']
+    xs = [c for ln in lines for c in (ln.dxf.start.x, ln.dxf.end.x)]
+    ys = [c for ln in lines for c in (ln.dxf.start.y, ln.dxf.end.y)]
+    x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+    bw, bh = x1 - x0, y1 - y0
+
+    # Top edge of the title strip: the highest full-width horizontal line
+    # that is not the sheet border itself.
+    strip_top = None
+    for ln in lines:
+        if abs(ln.dxf.start.y - ln.dxf.end.y) < 1e-6 and abs(ln.dxf.start.x - ln.dxf.end.x) >= 0.9 * bw:
+            y = ln.dxf.start.y
+            if y0 + 1.0 < y < y1 - 1.0 and (strip_top is None or y > strip_top):
+                strip_top = y
+    if strip_top is None:
+        strip_top = y0 + 0.15 * bh
+
+    # Each attribute's cell width: distance from its insert point to the
+    # nearest vertical line to its right on the same row.
+    cells = {}
+    for a in (e for e in entities if e.dxftype() == 'ATTDEF'):
+        ax, ay = a.dxf.insert.x, a.dxf.insert.y
+        right = x1
+        for ln in lines:
+            if abs(ln.dxf.start.x - ln.dxf.end.x) < 1e-6:
+                lx = ln.dxf.start.x
+                lo, hi = sorted((ln.dxf.start.y, ln.dxf.end.y))
+                if ax + 1.0 < lx < right and lo <= ay <= hi:
+                    right = lx
+        cells[a.dxf.tag] = right - ax
+
+    return {
+        'doc': tpl, 'entities': entities,
+        'x0': x0, 'y0': y0, 'x1': x1, 'y1': y1,
+        'strip_top': strip_top, 'cells': cells,
+    }
+
+
+def _dxf_titleblock_placement(tb, printable_w_in, printable_h_in):
+    """Scale factor (paper inches per template unit) and insert point that
+    centre the template border inside the printable area, plus the content
+    box (paper inches) left above the title strip for the drawing views."""
+    bw, bh = tb['x1'] - tb['x0'], tb['y1'] - tb['y0']
+    k = min((printable_w_in - 2 * _DXF_SHEET_BORDER_GAP_IN) / bw,
+            (printable_h_in - 2 * _DXF_SHEET_BORDER_GAP_IN) / bh)
+    ox = (printable_w_in - bw * k) / 2.0
+    oy = (printable_h_in - bh * k) / 2.0
+    content = (ox, oy + (tb['strip_top'] - tb['y0']) * k, ox + bw * k, oy + bh * k)
+    return k, ox, oy, content
+
+
+def _dxf_fit_attrib(attrib, max_width_in):
+    """Shrink (then truncate) an ATTRIB's text so it stays inside its cell."""
+    text = attrib.dxf.text or ''
+    if not text:
+        return
+    est = _dxf_text_w(text, attrib.dxf.height)
+    if est <= max_width_in:
+        return
+    factor = max_width_in / est
+    if factor >= 0.6:
+        attrib.dxf.width = factor
+        return
+    attrib.dxf.width = 0.6
+    max_chars = max(1, int(max_width_in / (attrib.dxf.height * _DXF_TEXT_WIDTH_FACTOR * 0.6)))
+    attrib.dxf.text = text[:max_chars]
+
+
+def _dxf_add_titleblock(doc, layout, tb, k, ox, oy, values):
+    """Import the template as a block, insert it on the sheet and fill in
+    the title block attributes."""
+    if _DXF_TITLEBLOCK_BLOCK not in doc.blocks:
+        block = doc.blocks.new(name=_DXF_TITLEBLOCK_BLOCK, base_point=(tb['x0'], tb['y0']))
+        importer = Importer(tb['doc'], doc)
+        importer.import_entities(tb['entities'], target_layout=block)
+        importer.finalize()
+        for e in block:
+            e.dxf.layer = 'AQUACELL-TITLEBLOCK'
+    ref = layout.add_blockref(
+        _DXF_TITLEBLOCK_BLOCK, (ox, oy),
+        dxfattribs={'xscale': k, 'yscale': k, 'layer': 'AQUACELL-TITLEBLOCK'},
+    )
+    ref.add_auto_attribs({tag: str(val) for tag, val in values.items()})
+    for attrib in ref.attribs:
+        attrib.dxf.layer = 'AQUACELL-TITLEBLOCK'
+        cell_w = tb['cells'].get(attrib.dxf.tag, tb['x1'] - tb['x0']) * k - 0.1
+        _dxf_fit_attrib(attrib, cell_w)
+    return ref
+
+
+def _dxf_add_view(layout, box, geo, scale_ft_per_in, caption_lines):
+    """Add a locked paper-space viewport filling `box` (paper inches) that
+    shows the model-space region `geo` at the given scale, with caption
+    lines underneath."""
+    bx0, by0, bx1, by1 = box
+    w, h = bx1 - bx0, by1 - by0
+    vp = layout.add_viewport(
+        center=((bx0 + bx1) / 2.0, (by0 + by1) / 2.0),
+        size=(w, h),
+        view_center_point=((geo['x0'] + geo['x1']) / 2.0, (geo['y0'] + geo['y1']) / 2.0),
+        view_height=h * scale_ft_per_in,
+        dxfattribs={'layer': 'AQUACELL-VPORT'},
+    )
+    vp.dxf.flags = vp.dxf.flags | _dxf_const.VSF_LOCK_ZOOM
+    _dxf_add_caption(layout, bx0, by0, caption_lines)
+    return vp
+
+
+def _dxf_add_caption(layout, x, box_bottom, caption_lines):
+    y = box_bottom - 0.10 - _DXF_PAPER_CAPTION_IN
+    for i, line in enumerate(caption_lines):
+        height = _DXF_PAPER_CAPTION_IN if i == 0 else _DXF_PAPER_TEXT_IN
+        layout.add_text(line, height=height, dxfattribs={'layer': 'AQUACELL-TEXT'}) \
+              .set_placement((x, y))
+        y -= height * 1.5
 
 
 @app.route('/download_dxf', methods=['POST'])
 def download_dxf():
 
     project_name   = request.form.get('project_name', 'Project')
+    project_num    = (request.form.get('project_num', '') or '').strip()
+    client         = (request.form.get('client', '') or '').strip()
+    estimator      = (request.form.get('estimator', '') or '').strip()
     config         = request.form.get('config', 'SC')
     if config not in ('SC', 'EX'):
         config = 'SC'
@@ -6907,10 +7097,14 @@ def download_dxf():
         ('AQUACELL-MODULES',    3),
         ('AQUACELL-DIMS',       1),
         ('AQUACELL-TEXT',       7),
-        ('AQUACELL-TITLEBLOCK', 8),
+        ('AQUACELL-TITLEBLOCK', 7),
     ):
         if name not in doc.layers:
             doc.layers.add(name=name, color=color)
+    # Viewport frames live on a non-plotting layer so they never print.
+    if 'AQUACELL-VPORT' not in doc.layers:
+        vport_layer = doc.layers.add(name='AQUACELL-VPORT', color=8)
+        vport_layer.dxf.plot = 0
 
     block_name = f'AQUACELL_MODULE_{config}'
     if block_name not in doc.blocks:
@@ -6935,20 +7129,51 @@ def download_dxf():
         format='xy', close=True, dxfattribs={'layer': 'AQUACELL-FOOTPRINT'},
     )
 
-    _dxf_dimstyle(doc)
-    dim_offset = max(tank_width, tank_length) * 0.08 + 1.0
+    # ══════════════════════════════════════════════════════════════
+    #  SHEET SETUP — 24x36 paper-space layout with the Wavin title block.
+    #  Done before the annotation is drawn because the plot scale of each
+    #  view decides how big its model-space text and dimensions must be.
+    # ══════════════════════════════════════════════════════════════
 
-    dim_w = msp.add_linear_dim(
-        base=(0, -dim_offset), p1=(0, 0), p2=(tank_width, 0),
-        dimstyle='AQUACELL_FT', dxfattribs={'layer': 'AQUACELL-DIMS'},
+    sheet = doc.layouts.new(_DXF_SHEET_LAYOUT_NAME)
+    if 'Layout1' in doc.layout_names():
+        doc.layouts.delete('Layout1')
+    margins_in = tuple(m / 25.4 for m in _DXF_SHEET_MARGINS_MM)
+    sheet.page_setup(
+        size=_DXF_SHEET_PAPER_IN, margins=margins_in, units='inch',
+        rotation=_DXF_SHEET_ROTATION, scale=(1, 1), name='ARCH_D',
+        device=_DXF_SHEET_DEVICE,
     )
-    dim_w.render()
+    plot = sheet.dxf_layout.dxf
+    plot.plot_layout_flags   = _DXF_SHEET_PLOT_FLAGS
+    plot.current_style_sheet = _DXF_SHEET_STYLE_SHEET
+    plot.plot_type           = _DXF_SHEET_PLOT_TYPE
+    # Printable area as it appears after the 90° rotation: X runs along the
+    # 36" edge (which carries the top/bottom margins of the unrotated paper),
+    # Y along the 24" edge. Paper-space origin is the printable area's
+    # lower-left corner.
+    top_m, right_m, bottom_m, left_m = margins_in
+    printable_w = _DXF_SHEET_PAPER_IN[1] - top_m - bottom_m
+    printable_h = _DXF_SHEET_PAPER_IN[0] - left_m - right_m
+    plot.limmin = (-bottom_m, -left_m)
+    plot.limmax = (printable_w + top_m, printable_h + right_m)
 
-    dim_l = msp.add_linear_dim(
-        base=(-dim_offset, 0), p1=(0, 0), p2=(0, tank_length), angle=90,
-        dimstyle='AQUACELL_FT', dxfattribs={'layer': 'AQUACELL-DIMS'},
-    )
-    dim_l.render()
+    titleblock = _dxf_titleblock_template()
+    tb_k, tb_ox, tb_oy, (cx0, cy0, cx1, cy1) = _dxf_titleblock_placement(titleblock, printable_w, printable_h)
+
+    pad  = _DXF_VIEW_PAD_IN
+    view_y0 = cy0 + _DXF_CAPTION_BAND_IN
+    view_y1 = cy1 - pad
+    if section_elevations_provided:
+        plan_box    = (cx0 + pad, view_y0, cx1 - _DXF_SECTION_COLUMN_IN - pad, view_y1)
+        section_box = (cx1 - _DXF_SECTION_COLUMN_IN + pad, view_y0, cx1 - pad, view_y1)
+    else:
+        plan_box    = (cx0 + pad, view_y0, cx1 - pad, view_y1)
+        section_box = None
+
+    # ══════════════════════════════════════════════════════════════
+    #  PLAN VIEW — dimensions + project notes, sized for the plan scale
+    # ══════════════════════════════════════════════════════════════
 
     generated_str = datetime.datetime.now().strftime('%m/%d/%Y')
     config_label  = 'SC - Standard Capacity' if config == 'SC' else 'EX - Extra Strong'
@@ -6969,18 +7194,56 @@ def download_dxf():
         else:
             scope = 'stone envelope'
         text_lines.append(f'LINER: Selected ({scope}) — geometry not shown, callout only')
-
-    line_h = 1.2
-    text_y = tank_length + dim_offset + 2.0
-    for i, line in enumerate(text_lines):
-        msp.add_text(line, height=0.9, dxfattribs={'layer': 'AQUACELL-TEXT'}) \
-           .set_placement((0, text_y + (len(text_lines) - 1 - i) * line_h))
-
+    if not section_elevations_provided:
+        text_lines.insert(0, 'CROSS-SECTION VIEW OMITTED — Estimated Surface Elevation and/or '
+                             'AquaCell Tank Bottom Elevation were not entered.')
     disc_lines = textwrap.wrap(_DXF_DISCLAIMER, width=110)
-    disc_y = -dim_offset - 2.0
+
+    def plan_geometry(s):
+        th = _DXF_PAPER_TEXT_IN * s
+        ts = _DXF_PAPER_TEXT_SMALL_IN * s
+        dim_off = 0.5 * s
+        line_h  = th * 1.4
+        text_y  = tank_length + dim_off + 0.25 * s     # baseline of the lowest note line
+        disc_y  = -dim_off - 0.35 * s                  # baseline of the first disclaimer line
+        return {
+            's': s, 'th': th, 'ts': ts, 'dim_off': dim_off, 'line_h': line_h,
+            'text_y': text_y, 'disc_y': disc_y,
+            'x0': -(dim_off + 0.35 * s),
+            'y0': disc_y - len(disc_lines) * ts * 1.4,
+            'x1': max(tank_width + 0.35 * s,
+                      _dxf_text_w(max(text_lines, key=len), th),
+                      _dxf_text_w(max(disc_lines, key=len), ts)),
+            'y1': text_y + len(text_lines) * line_h + 0.1 * s,
+        }
+
+    plan_scale, plan = _dxf_pick_scale(
+        plan_geometry,
+        (plan_box[2] - plan_box[0]) - _DXF_VIEW_FIT_SLACK_IN,
+        (plan_box[3] - plan_box[1]) - _DXF_VIEW_FIT_SLACK_IN,
+    )
+
+    _dxf_dimstyle(doc, 'AQUACELL_FT', plan_scale)
+
+    dim_w = msp.add_linear_dim(
+        base=(0, -plan['dim_off']), p1=(0, 0), p2=(tank_width, 0),
+        dimstyle='AQUACELL_FT', dxfattribs={'layer': 'AQUACELL-DIMS'},
+    )
+    dim_w.render()
+
+    dim_l = msp.add_linear_dim(
+        base=(-plan['dim_off'], 0), p1=(0, 0), p2=(0, tank_length), angle=90,
+        dimstyle='AQUACELL_FT', dxfattribs={'layer': 'AQUACELL-DIMS'},
+    )
+    dim_l.render()
+
+    for i, line in enumerate(text_lines):
+        msp.add_text(line, height=plan['th'], dxfattribs={'layer': 'AQUACELL-TEXT'}) \
+           .set_placement((0, plan['text_y'] + (len(text_lines) - 1 - i) * plan['line_h']))
+
     for i, line in enumerate(disc_lines):
-        msp.add_text(line, height=0.5, dxfattribs={'layer': 'AQUACELL-TEXT'}) \
-           .set_placement((0, disc_y - i * 0.7))
+        msp.add_text(line, height=plan['ts'], dxfattribs={'layer': 'AQUACELL-TEXT'}) \
+           .set_placement((0, plan['disc_y'] - i * plan['ts'] * 1.4))
 
     # ══════════════════════════════════════════════════════════════
     #  CROSS-SECTION VIEW — elevation-based, offset to the right of the
@@ -6989,20 +7252,15 @@ def download_dxf():
     #  would fabricate a section with invented EL. 0.00 elevations. Real
     #  project elevations are used directly as Y coordinates (not a local
     #  0-based frame), so a CAD user can read elevations straight off the
-    #  drawing. Horizontal width is a fixed representative value, not tied
-    #  to tank_width — this view is "to scale" vertically only, matching
-    #  the existing schematic conventions elsewhere in this app (see the
-    #  "CROSS-SECTION (NOT TO SCALE)" diagrams and index.html's own
-    #  client-side drawSection()).
+    #  drawing. Horizontal width is a fixed representative width on paper,
+    #  not tied to tank_width — this view is "to scale" vertically only,
+    #  matching the existing schematic conventions elsewhere in this app
+    #  (see the "CROSS-SECTION (NOT TO SCALE)" diagrams and index.html's
+    #  own client-side drawSection()).
     # ══════════════════════════════════════════════════════════════
 
-    if not section_elevations_provided:
-        msp.add_text(
-            'CROSS-SECTION VIEW OMITTED — Estimated Surface Elevation and/or '
-            'AquaCell Tank Bottom Elevation were not entered.',
-            height=0.6, dxfattribs={'layer': 'AQUACELL-TEXT'},
-        ).set_placement((0, text_y + len(text_lines) * line_h + 1.5))
-    else:
+    section_scale = None
+    if section_elevations_provided:
         for name, color in (
             ('AQUACELL-SECTION-SURFACE', 4),
             ('AQUACELL-SECTION-STONE',   8),
@@ -7013,12 +7271,78 @@ def download_dxf():
             if name not in doc.layers:
                 doc.layers.add(name=name, color=color)
 
-        _dxf_section_dimstyle(doc)
-
-        sec_x0 = tank_width + max(dim_offset * 2, 10.0)
-        sec_x1 = sec_x0 + _DXF_SECTION_WIDTH
-        label_x = sec_x1 + 0.5
         coincidence_tol = 0.005  # ft — treat elevations this close as the same line
+        top_coincides    = abs(top_of_stone_elev - tank_top_elev) < coincidence_tol
+        bottom_coincides = abs(bottom_of_stone_elev - tank_bottom_elev) < coincidence_tol
+
+        top_label = (f'TOP OF TANK / TOP OF STONE  EL. {tank_top_elev:.2f}' if top_coincides
+                     else f'TOP OF TANK  EL. {tank_top_elev:.2f}')
+        bottom_label = (f'BOTTOM OF TANK / BOTTOM OF STONE  EL. {tank_bottom_elev:.2f}' if bottom_coincides
+                        else f'BOTTOM OF TANK  EL. {tank_bottom_elev:.2f}')
+        surface_label = f'PROPOSED SURFACE  EL. {surface_elev:.2f}'
+        # Actual cover-depth callout (Surface − Top of Tank) — a real DXF
+        # linear dimension (which always displays the positive geometric
+        # distance between its two points) plus an explicit text value. When
+        # the elevations are inverted (surface at or below top of tank — an
+        # invalid configuration), the signed subtraction would show a
+        # negative number that contradicts the dimension's positive reading;
+        # show a clear warning instead so the two never disagree.
+        if cover_depth >= 0:
+            cover_text = f'ACTUAL COVER DEPTH: {cover_depth:.2f} FT'
+        else:
+            cover_text = (f'WARNING: TOP OF TANK IS {abs(cover_depth):.2f} FT ABOVE PROPOSED '
+                          'SURFACE — INVALID ELEVATIONS, VERIFY INPUTS')
+        # Wrapped so the warning form still fits the section's sheet column.
+        cover_lines = textwrap.wrap(cover_text, width=44)
+        section_title = ('CROSS-SECTION — VERTICAL TO SCALE, HORIZONTAL NOT TO SCALE — '
+                         f'GENERATED: {generated_str}')
+        section_disc_lines = textwrap.wrap(_DXF_DISCLAIMER, width=60)
+        section_labels = [top_label, bottom_label, surface_label, *cover_lines,
+                          'TOP OF STONE  EL. 0000.00', 'BOTTOM OF STONE  EL. 0000.00']
+
+        def section_geometry(s):
+            th = _DXF_PAPER_TEXT_IN * s
+            ts = _DXF_PAPER_TEXT_SMALL_IN * s
+            sec_w    = _DXF_SECTION_WIDTH_IN * s
+            sec_x0   = plan['x1'] + max(2 * plan['dim_off'], 10.0)
+            sec_x1   = sec_x0 + sec_w
+            overhang = sec_w * 0.25
+            dim_base_x = sec_x0 - overhang - 0.3 * s
+            label_x  = sec_x1 + 0.1 * s
+            title_y  = max(surface_elev, top_of_stone_elev) + 0.3 * s   # clear of the highest line even with inverted elevations
+            disc_y   = bottom_of_stone_elev - 0.4 * s
+            widest   = max(_dxf_text_w(max(section_labels, key=len), th),
+                           _dxf_text_w(max(section_disc_lines, key=len), ts),
+                           _dxf_text_w(section_title, ts) - (label_x - sec_x0))
+            return {
+                's': s, 'th': th, 'ts': ts, 'sec_x0': sec_x0, 'sec_x1': sec_x1,
+                'overhang': overhang, 'dim_base_x': dim_base_x, 'label_x': label_x,
+                'title_y': title_y, 'disc_y': disc_y,
+                'x0': dim_base_x - 0.35 * s,
+                'y0': disc_y - len(section_disc_lines) * ts * 1.4,
+                'x1': label_x + widest,
+                'y1': title_y + ts * 1.2,
+            }
+
+        section_scale, sec = _dxf_pick_scale(
+            section_geometry,
+            (section_box[2] - section_box[0]) - _DXF_VIEW_FIT_SLACK_IN,
+            (section_box[3] - section_box[1]) - _DXF_VIEW_FIT_SLACK_IN,
+        )
+        _dxf_dimstyle(doc, 'AQUACELL_FT_SECTION', section_scale)
+
+        sec_x0, sec_x1, label_x = sec['sec_x0'], sec['sec_x1'], sec['label_x']
+        th, ts = sec['th'], sec['ts']
+
+        # Right-hand labels are collected first and placed afterwards, top
+        # down, so two lines closer together than a text height (e.g. a 4"
+        # base stone under the tank bottom) get stacked instead of drawn on
+        # top of each other. Each label stays as close to its line as the
+        # label above it allows.
+        section_labels_to_place = []   # (elev, text, layer)
+
+        def section_label(text, elev, layer):
+            section_labels_to_place.append((elev, text, layer))
 
         # Tank envelope (bottom to top) + interior stack boundaries. The
         # envelope's own top/bottom edges already mark tank_bottom_elev and
@@ -7034,8 +7358,7 @@ def download_dxf():
             boundary_elev = tank_bottom_elev + layer_heights[k]
             msp.add_line((sec_x0, boundary_elev), (sec_x1, boundary_elev),
                           dxfattribs={'layer': 'AQUACELL-SECTION-TANK'})
-            msp.add_text(f'EL. {boundary_elev:.2f}', height=0.3, dxfattribs={'layer': 'AQUACELL-SECTION-TANK'}) \
-               .set_placement((label_x, boundary_elev - 0.1))
+            section_label(f'EL. {boundary_elev:.2f}', boundary_elev, 'AQUACELL-SECTION-TANK')
 
         # Stone lines are always drawn (cover_stone/base_stone are plain
         # thickness inputs with sensible defaults, not gated behind an
@@ -7050,62 +7373,82 @@ def download_dxf():
         msp.add_line((sec_x0, bottom_of_stone_elev), (sec_x1, bottom_of_stone_elev),
                       dxfattribs={'layer': 'AQUACELL-SECTION-STONE'})
 
-        top_coincides    = abs(top_of_stone_elev - tank_top_elev) < coincidence_tol
-        bottom_coincides = abs(bottom_of_stone_elev - tank_bottom_elev) < coincidence_tol
-
-        top_label = (f'TOP OF TANK / TOP OF STONE  EL. {tank_top_elev:.2f}' if top_coincides
-                     else f'TOP OF TANK  EL. {tank_top_elev:.2f}')
-        msp.add_text(top_label, height=0.3, dxfattribs={'layer': 'AQUACELL-SECTION-TANK'}) \
-           .set_placement((label_x, tank_top_elev - 0.1))
+        section_label(top_label, tank_top_elev, 'AQUACELL-SECTION-TANK')
         if not top_coincides:
-            msp.add_text(f'TOP OF STONE  EL. {top_of_stone_elev:.2f}', height=0.3, dxfattribs={'layer': 'AQUACELL-SECTION-STONE'}) \
-               .set_placement((label_x, top_of_stone_elev - 0.1))
-
-        bottom_label = (f'BOTTOM OF TANK / BOTTOM OF STONE  EL. {tank_bottom_elev:.2f}' if bottom_coincides
-                        else f'BOTTOM OF TANK  EL. {tank_bottom_elev:.2f}')
-        msp.add_text(bottom_label, height=0.3, dxfattribs={'layer': 'AQUACELL-SECTION-TANK'}) \
-           .set_placement((label_x, tank_bottom_elev - 0.1))
+            section_label(f'TOP OF STONE  EL. {top_of_stone_elev:.2f}', top_of_stone_elev, 'AQUACELL-SECTION-STONE')
+        section_label(bottom_label, tank_bottom_elev, 'AQUACELL-SECTION-TANK')
         if not bottom_coincides:
-            msp.add_text(f'BOTTOM OF STONE  EL. {bottom_of_stone_elev:.2f}', height=0.3, dxfattribs={'layer': 'AQUACELL-SECTION-STONE'}) \
-               .set_placement((label_x, bottom_of_stone_elev - 0.1))
+            section_label(f'BOTTOM OF STONE  EL. {bottom_of_stone_elev:.2f}', bottom_of_stone_elev, 'AQUACELL-SECTION-STONE')
 
         # Proposed surface line — drawn wider than the stack so it reads as a
         # ground line, not just another stack boundary.
-        surface_overhang = _DXF_SECTION_WIDTH * 0.25
-        msp.add_line((sec_x0 - surface_overhang, surface_elev), (sec_x1 + surface_overhang, surface_elev),
+        msp.add_line((sec_x0 - sec['overhang'], surface_elev), (sec_x1 + sec['overhang'], surface_elev),
                       dxfattribs={'layer': 'AQUACELL-SECTION-SURFACE'})
-        msp.add_text(f'PROPOSED SURFACE  EL. {surface_elev:.2f}', height=0.3, dxfattribs={'layer': 'AQUACELL-SECTION-SURFACE'}) \
-           .set_placement((label_x, surface_elev - 0.1))
+        section_label(surface_label, surface_elev, 'AQUACELL-SECTION-SURFACE')
 
-        # Actual cover-depth callout (Surface − Top of Tank) — a real DXF
-        # linear dimension (which always displays the positive geometric
-        # distance between its two points) plus an explicit text value. When
-        # the elevations are inverted (surface at or below top of tank — an
-        # invalid configuration), the signed subtraction would show a
-        # negative number that contradicts the dimension's positive reading;
-        # show a clear warning instead so the two never disagree.
         cover_dim = msp.add_linear_dim(
-            base=(sec_x0 - 2.0, (surface_elev + tank_top_elev) / 2),
+            base=(sec['dim_base_x'], (surface_elev + tank_top_elev) / 2),
             p1=(sec_x0, surface_elev), p2=(sec_x0, tank_top_elev), angle=90,
             dimstyle='AQUACELL_FT_SECTION', dxfattribs={'layer': 'AQUACELL-SECTION-DIMS'},
         )
         cover_dim.render()
-        if cover_depth >= 0:
-            cover_text = f'ACTUAL COVER DEPTH: {cover_depth:.2f} FT'
-        else:
-            cover_text = (f'WARNING: TOP OF TANK IS {abs(cover_depth):.2f} FT ABOVE PROPOSED '
-                          'SURFACE — INVALID ELEVATIONS, VERIFY INPUTS')
-        msp.add_text(cover_text, height=0.35, dxfattribs={'layer': 'AQUACELL-SECTION-DIMS'}) \
-           .set_placement((sec_x0 - 2.0, (surface_elev + tank_top_elev) / 2 + 0.4))
+        # Cover-depth value directly under the surface label, on the label side.
+        for i, line in enumerate(cover_lines):
+            section_label(line, surface_elev - th * (1.6 + 1.3 * i), 'AQUACELL-SECTION-DIMS')
 
-        # Section-view text block — generation date + disclaimer, duplicated
-        # here (not just on the plan view) so the section reads standalone if
-        # a viewer zooms/pans to it without the plan view in frame.
-        msp.add_text(f'GENERATED: {generated_str}', height=0.4, dxfattribs={'layer': 'AQUACELL-SECTION-TEXT'}) \
-           .set_placement((sec_x0, surface_elev + 2.0))
-        for i, line in enumerate(disc_lines):
-            msp.add_text(line, height=0.3, dxfattribs={'layer': 'AQUACELL-SECTION-TEXT'}) \
-               .set_placement((sec_x0, bottom_of_stone_elev - 1.5 - i * 0.5))
+        prev_y = None
+        for elev, text, layer in sorted(section_labels_to_place, key=lambda item: -item[0]):
+            y = elev - th / 2.0                       # centred on its line
+            if prev_y is not None and y > prev_y - th * 1.3:
+                y = prev_y - th * 1.3                 # pushed below the label above
+            msp.add_text(text, height=th, dxfattribs={'layer': layer}) \
+               .set_placement((label_x, y))
+            prev_y = y
+
+        # Section-view text block — title/generation date + disclaimer,
+        # duplicated here (not just on the plan view) so the section reads
+        # standalone if a viewer zooms/pans to it without the plan view in
+        # frame.
+        msp.add_text(section_title, height=ts, dxfattribs={'layer': 'AQUACELL-SECTION-TEXT'}) \
+           .set_placement((sec_x0, sec['title_y']))
+        for i, line in enumerate(section_disc_lines):
+            msp.add_text(line, height=ts, dxfattribs={'layer': 'AQUACELL-SECTION-TEXT'}) \
+               .set_placement((sec_x0, sec['disc_y'] - i * ts * 1.4))
+
+    # ══════════════════════════════════════════════════════════════
+    #  SHEET COMPOSITION — viewports, captions, title block attributes
+    # ══════════════════════════════════════════════════════════════
+
+    _dxf_add_view(sheet, plan_box, plan, plan_scale, [
+        f'PLAN VIEW    SCALE: {_dxf_scale_label(plan_scale)}',
+        f'{config}-{layers} AQUACELL — {crates_wide} x {crates_long} MODULES PER LAYER — '
+        f'FOOTPRINT {tank_width:.2f} FT x {tank_length:.2f} FT',
+    ])
+    if section_elevations_provided:
+        _dxf_add_view(sheet, section_box, sec, section_scale, [
+            f'CROSS-SECTION    SCALE: {_dxf_scale_label(section_scale)} (VERTICAL)',
+            'HORIZONTAL WIDTH NOT TO SCALE — ELEVATIONS AS ENTERED',
+        ])
+    else:
+        _dxf_add_caption(sheet, cx1 - _DXF_SECTION_COLUMN_IN + pad, view_y0, [
+            'CROSS-SECTION OMITTED',
+            'Surface and/or tank bottom elevation not entered.',
+        ])
+
+    if section_scale is None or section_scale == plan_scale:
+        scale_text = _dxf_scale_label(plan_scale)
+    else:
+        scale_text = 'AS NOTED'
+    _dxf_add_titleblock(doc, sheet, titleblock, tb_k, tb_ox, tb_oy, {
+        'PROJECT_NAME': (project_name or 'Project').strip(),
+        'PROJECT_NUM':  project_num,
+        'DATE':         generated_str,
+        'SCALE':        scale_text,
+        'CLIENT':       client,
+        'LAYOUT':       f'{config}-{layers} TANK PLAN' + (' & SECTION' if section_elevations_provided else ''),
+        'REV_#':        '0',
+        'ESTIMATOR':    estimator,
+    })
 
     stream = io.StringIO()
     doc.write(stream)
