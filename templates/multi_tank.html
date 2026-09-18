@@ -764,9 +764,9 @@
                 <div class="input-group">
                     <label>Number of Layers</label>
                     <select id="f_layers" onchange="saveDraft()">
-                        <option value="1">1</option>
+                        <option value="1" selected>1</option>
                         <option value="2">2</option>
-                        <option value="3" selected>3</option>
+                        <option value="3">3</option>
                         <option value="4">4</option>
                         <option value="5">5</option>
                         <option value="6">6</option>
@@ -1515,13 +1515,11 @@ const WEIGHTS = { base:25.18, side:4.91, bottom:7.86, pipe:2.70, adapter12:11.02
 // ══════════════════════════════════════════════════════════════════
 //  TANK LIFECYCLE
 // ══════════════════════════════════════════════════════════════════
-// `idx` is the tank's position in the project. The first tank (idx 0)
-// defaults to 3 layers; every additional tank defaults to 1 layer.
-function defaultTankData(label, idx) {
-    const defaultLayers = (idx === undefined || idx === 0) ? '3' : '1';
+// Every tank, including the first, defaults to 1 layer when created.
+function defaultTankData(label) {
     return {
         tank_label: label,
-        config: 'SC', layers: defaultLayers, traffic_load: 'HS20',
+        config: 'SC', layers: '1', traffic_load: 'HS20',
         known_width: '', known_length: '',
         shape_mode: 'rectangle',
         complex_scaled_area: '', complex_known_dim: '',
@@ -1552,7 +1550,7 @@ function addTank() {
     }
     const idx = tanks.length;
     const label = `Tank ${idx + 1}`;
-    tanks.push(defaultTankData(label, idx));
+    tanks.push(defaultTankData(label));
     results.push(null);
     renderSidebar();
     selectTank(idx);
@@ -1594,7 +1592,7 @@ function resetForm() {
     if (activeIdx === null) { showToast('Select a tank first'); return; }
     const label = tanks[activeIdx].tank_label || `Tank ${activeIdx + 1}`;
     if (!confirm(`Reset "${label}" back to blank inputs? This clears everything entered for this tank.`)) return;
-    tanks[activeIdx] = defaultTankData(`Tank ${activeIdx + 1}`, activeIdx);
+    tanks[activeIdx] = defaultTankData(`Tank ${activeIdx + 1}`);
     results[activeIdx] = null;
     renderSidebar();
     loadEditor(activeIdx);
