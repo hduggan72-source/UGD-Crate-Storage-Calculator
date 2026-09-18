@@ -16,7 +16,6 @@ import requests
 from pypdf import PdfWriter, PdfReader as PyPdfReader
 import ezdxf
 from ezdxf.addons import Importer
-from ezdxf.lldxf import const as _dxf_const
 
 app = Flask(__name__)
 
@@ -6829,6 +6828,11 @@ _DXF_SHEET_STYLE_SHEET = 'DWF Virtual Pens.ctb'
 _DXF_SHEET_PLOT_FLAGS  = 672   # PlotPlotStyles | PrintLineweights | DrawViewportsFirst (as stored in the template)
 _DXF_SHEET_PLOT_TYPE   = 5     # plot the layout (paper) extents
 
+# VIEWPORT flag bit 14 (16384): zoom locking. Used as a literal because ezdxf
+# has exposed it under two names (VSF_LOCK_ZOOM / VSF_VIEWPORT_ZOOM_LOCKING)
+# across versions.
+_DXF_VIEWPORT_LOCK_ZOOM = 16384
+
 _DXF_TITLEBLOCK_PATH  = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                      'static', 'cad', 'CRATE_CALC_DXF_EXPORT_TEMPLATE_00.dxf')
 _DXF_TITLEBLOCK_BLOCK = 'AQUACELL_TITLEBLOCK_24X36'
@@ -7050,7 +7054,7 @@ def _dxf_add_view(layout, box, geo, scale_ft_per_in, caption_lines, frozen_layer
         view_height=h * scale_ft_per_in,
         dxfattribs={'layer': 'AQUACELL-VPORT'},
     )
-    vp.dxf.flags = vp.dxf.flags | _dxf_const.VSF_LOCK_ZOOM
+    vp.dxf.flags = vp.dxf.flags | _DXF_VIEWPORT_LOCK_ZOOM
     if frozen_layers:
         vp.frozen_layers = list(frozen_layers)
     _dxf_add_caption(layout, bx0, by0, caption_lines)
@@ -7498,6 +7502,11 @@ def download_dxf():
         'REV_#':        '0',
         'ESTIMATOR':    estimator,
     })
+
+    # Open on the sheet, not on Model, so Plot picks up the page setup
+    # straight away ($TILEMODE 0 = a paper-space layout is current).
+    doc.layouts.set_active_layout(_DXF_SHEET_LAYOUT_NAME)
+    doc.header['$TILEMODE'] = 0
 
     stream = io.StringIO()
     doc.write(stream)
