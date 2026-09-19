@@ -6788,7 +6788,17 @@ _DXF_PAPER_TEXT_SMALL_IN = 0.08
 _DXF_PAPER_CAPTION_IN    = 0.16
 _DXF_PAPER_DIM_TEXT_IN   = 0.10
 _DXF_PAPER_DIM_ARROW_IN  = 0.10
-_DXF_TEXT_WIDTH_FACTOR   = 0.80   # average glyph width / height, for extent estimates
+_DXF_TEXT_WIDTH_FACTOR   = 1.00   # average glyph width / height, for extent estimates.
+                                  # Measured against Liberation Sans / DejaVu Sans (Arial-
+                                  # compatible substitutes for the template's Nunito) on
+                                  # representative title-block and label strings: real
+                                  # width/height ratios ran 0.75-0.96, worst case on short
+                                  # all-caps strings like "HEATH DUGGAN" (0.96). 1.00 keeps
+                                  # a margin above that measured worst case — the failure
+                                  # mode of underestimating (silent text overlap in AutoCAD,
+                                  # as happened with the old 0.80 factor on the LAYOUT field
+                                  # and the cross-section title) is worse than the cost of
+                                  # occasionally picking a more conservative scale.
 
 # Cross-section: vertical axis is to scale; the horizontal width is a fixed
 # representative width ON PAPER (matches the "CROSS-SECTION (NOT TO SCALE)"
@@ -6909,8 +6919,10 @@ def _dxf_titleblock_template():
     # Each attribute's cell width: distance from its insert point to the
     # nearest vertical line to its right on the same row.
     cells = {}
+    attdef_x = {}
     for a in (e for e in entities if e.dxftype() == 'ATTDEF'):
         ax, ay = a.dxf.insert.x, a.dxf.insert.y
+        attdef_x[a.dxf.tag] = ax
         right = x1
         for ln in lines:
             if abs(ln.dxf.start.x - ln.dxf.end.x) < 1e-6:
@@ -6923,7 +6935,7 @@ def _dxf_titleblock_template():
     return {
         'doc': tpl, 'entities': entities,
         'x0': x0, 'y0': y0, 'x1': x1, 'y1': y1,
-        'strip_top': strip_top, 'cells': cells,
+        'strip_top': strip_top, 'cells': cells, 'attdef_x': attdef_x,
     }
 
 
@@ -6974,7 +6986,14 @@ def _dxf_add_titleblock(doc, layout, tb, k, ox, oy, values):
     ref.add_auto_attribs({tag: str(val) for tag, val in values.items()})
     for attrib in ref.attribs:
         attrib.dxf.layer = 'AQUACELL-TITLEBLOCK'
-        cell_w = tb['cells'].get(attrib.dxf.tag, tb['x1'] - tb['x0']) * k - 0.1
+        tag = attrib.dxf.tag
+        if tag == 'LAYOUT':
+            # REV_# is left blank (see values dict below), so LAYOUT's usable
+            # width runs through that cell to the title block's own right
+            # border rather than stopping at the LAYOUT/REV_# divider line.
+            cell_w = (tb['x1'] - tb['attdef_x'].get('LAYOUT', tb['x0'])) * k - 0.1
+        else:
+            cell_w = tb['cells'].get(tag, tb['x1'] - tb['x0']) * k - 0.1
         _dxf_fit_attrib(attrib, cell_w)
     return ref
 
@@ -7275,8 +7294,14 @@ def download_dxf():
                           'SURFACE — INVALID ELEVATIONS, VERIFY INPUTS')
         # Wrapped so the warning form still fits the section's sheet column.
         cover_lines = textwrap.wrap(cover_text, width=44)
-        section_title = ('CROSS-SECTION — VERTICAL TO SCALE, HORIZONTAL NOT TO SCALE — '
-                         f'GENERATED: {generated_str}')
+        # Two lines, not one long string: at the section column's fixed paper
+        # width, annotation text is sized in paper inches regardless of plot
+        # scale (see _dxf_pick_scale), so a single ~85-character line can run
+        # off the sheet edge at every scale — no scale choice makes it any
+        # narrower on paper. Splitting it the way the plan view's own caption
+        # lines already are is what actually shortens it.
+        section_title_line1 = 'CROSS-SECTION — VERTICAL TO SCALE, HORIZONTAL NOT TO SCALE'
+        section_title_line2 = f'GENERATED: {generated_str}'
         section_disc_lines = textwrap.wrap(_DXF_DISCLAIMER, width=60)
 
         # Model-space placement: to the right of everything the PLAN viewport
@@ -7323,16 +7348,20 @@ def download_dxf():
             # tank when elevations are inverted) and the last stacked label.
             title_y = max(surface_elev, top_of_stone_elev) + 0.3 * s
             disc_y  = min(bottom_of_stone_elev, surface_elev, lowest_label_y) - 0.4 * s
+            # Title lines start at sec_x0 (not label_x), so their reach is
+            # measured from there directly rather than folded into the
+            # label-relative `widest` term below.
+            title_right = sec_x0 + max(_dxf_text_w(section_title_line1, ts),
+                                       _dxf_text_w(section_title_line2, ts))
             widest  = max(max(_dxf_text_w(text, th) for _, text, _ in labels),
-                          _dxf_text_w(max(section_disc_lines, key=len), ts),
-                          _dxf_text_w(section_title, ts) - (label_x - sec_x0))
+                          _dxf_text_w(max(section_disc_lines, key=len), ts))
             return {
                 's': s, 'th': th, 'ts': ts, 'sec_x0': sec_x0, 'sec_x1': sec_x1,
                 'overhang': overhang, 'dim_base_x': dim_base_x, 'label_x': label_x,
                 'title_y': title_y, 'disc_y': disc_y, 'labels': labels,
                 'x0': sec_x0 - left_reach,
                 'y0': disc_y - len(section_disc_lines) * ts * 1.4,
-                'x1': label_x + widest,
+                'x1': max(label_x + widest, title_right),
                 'y1': title_y + ts * 1.2,
             }
 
@@ -7393,9 +7422,12 @@ def download_dxf():
         # Section-view text block — title/generation date + disclaimer,
         # duplicated here (not just on the plan view) so the section reads
         # standalone if a viewer zooms/pans to it without the plan view in
-        # frame.
-        msp.add_text(section_title, height=ts, dxfattribs={'layer': 'AQUACELL-SECTION-TEXT'}) \
+        # frame. Two lines (see section_title_line1/2 above) so neither runs
+        # off the section column's fixed paper width.
+        msp.add_text(section_title_line1, height=ts, dxfattribs={'layer': 'AQUACELL-SECTION-TEXT'}) \
            .set_placement((sec_x0, sec['title_y']))
+        msp.add_text(section_title_line2, height=ts, dxfattribs={'layer': 'AQUACELL-SECTION-TEXT'}) \
+           .set_placement((sec_x0, sec['title_y'] - ts * 1.4))
         for i, line in enumerate(section_disc_lines):
             msp.add_text(line, height=ts, dxfattribs={'layer': 'AQUACELL-SECTION-TEXT'}) \
                .set_placement((sec_x0, sec['disc_y'] - i * ts * 1.4))
@@ -7438,7 +7470,10 @@ def download_dxf():
         'SCALE':        scale_text,
         'CLIENT':       client,
         'LAYOUT':       f'{config}-{layers} TANK PLAN' + (' & SECTION' if section_elevations_provided else ''),
-        'REV_#':        '0',
+        # Left blank per James's review: a computed export has no revision
+        # history to report, and blanking this cell frees its width for
+        # LAYOUT (see the LAYOUT special-case in _dxf_add_titleblock above).
+        'REV_#':        '',
         'ESTIMATOR':    estimator,
     })
 
