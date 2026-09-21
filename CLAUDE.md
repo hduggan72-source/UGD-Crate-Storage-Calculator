@@ -154,9 +154,17 @@ This is the active project as of this handoff:
   running for a few weeks total before being taken down for feedback review.
 - **Scope:** single-tank calculator only (multi-tank hidden), `PRICING_ENABLED=False`
   flag stripping all cost/quote fields down to a "Design Summary" PDF, and exactly
-  **two** design tool calculators: Stage-Storage and the PT-ROW™ Transparent Sizing
-  Calculator. Both are now confirmed and scoped — see Section 8 for build details on
-  each. No third calculator is in scope for this BETA.
+  **four** design tool calculators, confirmed by James on 2026-09-21 after being
+  vetted for usage and accuracy: Stage-Storage, the PT-ROW™ Transparent Sizing
+  Calculator, Site Overlay, and the AquaCell Document Library. Stage-Storage and
+  PT-ROW were the two build tasks from the original handoff — see Section 8 for
+  build details on each. Site Overlay and Document Library were already built and
+  wired into `design_tools.html`'s nav separately (Aug 2026) and are confirmed
+  in scope, superseding the "Site Overlay is out of scope" note that used to be
+  here. No fifth calculator (the remaining internal-only tools — Buoyancy, Loading
+  Truck/Outrigger, Excavation Slope, Stepped Backfill, Min Cover Burial, Min
+  Distance from Structure, Complex Shape Builder, Crate Comparison) is in scope for
+  this BETA; they stay nav-hidden here and fully reachable only on `Pricing_Engine_v1`.
 - **CAD/submittal deliverable:** NOT dynamic DWG/DXF generation. James has native DWG
   source files for all detail sheets (self-drawn). The build is a static file library:
   detail files live in a dedicated asset folder (not bloating git history with binary
@@ -170,17 +178,17 @@ This is the active project as of this handoff:
 - **Kill switch:** a shutdown/expiry mechanism (env var or date check) should exist
   so the BETA can be taken offline without a manual scramble — confirm timing with
   James.
-- Site Overlay (BETA feature) is explicitly OUT of scope for this client-facing
-  build — it is beta-of-a-beta internally and considered too fragile for a first
-  external impression.
 
 ---
 
 ## 8. Active Build Tasks for This Handoff
 
-Two Design Tools calculators are confirmed in scope for the BETA (Section 7). Both
-are documented below. Do not start either without confirming the exact BETA branch
-name with James first (Section 2).
+Four Design Tools calculators are confirmed in scope for the BETA (Section 7): the
+two below (Stage-Storage, PT-ROW) were the original build tasks for this handoff
+and are documented in full. Site Overlay and the AquaCell Document Library are also
+confirmed in scope, but were already built and integrated separately — there's no
+outstanding build task for either here. Do not start new work on any of the four
+without confirming the exact BETA branch name with James first (Section 2).
 
 ### 8.1 Stage-Storage Calculator — Integration Task
 
@@ -293,7 +301,7 @@ sign-off before implementing — do not choose silently and present it as done.
 - HTML / JavaScript frontend (no frontend framework)
 - ReportLab for PDF generation
 - Chart.js for stage-storage curves
-- PDF.js for PDF upload (Site Overlay — internal tool only, not in BETA scope)
+- PDF.js for PDF upload (Site Overlay — confirmed in BETA scope as of 2026-09-21)
 - Canvas API for schematic/overlay rendering
 - Render for deployment; `GITHUB_PAT` env var used for Details modal API calls and
   git push; `GITHUB_BRANCH` in `app.py` is the single line to change when cutting a
