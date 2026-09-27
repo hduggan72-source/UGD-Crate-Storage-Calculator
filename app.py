@@ -5016,6 +5016,413 @@ def build_site_overlay_pdf(image_data_url, project_name=None, meta=None):
 
 
 # ══════════════════════════════════════════════════════════════════
+#  PDF BUILDER — Site Concept Builder (INTERNAL ONLY)
+#  Page 1: the annotated plan (browser-composited image) + project
+#  summary. One spec sheet per tank. Last page: project totals.
+#  Every number is recomputed server-side by calc_site_concept() from
+#  the tank INPUTS — the browser supplies only the plan image.
+# ══════════════════════════════════════════════════════════════════
+_SITE_CONCEPT_DISCLAIMER_TEXT = (
+    "DISCLAIMER: This is a CONCEPTUAL ESTIMATE for internal estimating only and is not a stamped "
+    "engineering design. The plan image is a backdrop positioned by hand over a raster copy of the "
+    "plan and is NOT TO SCALE FOR MEASUREMENT. All quantities are computed from the AquaCell crate "
+    "layout entered and the stone/fabric inputs listed on each sheet, not measured from the image. "
+    "Excavation is the stone envelope (tank offset by the perimeter stone width) with vertical sides; "
+    "it does NOT include OSHA sloping, benching, shoring, or over-excavation. Stone quantities include "
+    "a 10% allowance at 100 lb/cf. A project-specific takeoff (CAD / Bluebeam) is the source of truth. "
+    "FINAL LAYOUTS, CAPACITIES, AND INSTALLATION DEPTHS MUST BE CONFIRMED BY A LICENSED PROFESSIONAL "
+    "ENGINEER."
+)
+# No bold lines: _wrap_disclaimer_lines() measures in regular Helvetica,
+# so a bolded line overruns the box. Emphasis is carried by the caps.
+_SITE_CONCEPT_BOLD_TRIGGERS = ()
+
+
+def _scb_union_edges(rects):
+    """Outline segments (x0, y0, x1, y1) of a union of axis-aligned rects,
+    so a notched tank or merged excavation draws as one outline. Same
+    scanline as _scb_rect_union()."""
+    ys = sorted({round(v, 9) for r in rects for v in (r[1], r[3])})
+    bands = []
+    for y0, y1 in zip(ys, ys[1:]):
+        if y1 - y0 <= _SCB_TOL:
+            continue
+        mid = (y0 + y1) / 2.0
+        bands.append((y0, y1, _scb_merge_intervals([(r[0], r[2]) for r in rects if r[1] < mid < r[3]])))
+    segs = []
+    for y0, y1, ivs in bands:
+        for a, b in ivs:
+            segs.append((a, y0, a, y1))
+            segs.append((b, y0, b, y1))
+    padded = [(None, ys[0] if ys else 0, [])] + bands + [(ys[-1] if ys else 0, None, [])]
+    for lower, upper in zip(padded, padded[1:]):
+        y = upper[0] if upper[0] is not None else lower[1]
+        A, B = lower[2], upper[2]
+        xs = sorted({v for iv in A + B for v in iv})
+        for x0, x1 in zip(xs, xs[1:]):
+            mid = (x0 + x1) / 2.0
+            in_a = any(a < mid < b for a, b in A)
+            in_b = any(a < mid < b for a, b in B)
+            if in_a != in_b:
+                segs.append((x0, y, x1, y))
+    return segs
+
+
+def _scb_pdf_header(c, subtitle, generated_str, project_name):
+    band_h = 64
+    c.setFillColor(NAVY)
+    c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
+    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    if os.path.exists(logo_path):
+        try:
+            c.drawImage(ImageReader(logo_path), LM, PH - band_h + 8, width=160, height=46,
+                        preserveAspectRatio=True, mask='auto')
+        except Exception:
+            pass
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 14)
+    c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
+    c.setFont('Helvetica', 9)
+    c.setFillColor(colors.HexColor('#93c5fd'))
+    c.drawRightString(PW - RM, PH - 37, subtitle)
+    c.setFont('Helvetica', 7)
+    c.setFillColor(colors.HexColor('#94a3b8'))
+    c.drawRightString(PW - RM, PH - 50, generated_str)
+    y = PH - band_h - 10
+    if project_name:
+        c.setFillColor(GRAY)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM, y, _scb_fit_text(c, f'Project: {project_name}', 'Helvetica-Bold', 9, CW))
+        y -= 15
+    return y
+
+
+def _scb_pdf_footer(c, page_num, total_pages, project_name, generated_str):
+    c.setFillColor(NAVY)
+    c.rect(0, 0, PW, 30, fill=1, stroke=0)
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica', 6.5)
+    left = 'AquaCell Site Concept Builder — Conceptual Estimate (internal)'
+    if project_name:
+        left += f'  |  {project_name}'
+    c.drawString(LM, 10, _scb_fit_text(c, left + f'  |  {generated_str}', 'Helvetica', 6.5, CW - 70))
+    c.setFont('Helvetica-Bold', 6.5)
+    c.drawRightString(PW - RM, 10, f'Page {page_num} of {total_pages}')
+
+
+def _scb_fit_text(c, text, font, size, max_w):
+    """Truncate with an ellipsis so user-entered labels never overrun."""
+    text = str(text)
+    if c.stringWidth(text, font, size) <= max_w:
+        return text
+    while text and c.stringWidth(text + '...', font, size) > max_w:
+        text = text[:-1]
+    return text + '...'
+
+
+def _scb_kv(c, x, y, w, label, value, shade=False, bold_row=False):
+    """Label / value row in a column of width w. Returns y below."""
+    rh = 13
+    if shade or bold_row:
+        c.setFillColor(LTBLUE if bold_row else LGRAY)
+        c.rect(x, y - rh + 3, w, rh, fill=1, stroke=0)
+    c.setFillColor(BLUE if bold_row else GRAY)
+    c.setFont('Helvetica-Bold' if bold_row else 'Helvetica', 7.5)
+    c.drawString(x + 5, y - 3, label)
+    c.setFillColor(BLUE if bold_row else BLACK)
+    c.setFont('Helvetica-Bold', 7.5)
+    c.drawRightString(x + w - 5, y - 3, str(value))
+    c.setStrokeColor(MGRAY)
+    c.setLineWidth(0.25)
+    c.line(x, y - rh + 3, x + w, y - rh + 3)
+    return y - rh
+
+
+def _scb_col_header(c, x, y, w, title):
+    band_h = 16
+    c.setFillColor(NAVY)
+    c.rect(x, y - band_h + 4, w, band_h, fill=1, stroke=0)
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 8.5)
+    c.drawString(x + 6, y - band_h + 8, title)
+    return y - band_h - 2
+
+
+def _scb_n(v, dec=0):
+    return f'{v:,.{dec}f}'
+
+
+def _draw_scb_tank_plan(c, x0, y0, w, h, r):
+    """Plan-view schematic of one tank (unrotated: crate long axis runs
+    down the page). Excavation outline, crates, overall dimensions."""
+    c.setFillColor(WHITE)
+    c.setStrokeColor(MGRAY)
+    c.setLineWidth(0.5)
+    c.rect(x0, y0, w, h, fill=1, stroke=1)
+
+    ex = r['excavation_rects_ft']
+    tk = r['tank_rects_ft']
+    min_x = min(q[0] for q in ex)
+    min_y = min(q[1] for q in ex)
+    max_x = max(q[2] for q in ex)
+    max_y = max(q[3] for q in ex)
+    span_x = max(max_x - min_x, 1e-6)
+    span_y = max(max_y - min_y, 1e-6)
+    pad_l, pad_r, pad_t, pad_b = 46, 16, 28, 18
+    s = min((w - pad_l - pad_r) / span_x, (h - pad_t - pad_b) / span_y)
+    ox = x0 + pad_l + ((w - pad_l - pad_r) - span_x * s) / 2.0
+    oy_top = y0 + h - pad_t - ((h - pad_t - pad_b) - span_y * s) / 2.0
+
+    def X(v):
+        return ox + (v - min_x) * s
+
+    def Y(v):  # tank y runs DOWN the length; PDF y runs up
+        return oy_top - (v - min_y) * s
+
+    # Excavation fill + dashed outline
+    c.setFillColor(colors.HexColor('#fdecd8'))
+    for q in ex:
+        c.rect(X(q[0]), Y(q[3]), (q[2] - q[0]) * s, (q[3] - q[1]) * s, fill=1, stroke=0)
+    c.setStrokeColor(colors.HexColor('#b45309'))
+    c.setLineWidth(0.8)
+    c.setDash(4, 3)
+    for sx0, sy0, sx1, sy1 in _scb_union_edges(ex):
+        c.line(X(sx0), Y(sy0), X(sx1), Y(sy1))
+    c.setDash()
+
+    # Tank fill, crate grid, outline
+    c.setFillColor(colors.HexColor('#c7d2fe'))
+    for q in tk:
+        c.rect(X(q[0]), Y(q[3]), (q[2] - q[0]) * s, (q[3] - q[1]) * s, fill=1, stroke=0)
+    if MODULE_WID * s >= 2.5:
+        c.setStrokeColor(colors.HexColor('#6366f1'))
+        c.setLineWidth(0.25)
+        for q in tk:
+            n = int(round((q[2] - q[0]) / MODULE_WID))
+            for k in range(n + 1):
+                gx = X(q[0] + k * MODULE_WID)
+                c.line(gx, Y(q[1]), gx, Y(q[3]))
+            c.line(X(q[0]), Y(q[1]), X(q[2]), Y(q[1]))
+            c.line(X(q[0]), Y(q[3]), X(q[2]), Y(q[3]))
+    c.setStrokeColor(BLUE)
+    c.setLineWidth(1.4)
+    for sx0, sy0, sx1, sy1 in _scb_union_edges(tk):
+        c.line(X(sx0), Y(sy0), X(sx1), Y(sy1))
+
+    # Overall tank dimensions (bounding): width above, length at left.
+    bw, bl = r['bounding_width_ft'], r['bounding_length_ft']
+    c.setStrokeColor(GRAY)
+    c.setFillColor(GRAY)
+    c.setLineWidth(0.5)
+    ty = Y(min_y) + 10
+    c.line(X(0), ty, X(bw), ty)
+    c.line(X(0), ty - 3, X(0), ty + 3)
+    c.line(X(bw), ty - 3, X(bw), ty + 3)
+    c.setFont('Helvetica-Bold', 7)
+    c.drawCentredString((X(0) + X(bw)) / 2.0, ty + 3,
+                        f"{_scb_n(bw, 2)} ft ({r['bounding_width_crates']} crates)")
+    lx = X(min_x) - 10
+    c.line(lx, Y(0), lx, Y(bl))
+    c.line(lx - 3, Y(0), lx + 3, Y(0))
+    c.line(lx - 3, Y(bl), lx + 3, Y(bl))
+    c.saveState()
+    c.translate(lx - 3, (Y(0) + Y(bl)) / 2.0)
+    c.rotate(90)
+    c.drawCentredString(0, 0, f"{_scb_n(bl, 2)} ft ({r['bounding_length_crates']} crates)")
+    c.restoreState()
+
+    c.setFont('Helvetica', 6.5)
+    c.setFillColor(GRAY)
+    c.drawString(x0 + 6, y0 + 5, 'Plan view, not to scale. Shaded = crates (long axis runs down the '
+                 'length); dashed = excavation (tank + perimeter stone).')
+
+
+def build_site_concept_pdf(image_data_url, inputs, results, project_name=None):
+    """results = calc_site_concept(inputs). Returns a BytesIO at 0."""
+    import base64 as _b64
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
+    tanks = results['tanks']
+    tot = results['totals']
+    total_pages = 1 + len(tanks) + 1
+    half = (CW - 12) / 2.0
+    xl, xr = LM, LM + half + 12
+
+    # ── PAGE 1: plan + summary ──────────────────────────────────────
+    y = _scb_pdf_header(c, 'Site Concept Builder — Conceptual Estimate', generated_str, project_name)
+    y = _section_header(c, y, 'PROJECT SUMMARY')
+    ly = _scb_kv(c, xl, y, half, 'Tanks', tot['tank_count'])
+    ly = _scb_kv(c, xl, ly, half, 'Total Crates (all layers)', _scb_n(tot['num_crates']), shade=True)
+    ly = _scb_kv(c, xl, ly, half, 'Tank Footprint (all tanks)', f"{_scb_n(tot['tank_footprint_sf'], 1)} sf")
+    ry = _scb_kv(c, xr, y, half, 'Total Storage', f"{_scb_n(tot['total_storage_cf'], 1)} cf", bold_row=True)
+    ry = _scb_kv(c, xr, ry, half, 'Excavation', f"{_scb_n(tot['excavation_vol_cy'], 1)} cy", shade=True)
+    ry = _scb_kv(c, xr, ry, half, 'Stone', f"{_scb_n(tot['stone_yd3'], 1)} yd³ ({_scb_n(tot['stone_tons'], 1)} tons)")
+    y = min(ly, ry) - 8
+
+    bar_h = 16
+    c.setFillColor(BLUE)
+    c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
+    c.setFillColor(WHITE)
+    c.setFont('Helvetica-Bold', 9)
+    c.drawString(LM + 8, y - bar_h + 4, 'SITE PLAN — AQUACELL TANKS AS PLACED (NOT TO SCALE FOR MEASUREMENT)')
+    box_top = y - bar_h
+    disc_h = _disclaimer_box_height(_SITE_CONCEPT_DISCLAIMER_TEXT)
+    box_bottom = 36 + disc_h + 8
+    box_h = box_top - box_bottom
+    c.setFillColor(WHITE)
+    c.setStrokeColor(MGRAY)
+    c.setLineWidth(0.5)
+    c.rect(LM, box_bottom, CW, box_h, fill=1, stroke=1)
+    try:
+        raw = image_data_url.split(',', 1)[1] if ',' in image_data_url else image_data_url
+        img_reader = ImageReader(io.BytesIO(_b64.b64decode(raw)))
+        iw, ih = img_reader.getSize()
+        aw, ah = CW - 12, box_h - 12
+        if iw > 0 and ih > 0 and aw > 0 and ah > 0:
+            sc = min(aw / iw, ah / ih)
+            c.drawImage(img_reader, LM + 6 + (aw - iw * sc) / 2.0, box_bottom + 6 + (ah - ih * sc) / 2.0,
+                        width=iw * sc, height=ih * sc, preserveAspectRatio=True, mask=None)
+    except Exception as exc:
+        c.setFillColor(RED)
+        c.setFont('Helvetica-Bold', 10)
+        c.drawString(LM + 12, box_bottom + box_h / 2.0, f'Plan image could not be embedded: {exc}')
+    _draw_disclaimer_block(c, 36, disclaimer_lines_raw=_SITE_CONCEPT_DISCLAIMER_TEXT,
+                           bold_triggers=_SITE_CONCEPT_BOLD_TRIGGERS)
+    _scb_pdf_footer(c, 1, total_pages, project_name, generated_str)
+    c.showPage()
+
+    # ── ONE SPEC SHEET PER TANK ─────────────────────────────────────
+    for i, r in enumerate(tanks):
+        page = 2 + i
+        y = _scb_pdf_header(c, 'Site Concept Builder — Tank Spec Sheet', generated_str, project_name)
+        cfg = 'SC — Standard' if r['config'] == 'SC' else 'EX — Extra Strong'
+        title = f"TANK {i + 1} OF {len(tanks)}: {r['label']}  |  AquaCell {cfg}  |  {r['layers']} LAYER{'S' if r['layers'] > 1 else ''}"
+        y = _section_header(c, y, _scb_fit_text(c, title, 'Helvetica-Bold', 8.5, CW - 12))
+
+        plan_h = 200
+        _draw_scb_tank_plan(c, LM, y - plan_h, CW, plan_h, r)
+        y -= plan_h + 10
+
+        if r.get('warnings'):
+            c.setFillColor(AMBER)
+            c.setFont('Helvetica-Bold', 7)
+            for w in r['warnings']:
+                c.drawString(LM, y, _scb_fit_text(c, 'NOTE: ' + w, 'Helvetica-Bold', 7, CW))
+                y -= 10
+            y -= 2
+
+        ly = _scb_col_header(c, xl, y, half, 'DIMENSIONS')
+        ly = _scb_kv(c, xl, ly, half, 'Tank Width × Length (bounding)',
+                     f"{_scb_n(r['bounding_width_ft'], 2)} × {_scb_n(r['bounding_length_ft'], 2)} ft")
+        ly = _scb_kv(c, xl, ly, half, 'Crates Wide × Rows Long',
+                     f"{r['bounding_width_crates']} × {r['bounding_length_crates']}", shade=True)
+        ly = _scb_kv(c, xl, ly, half, 'Tank Height', f"{_scb_n(r['tank_height_ft'], 3)} ft")
+        ly = _scb_kv(c, xl, ly, half, 'Total System Depth (base+tank+cover)', f"{_scb_n(r['total_system_depth_ft'], 3)} ft", shade=True)
+        ly = _scb_kv(c, xl, ly, half, 'Tank Footprint', f"{_scb_n(r['tank_footprint_sf'], 1)} sf")
+        ly = _scb_kv(c, xl, ly, half, 'Tank Perimeter', f"{_scb_n(r['tank_perimeter_ft'], 1)} ft", shade=True)
+        ly = _scb_kv(c, xl, ly, half, 'Fill Efficiency (vs. bounding box)', f"{_scb_n(r['fill_efficiency_pct'], 1)}%")
+        ly = _scb_kv(c, xl, ly, half, 'Crates / Layer  ·  Total', f"{_scb_n(r['crates_layer'])}  ·  {_scb_n(r['num_crates'])}", shade=True)
+
+        ry = _scb_col_header(c, xr, y, half, 'EXCAVATION')
+        ry = _scb_kv(c, xr, ry, half, 'Perimeter Stone Width', f"{_scb_n(r['perimeter_stone_width_ft'], 2)} ft")
+        ry = _scb_kv(c, xr, ry, half, 'Excavation Area', f"{_scb_n(r['excavation_area_sf'], 1)} sf", shade=True)
+        ry = _scb_kv(c, xr, ry, half, 'Excavation Perimeter', f"{_scb_n(r['excavation_perimeter_ft'], 1)} ft")
+        ry = _scb_kv(c, xr, ry, half, 'Excavation Extents',
+                     f"{_scb_n(r['excavation_bbox_width_ft'], 2)} × {_scb_n(r['excavation_bbox_length_ft'], 2)} ft", shade=True)
+        ry = _scb_kv(c, xr, ry, half, 'Excavation Volume (vertical sides)', f"{_scb_n(r['excavation_vol_cy'], 1)} cy")
+        ry = _scb_kv(c, xr, ry, half, '', f"({_scb_n(r['excavation_vol_cf'])} cf)", shade=True)
+        y = min(ly, ry) - 8
+
+        def _inc(flag):
+            return '' if flag else '  (excluded)'
+        ly = _scb_col_header(c, xl, y, half, 'STORAGE')
+        ly = _scb_kv(c, xl, ly, half, 'Tank Storage', f"{_scb_n(r['tank_storage_cf'], 1)} cf")
+        ly = _scb_kv(c, xl, ly, half, 'Cover Stone (net)' + _inc(r['stone_top_included']), f"{_scb_n(r['stone_top_net_cf'], 1)} cf", shade=True)
+        ly = _scb_kv(c, xl, ly, half, 'Perimeter Stone (net)' + _inc(r['stone_perim_included']), f"{_scb_n(r['stone_perim_net_cf'], 1)} cf")
+        ly = _scb_kv(c, xl, ly, half, 'Base Stone (net)' + _inc(r['stone_base_included']), f"{_scb_n(r['stone_base_net_cf'], 1)} cf", shade=True)
+        ly = _scb_kv(c, xl, ly, half, 'Stone Storage', f"{_scb_n(r['stone_storage_cf'], 1)} cf")
+        ly = _scb_kv(c, xl, ly, half, 'TOTAL STORAGE', f"{_scb_n(r['total_storage_cf'], 1)} cf", bold_row=True)
+
+        ry = _scb_col_header(c, xr, y, half, 'STONE & FABRIC')
+        ry = _scb_kv(c, xr, ry, half, 'Cover / Base Stone Depth', f"{_scb_n(r['cover_stone_ft'], 3)} / {_scb_n(r['base_stone_ft'], 3)} ft")
+        ry = _scb_kv(c, xr, ry, half, 'Stone Void Ratio', f"{_scb_n(r['stone_void'] * 100, 1)}%", shade=True)
+        ry = _scb_kv(c, xr, ry, half, 'Stone Quantity', f"{_scb_n(r['stone_yd3'], 1)} yd³  ({_scb_n(r['stone_tons'], 1)} tons)")
+        ry = _scb_kv(c, xr, ry, half, 'Geotextile — Tank', f"{_scb_n(r['geotextile_tank_yd2'], 1)} yd²", shade=True)
+        ry = _scb_kv(c, xr, ry, half, 'Geotextile — Stone Envelope', f"{_scb_n(r['geotextile_stone_yd2'], 1)} yd²")
+        ry = _scb_kv(c, xr, ry, half, f"Geotextile — Total (incl. {_scb_n(r['geo_waste_pct'], 0)}% waste)",
+                     f"{_scb_n(r['geotextile_total_yd2'], 1)} yd²", shade=True)
+        y = min(ly, ry) - 8
+
+        y = _section_header(c, y, 'MATERIALS')
+        y = _scb_bom_table(c, y, r['bom'], r['config'])
+        _scb_pdf_footer(c, page, total_pages, project_name, generated_str)
+        c.showPage()
+
+    # ── PROJECT TOTALS ──────────────────────────────────────────────
+    y = _scb_pdf_header(c, 'Site Concept Builder — Project Totals', generated_str, project_name)
+    y = _section_header(c, y, f"TANKS ({tot['tank_count']})")
+    cols = [('Tank', LM + 5, 150, 'left'), ('Config', LM + 160, 50, 'left'),
+            ('W × L (ft)', LM + 210, 90, 'right'), ('Crates', LM + 300, 50, 'right'),
+            ('Storage (cf)', LM + 350, 70, 'right'), ('Excav. (cy)', LM + 420, 45, 'right'),
+            ('Stone (tons)', LM + 465, 52, 'right')]
+    y = _table_header(c, y, cols)
+    for i, r in enumerate(tanks):
+        vals = [_scb_fit_text(c, r['label'], 'Helvetica', 7.5, 150), f"{r['config']} / {r['layers']}L",
+                f"{_scb_n(r['bounding_width_ft'], 1)} × {_scb_n(r['bounding_length_ft'], 1)}",
+                _scb_n(r['num_crates']), _scb_n(r['total_storage_cf'], 1),
+                _scb_n(r['excavation_vol_cy'], 1), _scb_n(r['stone_tons'], 1)]
+        y = _table_row(c, y, [(v, x, w, a, False, None) for v, (_, x, w, a) in zip(vals, cols)], shade=(i % 2 == 1))
+    tvals = ['TOTAL', '', '', _scb_n(tot['num_crates']), _scb_n(tot['total_storage_cf'], 1),
+             _scb_n(tot['excavation_vol_cy'], 1), _scb_n(tot['stone_tons'], 1)]
+    y = _table_total_row(c, y, [(v, x, w, a) for v, (_, x, w, a) in zip(tvals, cols)], LTBLUE, BLUE)
+    y -= 10
+
+    y = _section_header(c, y, 'PROJECT MATERIALS (contingency rounded once for the whole project)')
+    y = _scb_bom_table(c, y, tot['bom'], 'SC' if any(r['config'] == 'SC' for r in tanks) else 'EX')
+    y = _kv_row(c, y, 'Stone (all tanks)', f"{_scb_n(tot['stone_yd3'], 1)} yd³  ({_scb_n(tot['stone_tons'], 1)} tons)")
+    y = _kv_row(c, y, 'Geotextile (all tanks)', f"{_scb_n(tot['geotextile_total_yd2'], 1)} yd²", shade=True)
+    y = _kv_row(c, y, 'Excavation (all tanks, vertical sides)', f"{_scb_n(tot['excavation_vol_cy'], 1)} cy")
+    y = _highlight_row(c, y - 2, 'TOTAL STORAGE (all tanks)', f"{_scb_n(tot['total_storage_cf'], 1)} cf")
+
+    _draw_disclaimer_block(c, 36, disclaimer_lines_raw=_SITE_CONCEPT_DISCLAIMER_TEXT,
+                           bold_triggers=_SITE_CONCEPT_BOLD_TRIGGERS)
+    _scb_pdf_footer(c, total_pages, total_pages, project_name, generated_str)
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
+def _scb_bom_table(c, y, bom, config):
+    """Crate / plate / accessory table (qty, pallets, weight). Bottom
+    plates are omitted for an EX-only table (EX uses none)."""
+    cols = [('Item', LM + 5, 220, 'left'), ('Qty', LM + 230, 80, 'right'),
+            ('Pallets', LM + 320, 80, 'right'), ('Weight (lbs)', LM + 410, 107, 'right')]
+    y = _table_header(c, y, cols)
+    items = [('Base Units', 'base_units'), ('Contingency Units (to full pallet)', 'contingency'),
+             ('Side Plates', 'side_plates')]
+    if config == 'SC' or bom['bottom_plates']['qty'] > 0:
+        items.append(('Bottom Plates', 'bottom_plates'))
+    for label, key in (('Pipe Connectors', 'pipe_connectors'), ('12" Top Adapters', 'top_adapters_12'),
+                       ('16" Top Adapters', 'top_adapters_16')):
+        if bom[key]['qty'] > 0:
+            items.append((label, key))
+    for i, (label, key) in enumerate(items):
+        b = bom[key]
+        vals = [label, _scb_n(b['qty']), _scb_n(b['pallets']) if key != 'contingency' else '—',
+                _scb_n(b['weight_lbs'], 1)]
+        y = _table_row(c, y, [(v, x, w, a, False, None) for v, (_, x, w, a) in zip(vals, cols)], shade=(i % 2 == 1))
+    base_pallets = math.ceil((bom['base_units']['qty'] + bom['contingency']['qty']) / _MT_PALLETS['base']) \
+        if bom['base_units']['qty'] > 0 else 0
+    total_w = sum(v['weight_lbs'] for v in bom.values())
+    y = _table_total_row(c, y, [('Base-unit pallets incl. contingency', LM + 5, 220, 'left'),
+                                (_scb_n(base_pallets), LM + 320, 80, 'right'),
+                                (_scb_n(total_w, 1), LM + 410, 107, 'right')], LGRAY, NAVY)
+    return y - 6
+
+
+# ══════════════════════════════════════════════════════════════════
 #  DESIGN VERIFICATION DASHBOARD — PT-ROW™ Transparent Sizing Calculator
 #
 #  Shows the engineer four independent sizing methods side by side rather
@@ -5581,6 +5988,20 @@ def design_tools_download_pdf():
             meta = data.get('meta', {}) or {}
             buffer = build_site_overlay_pdf(image_data_url, project_name=project_name, meta=meta)
             download_name = 'AquaCell_Site_Overlay.pdf'
+        elif calc_type == 'site_concept':
+            # Internal estimating tool only (see /design-tools/calculate).
+            if not PRICING_ENABLED:
+                return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 404
+            image_data_url = data.get('image', '')
+            if not image_data_url:
+                return jsonify({'error': 'No plan image was received.'}), 400
+            # Numbers are always recomputed from the tank inputs — the
+            # browser supplies only the composited plan image.
+            result = calc_site_concept(payload)
+            if 'error' in result:
+                return jsonify(result), 400
+            buffer = build_site_concept_pdf(image_data_url, payload, result, project_name=project_name)
+            download_name = 'AquaCell_Site_Concept.pdf'
         elif calc_type == 'pt_row':
             result = calc_pt_row(payload)
             buffer = build_pt_row_pdf(payload, result, project_name=project_name)
