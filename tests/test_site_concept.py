@@ -117,22 +117,15 @@ for k in range(200):
 check('perimeter matches builder on 200 random shapes', bad==0, bad)
 
 # 10. PR #41 review fixes
-# (a) len_along_width envelope: footprint built from the rotated grid
-code,j=post({'tanks':[{'mode':'envelope','orientation':'len_along_width','envelope_width_ft':3.937001,
-              'envelope_length_ft':5.905501,'perimeter_stone_width':0,'cover_stone':0,'base_stone':0}]})
-t=j['tanks'][0]
-check('rotated: 3 crates', code==200 and t['crates_layer']==3, t.get('crates_layer'))
-check('rotated: footprint = crates x module area', close(t['tank_footprint_sf'], 3*W*L, 0.01))
-check('rotated: d=0 excav area == tank area', close(t['excavation_area_sf'], t['tank_footprint_sf'], 0.01))
-check('rotated: perim-stone volume not negative', t['stone_perim_gross_cf'] >= -1e-6, t['stone_perim_gross_cf'])
-check('rotated: perimeter = 2(L + 3W)', close(t['tank_perimeter_ft'], 2*(L+3*W), 0.01))
-for ew, el in [(40,80),(41.3,77.9),(10,10)]:
-    code,j=post({'tanks':[{'mode':'envelope','orientation':'len_along_width','envelope_width_ft':ew,'envelope_length_ft':el,'perimeter_stone_width':1}]})
-    t=j['tanks'][0]
-    exact=(ew//L)*L*(el//W)*W
-    check(f'rotated {ew}x{el}: area consistent with rect', close(t['tank_footprint_sf'], exact, 0.01)
-          and t['crates_layer']==int(ew//L)*int(el//W)
-          and t['bounding_width_ft']<=ew and t['bounding_length_ft']<=el)
+# (a) "long axis across width" dropped: any orientation sent is ignored
+for orient in ('len_along_width', 'bogus', None):
+    tk={'mode':'envelope','envelope_width_ft':3.937001,'envelope_length_ft':5.905501,
+        'perimeter_stone_width':0,'cover_stone':0,'base_stone':0}
+    if orient: tk['orientation']=orient
+    code,j=post({'tanks':[tk]}); t=j['tanks'][0]
+    check(f'orientation {orient!r} ignored -> down-length count (2 crates)', code==200 and t['crates_layer']==2, t.get('crates_layer'))
+    check(f'orientation {orient!r}: d=0 excav == tank', close(t['excavation_area_sf'], t['tank_footprint_sf'], 0.01))
+    check(f'orientation {orient!r}: no negative stone', t['stone_perim_gross_cf'] >= -1e-6)
 # (b) project contingency from combined base units
 code,j=post({'tanks':[{'rows':[{'crate_count':10,'offset_crates':0}],'layers':1},{'rows':[{'crate_count':10,'offset_crates':0}],'layers':1}]})
 check('per-tank contingency 46 each', all(t['bom']['contingency']['qty']==46 for t in j['tanks']))

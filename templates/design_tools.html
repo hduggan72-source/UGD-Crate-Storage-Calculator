@@ -434,7 +434,8 @@
         <button class="calc-nav-item active" data-calc="buoyancy" onclick="selectCalc('buoyancy')">
             Buoyancy / Uplift
         </button>
-        <button class="calc-nav-item" data-calc="complex_shape_builder" onclick="selectCalc('complex_shape_builder')">
+        <!-- Hidden 2026-09-27: superseded by Site Concept Builder (James). Panel + code kept. -->
+        <button class="calc-nav-item" data-calc="complex_shape_builder" onclick="selectCalc('complex_shape_builder')" style="display:none;">
             Complex Shape Builder <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
         </button>
         <button class="calc-nav-item" data-calc="crate_comparison" onclick="selectCalc('crate_comparison')">
@@ -461,7 +462,13 @@
         <button class="calc-nav-item" data-calc="pt_row" onclick="selectCalc('pt_row')">
             PT-ROW™ Sizing Calculator <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
         </button>
-        <button class="calc-nav-item" data-calc="site_overlay" onclick="selectCalc('site_overlay')">
+        {% if pricing_enabled %}
+        <button class="calc-nav-item" data-calc="site_concept" onclick="selectCalc('site_concept')">
+            Site Concept Builder <span class="soon-tag" style="background:#7c3aed;color:#fff;">INTERNAL</span>
+        </button>
+        {% endif %}
+        <!-- Hidden 2026-09-27: superseded by Site Concept Builder (James). Panel + code kept. -->
+        <button class="calc-nav-item" data-calc="site_overlay" onclick="selectCalc('site_overlay')" style="display:none;">
             Site Overlay <span class="soon-tag" style="background:#7c3aed;color:#fff;">BETA</span>
         </button>
         <button class="calc-nav-item" data-calc="stage_storage" onclick="selectCalc('stage_storage')">
@@ -1324,6 +1331,165 @@
             </div>
         </div>
 
+        {% if pricing_enabled %}
+        <!-- ── SITE CONCEPT BUILDER (INTERNAL) ──
+             Merges Complex Shape Builder + Site Overlay: build each tank by
+             width × length or row by row, see it on the scaled plan, and get
+             live quantities from /design-tools/calculate (calc_type
+             'site_concept'). Internal estimating tool — never rendered on
+             the client BETA build (pricing_enabled=False). -->
+        <div id="panel-site_concept" class="calc-panel" style="display:none;">
+            <div class="calc-inputs">
+                <div class="disclaimer-box">
+                    <strong>Site Concept Builder &mdash; internal conceptual estimate.</strong>
+                    Upload a plan, set the scale, and build each tank on top of it. Quantities
+                    recalculate as you build. The plan image is a backdrop only &mdash; every number
+                    comes from the crate layout you enter, never from measuring the image. A
+                    project-specific takeoff (CAD / Bluebeam) and the Engineer of Record remain the
+                    source of truth.
+                </div>
+
+                <label class="calc-label">Project Name (optional)</label>
+                <input type="text" id="scb_project" class="calc-input" placeholder="e.g. Cape Coral Home Depot">
+
+                <label class="calc-label" style="margin-top:10px;">1. Plan (PNG / JPEG / PDF)</label>
+                <input type="file" id="scb_file" class="calc-input" accept="image/png,image/jpeg,image/jpg,application/pdf,.pdf" onchange="scbLoadFile(event)">
+
+                <label class="calc-label" style="margin-top:10px;">2. Set Scale</label>
+                <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">
+                    Click <strong>Set Scale</strong>, click two points on a known dimension
+                    (scale bar or dimensioned line), then enter the real distance.
+                </div>
+                <button type="button" id="scb_scale_btn" class="calc-btn secondary" style="width:100%; margin-bottom:6px;" onclick="scbStartScale()">Set Scale</button>
+                <input type="number" step="any" min="0" id="scb_scale_dist" class="calc-input" style="width:100%; margin-bottom:6px;" placeholder="Real distance (ft)">
+                <button type="button" class="calc-btn" style="width:100%; margin-bottom:6px;" onclick="scbFinishScale()">Set Distance</button>
+                <div id="scb_scale_status" style="font-size:12px; color:var(--muted); margin-bottom:4px;">Scale: not set</div>
+
+                <label class="calc-label" style="margin-top:10px;">3. Tanks</label>
+                <div id="scb_tank_list" style="display:flex; flex-direction:column; gap:4px; margin-bottom:8px;"></div>
+                <button type="button" class="calc-btn secondary" style="width:100%; margin-bottom:8px;" onclick="scbAddTank()">+ Add Tank</button>
+
+                <div id="scb_editor" style="display:none;">
+                    <div class="section-card">
+                        <div class="section-card-header">Selected Tank</div>
+                        <div class="section-card-body">
+                            <label>Label</label>
+                            <input type="text" id="scb_label" placeholder="e.g. Tank A — North Lot" oninput="scbEditorChanged()">
+
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                                <div>
+                                    <label>Configuration</label>
+                                    <select id="scb_config" onchange="scbEditorChanged()">
+                                        <option value="SC">SC — Standard</option>
+                                        <option value="EX">EX — Extra Strong</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label>Layers</label>
+                                    <select id="scb_layers" onchange="scbEditorChanged()">
+                                        <option value="1">1</option><option value="2">2</option>
+                                        <option value="3" selected>3</option><option value="4">4</option>
+                                        <option value="5">5</option><option value="6">6</option>
+                                        <option value="7">7</option><option value="8">8</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <label>Build Mode</label>
+                            <div style="display:flex; gap:8px; margin-top:4px;">
+                                <button type="button" id="scb_mode_env_btn" class="calc-btn" style="flex:1; margin-top:0;" onclick="scbSetMode('envelope')">Width × Length</button>
+                                <button type="button" id="scb_mode_rows_btn" class="calc-btn secondary" style="flex:1; margin-top:0;" onclick="scbSetMode('rows')">Build by Rows</button>
+                            </div>
+
+                            <div id="scb_env_section">
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                                    <div><label>Width (ft)</label><input type="number" step="any" min="0" id="scb_env_w" value="40" oninput="scbEditorChanged()"></div>
+                                    <div><label>Length (ft)</label><input type="number" step="any" min="0" id="scb_env_l" value="80" oninput="scbEditorChanged()"></div>
+                                </div>
+                                <div style="font-size:11px; color:#64748b; margin-top:6px; line-height:1.4;">
+                                    Snaps DOWN to whole crates. Crate long axis runs down the length &mdash;
+                                    rotate the tank on the plan to turn it. Switch to <em>Build by Rows</em>
+                                    to notch or shape it (rows start from this rectangle).
+                                </div>
+                            </div>
+
+                            <div id="scb_rows_section" style="display:none;">
+                                <div style="display:flex; gap:8px; font-size:11px; font-weight:bold; color:#6b7280; margin:8px 0 4px; padding:0 2px;">
+                                    <div style="flex:0 0 30px;">Row</div>
+                                    <div style="flex:1;">Crates Wide</div>
+                                    <div style="flex:1;">Offset (crates)</div>
+                                    <div style="flex:0 0 30px;"></div>
+                                </div>
+                                <div id="scb_rows"></div>
+                                <div style="display:flex; gap:8px;">
+                                    <button type="button" class="calc-btn secondary" style="flex:1;" onclick="scbAddRow()">+ Row (copy last)</button>
+                                </div>
+                                <div style="font-size:11px; color:#64748b; margin-top:6px; line-height:1.4;">
+                                    Rows run top to bottom down the length; each row is one crate long
+                                    (3.937 ft). Offset shifts a row right by whole crates.
+                                </div>
+                            </div>
+
+                            <label>Rotation on plan (° &mdash; visual only)</label>
+                            <input type="number" step="any" id="scb_rot" value="0" oninput="scbEditorChanged()">
+                            <div style="display:flex; gap:8px;">
+                                <button type="button" class="calc-btn secondary" style="flex:1 1 0; min-width:0;" onclick="scbRotate90(-1)">↺ 90° CCW</button>
+                                <button type="button" class="calc-btn secondary" style="flex:1 1 0; min-width:0;" onclick="scbRotate90(1)">↻ 90° CW</button>
+                            </div>
+
+                            <button type="button" class="calc-btn" style="background:#b91c1c;" onclick="scbDeleteTank()">Delete Tank</button>
+                        </div>
+                    </div>
+
+                    <div class="section-card">
+                        <div class="section-card-header">Stone &amp; Fabric (this tank)</div>
+                        <div class="section-card-body">
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                                <div><label>Perimeter Stone (ft)</label><input type="number" step="any" min="0" id="scb_perim_stone" value="1.0" oninput="scbEditorChanged()"></div>
+                                <div><label>Cover Stone (ft)</label><input type="number" step="any" min="0" id="scb_cover_stone" value="1.0" oninput="scbEditorChanged()"></div>
+                                <div><label>Base Stone (ft)</label><input type="number" step="any" min="0" id="scb_base_stone" value="0.333" oninput="scbEditorChanged()"></div>
+                                <div><label>Stone Void (fraction)</label><input type="number" step="any" min="0" max="1" id="scb_stone_void" value="0.40" oninput="scbEditorChanged()"></div>
+                                <div><label>Fabric Waste (%)</label><input type="number" step="any" min="0" id="scb_geo_waste" value="20" oninput="scbEditorChanged()"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <label class="calc-label" style="margin-top:6px;">Display</label>
+                <div style="display:flex; flex-direction:column; gap:4px; font-size:12.5px;">
+                    <label style="display:flex; align-items:center; gap:6px; margin:0; font-weight:normal;"><input type="checkbox" id="scb_show_grid" checked onchange="scbRedraw()" style="width:auto; margin:0;"> Crate grid</label>
+                    <label style="display:flex; align-items:center; gap:6px; margin:0; font-weight:normal;"><input type="checkbox" id="scb_show_excav" checked onchange="scbRedraw()" style="width:auto; margin:0;"> Excavation outline</label>
+                </div>
+
+                <button type="button" class="calc-btn secondary" style="width:100%; margin-top:12px;" onclick="scbExportPNG()">Export PNG</button>
+                <div id="scb_status" style="font-size:12px; color:var(--muted); margin-top:8px;"></div>
+            </div>
+
+            <div class="calc-results" id="scb_results">
+                <div id="scb_zoom_bar" style="display:none; align-items:center; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
+                    <span style="font-size:12px; color:var(--muted); margin-right:2px;">Zoom:</span>
+                    <button type="button" class="calc-btn secondary" style="padding:4px 10px; min-width:34px; margin-top:0; width:auto;" onclick="scbZoomBy(1/1.25)" title="Zoom out">&minus;</button>
+                    <button type="button" class="calc-btn secondary" style="padding:4px 10px; min-width:34px; margin-top:0; width:auto;" onclick="scbZoomBy(1.25)" title="Zoom in">+</button>
+                    <button type="button" class="calc-btn secondary" style="padding:4px 10px; margin-top:0; width:auto;" onclick="scbZoomFit()" title="Fit plan to viewer width">Fit</button>
+                    <span id="scb_zoom_readout" style="font-size:12px; color:var(--muted); margin-left:2px;">Fit</span>
+                    <span style="font-size:11px; color:var(--muted); margin-left:auto;">Ctrl/&#8984; + scroll to zoom &middot; drag a tank to move it</span>
+                </div>
+                <div id="scb_page_bar" style="display:none; align-items:center; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
+                    <span style="font-size:12px; color:var(--muted); margin-right:2px;">PDF page:</span>
+                    <button type="button" class="calc-btn secondary" style="padding:4px 12px; min-width:34px; margin-top:0; width:auto;" onclick="scbPdfPage(-1)" title="Previous page">&lsaquo;</button>
+                    <span id="scb_page_readout" style="font-size:12px; min-width:78px; text-align:center;">Page 1 / 1</span>
+                    <button type="button" class="calc-btn secondary" style="padding:4px 12px; min-width:34px; margin-top:0; width:auto;" onclick="scbPdfPage(1)" title="Next page">&rsaquo;</button>
+                    <span style="font-size:11px; color:var(--muted); margin-left:8px;">Switching pages clears the scale.</span>
+                </div>
+                <div id="scb_canvas_wrap" style="width:100%; max-height:62vh; overflow:auto; background:#0b1220; border:1px solid var(--border); border-radius:8px;">
+                    <canvas id="scb_canvas" width="900" height="600" style="display:block; cursor:crosshair;"></canvas>
+                </div>
+                <div class="empty-state" id="scb_empty" style="margin-top:8px;">Upload a plan image or PDF to begin &mdash; or drag &amp; drop a PNG / JPEG / PDF onto the viewer.</div>
+                <div id="scb_output" style="margin-top:12px;"></div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- ── PT-ROW™ TRANSPARENT SIZING CALCULATOR ── -->
         <div id="panel-pt_row" class="calc-panel" style="display:none;">
             <div class="calc-inputs">
@@ -1659,6 +1825,11 @@
         }
         if (name === 'doc_library') {
             idlInit();
+        }
+        // Site Concept Builder only exists on the internal build.
+        if (name === 'site_concept' && typeof scbApplyZoom === 'function') {
+            scbApplyZoom();
+            scbRedraw();
         }
     }
 
@@ -4558,6 +4729,950 @@
             soSetStatus('PDF export error: ' + err);
         }
     }
+
+    {% if pricing_enabled %}
+    // ══════════════════════════════════════════════════════════════
+    //  SITE CONCEPT BUILDER (INTERNAL)
+    //  Complex Shape Builder + Site Overlay in one tool. Each tank is a
+    //  row model (or a W × L that the backend snaps into rows); every
+    //  edit re-POSTs all tanks to /design-tools/calculate
+    //  (calc_type 'site_concept') and the returned geometry + quantities
+    //  drive both the drawing and the results. No quantity is computed
+    //  in the browser — the plan image is a backdrop only.
+    //  Canvas drawing uses literal hex/rgba colors only (never CSS vars).
+    //  Self-contained (scb*) so the hidden Site Overlay / Complex Shape
+    //  Builder code is left untouched.
+    // ══════════════════════════════════════════════════════════════
+    const SCB_MODULE_WID = 1.9685;   // ft (mirrors app.py MODULE_WID) — seeding rows / readouts only
+    const SCB_MODULE_LEN = 3.937;    // ft (mirrors app.py MODULE_LEN)
+    const SCB_MAX_ROWS = 200;        // mirrors app.py _MAX_SHAPE_ROWS
+    const SCB_PDFJS_VER = '3.11.174';
+    const SCB_PDF_MAX_EDGE = 2400;
+    const SCB_ZOOM_MIN = 0.1;
+    const SCB_ZOOM_MAX = 8;
+    const SCB_CALC_DELAY_MS = 250;
+
+    const scbState = {
+        img: null,
+        pxPerFt: null,
+        scaling: false,
+        scalePts: [],
+        tanks: [],          // see scbNewTank()
+        activeId: null,
+        nextNum: 1,
+        dragging: false,
+        dragDX: 0,
+        dragDY: 0,
+        zoom: null,         // null = fit-to-width
+        totals: null,
+        calcError: null,
+        calcSeq: 0,
+        calcTimer: null,
+    };
+    const scbPdf = { doc: null, pageNum: 1, pageCount: 0, rendering: false };
+
+    function scbCanvas() { return document.getElementById('scb_canvas'); }
+    function scbSetStatus(msg) {
+        const el = document.getElementById('scb_status');
+        if (el) el.textContent = msg || '';
+    }
+    function scbActive() {
+        return scbState.tanks.find(function (t) { return t.id === scbState.activeId; }) || null;
+    }
+    function scbEsc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function scbFmt(n, dec) {
+        if (n === null || n === undefined || isNaN(n)) return '—';
+        return Number(n).toLocaleString(undefined, { minimumFractionDigits: dec || 0, maximumFractionDigits: dec || 0 });
+    }
+
+    // ── ZOOM (CSS display transform only — backing resolution fixed) ──
+    function scbFitZoom() {
+        const cv = scbCanvas();
+        const wrap = document.getElementById('scb_canvas_wrap');
+        if (!cv || !wrap || !cv.width) return 1;
+        return Math.max(50, wrap.clientWidth - 2) / cv.width;
+    }
+    function scbCurrentZoom() { return scbState.zoom == null ? scbFitZoom() : scbState.zoom; }
+    function scbApplyZoom() {
+        const cv = scbCanvas();
+        if (!cv || !scbState.img) return;
+        const readout = document.getElementById('scb_zoom_readout');
+        if (scbState.zoom == null) {
+            cv.style.width = '100%';
+            cv.style.height = 'auto';
+            if (readout) readout.textContent = 'Fit';
+        } else {
+            scbState.zoom = Math.min(SCB_ZOOM_MAX, Math.max(SCB_ZOOM_MIN, scbState.zoom));
+            cv.style.width = (cv.width * scbState.zoom) + 'px';
+            cv.style.height = (cv.height * scbState.zoom) + 'px';
+            if (readout) readout.textContent = Math.round(scbState.zoom * 100) + '%';
+        }
+    }
+    function scbZoomBy(k) {
+        if (!scbState.img) { scbSetStatus('Load a plan first.'); return; }
+        scbState.zoom = scbCurrentZoom() * k;
+        scbApplyZoom();
+    }
+    function scbZoomFit() {
+        if (!scbState.img) { scbSetStatus('Load a plan first.'); return; }
+        scbState.zoom = null;
+        scbApplyZoom();
+    }
+    // Zoom toward a canvas point, keeping it under the cursor.
+    function scbZoomAtPoint(p, newZoom) {
+        const wrap = document.getElementById('scb_canvas_wrap');
+        const cv = scbCanvas();
+        const rect = cv.getBoundingClientRect();
+        const wrect = wrap.getBoundingClientRect();
+        const viewX = rect.left + p.x * (rect.width / cv.width) - wrect.left;
+        const viewY = rect.top + p.y * (rect.height / cv.height) - wrect.top;
+        scbState.zoom = newZoom;
+        scbApplyZoom();
+        wrap.scrollLeft = p.x * scbState.zoom - viewX;
+        wrap.scrollTop = p.y * scbState.zoom - viewY;
+    }
+    function scbEventToCanvas(ev) {
+        const cv = scbCanvas();
+        const rect = cv.getBoundingClientRect();
+        return {
+            x: (ev.clientX - rect.left) * (cv.width / rect.width),
+            y: (ev.clientY - rect.top) * (cv.height / rect.height),
+        };
+    }
+    // Canvas point at the middle of what's currently visible in the viewer.
+    function scbVisibleCenter() {
+        const cv = scbCanvas();
+        const wrap = document.getElementById('scb_canvas_wrap');
+        const rect = cv.getBoundingClientRect();
+        const wrect = wrap.getBoundingClientRect();
+        if (!rect.width || !rect.height) return { x: cv.width / 2, y: cv.height / 2 };
+        const cx = (Math.max(rect.left, wrect.left) + Math.min(rect.right, wrect.right)) / 2;
+        const cy = (Math.max(rect.top, wrect.top) + Math.min(rect.bottom, wrect.bottom)) / 2;
+        return {
+            x: (cx - rect.left) * (cv.width / rect.width),
+            y: (cy - rect.top) * (cv.height / rect.height),
+        };
+    }
+
+    // ── PLAN LOADING (PNG / JPEG / PDF) ──
+    function scbLoadFile(ev) {
+        scbProcessFile(ev.target.files && ev.target.files[0]);
+    }
+    function scbProcessFile(file) {
+        if (!file) return;
+        const isPdf = /^application\/pdf$/i.test(file.type) || /\.pdf$/i.test(file.name || '');
+        if (isPdf) { scbProcessPdf(file); return; }
+        if (!/^image\/(png|jpe?g)$/i.test(file.type)) {
+            scbSetStatus('Please use a PNG, JPEG, or PDF file.');
+            return;
+        }
+        scbResetPdf();
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const img = new Image();
+            img.onload = function () {
+                scbCommitImage(img, 1600, false);
+                scbSetStatus('Plan loaded. Set the scale next.');
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+    // keepTanks: true when switching PDF pages (tank definitions survive,
+    // they reappear once the new sheet's scale is set); false for a new file.
+    function scbCommitImage(img, maxEdge, keepTanks) {
+        let w = img.width, h = img.height;
+        const longEdge = Math.max(w, h);
+        if (longEdge > maxEdge) {
+            const k = maxEdge / longEdge;
+            w = Math.round(w * k);
+            h = Math.round(h * k);
+        }
+        const cv = scbCanvas();
+        cv.width = w;
+        cv.height = h;
+        scbState.img = img;
+        scbState.pxPerFt = null;
+        scbState.scaling = false;
+        scbState.scalePts = [];
+        if (!keepTanks) {
+            scbState.tanks = [];
+            scbState.activeId = null;
+            scbState.nextNum = 1;
+            scbState.totals = null;
+            scbState.calcError = null;
+        }
+        document.getElementById('scb_empty').style.display = 'none';
+        document.getElementById('scb_scale_status').textContent = 'Scale: not set';
+        document.getElementById('scb_zoom_bar').style.display = 'flex';
+        scbState.zoom = null;
+        scbApplyZoom();
+        scbRenderTankList();
+        scbSyncEditor();
+        scbRenderOutput();
+        scbRedraw();
+    }
+    function scbResetPdf() {
+        scbPdf.doc = null;
+        scbPdf.pageNum = 1;
+        scbPdf.pageCount = 0;
+        scbPdf.rendering = false;
+        document.getElementById('scb_page_bar').style.display = 'none';
+    }
+    // PDF.js is lazy-loaded from cdnjs (same version/source as Site Overlay).
+    function scbEnsurePdfJs(cb) {
+        if (window.pdfjsLib) { cb(window.pdfjsLib); return; }
+        scbSetStatus('Loading PDF engine…');
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/' + SCB_PDFJS_VER + '/pdf.min.js';
+        s.onload = function () {
+            try {
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+                    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/' + SCB_PDFJS_VER + '/pdf.worker.min.js';
+            } catch (e) {}
+            cb(window.pdfjsLib);
+        };
+        s.onerror = function () {
+            scbSetStatus('Could not load the PDF engine (network blocked?). Export the sheet as PNG/JPEG instead.');
+        };
+        document.head.appendChild(s);
+    }
+    function scbProcessPdf(file) {
+        scbResetPdf();
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const data = new Uint8Array(e.target.result);
+            scbEnsurePdfJs(function (pdfjsLib) {
+                if (!pdfjsLib) return;
+                scbSetStatus('Reading PDF…');
+                pdfjsLib.getDocument({ data: data }).promise.then(function (doc) {
+                    scbPdf.doc = doc;
+                    scbPdf.pageCount = doc.numPages;
+                    scbRenderPdfPage(1, false);
+                }).catch(function (err) {
+                    scbSetStatus('Could not open that PDF: ' + (err && err.message ? err.message : 'unknown error'));
+                });
+            });
+        };
+        reader.onerror = function () { scbSetStatus('Could not read the PDF file.'); };
+        reader.readAsArrayBuffer(file);
+    }
+    function scbRenderPdfPage(n, keepTanks) {
+        if (!scbPdf.doc || scbPdf.rendering) return;
+        n = Math.min(scbPdf.pageCount, Math.max(1, n));
+        scbPdf.rendering = true;
+        scbPdf.pageNum = n;
+        scbSetStatus('Rendering page ' + n + ' of ' + scbPdf.pageCount + '…');
+        scbPdf.doc.getPage(n).then(function (page) {
+            const base = page.getViewport({ scale: 1 });
+            const longEdge = Math.max(base.width, base.height);
+            const viewport = page.getViewport({ scale: longEdge > 0 ? SCB_PDF_MAX_EDGE / longEdge : 1 });
+            const tmp = document.createElement('canvas');
+            tmp.width = Math.round(viewport.width);
+            tmp.height = Math.round(viewport.height);
+            const tctx = tmp.getContext('2d');
+            tctx.fillStyle = '#ffffff';
+            tctx.fillRect(0, 0, tmp.width, tmp.height);
+            return page.render({ canvasContext: tctx, viewport: viewport }).promise.then(function () {
+                const img = new Image();
+                img.onload = function () {
+                    scbCommitImage(img, SCB_PDF_MAX_EDGE, keepTanks);
+                    scbPdf.rendering = false;
+                    const bar = document.getElementById('scb_page_bar');
+                    bar.style.display = scbPdf.pageCount > 1 ? 'flex' : 'none';
+                    document.getElementById('scb_page_readout').textContent = 'Page ' + n + ' / ' + scbPdf.pageCount;
+                    scbSetStatus('Page ' + n + ' loaded. Set the scale next.');
+                };
+                img.onerror = function () { scbPdf.rendering = false; scbSetStatus('Failed to rasterize the PDF page.'); };
+                img.src = tmp.toDataURL('image/png');
+            });
+        }).catch(function (err) {
+            scbPdf.rendering = false;
+            scbSetStatus('Render failed: ' + (err && err.message ? err.message : 'unknown error'));
+        });
+    }
+    function scbPdfPage(dir) {
+        if (!scbPdf.doc || scbPdf.rendering) return;
+        const n = scbPdf.pageNum + dir;
+        if (n < 1 || n > scbPdf.pageCount) return;
+        scbRenderPdfPage(n, true);
+    }
+
+    // ── SCALE ──
+    function scbStartScale() {
+        if (!scbState.img) { scbSetStatus('Load a plan first.'); return; }
+        scbState.scaling = true;
+        scbState.scalePts = [];
+        scbRedraw();
+        scbSetStatus('Scale mode: click the FIRST point of a known dimension.');
+    }
+    function scbFinishScale() {
+        if (scbState.scalePts.length < 2) {
+            scbSetStatus('Click Set Scale, then two points on the plan, then enter the distance.');
+            return;
+        }
+        const distFt = parseFloat(document.getElementById('scb_scale_dist').value);
+        if (!(distFt > 0)) {
+            scbSetStatus('Enter the real distance (ft), then click Set Distance.');
+            return;
+        }
+        const a = scbState.scalePts[0], b = scbState.scalePts[1];
+        const px = Math.hypot(b.x - a.x, b.y - a.y);
+        if (px < 2) {
+            scbSetStatus('Those two points are too close. Click Set Scale and try again.');
+            scbState.scalePts = [];
+            scbRedraw();
+            return;
+        }
+        scbState.pxPerFt = px / distFt;
+        scbState.scaling = false;
+        document.getElementById('scb_scale_status').textContent =
+            'Scale: ' + scbState.pxPerFt.toFixed(2) + ' px/ft  (' + px.toFixed(0) + ' px = ' + distFt + ' ft)';
+        scbSetStatus(scbState.tanks.length ? 'Scale set.' : 'Scale set. Click + Add Tank.');
+        scbRedraw();
+    }
+
+    // ── TANKS ──
+    function scbNewTank(label, cx, cy) {
+        return {
+            id: 'scb_t' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+            label: label,
+            config: 'SC',
+            layers: '3',
+            mode: 'envelope',
+            envW: '40',
+            envL: '80',
+            rows: [],            // [{n: '10', off: '0'}] — raw input strings
+            rot: 0,
+            cx: cx,
+            cy: cy,
+            perimStone: '1.0',   // defaults = calc_tank() defaults (confirmed by James)
+            coverStone: '1.0',
+            baseStone: '0.333',
+            stoneVoid: '0.40',
+            geoWaste: '20',
+            result: null,        // last good backend result for this tank
+        };
+    }
+    function scbAddTank() {
+        if (!scbState.img) { scbSetStatus('Load a plan first.'); return; }
+        if (!scbState.pxPerFt) { scbSetStatus('Set the scale before adding a tank.'); return; }
+        const c = scbVisibleCenter();
+        const offset = (scbState.tanks.length % 5) * 24;
+        const t = scbNewTank('Tank ' + scbState.nextNum, c.x + offset, c.y + offset);
+        scbState.nextNum++;
+        scbState.tanks.push(t);
+        scbState.activeId = t.id;
+        scbRenderTankList();
+        scbSyncEditor();
+        scbScheduleCalc(0);
+        scbSetStatus('Tank added. Edit it on the left; drag it on the plan to position it.');
+    }
+    function scbSelectTank(id) {
+        scbState.activeId = id;
+        scbRenderTankList();
+        scbSyncEditor();
+        scbRenderOutput();
+        scbRedraw();
+    }
+    function scbDeleteTank() {
+        const t = scbActive();
+        if (!t) return;
+        if (!confirm('Delete ' + (t.label || 'this tank') + '?')) return;
+        scbState.tanks = scbState.tanks.filter(function (x) { return x.id !== t.id; });
+        scbState.activeId = scbState.tanks.length ? scbState.tanks[scbState.tanks.length - 1].id : null;
+        scbRenderTankList();
+        scbSyncEditor();
+        scbScheduleCalc(0);
+        scbSetStatus('Tank deleted.');
+    }
+    function scbRenderTankList() {
+        const box = document.getElementById('scb_tank_list');
+        box.innerHTML = '';
+        scbState.tanks.forEach(function (t) {
+            const row = document.createElement('div');
+            const active = t.id === scbState.activeId;
+            row.style.cssText = 'display:flex; gap:6px; padding:6px 8px; border-radius:6px; cursor:pointer; font-size:12.5px; ' +
+                (active ? 'background:rgba(30,58,138,0.18); border:1px solid #1e3a8a;'
+                        : 'background:var(--highlight); border:1px solid transparent;');
+            const name = document.createElement('span');
+            name.style.cssText = 'flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+            const r = t.result;
+            name.textContent = (t.label || 'Tank') + (r ? ' — ' + scbFmt(r.bounding_width_ft, 1) + ' × ' +
+                scbFmt(r.bounding_length_ft, 1) + ' ft, ' + scbFmt(r.total_storage_cf) + ' cf' : '');
+            row.appendChild(name);
+            row.addEventListener('click', function () { scbSelectTank(t.id); });
+            box.appendChild(row);
+        });
+    }
+
+    // ── EDITOR ──
+    function scbSetVal(id, v) { document.getElementById(id).value = v; }
+    function scbGetVal(id) { return document.getElementById(id).value; }
+
+    function scbSyncEditor() {
+        const t = scbActive();
+        document.getElementById('scb_editor').style.display = t ? '' : 'none';
+        if (!t) return;
+        scbSetVal('scb_label', t.label);
+        scbSetVal('scb_config', t.config);
+        scbSetVal('scb_layers', t.layers);
+        scbSetVal('scb_env_w', t.envW);
+        scbSetVal('scb_env_l', t.envL);
+        scbSetVal('scb_rot', t.rot);
+        scbSetVal('scb_perim_stone', t.perimStone);
+        scbSetVal('scb_cover_stone', t.coverStone);
+        scbSetVal('scb_base_stone', t.baseStone);
+        scbSetVal('scb_stone_void', t.stoneVoid);
+        scbSetVal('scb_geo_waste', t.geoWaste);
+        scbShowMode(t.mode);
+        scbRenderRows();
+    }
+    // Every editor field routes here: copy fields into the active tank
+    // (raw strings — the backend parses them, so a typed 0 stays 0),
+    // redraw right away, and debounce the recalculation.
+    function scbEditorChanged() {
+        const t = scbActive();
+        if (!t) return;
+        t.label = scbGetVal('scb_label').trim() || t.label;
+        t.config = scbGetVal('scb_config');
+        t.layers = scbGetVal('scb_layers');
+        t.envW = scbGetVal('scb_env_w');
+        t.envL = scbGetVal('scb_env_l');
+        const rot = parseFloat(scbGetVal('scb_rot'));
+        t.rot = isNaN(rot) ? 0 : rot;
+        t.perimStone = scbGetVal('scb_perim_stone');
+        t.coverStone = scbGetVal('scb_cover_stone');
+        t.baseStone = scbGetVal('scb_base_stone');
+        t.stoneVoid = scbGetVal('scb_stone_void');
+        t.geoWaste = scbGetVal('scb_geo_waste');
+        scbRenderTankList();
+        scbRedraw();
+        scbScheduleCalc();
+    }
+    function scbRotate90(dir) {
+        const t = scbActive();
+        if (!t) return;
+        t.rot = (((t.rot + (dir === -1 ? -90 : 90)) % 360) + 360) % 360;
+        scbSetVal('scb_rot', t.rot);
+        scbRedraw();
+    }
+    function scbShowMode(mode) {
+        document.getElementById('scb_env_section').style.display = mode === 'envelope' ? '' : 'none';
+        document.getElementById('scb_rows_section').style.display = mode === 'rows' ? '' : 'none';
+        document.getElementById('scb_mode_env_btn').className = mode === 'envelope' ? 'calc-btn' : 'calc-btn secondary';
+        document.getElementById('scb_mode_rows_btn').className = mode === 'rows' ? 'calc-btn' : 'calc-btn secondary';
+    }
+    function scbSetMode(mode) {
+        const t = scbActive();
+        if (!t || t.mode === mode) return;
+        if (mode === 'rows' && t.rows.length === 0) {
+            // Start the row list from the current W × L rectangle (snapped
+            // down the same way the backend does), so notching an existing
+            // rectangle is one step. Falls back to a single 10-crate row.
+            const w = parseFloat(t.envW), l = parseFloat(t.envL);
+            const nCols = w > 0 ? Math.floor(w / SCB_MODULE_WID) : 0;
+            const nRows = l > 0 ? Math.min(SCB_MAX_ROWS, Math.floor(l / SCB_MODULE_LEN)) : 0;
+            if (nCols >= 1 && nRows >= 1) {
+                for (let i = 0; i < nRows; i++) t.rows.push({ n: String(nCols), off: '0' });
+            } else {
+                t.rows.push({ n: '10', off: '0' });
+            }
+        }
+        t.mode = mode;
+        scbShowMode(mode);
+        scbRenderRows();
+        scbScheduleCalc(0);
+    }
+    function scbRenderRows() {
+        const t = scbActive();
+        const box = document.getElementById('scb_rows');
+        box.innerHTML = '';
+        if (!t) return;
+        t.rows.forEach(function (r, i) {
+            const div = document.createElement('div');
+            div.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:6px;';
+            const idx = document.createElement('div');
+            idx.style.cssText = 'flex:0 0 30px; font-size:12px; color:#6b7280; text-align:center;';
+            idx.textContent = i + 1;
+            const n = document.createElement('input');
+            n.type = 'number'; n.step = '1'; n.min = '1'; n.value = r.n; n.className = 'scb-row-n';
+            n.style.cssText = 'flex:1; margin:0;';
+            n.addEventListener('input', function () { r.n = n.value; scbScheduleCalc(); });
+            const off = document.createElement('input');
+            off.type = 'number'; off.step = '1'; off.min = '0'; off.value = r.off; off.className = 'scb-row-off';
+            off.style.cssText = 'flex:1; margin:0;';
+            off.addEventListener('input', function () { r.off = off.value; scbScheduleCalc(); });
+            const del = document.createElement('button');
+            del.type = 'button';
+            del.textContent = '×';
+            del.title = 'Remove row';
+            del.style.cssText = 'flex:0 0 30px; background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; border-radius:4px; cursor:pointer; font-weight:bold;';
+            del.addEventListener('click', function () { scbRemoveRow(i); });
+            div.appendChild(idx); div.appendChild(n); div.appendChild(off); div.appendChild(del);
+            box.appendChild(div);
+        });
+    }
+    function scbAddRow() {
+        const t = scbActive();
+        if (!t) return;
+        if (t.rows.length >= SCB_MAX_ROWS) { scbSetStatus('Row limit reached (' + SCB_MAX_ROWS + ').'); return; }
+        const last = t.rows[t.rows.length - 1];
+        t.rows.push(last ? { n: last.n, off: last.off } : { n: '10', off: '0' });
+        scbRenderRows();
+        scbScheduleCalc(0);
+    }
+    function scbRemoveRow(i) {
+        const t = scbActive();
+        if (!t) return;
+        t.rows.splice(i, 1);
+        scbRenderRows();
+        scbScheduleCalc(0);
+    }
+
+    // ── LIVE CALCULATION ──
+    function scbTankPayload(t) {
+        const p = {
+            label: t.label,
+            config: t.config,
+            layers: t.layers,
+            mode: t.mode,
+            perimeter_stone_width: t.perimStone,
+            cover_stone: t.coverStone,
+            base_stone: t.baseStone,
+            stone_void: t.stoneVoid,
+            geo_waste_pct: t.geoWaste,
+        };
+        if (t.mode === 'envelope') {
+            p.envelope_width_ft = t.envW;
+            p.envelope_length_ft = t.envL;
+        } else {
+            p.rows = t.rows.map(function (r) { return { crate_count: r.n, offset_crates: r.off }; });
+        }
+        return p;
+    }
+    function scbScheduleCalc(delay) {
+        clearTimeout(scbState.calcTimer);
+        scbState.calcTimer = setTimeout(scbRunCalc, delay === undefined ? SCB_CALC_DELAY_MS : delay);
+    }
+    async function scbRunCalc() {
+        const seq = ++scbState.calcSeq;
+        if (scbState.tanks.length === 0) {
+            scbState.totals = null;
+            scbState.calcError = null;
+            scbRenderOutput();
+            scbRedraw();
+            return;
+        }
+        // Results are matched back by tank id — tanks can be added or
+        // deleted while a request is in flight.
+        const ids = scbState.tanks.map(function (t) { return t.id; });
+        const body = { calc_type: 'site_concept', inputs: { tanks: scbState.tanks.map(scbTankPayload) } };
+        let data;
+        try {
+            const resp = await fetch('/design-tools/calculate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            data = await resp.json();
+            if (seq !== scbState.calcSeq) return;   // a newer edit superseded this one
+            if (!resp.ok || data.error) {
+                scbState.calcError = data.error || ('Calculation failed (HTTP ' + resp.status + ').');
+                scbRenderOutput();
+                return;
+            }
+        } catch (err) {
+            if (seq !== scbState.calcSeq) return;
+            scbState.calcError = 'Request failed: ' + err.message;
+            scbRenderOutput();
+            return;
+        }
+        scbState.calcError = null;
+        ids.forEach(function (id, i) {
+            const t = scbState.tanks.find(function (x) { return x.id === id; });
+            if (t) t.result = data.tanks[i];
+        });
+        scbState.totals = data.totals;
+        scbRenderTankList();
+        scbRenderOutput();
+        scbRedraw();
+    }
+
+    // ── GEOMETRY HELPERS (drawing only) ──
+    // Outline of a union of axis-aligned rects [x0,y0,x1,y1] as line
+    // segments, so a notched tank or merged excavation draws as one clean
+    // outline instead of every row's box. Same scanline idea as the
+    // backend's _scb_rect_union().
+    function scbMerge(ivs) {
+        ivs.sort(function (a, b) { return a[0] - b[0]; });
+        const out = [];
+        ivs.forEach(function (iv) {
+            if (out.length && iv[0] <= out[out.length - 1][1] + 1e-9) {
+                out[out.length - 1][1] = Math.max(out[out.length - 1][1], iv[1]);
+            } else {
+                out.push([iv[0], iv[1]]);
+            }
+        });
+        return out;
+    }
+    function scbCovered(ivs, x) {
+        return ivs.some(function (iv) { return iv[0] < x && x < iv[1]; });
+    }
+    function scbUnionEdges(rects) {
+        const ys = Array.from(new Set(rects.flatMap(function (r) { return [r[1], r[3]]; })))
+            .sort(function (a, b) { return a - b; });
+        const bands = [];
+        for (let i = 0; i + 1 < ys.length; i++) {
+            const y0 = ys[i], y1 = ys[i + 1];
+            if (y1 - y0 < 1e-9) continue;
+            const mid = (y0 + y1) / 2;
+            bands.push({ y0: y0, y1: y1, ivs: scbMerge(rects.filter(function (r) { return r[1] < mid && mid < r[3]; })
+                .map(function (r) { return [r[0], r[2]]; })) });
+        }
+        const segs = [];
+        bands.forEach(function (b) {
+            b.ivs.forEach(function (iv) {
+                segs.push([iv[0], b.y0, iv[0], b.y1]);
+                segs.push([iv[1], b.y0, iv[1], b.y1]);
+            });
+        });
+        // Horizontal edges: where coverage differs between the band below
+        // and the band above a boundary (sentinel empty bands at the ends).
+        for (let i = 0; i <= bands.length; i++) {
+            const lower = i > 0 ? bands[i - 1] : null;
+            const upper = i < bands.length ? bands[i] : null;
+            const y = upper ? upper.y0 : lower.y1;
+            const A = (lower && Math.abs(lower.y1 - y) < 1e-9) ? lower.ivs : [];
+            const B = upper ? upper.ivs : [];
+            const xs = Array.from(new Set(A.concat(B).flat())).sort(function (a, b) { return a - b; });
+            for (let k = 0; k + 1 < xs.length; k++) {
+                const mid = (xs[k] + xs[k + 1]) / 2;
+                if (scbCovered(A, mid) !== scbCovered(B, mid)) segs.push([xs[k], y, xs[k + 1], y]);
+            }
+            // A gap between two bands (disconnected pieces) closes both sides.
+            if (lower && upper && Math.abs(lower.y1 - upper.y0) >= 1e-9) {
+                lower.ivs.forEach(function (iv) { segs.push([iv[0], lower.y1, iv[1], lower.y1]); });
+            }
+        }
+        return segs;
+    }
+
+    // Map a canvas point into a tank's frame (ft, origin at the tank's
+    // top-left crate, before rotation).
+    function scbToTankFt(t, p) {
+        const r = t.result;
+        const rot = (t.rot || 0) * Math.PI / 180;
+        const dx = p.x - t.cx, dy = p.y - t.cy;
+        const lx = dx * Math.cos(rot) + dy * Math.sin(rot);
+        const ly = -dx * Math.sin(rot) + dy * Math.cos(rot);
+        return { x: lx / scbState.pxPerFt + r.bounding_width_ft / 2, y: ly / scbState.pxPerFt + r.bounding_length_ft / 2 };
+    }
+    function scbHitTest(p) {
+        if (!scbState.pxPerFt) return null;
+        const order = scbState.tanks.slice().reverse();
+        const a = scbActive();
+        if (a) order.unshift(a);
+        for (let i = 0; i < order.length; i++) {
+            const t = order[i];
+            if (!t.result) continue;
+            const f = scbToTankFt(t, p);
+            const hit = t.result.excavation_rects_ft.some(function (r) {
+                return f.x >= r[0] && f.x <= r[2] && f.y >= r[1] && f.y <= r[3];
+            });
+            if (hit) return t;
+        }
+        return null;
+    }
+
+    // ── DRAWING ──
+    // forExport: draw without the selection highlight (it has no design
+    // meaning and must not be baked into an exported image).
+    function scbRedraw(forExport) {
+        const cv = scbCanvas();
+        const ctx = cv.getContext('2d');
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        if (scbState.img) ctx.drawImage(scbState.img, 0, 0, cv.width, cv.height);
+        if (scbState.scalePts.length && !forExport) {
+            ctx.fillStyle = '#dc2626';
+            scbState.scalePts.forEach(function (p) {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            if (scbState.scalePts.length === 2) {
+                ctx.strokeStyle = '#dc2626';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(scbState.scalePts[0].x, scbState.scalePts[0].y);
+                ctx.lineTo(scbState.scalePts[1].x, scbState.scalePts[1].y);
+                ctx.stroke();
+            }
+        }
+        if (!scbState.pxPerFt) return;
+        const active = scbActive();
+        scbState.tanks.forEach(function (t) { if (t !== active) scbDrawTank(ctx, t, false); });
+        if (active) scbDrawTank(ctx, active, !forExport);
+    }
+    function scbDrawTank(ctx, t, isActive) {
+        const r = t.result;
+        if (!r) return;
+        const ppf = scbState.pxPerFt;
+        const bw = r.bounding_width_ft, bl = r.bounding_length_ft;
+        const X = function (x) { return (x - bw / 2) * ppf; };
+        const Y = function (y) { return (y - bl / 2) * ppf; };
+        const rectPath = function (rects) {
+            ctx.beginPath();
+            rects.forEach(function (q) { ctx.rect(X(q[0]), Y(q[1]), (q[2] - q[0]) * ppf, (q[3] - q[1]) * ppf); });
+        };
+        const strokeSegs = function (segs) {
+            ctx.beginPath();
+            segs.forEach(function (s) { ctx.moveTo(X(s[0]), Y(s[1])); ctx.lineTo(X(s[2]), Y(s[3])); });
+            ctx.stroke();
+        };
+
+        ctx.save();
+        ctx.translate(t.cx, t.cy);
+        ctx.rotate((t.rot || 0) * Math.PI / 180);
+
+        // Excavation (Option A offset) — one path, so overlaps don't darken.
+        if (document.getElementById('scb_show_excav').checked) {
+            rectPath(r.excavation_rects_ft);
+            ctx.fillStyle = 'rgba(180, 83, 9, 0.16)';
+            ctx.fill('nonzero');
+            ctx.strokeStyle = '#b45309';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([6, 4]);
+            strokeSegs(scbUnionEdges(r.excavation_rects_ft));
+            ctx.setLineDash([]);
+        }
+
+        // Tank body
+        rectPath(r.tank_rects_ft);
+        ctx.fillStyle = 'rgba(30, 58, 138, 0.30)';
+        ctx.fill('nonzero');
+
+        // Crate grid: column lines every MODULE_WID inside each row, row
+        // lines at every row edge. Skipped when cells would be < 3 px.
+        if (document.getElementById('scb_show_grid').checked && SCB_MODULE_WID * ppf >= 3) {
+            ctx.strokeStyle = 'rgba(30, 58, 138, 0.55)';
+            ctx.lineWidth = 0.75;
+            ctx.beginPath();
+            r.tank_rects_ft.forEach(function (q) {
+                const n = Math.round((q[2] - q[0]) / SCB_MODULE_WID);
+                for (let k = 0; k <= n; k++) {
+                    const gx = X(q[0] + k * SCB_MODULE_WID);
+                    ctx.moveTo(gx, Y(q[1]));
+                    ctx.lineTo(gx, Y(q[3]));
+                }
+                ctx.moveTo(X(q[0]), Y(q[1])); ctx.lineTo(X(q[2]), Y(q[1]));
+                ctx.moveTo(X(q[0]), Y(q[3])); ctx.lineTo(X(q[2]), Y(q[3]));
+            });
+            ctx.stroke();
+        }
+
+        // Tank outline — heavier and dashed on the selected tank.
+        ctx.strokeStyle = '#1e3a8a';
+        ctx.lineWidth = isActive ? 3.5 : 2.5;
+        if (isActive) ctx.setLineDash([8, 5]);
+        strokeSegs(scbUnionEdges(r.tank_rects_ft));
+        ctx.setLineDash([]);
+
+        // Label — counter-rotated so it always reads upright.
+        ctx.rotate(-(t.rot || 0) * Math.PI / 180);
+        const line1 = t.label || 'Tank';
+        const line2 = r.config + ' · ' + r.layers + 'L · ' + scbFmt(bw, 1) + ' × ' + scbFmt(bl, 1) + ' ft · ' +
+            scbFmt(r.total_storage_cf) + ' cf';
+        ctx.font = 'bold 13px Helvetica, Arial, sans-serif';
+        const w1 = ctx.measureText(line1).width;
+        ctx.font = '12px Helvetica, Arial, sans-serif';
+        const w2 = ctx.measureText(line2).width;
+        const bwBox = Math.max(w1, w2) + 12;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+        ctx.fillRect(-bwBox / 2, -19, bwBox, 38);
+        ctx.fillStyle = '#0f1e3c';
+        ctx.font = 'bold 13px Helvetica, Arial, sans-serif';
+        ctx.fillText(line1, -w1 / 2, -4);
+        ctx.font = '12px Helvetica, Arial, sans-serif';
+        ctx.fillText(line2, -w2 / 2, 12);
+        ctx.restore();
+    }
+
+    // ── RESULTS PANEL ──
+    function scbRow(label, val) {
+        return '<div class="result-row"><span>' + label + '</span><span class="val">' + val + '</span></div>';
+    }
+    function scbRenderOutput() {
+        const out = document.getElementById('scb_output');
+        let html = '';
+        if (scbState.calcError) {
+            html += '<div class="error-box">' + scbEsc(scbState.calcError) + '</div>';
+        }
+        const t = scbActive();
+        const r = t && t.result;
+        if (r) {
+            const b = r.bom;
+            const warn = (r.warnings || []).map(function (w) { return '<div class="disclaimer-box" style="margin:0 0 10px;">' + scbEsc(w) + '</div>'; }).join('');
+            html += '<div class="result-card"><h3>' + scbEsc(r.label) + ' &mdash; ' + r.config + ', ' + r.layers +
+                ' layer' + (r.layers > 1 ? 's' : '') + '</h3>' + warn +
+                '<div class="results-flex"><div class="results-data">' +
+                '<div style="font-weight:bold; font-size:12px; color:#6b7280; margin:4px 0;">DIMENSIONS</div>' +
+                scbRow('Tank (bounding)', scbFmt(r.bounding_width_ft, 2) + ' × ' + scbFmt(r.bounding_length_ft, 2) + ' ft (' +
+                    r.bounding_width_crates + ' × ' + r.bounding_length_crates + ' crates)') +
+                scbRow('Tank Height / System Depth', scbFmt(r.tank_height_ft, 3) + ' ft / ' + scbFmt(r.total_system_depth_ft, 3) + ' ft') +
+                scbRow('Footprint / Perimeter', scbFmt(r.tank_footprint_sf, 1) + ' sf / ' + scbFmt(r.tank_perimeter_ft, 1) + ' ft') +
+                scbRow('Fill Efficiency', scbFmt(r.fill_efficiency_pct, 1) + '%') +
+                scbRow('Crates / Layer &middot; Total', scbFmt(r.crates_layer) + ' &middot; ' + scbFmt(r.num_crates)) +
+                '<div style="font-weight:bold; font-size:12px; color:#6b7280; margin:10px 0 4px;">EXCAVATION (tank + ' + scbFmt(r.perimeter_stone_width_ft, 2) + ' ft stone)</div>' +
+                scbRow('Area / Perimeter', scbFmt(r.excavation_area_sf, 1) + ' sf / ' + scbFmt(r.excavation_perimeter_ft, 1) + ' ft') +
+                scbRow('Extents', scbFmt(r.excavation_bbox_width_ft, 2) + ' × ' + scbFmt(r.excavation_bbox_length_ft, 2) + ' ft') +
+                scbRow('Volume', scbFmt(r.excavation_vol_cy, 1) + ' cy (' + scbFmt(r.excavation_vol_cf) + ' cf)') +
+                '</div><div class="results-data">' +
+                '<div style="font-weight:bold; font-size:12px; color:#6b7280; margin:4px 0;">STORAGE</div>' +
+                scbRow('Tank', scbFmt(r.tank_storage_cf, 1) + ' cf') +
+                scbRow('Stone', scbFmt(r.stone_storage_cf, 1) + ' cf') +
+                scbRow('<strong>Total</strong>', '<strong>' + scbFmt(r.total_storage_cf, 1) + ' cf</strong>') +
+                '<div style="font-weight:bold; font-size:12px; color:#6b7280; margin:10px 0 4px;">MATERIALS</div>' +
+                scbRow('Base Units', scbFmt(b.base_units.qty) + ' (' + b.base_units.pallets + ' pallets)') +
+                scbRow('Contingency Units', scbFmt(b.contingency.qty)) +
+                scbRow('Side Plates', scbFmt(b.side_plates.qty) + ' (' + b.side_plates.pallets + ' pallets)') +
+                (r.config === 'SC' ? scbRow('Bottom Plates', scbFmt(b.bottom_plates.qty) + ' (' + b.bottom_plates.pallets + ' pallets)') : '') +
+                scbRow('Stone', scbFmt(r.stone_yd3, 1) + ' yd³ (' + scbFmt(r.stone_tons, 1) + ' tons)') +
+                scbRow('Geotextile (tank + stone)', scbFmt(r.geotextile_total_yd2, 1) + ' yd²') +
+                '</div></div></div>';
+        }
+        const tot = scbState.totals;
+        if (tot && scbState.tanks.length) {
+            const rowsHtml = scbState.tanks.filter(function (x) { return x.result; }).map(function (x) {
+                const q = x.result;
+                return '<tr><td>' + scbEsc(q.label) + '</td><td>' + q.config + ' / ' + q.layers + 'L</td><td>' +
+                    scbFmt(q.bounding_width_ft, 1) + ' × ' + scbFmt(q.bounding_length_ft, 1) + '</td><td>' +
+                    scbFmt(q.num_crates) + '</td><td>' + scbFmt(q.total_storage_cf) + '</td><td>' +
+                    scbFmt(q.excavation_vol_cy, 1) + '</td></tr>';
+            }).join('');
+            html += '<div class="result-card"><h3>Project Totals (' + tot.tank_count + ' tank' + (tot.tank_count > 1 ? 's' : '') + ')</h3>' +
+                '<table class="cc-cmp-table"><thead><tr><th>Tank</th><th>Config</th><th>W × L (ft)</th><th>Crates</th><th>Storage (cf)</th><th>Excav. (cy)</th></tr></thead>' +
+                '<tbody>' + rowsHtml + '<tr style="font-weight:bold;"><td>Total</td><td></td><td></td><td>' + scbFmt(tot.num_crates) +
+                '</td><td>' + scbFmt(tot.total_storage_cf) + '</td><td>' + scbFmt(tot.excavation_vol_cy, 1) + '</td></tr></tbody></table>' +
+                '<div style="margin-top:10px;">' +
+                scbRow('Base Units', scbFmt(tot.bom.base_units.qty) + ' (' + tot.bom.base_units.pallets + ' pallets)') +
+                scbRow('Contingency Units (project)', scbFmt(tot.bom.contingency.qty)) +
+                scbRow('Side Plates', scbFmt(tot.bom.side_plates.qty) + ' (' + tot.bom.side_plates.pallets + ' pallets)') +
+                scbRow('Bottom Plates', scbFmt(tot.bom.bottom_plates.qty) + ' (' + tot.bom.bottom_plates.pallets + ' pallets)') +
+                scbRow('Stone', scbFmt(tot.stone_yd3, 1) + ' yd³ (' + scbFmt(tot.stone_tons, 1) + ' tons)') +
+                scbRow('Geotextile', scbFmt(tot.geotextile_total_yd2, 1) + ' yd²') +
+                scbRow('Material Weight (crates &amp; plates)', scbFmt(tot.total_weight_lbs) + ' lbs') +
+                '</div><div style="font-size:11px; color:#64748b; margin-top:8px; line-height:1.4;">Conceptual estimate &mdash; quantities come from the crate layout entered, not from the plan image.</div></div>';
+        }
+        if (!html && scbState.img && scbState.pxPerFt) {
+            html = '<div class="empty-state" style="padding:24px;">Click <strong>+ Add Tank</strong> to start building.</div>';
+        }
+        out.innerHTML = html;
+    }
+
+    // ── CANVAS INTERACTION ──
+    (function scbWireCanvas() {
+        const cv = scbCanvas();
+        if (!cv) return;
+        cv.addEventListener('mousedown', function (ev) {
+            if (!scbState.img) return;
+            const p = scbEventToCanvas(ev);
+            if (scbState.scaling) {
+                if (scbState.scalePts.length >= 2) scbState.scalePts = [];
+                scbState.scalePts.push(p);
+                scbRedraw();
+                if (scbState.scalePts.length === 1) {
+                    scbSetStatus('Now click the SECOND point of the known dimension.');
+                } else {
+                    scbState.scaling = false;
+                    scbSetStatus('Both points set. Enter the real distance (ft) and click Set Distance.');
+                }
+                return;
+            }
+            const t = scbHitTest(p);
+            if (!t) return;
+            if (scbState.activeId !== t.id) scbSelectTank(t.id);
+            scbState.dragging = true;
+            scbState.dragDX = p.x - t.cx;
+            scbState.dragDY = p.y - t.cy;
+            cv.style.cursor = 'grabbing';
+        });
+        cv.addEventListener('mousemove', function (ev) {
+            if (!scbState.dragging) return;
+            const t = scbActive();
+            if (!t) return;
+            const p = scbEventToCanvas(ev);
+            t.cx = p.x - scbState.dragDX;
+            t.cy = p.y - scbState.dragDY;
+            scbRedraw();
+        });
+        window.addEventListener('mouseup', function () {
+            if (scbState.dragging) {
+                scbState.dragging = false;
+                scbCanvas().style.cursor = 'crosshair';
+            }
+        });
+        cv.addEventListener('wheel', function (ev) {
+            if (!scbState.img || !(ev.ctrlKey || ev.metaKey)) return;
+            ev.preventDefault();
+            scbZoomAtPoint(scbEventToCanvas(ev), scbCurrentZoom() * (ev.deltaY < 0 ? 1.15 : 1 / 1.15));
+        }, { passive: false });
+
+        const drop = document.getElementById('scb_canvas_wrap');
+        const stop = function (ev) { ev.preventDefault(); ev.stopPropagation(); };
+        ['dragenter', 'dragover'].forEach(function (evt) {
+            drop.addEventListener(evt, function (ev) {
+                stop(ev);
+                drop.style.outline = '2px dashed #7c3aed';
+                drop.style.outlineOffset = '-4px';
+            });
+        });
+        ['dragleave', 'dragend'].forEach(function (evt) {
+            drop.addEventListener(evt, function (ev) { stop(ev); drop.style.outline = 'none'; });
+        });
+        drop.addEventListener('drop', function (ev) {
+            stop(ev);
+            drop.style.outline = 'none';
+            if (ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files.length) {
+                scbProcessFile(ev.dataTransfer.files[0]);
+            }
+        });
+    })();
+
+    // ── EXPORT PNG (plan + tanks + watermark strip) ──
+    // Filename is set client-side via a.download (app convention).
+    function scbExportPNG() {
+        if (!scbState.img) { scbSetStatus('Load a plan first.'); return; }
+        scbRedraw(true);
+        const src = scbCanvas();
+        const tmp = document.createElement('canvas');
+        const stripH = 34;
+        tmp.width = src.width;
+        tmp.height = src.height + stripH;
+        const ctx = tmp.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, tmp.width, tmp.height);
+        ctx.drawImage(src, 0, 0);
+        ctx.fillStyle = '#0f1e3c';
+        ctx.fillRect(0, src.height, tmp.width, stripH);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 13px Helvetica, Arial, sans-serif';
+        ctx.fillText('AquaCell® Conceptual Site Concept — NOT TO SCALE FOR MEASUREMENT. Quantities from crate layout, not the image.',
+                     12, src.height + 22);
+        const a = document.createElement('a');
+        a.href = tmp.toDataURL('image/png');
+        a.download = acPdfName('AquaCell_Site_Concept', scbGetVal('scb_project')).replace(/\.pdf$/, '.png');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        scbRedraw();
+        scbSetStatus('PNG exported.');
+    }
+    {% endif %}
 
     // ══════════════ PT-ROW™ TRANSPARENT SIZING CALCULATOR ══════════════
     let ptrLastInputs  = null;
