@@ -1350,7 +1350,7 @@
                 </div>
 
                 <label class="calc-label">Project Name (optional)</label>
-                <input type="text" id="scb_project" class="calc-input" placeholder="e.g. Cape Coral Home Depot">
+                <input type="text" id="scb_project" class="calc-input" placeholder="e.g. your project here">
 
                 <label class="calc-label" style="margin-top:10px;">1. Plan (PNG / JPEG / PDF)</label>
                 <input type="file" id="scb_file" class="calc-input" accept="image/png,image/jpeg,image/jpg,application/pdf,.pdf" onchange="scbLoadFile(event)">
@@ -1369,9 +1369,9 @@
                 <div id="scb_tank_list" style="display:flex; flex-direction:column; gap:4px; margin-bottom:8px;"></div>
                 <button type="button" class="calc-btn secondary" style="width:100%; margin-bottom:8px;" onclick="scbAddTank()">+ Add Tank</button>
 
-                <div id="scb_editor" style="display:none;">
+                <div id="scb_editor">
                     <div class="section-card">
-                        <div class="section-card-header">Selected Tank</div>
+                        <div class="section-card-header" id="scb_editor_title">Selected Tank</div>
                         <div class="section-card-body">
                             <label>Label</label>
                             <input type="text" id="scb_label" placeholder="e.g. Tank A — North Lot" oninput="scbEditorChanged()">
@@ -1387,8 +1387,8 @@
                                 <div>
                                     <label>Layers</label>
                                     <select id="scb_layers" onchange="scbEditorChanged()">
-                                        <option value="1">1</option><option value="2">2</option>
-                                        <option value="3" selected>3</option><option value="4">4</option>
+                                        <option value="1" selected>1</option><option value="2">2</option>
+                                        <option value="3">3</option><option value="4">4</option>
                                         <option value="5">5</option><option value="6">6</option>
                                         <option value="7">7</option><option value="8">8</option>
                                     </select>
@@ -1437,7 +1437,7 @@
                                 <button type="button" class="calc-btn secondary" style="flex:1 1 0; min-width:0;" onclick="scbRotate90(1)">↻ 90° CW</button>
                             </div>
 
-                            <button type="button" class="calc-btn" style="background:#b91c1c;" onclick="scbDeleteTank()">Delete Tank</button>
+                            <button type="button" id="scb_delete_btn" class="calc-btn" style="background:#b91c1c;" onclick="scbDeleteTank()">Delete Tank</button>
                         </div>
                     </div>
 
@@ -4763,6 +4763,7 @@
         tanks: [],          // see scbNewTank()
         activeId: null,
         nextNum: 1,
+        draft: null,        // pre-filled fields shown before a tank exists (see scbEditTarget)
         dragging: false,
         dragDX: 0,
         dragDY: 0,
@@ -4781,6 +4782,16 @@
     }
     function scbActive() {
         return scbState.tanks.find(function (t) { return t.id === scbState.activeId; }) || null;
+    }
+    // What the tank fields edit: the selected tank, or — before any tank
+    // exists — a draft pre-filled with the defaults (SC, 1 layer, 40 × 80)
+    // that + Add Tank turns into the first tank. Keeps the fields open
+    // from the start (James, 2026-09-27).
+    function scbEditTarget() {
+        const t = scbActive();
+        if (t) return t;
+        if (!scbState.draft) scbState.draft = scbNewTank('Tank ' + scbState.nextNum, 0, 0);
+        return scbState.draft;
     }
     function scbEsc(s) {
         return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -4906,6 +4917,7 @@
             scbState.tanks = [];
             scbState.activeId = null;
             scbState.nextNum = 1;
+            scbState.draft = null;
             scbState.totals = null;
             scbState.calcError = null;
         }
@@ -5045,7 +5057,7 @@
             id: 'scb_t' + Date.now() + '_' + Math.floor(Math.random() * 1000),
             label: label,
             config: 'SC',
-            layers: '3',
+            layers: '1',
             mode: 'envelope',
             envW: '40',
             envL: '80',
@@ -5066,7 +5078,16 @@
         if (!scbState.pxPerFt) { scbSetStatus('Set the scale before adding a tank.'); return; }
         const c = scbVisibleCenter();
         const offset = (scbState.tanks.length % 5) * 24;
-        const t = scbNewTank('Tank ' + scbState.nextNum, c.x + offset, c.y + offset);
+        let t;
+        if (scbState.tanks.length === 0 && scbState.draft) {
+            // First tank: take whatever was set in the open fields.
+            t = scbState.draft;
+            t.cx = c.x + offset;
+            t.cy = c.y + offset;
+        } else {
+            t = scbNewTank('Tank ' + scbState.nextNum, c.x + offset, c.y + offset);
+        }
+        scbState.draft = null;
         scbState.nextNum++;
         scbState.tanks.push(t);
         scbState.activeId = t.id;
@@ -5118,9 +5139,11 @@
     function scbGetVal(id) { return document.getElementById(id).value; }
 
     function scbSyncEditor() {
-        const t = scbActive();
-        document.getElementById('scb_editor').style.display = t ? '' : 'none';
-        if (!t) return;
+        const isDraft = !scbActive();
+        const t = scbEditTarget();
+        document.getElementById('scb_editor_title').textContent =
+            isDraft ? 'New Tank (set up, then click + Add Tank)' : 'Selected Tank';
+        document.getElementById('scb_delete_btn').style.display = isDraft ? 'none' : '';
         scbSetVal('scb_label', t.label);
         scbSetVal('scb_config', t.config);
         scbSetVal('scb_layers', t.layers);
@@ -5139,7 +5162,7 @@
     // (raw strings — the backend parses them, so a typed 0 stays 0),
     // redraw right away, and debounce the recalculation.
     function scbEditorChanged() {
-        const t = scbActive();
+        const t = scbEditTarget();
         if (!t) return;
         t.label = scbGetVal('scb_label').trim() || t.label;
         t.config = scbGetVal('scb_config');
@@ -5158,7 +5181,7 @@
         scbScheduleCalc();
     }
     function scbRotate90(dir) {
-        const t = scbActive();
+        const t = scbEditTarget();
         if (!t) return;
         t.rot = (((t.rot + (dir === -1 ? -90 : 90)) % 360) + 360) % 360;
         scbSetVal('scb_rot', t.rot);
@@ -5171,7 +5194,7 @@
         document.getElementById('scb_mode_rows_btn').className = mode === 'rows' ? 'calc-btn' : 'calc-btn secondary';
     }
     function scbSetMode(mode) {
-        const t = scbActive();
+        const t = scbEditTarget();
         if (!t || t.mode === mode) return;
         if (mode === 'rows' && t.rows.length === 0) {
             // Start the row list from the current W × L rectangle (snapped
@@ -5192,7 +5215,7 @@
         scbScheduleCalc(0);
     }
     function scbRenderRows() {
-        const t = scbActive();
+        const t = scbEditTarget();
         const box = document.getElementById('scb_rows');
         box.innerHTML = '';
         if (!t) return;
@@ -5221,7 +5244,7 @@
         });
     }
     function scbAddRow() {
-        const t = scbActive();
+        const t = scbEditTarget();
         if (!t) return;
         if (t.rows.length >= SCB_MAX_ROWS) { scbSetStatus('Row limit reached (' + SCB_MAX_ROWS + ').'); return; }
         const last = t.rows[t.rows.length - 1];
@@ -5230,7 +5253,7 @@
         scbScheduleCalc(0);
     }
     function scbRemoveRow(i) {
-        const t = scbActive();
+        const t = scbEditTarget();
         if (!t) return;
         t.rows.splice(i, 1);
         scbRenderRows();
@@ -5645,6 +5668,9 @@
             }
         });
     })();
+
+    // Tank fields start open, filled with the new-tank defaults.
+    scbSyncEditor();
 
     // ── EXPORT PNG (plan + tanks + watermark strip) ──
     // Filename is set client-side via a.download (app convention).
