@@ -115,5 +115,41 @@ for k in range(200):
     g=A.calc_complex_shape_builder({'rows':rows}); code,j=post({'tanks':[{'rows':rows}]})
     if not close(g['perimeter_ft'], j['tanks'][0]['tank_perimeter_ft'], 0.011): bad+=1
 check('perimeter matches builder on 200 random shapes', bad==0, bad)
+
+# 10. PR #41 review fixes
+# (a) len_along_width envelope: footprint built from the rotated grid
+code,j=post({'tanks':[{'mode':'envelope','orientation':'len_along_width','envelope_width_ft':3.937001,
+              'envelope_length_ft':5.905501,'perimeter_stone_width':0,'cover_stone':0,'base_stone':0}]})
+t=j['tanks'][0]
+check('rotated: 3 crates', code==200 and t['crates_layer']==3, t.get('crates_layer'))
+check('rotated: footprint = crates x module area', close(t['tank_footprint_sf'], 3*W*L, 0.01))
+check('rotated: d=0 excav area == tank area', close(t['excavation_area_sf'], t['tank_footprint_sf'], 0.01))
+check('rotated: perim-stone volume not negative', t['stone_perim_gross_cf'] >= -1e-6, t['stone_perim_gross_cf'])
+check('rotated: perimeter = 2(L + 3W)', close(t['tank_perimeter_ft'], 2*(L+3*W), 0.01))
+for ew, el in [(40,80),(41.3,77.9),(10,10)]:
+    code,j=post({'tanks':[{'mode':'envelope','orientation':'len_along_width','envelope_width_ft':ew,'envelope_length_ft':el,'perimeter_stone_width':1}]})
+    t=j['tanks'][0]
+    exact=(ew//L)*L*(el//W)*W
+    check(f'rotated {ew}x{el}: area consistent with rect', close(t['tank_footprint_sf'], exact, 0.01)
+          and t['crates_layer']==int(ew//L)*int(el//W)
+          and t['bounding_width_ft']<=ew and t['bounding_length_ft']<=el)
+# (b) project contingency from combined base units
+code,j=post({'tanks':[{'rows':[{'crate_count':10,'offset_crates':0}],'layers':1},{'rows':[{'crate_count':10,'offset_crates':0}],'layers':1}]})
+check('per-tank contingency 46 each', all(t['bom']['contingency']['qty']==46 for t in j['tanks']))
+check('project contingency 36 (not 92)', j['totals']['bom']['contingency']['qty']==36, j['totals']['bom']['contingency'])
+# (c) config normalised / rejected
+code,j=post({'tanks':[{'rows':[{'crate_count':4,'offset_crates':0}],'config':'sc'}]})
+t=j['tanks'][0]
+check("config 'sc' normalised to SC BOM", code==200 and t['config']=='SC' and t['bom']['base_units']['qty']==t['num_crates'] and t['bom']['bottom_plates']['qty']==4)
+code,j=post({'tanks':[{'rows':[{'crate_count':4,'offset_crates':0}],'config':'XX'}]})
+check('unknown config -> 400', code==400)
+# (d) drawing frame starts at x = 0
+code,j=post({'tanks':[{'rows':[{'crate_count':3,'offset_crates':5}]}]})
+t=j['tanks'][0]
+check('offset row normalised to x=0', close(t['tank_rects_ft'][0][0], 0, 1e-6) and close(t['bounding_width_ft'], 3*W, 0.001)
+      and t['bounding_width_crates']==3 and close(t['fill_efficiency_pct'],100,0.05), t['tank_rects_ft'])
+code,j=post({'tanks':[{'rows':[{'crate_count':3,'offset_crates':5},{'crate_count':2,'offset_crates':6}],'perimeter_stone_width':1}]})
+t=j['tanks'][0]
+check('min excavation x = -d', close(min(r[0] for r in t['excavation_rects_ft']), -1, 1e-6))
 print('FAILS', fails)
 sys.exit(1 if fails else 0)

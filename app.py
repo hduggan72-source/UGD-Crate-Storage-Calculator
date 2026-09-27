@@ -1130,6 +1130,15 @@ def calc_site_concept_tank(payload):
     no pricing."""
     label = (str(payload.get('label', '') or '')).strip() or 'Tank'
 
+    # Normalize config up front. calc_complex_shape_builder() silently
+    # falls back to SC geometry for an unknown value, while the BOM rules
+    # below branch on config == 'SC' — an unvalidated 'sc' would mix SC
+    # storage with EX base-unit rules.
+    config = str(payload.get('config', 'SC') or 'SC').strip().upper()
+    if config not in CONFIG_DATA:
+        return {'error': f'{label}: configuration must be SC or EX.'}
+    payload = dict(payload, config=config)
+
     geo = calc_complex_shape_builder(payload)
     if 'error' in geo:
         return {'error': f'{label}: {geo["error"]}'}
@@ -1152,7 +1161,6 @@ def calc_site_concept_tank(payload):
     if stone_void > 1:
         return {'error': f'{label}: stone void must be a fraction (e.g. 0.40), not a percent.'}
 
-    config = geo['config']
     layers = geo['layers']
     cd = CONFIG_DATA.get(config, CONFIG_DATA['SC'])
     void_ratio      = cd['void_ratio']
@@ -1172,11 +1180,35 @@ def calc_site_concept_tank(payload):
     # Rows run top-to-bottom down the length (y), crates across the
     # width (x) — same frame the Complex Shape Builder drawing uses.
     d = perimeter_stone_width
-    tank_rects = []
-    for r in geo['rows']:
-        x0 = r['offset_crates'] * MODULE_WID
-        y0 = r['row_index'] * MODULE_LEN
-        tank_rects.append((x0, y0, x0 + r['crate_count'] * MODULE_WID, y0 + MODULE_LEN))
+    rotated = (geo['mode'] == 'envelope'
+               and geo['envelope']['orientation'] == 'len_along_width')
+    if rotated:
+        # Long axis across the width: the selected crate tally packs
+        # MODULE_LEN-wide columns and MODULE_WID-deep rows (same floor
+        # math as _envelope_to_rows), so the footprint must be built from
+        # that grid — not from the canonical len_along_length rows —
+        # or the tank volume and the excavation describe different tanks.
+        env_w = float(payload.get('envelope_width_ft'))
+        env_l = float(payload.get('envelope_length_ft'))
+        width_crates  = int(env_w // MODULE_LEN)
+        length_crates = int(env_l // MODULE_WID)
+        if width_crates < 1 or length_crates < 1:
+            return {'error': f'{label}: footprint is too small to fit a crate with the long axis across the width.'}
+        tank_rects = [(0.0, 0.0, width_crates * MODULE_LEN, length_crates * MODULE_WID)]
+    else:
+        # Normalize to the left-most crate so the drawing frame starts
+        # at x = 0 even when every row carries a positive offset.
+        min_off = min(r['offset_crates'] for r in geo['rows'])
+        tank_rects = []
+        for r in geo['rows']:
+            x0 = (r['offset_crates'] - min_off) * MODULE_WID
+            y0 = r['row_index'] * MODULE_LEN
+            tank_rects.append((x0, y0, x0 + r['crate_count'] * MODULE_WID, y0 + MODULE_LEN))
+        width_crates  = max(r['offset_crates'] + r['crate_count'] for r in geo['rows']) - min_off
+        length_crates = geo['n_rows']
+    bbox_w = max(r[2] for r in tank_rects)
+    bbox_l = max(r[3] for r in tank_rects)
+    bbox_area = bbox_w * bbox_l
     _, tank_perim = _scb_rect_union(tank_rects)
     excav_rects = [(x0 - d, y0 - d, x1 + d, y1 + d) for (x0, y0, x1, y1) in tank_rects]
     excav_area, excav_perim = _scb_rect_union(excav_rects)
@@ -1190,9 +1222,6 @@ def calc_site_concept_tank(payload):
         if hi <= lo:
             warnings.append(f'Rows {a["row_index"]} and {b["row_index"]} do not overlap — '
                             'the tank is drawn as separate pieces.')
-    if geo.get('envelope', {}).get('orientation') == 'len_along_width':
-        warnings.append('Crate count uses the long-axis-across-width tally; the footprint, '
-                        'perimeter, and excavation use the snapped footprint rectangle.')
 
     # ── Volumes & storage (mirrors calc_tank complex path) ──────────
     gross_tank_vol  = tank_area * tank_height
@@ -1249,21 +1278,22 @@ def calc_site_concept_tank(payload):
         'tank_height_ft':         round(tank_height, 3),
         'total_system_depth_ft':  round(total_system_depth, 3),
         'n_rows':                 geo['n_rows'],
-        'bounding_width_ft':      geo['bounding_width_ft'],
-        'bounding_length_ft':     geo['bounding_length_ft'],
-        'bounding_width_crates':  geo['bounding_width_crates'],
-        'bounding_length_crates': geo['bounding_length_crates'],
+        'crate_orientation':      'len_along_width' if rotated else 'len_along_length',
+        'bounding_width_ft':      round(bbox_w, 3),
+        'bounding_length_ft':     round(bbox_l, 3),
+        'bounding_width_crates':  width_crates,
+        'bounding_length_crates': length_crates,
         'tank_footprint_sf':      round(tank_area, 2),
         'tank_perimeter_ft':      round(tank_perim, 2),
-        'fill_efficiency_pct':    geo['fill_efficiency_pct'],
+        'fill_efficiency_pct':    round(tank_area / bbox_area * 100.0, 1) if bbox_area > 0 else 0.0,
         'crates_layer':           crates_layer,
         'num_crates':             num_crates,
         # Excavation (Option A — true offset)
         'perimeter_stone_width_ft':  round(perimeter_stone_width, 3),
         'excavation_area_sf':        round(excav_area, 2),
         'excavation_perimeter_ft':   round(excav_perim, 2),
-        'excavation_bbox_width_ft':  round(geo['bounding_width_ft'] + 2 * d, 3),
-        'excavation_bbox_length_ft': round(geo['bounding_length_ft'] + 2 * d, 3),
+        'excavation_bbox_width_ft':  round(bbox_w + 2 * d, 3),
+        'excavation_bbox_length_ft': round(bbox_l + 2 * d, 3),
         'excavation_vol_cf':         round(total_excav_vol, 1),
         'excavation_vol_cy':         round(total_excav_vol / 27, 1),
         # Storage
@@ -1295,6 +1325,8 @@ def calc_site_concept_tank(payload):
         # Drawing data for the plan overlay (ft, tank-local frame:
         # x across width from the left-most crate, y down the length
         # from row 0). The excavation outline is the union of these.
+        # For len_along_width this is one rectangle; the crate grid
+        # inside it is MODULE_LEN wide × MODULE_WID deep.
         'tank_rects_ft':       [[round(v, 4) for v in r] for r in tank_rects],
         'excavation_rects_ft': [[round(v, 4) for v in r] for r in excav_rects],
     }
@@ -1344,8 +1376,13 @@ def calc_site_concept(payload):
                 'stone_yd3', 'stone_tons', 'geotextile_tank_yd2', 'geotextile_stone_yd2',
                 'geotextile_total_yd2']
     totals = {k: round(sum(t[k] for t in tanks), 2) for k in sum_keys}
-    totals['bom'] = _scb_bom({item: sum(t['bom'][item]['qty'] for t in tanks)
-                              for item in tanks[0]['bom']})
+    # Contingency is re-derived from the COMBINED base units (one pallet
+    # round-up for the project), same as the multi-tank cumulative_bom() —
+    # summing each tank's own round-up would overstate it.
+    qtys = {item: sum(t['bom'][item]['qty'] for t in tanks) for item in tanks[0]['bom']}
+    qtys['contingency'] = max(0, math.ceil(qtys['base_units'] / _MT_PALLETS['base'])
+                              * _MT_PALLETS['base'] - qtys['base_units'])
+    totals['bom'] = _scb_bom(qtys)
     totals['total_weight_lbs'] = round(sum(v['weight_lbs'] for v in totals['bom'].values()), 1)
     totals['tank_count'] = len(tanks)
 
