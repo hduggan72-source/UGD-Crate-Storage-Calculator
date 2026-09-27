@@ -1014,6 +1014,345 @@ def calc_complex_shape_builder(payload):
 
 
 # ══════════════════════════════════════════════════════════════════
+#  SITE CONCEPT BUILDER  (INTERNAL ONLY — blocked when PRICING_ENABLED
+#  is False, i.e. on the client-facing BETA build)
+#
+#  Merges the Complex Shape Builder and Site Overlay into one
+#  "build-a-tank on the plan" rough estimate. This function is the
+#  backend for it (Step 1): given one or more tanks built from the
+#  Complex Shape Builder row model, return per-tank dimensional data,
+#  storage, excavation, and materials, plus project totals.
+#
+#  Tank geometry comes straight from calc_complex_shape_builder() —
+#  the verified row model (crate count, net area, perimeter). Nothing
+#  about the shape math is re-derived here.
+#
+#  EXCAVATION — "Option A", signed off by James 2026-09-27: the
+#  excavation footprint is the TRUE outward offset of the tank shape
+#  by the perimeter stone width (square/mitered corners), not the
+#  bounding box. Computed exactly as the union of every row strip
+#  grown by the stone width on all four sides (Minkowski sum with a
+#  square). Where a notch is narrower than 2 × stone width, the
+#  offsets merge and the notch is dug out — which is what happens in
+#  the field. For shapes with no such narrow notch this reduces to
+#  area = A + P·d + 4d² and perimeter = P + 8d (the same excavation
+#  perimeter default the single/multi-tank Complex Shape path uses).
+#
+#  Volumes, stone, fabric, and BOM formulas mirror calc_tank()'s
+#  complex-shape path (the multi-tank per-tank calc) exactly, fed with
+#  the exact row-model area/perimeter instead of a snapped rectangle.
+#  calc_tank() itself is NOT called or modified — it serves live
+#  multi-tank users.
+# ══════════════════════════════════════════════════════════════════
+_SCB_TOL = 1e-9
+_SCB_MAX_TANKS = 25
+
+
+def _scb_num(payload, key, default):
+    """Float parse where 0 is a valid value — only a missing/blank field
+    falls back to the default (never `value or default`)."""
+    v = payload.get(key, None)
+    if v is None or (isinstance(v, str) and v.strip() == ''):
+        return float(default)
+    return float(v)
+
+
+def _scb_bool(payload, key, default=True):
+    v = payload.get(key, default)
+    if isinstance(v, str):
+        return v == '1' or v.lower() == 'true'
+    return bool(v)
+
+
+def _scb_merge_intervals(ivs):
+    out = []
+    for a, b in sorted(ivs):
+        if out and a <= out[-1][1] + _SCB_TOL:
+            out[-1][1] = max(out[-1][1], b)
+        else:
+            out.append([a, b])
+    return out
+
+
+def _scb_overlap_len(A, B):
+    """Total overlap length of two merged, sorted interval lists."""
+    i = j = 0
+    total = 0.0
+    while i < len(A) and j < len(B):
+        lo = max(A[i][0], B[j][0])
+        hi = min(A[i][1], B[j][1])
+        if hi > lo:
+            total += hi - lo
+        if A[i][1] < B[j][1]:
+            i += 1
+        else:
+            j += 1
+    return total
+
+
+def _scb_rect_union(rects):
+    """Exact area and perimeter of a union of axis-aligned rectangles
+    (x0, y0, x1, y1). Horizontal scanline over the distinct y edges:
+    each band's covered x-intervals give its area and its vertical
+    perimeter edges; the symmetric difference between adjacent bands'
+    coverage gives the horizontal perimeter edges."""
+    ys = sorted({round(v, 9) for r in rects for v in (r[1], r[3])})
+    bands = [[]]  # empty sentinel band below the shape
+    heights = [0.0]
+    for y0, y1 in zip(ys, ys[1:]):
+        h = y1 - y0
+        if h <= _SCB_TOL:
+            continue
+        mid = (y0 + y1) / 2.0
+        ivs = _scb_merge_intervals([(r[0], r[2]) for r in rects if r[1] < mid < r[3]])
+        bands.append(ivs)
+        heights.append(h)
+    bands.append([])  # empty sentinel band above the shape
+    heights.append(0.0)
+
+    area = 0.0
+    perim = 0.0
+    for ivs, h in zip(bands, heights):
+        width = sum(b - a for a, b in ivs)
+        area += width * h
+        perim += 2 * len(ivs) * h
+    for lower, upper in zip(bands, bands[1:]):
+        wl = sum(b - a for a, b in lower)
+        wu = sum(b - a for a, b in upper)
+        perim += wl + wu - 2 * _scb_overlap_len(lower, upper)
+    return area, perim
+
+
+def calc_site_concept_tank(payload):
+    """One tank of the Site Concept Builder. Payload = the Complex Shape
+    Builder inputs (config, layers, mode, rows | envelope_*) plus the
+    stone / fabric / accessory inputs below. Returns quantities only —
+    no pricing."""
+    label = (str(payload.get('label', '') or '')).strip() or 'Tank'
+
+    geo = calc_complex_shape_builder(payload)
+    if 'error' in geo:
+        return {'error': f'{label}: {geo["error"]}'}
+
+    try:
+        perimeter_stone_width = _scb_num(payload, 'perimeter_stone_width', 1.0)
+        cover_stone           = _scb_num(payload, 'cover_stone', 1.0)
+        base_stone            = _scb_num(payload, 'base_stone', 0.333)
+        stone_void            = _scb_num(payload, 'stone_void', 0.40)
+        geo_waste_pct         = _scb_num(payload, 'geo_waste_pct', 20)
+        pipe_connectors       = int(_scb_num(payload, 'pipe_connectors', 0))
+        top_adapters_12       = int(_scb_num(payload, 'top_adapters_12', 0))
+        top_adapters_16       = int(_scb_num(payload, 'top_adapters_16', 0))
+    except (TypeError, ValueError):
+        return {'error': f'{label}: stone, fabric, and accessory inputs must be numbers.'}
+
+    if min(perimeter_stone_width, cover_stone, base_stone, stone_void,
+           geo_waste_pct, pipe_connectors, top_adapters_12, top_adapters_16) < 0:
+        return {'error': f'{label}: inputs cannot be negative.'}
+    if stone_void > 1:
+        return {'error': f'{label}: stone void must be a fraction (e.g. 0.40), not a percent.'}
+
+    config = geo['config']
+    layers = geo['layers']
+    cd = CONFIG_DATA.get(config, CONFIG_DATA['SC'])
+    void_ratio      = cd['void_ratio']
+    side_multiplier = cd['side_multiplier']
+
+    tank_height        = geo['tank_height_ft']
+    total_system_depth = base_stone + tank_height + cover_stone
+
+    # ── Tank shape (row model, exact) ────────────────────────────────
+    # Area and perimeter are recomputed unrounded here (the builder's
+    # returned values are rounded for display) so the storage figures
+    # match calc_tank() to the decimal on a plain rectangle.
+    crates_layer = geo['total_crates_layer']
+    num_crates   = geo['total_crates_all_layers']
+    tank_area    = crates_layer * MODULE_WID * MODULE_LEN
+
+    # Rows run top-to-bottom down the length (y), crates across the
+    # width (x) — same frame the Complex Shape Builder drawing uses.
+    d = perimeter_stone_width
+    tank_rects = []
+    for r in geo['rows']:
+        x0 = r['offset_crates'] * MODULE_WID
+        y0 = r['row_index'] * MODULE_LEN
+        tank_rects.append((x0, y0, x0 + r['crate_count'] * MODULE_WID, y0 + MODULE_LEN))
+    _, tank_perim = _scb_rect_union(tank_rects)
+    excav_rects = [(x0 - d, y0 - d, x1 + d, y1 + d) for (x0, y0, x1, y1) in tank_rects]
+    excav_area, excav_perim = _scb_rect_union(excav_rects)
+
+    # Rows that share no crate column with the row above form separate
+    # pieces — still calculated, but flagged so it isn't a silent typo.
+    warnings = []
+    for a, b in zip(geo['rows'], geo['rows'][1:]):
+        lo = max(a['offset_crates'], b['offset_crates'])
+        hi = min(a['offset_crates'] + a['crate_count'], b['offset_crates'] + b['crate_count'])
+        if hi <= lo:
+            warnings.append(f'Rows {a["row_index"]} and {b["row_index"]} do not overlap — '
+                            'the tank is drawn as separate pieces.')
+    if geo.get('envelope', {}).get('orientation') == 'len_along_width':
+        warnings.append('Crate count uses the long-axis-across-width tally; the footprint, '
+                        'perimeter, and excavation use the snapped footprint rectangle.')
+
+    # ── Volumes & storage (mirrors calc_tank complex path) ──────────
+    gross_tank_vol  = tank_area * tank_height
+    tank_storage    = gross_tank_vol * void_ratio
+    total_excav_vol = excav_area * total_system_depth
+    stone_env_vol   = total_excav_vol - gross_tank_vol
+
+    stone_top_gross   = excav_area * cover_stone
+    stone_perim_gross = (excav_area - tank_area) * tank_height
+    stone_base_gross  = excav_area * base_stone
+    stone_top_net     = stone_top_gross * stone_void
+    stone_perim_net   = stone_perim_gross * stone_void
+    stone_base_net    = stone_base_gross * stone_void
+    stone_top_included   = _scb_bool(payload, 'stone_top_included')
+    stone_perim_included = _scb_bool(payload, 'stone_perim_included')
+    stone_base_included  = _scb_bool(payload, 'stone_base_included')
+    stone_storage = ((stone_top_net   if stone_top_included   else 0.0) +
+                     (stone_perim_net if stone_perim_included else 0.0) +
+                     (stone_base_net  if stone_base_included  else 0.0))
+    total_storage = tank_storage + stone_storage
+
+    # Stone is still placed when its storage credit is excluded, so the
+    # purchase quantity stays gross (same as calc_tank).
+    stone_yd3  = stone_env_vol * 1.10 / 27
+    stone_tons = stone_env_vol * 1.10 * 100 / 2000
+
+    # ── Materials (mirrors calc_tank) ────────────────────────────────
+    side_plates = round(tank_perim * (layers * side_multiplier) / 5.17)
+    if config == 'SC':
+        base_units    = num_crates
+        bottom_plates = crates_layer
+    else:
+        base_units    = num_crates * 2
+        bottom_plates = 0
+    contingency = max(0, math.ceil(base_units / _MT_PALLETS['base']) * _MT_PALLETS['base'] - base_units)
+
+    geo_factor = 1 + geo_waste_pct / 100.0
+    geo_tank_sf  = (2 * tank_area + tank_perim * tank_height) * geo_factor
+    geo_stone_sf = (2 * excav_area + excav_perim * total_system_depth) * geo_factor
+
+    bom = _scb_bom({
+        'base_units': base_units, 'side_plates': side_plates, 'bottom_plates': bottom_plates,
+        'pipe_connectors': pipe_connectors, 'top_adapters_12': top_adapters_12,
+        'top_adapters_16': top_adapters_16, 'contingency': contingency,
+    })
+
+    return {
+        'label':  label,
+        'config': config,
+        'layers': layers,
+        'mode':   geo['mode'],
+        'warnings': warnings,
+        # Dimensional
+        'tank_height_ft':         round(tank_height, 3),
+        'total_system_depth_ft':  round(total_system_depth, 3),
+        'n_rows':                 geo['n_rows'],
+        'bounding_width_ft':      geo['bounding_width_ft'],
+        'bounding_length_ft':     geo['bounding_length_ft'],
+        'bounding_width_crates':  geo['bounding_width_crates'],
+        'bounding_length_crates': geo['bounding_length_crates'],
+        'tank_footprint_sf':      round(tank_area, 2),
+        'tank_perimeter_ft':      round(tank_perim, 2),
+        'fill_efficiency_pct':    geo['fill_efficiency_pct'],
+        'crates_layer':           crates_layer,
+        'num_crates':             num_crates,
+        # Excavation (Option A — true offset)
+        'perimeter_stone_width_ft':  round(perimeter_stone_width, 3),
+        'excavation_area_sf':        round(excav_area, 2),
+        'excavation_perimeter_ft':   round(excav_perim, 2),
+        'excavation_bbox_width_ft':  round(geo['bounding_width_ft'] + 2 * d, 3),
+        'excavation_bbox_length_ft': round(geo['bounding_length_ft'] + 2 * d, 3),
+        'excavation_vol_cf':         round(total_excav_vol, 1),
+        'excavation_vol_cy':         round(total_excav_vol / 27, 1),
+        # Storage
+        'tank_storage_cf':  round(tank_storage, 1),
+        'stone_storage_cf': round(stone_storage, 1),
+        'total_storage_cf': round(total_storage, 1),
+        'stone_top_gross_cf':   round(stone_top_gross, 1),
+        'stone_top_net_cf':     round(stone_top_net, 1),
+        'stone_perim_gross_cf': round(stone_perim_gross, 1),
+        'stone_perim_net_cf':   round(stone_perim_net, 1),
+        'stone_base_gross_cf':  round(stone_base_gross, 1),
+        'stone_base_net_cf':    round(stone_base_net, 1),
+        'stone_top_included':   stone_top_included,
+        'stone_perim_included': stone_perim_included,
+        'stone_base_included':  stone_base_included,
+        # Stone & fabric
+        'cover_stone_ft': round(cover_stone, 3),
+        'base_stone_ft':  round(base_stone, 3),
+        'stone_void':     round(stone_void, 4),
+        'stone_env_cf':   round(stone_env_vol, 1),
+        'stone_yd3':      round(stone_yd3, 1),
+        'stone_tons':     round(stone_tons, 2),
+        'geo_waste_pct':  round(geo_waste_pct, 1),
+        'geotextile_tank_yd2':  round(geo_tank_sf / 9, 1),
+        'geotextile_stone_yd2': round(geo_stone_sf / 9, 1),
+        'geotextile_total_yd2': round((geo_tank_sf + geo_stone_sf) / 9, 1),
+        # Materials
+        'bom': bom,
+        # Drawing data for the plan overlay (ft, tank-local frame:
+        # x across width from the left-most crate, y down the length
+        # from row 0). The excavation outline is the union of these.
+        'tank_rects_ft':       [[round(v, 4) for v in r] for r in tank_rects],
+        'excavation_rects_ft': [[round(v, 4) for v in r] for r in excav_rects],
+    }
+
+
+def _scb_bom(qtys):
+    """Per-item qty, weight, pallets — same pallet/weight tables and
+    ceil-to-pallet rule as the multi-tank cumulative BOM."""
+    keys = {
+        'base_units': 'base', 'side_plates': 'side', 'bottom_plates': 'bottom',
+        'pipe_connectors': 'pipe', 'top_adapters_12': 'adapter12',
+        'top_adapters_16': 'adapter16', 'contingency': 'base',
+    }
+    out = {}
+    for item, key in keys.items():
+        qty = int(qtys.get(item, 0) or 0)
+        out[item] = {
+            'qty':        qty,
+            'weight_lbs': round(qty * _MT_WEIGHTS[key], 1),
+            'pallets':    math.ceil(qty / _MT_PALLETS[key]) if qty > 0 else 0,
+        }
+    return out
+
+
+def calc_site_concept(payload):
+    """Site Concept Builder — all tanks on the plan + project totals."""
+    tanks_in = payload.get('tanks', [])
+    if not isinstance(tanks_in, list) or len(tanks_in) == 0:
+        return {'error': 'Add at least one tank.'}
+    if len(tanks_in) > _SCB_MAX_TANKS:
+        return {'error': f'Too many tanks (limit {_SCB_MAX_TANKS}).'}
+
+    tanks = []
+    for i, t in enumerate(tanks_in):
+        if not isinstance(t, dict):
+            return {'error': f'Tank {i + 1}: invalid input.'}
+        t = dict(t)
+        if not str(t.get('label', '') or '').strip():
+            t['label'] = f'Tank {i + 1}'
+        r = calc_site_concept_tank(t)
+        if 'error' in r:
+            return r
+        tanks.append(r)
+
+    sum_keys = ['num_crates', 'tank_footprint_sf', 'excavation_area_sf', 'excavation_vol_cf',
+                'excavation_vol_cy', 'tank_storage_cf', 'stone_storage_cf', 'total_storage_cf',
+                'stone_yd3', 'stone_tons', 'geotextile_tank_yd2', 'geotextile_stone_yd2',
+                'geotextile_total_yd2']
+    totals = {k: round(sum(t[k] for t in tanks), 2) for k in sum_keys}
+    totals['bom'] = _scb_bom({item: sum(t['bom'][item]['qty'] for t in tanks)
+                              for item in tanks[0]['bom']})
+    totals['total_weight_lbs'] = round(sum(v['weight_lbs'] for v in totals['bom'].values()), 1)
+    totals['tank_count'] = len(tanks)
+
+    return {'tanks': tanks, 'totals': totals}
+
+
+# ══════════════════════════════════════════════════════════════════
 #  VOID SPACE ENTRY  (Complex Shape mode)
 #  Open areas inside the tank footprint (concrete islands, light
 #  poles, monuments, etc.) that the tank must form around.
@@ -5112,6 +5451,13 @@ def design_tools_calculate():
             result = calc_complex_shape_builder(payload)
         elif calc_type == 'pt_row':
             result = calc_pt_row(payload)
+        elif calc_type == 'site_concept':
+            # Internal estimating tool only — never served on the
+            # client-facing BETA build (PRICING_ENABLED=False).
+            # (abort() would be swallowed by the except below → 500.)
+            if not PRICING_ENABLED:
+                return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 404
+            result = calc_site_concept(payload)
         else:
             return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
 
