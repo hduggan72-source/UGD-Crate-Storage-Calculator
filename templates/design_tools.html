@@ -1461,7 +1461,10 @@
                     <label style="display:flex; align-items:center; gap:6px; margin:0; font-weight:normal;"><input type="checkbox" id="scb_show_excav" checked onchange="scbRedraw()" style="width:auto; margin:0;"> Excavation outline</label>
                 </div>
 
-                <button type="button" class="calc-btn secondary" style="width:100%; margin-top:12px;" onclick="scbExportPNG()">Export PNG</button>
+                <div style="display:flex; gap:8px; margin-top:12px;">
+                    <button type="button" class="calc-btn secondary" style="flex:1;" onclick="scbExportPNG()">Export PNG</button>
+                    <button type="button" id="scb_pdf_btn" class="calc-btn" style="flex:1;" onclick="scbExportPDF()">Download Estimate PDF</button>
+                </div>
                 <div id="scb_status" style="font-size:12px; color:var(--muted); margin-top:8px;"></div>
             </div>
 
@@ -5671,6 +5674,63 @@
         document.body.removeChild(a);
         scbRedraw();
         scbSetStatus('PNG exported.');
+    }
+
+    // ── EXPORT PDF (plan page + one spec sheet per tank + totals) ──
+    // Sends the composited plan image plus the tank INPUTS; the server
+    // recomputes every number (no client-side quantity is trusted).
+    // JPEG, long edge capped, so the upload stays small for Render.
+    async function scbExportPDF() {
+        if (!scbState.img) { scbSetStatus('Load a plan first.'); return; }
+        if (!scbState.tanks.length) { scbSetStatus('Add at least one tank first.'); return; }
+        if (scbState.calcError) { scbSetStatus('Fix the error shown under the plan before exporting.'); return; }
+        const btn = document.getElementById('scb_pdf_btn');
+        btn.disabled = true;
+        scbSetStatus('Building PDF…');
+        scbRedraw(true);
+        const src = scbCanvas();
+        const k = Math.min(1, 1600 / Math.max(src.width, src.height));
+        const tmp = document.createElement('canvas');
+        tmp.width = Math.round(src.width * k);
+        tmp.height = Math.round(src.height * k);
+        tmp.getContext('2d').drawImage(src, 0, 0, tmp.width, tmp.height);
+        const image = tmp.toDataURL('image/jpeg', 0.72);
+        scbRedraw();
+        const projName = scbGetVal('scb_project').trim();
+        try {
+            const resp = await fetch('/design-tools/download_pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    calc_type: 'site_concept',
+                    project_name: projName || null,
+                    image: image,
+                    inputs: { tanks: scbState.tanks.map(scbTankPayload) },
+                }),
+            });
+            const ct = resp.headers.get('content-type') || '';
+            if (!resp.ok || ct.indexOf('application/pdf') === -1) {
+                let msg = 'PDF export failed (HTTP ' + resp.status + ').';
+                if (ct.indexOf('application/json') !== -1) {
+                    try { const j = await resp.json(); if (j && j.error) msg = j.error; } catch (e) {}
+                }
+                scbSetStatus(msg);
+                return;
+            }
+            const url = URL.createObjectURL(await resp.blob());
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = acPdfName('AquaCell_Site_Concept', projName);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            scbSetStatus('PDF exported.');
+        } catch (err) {
+            scbSetStatus('PDF export error: ' + err.message);
+        } finally {
+            btn.disabled = false;
+        }
     }
     {% endif %}
 

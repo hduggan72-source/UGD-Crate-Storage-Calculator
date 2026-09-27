@@ -144,5 +144,37 @@ check('offset row normalised to x=0', close(t['tank_rects_ft'][0][0], 0, 1e-6) a
 code,j=post({'tanks':[{'rows':[{'crate_count':3,'offset_crates':5},{'crate_count':2,'offset_crates':6}],'perimeter_stone_width':1}]})
 t=j['tanks'][0]
 check('min excavation x = -d', close(min(r[0] for r in t['excavation_rects_ft']), -1, 1e-6))
+
+# 11. Step 3 — estimate PDF (/design-tools/download_pdf, calc_type site_concept)
+import base64, io
+from pypdf import PdfReader
+_png = base64.b64encode(bytes.fromhex(
+    '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489'
+    '0000000d49444154789c6360f8cf00000301010018dd8db40000000049454e44ae426082')).decode()
+IMG = 'data:image/png;base64,' + _png
+def pdf(inputs, image=IMG, project='Maple Ridge #2'):
+    return c.post('/design-tools/download_pdf', json={'calc_type':'site_concept','project_name':project,'image':image,'inputs':inputs})
+two = {'tanks':[{'label':'Tank A','rows':[{'crate_count':10,'offset_crates':0}]*5+[{'crate_count':20,'offset_crates':0}]*15},
+                {'label':'Tank B','config':'EX','layers':4,'mode':'envelope','envelope_width_ft':30,'envelope_length_ft':60}]}
+r = pdf(two)
+check('pdf 200 + application/pdf', r.status_code==200 and r.headers['Content-Type']=='application/pdf', r.status_code)
+check('pdf filename', 'AquaCell_Site_Concept_Maple_Ridge_2.pdf' in r.headers.get('Content-Disposition',''))
+rd = PdfReader(io.BytesIO(r.data))
+check('pdf pages = 1 + tanks + 1', len(rd.pages)==4, len(rd.pages))
+calc = c.post('/design-tools/calculate', json={'calc_type':'site_concept','inputs':two}).get_json()
+txt = ''.join(pg.extract_text() for pg in rd.pages)
+check('pdf shows server total storage', f"{calc['totals']['total_storage_cf']:,.1f} cf" in txt, calc['totals']['total_storage_cf'])
+for t in calc['tanks']:
+    check(f"pdf shows {t['label']} storage + excavation", f"{t['total_storage_cf']:,.1f} cf" in txt and f"{t['excavation_vol_cy']:,.1f} cy" in txt)
+check('pdf project contingency', f"{calc['totals']['bom']['contingency']['qty']:,}" in rd.pages[-1].extract_text())
+r = pdf(two, image=''); check('pdf without image -> 400', r.status_code==400)
+r = pdf({'tanks':[{'rows':[]}]}); check('pdf bad tank -> 400', r.status_code==400)
+r = pdf({'tanks':[{'label':'X'*300,'rows':[{'crate_count':3,'offset_crates':0}]}]}, project=None)
+check('pdf long label / no project -> 200', r.status_code==200)
+many = {'tanks':[{'label':f'T{i}','rows':[{'crate_count':1+i%7,'offset_crates':i%3}]*(1+i%9)} for i in range(25)]}
+r = pdf(many); check('pdf 25 tanks -> 27 pages', r.status_code==200 and len(PdfReader(io.BytesIO(r.data)).pages)==27)
+A.PRICING_ENABLED=False
+r = pdf(two); check('pdf on BETA build -> 404', r.status_code==404)
+A.PRICING_ENABLED=True
 print('FAILS', fails)
 sys.exit(1 if fails else 0)
