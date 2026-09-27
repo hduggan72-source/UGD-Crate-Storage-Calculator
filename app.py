@@ -1137,7 +1137,10 @@ def calc_site_concept_tank(payload):
     config = str(payload.get('config', 'SC') or 'SC').strip().upper()
     if config not in CONFIG_DATA:
         return {'error': f'{label}: configuration must be SC or EX.'}
-    payload = dict(payload, config=config)
+    # Crate long axis always runs down the tank length in this tool —
+    # "long axis across width" was dropped (James, 2026-09-27); rotate the
+    # tank 90° on the plan instead. Any orientation sent is ignored.
+    payload = dict(payload, config=config, orientation='len_along_length')
 
     geo = calc_complex_shape_builder(payload)
     if 'error' in geo:
@@ -1180,32 +1183,16 @@ def calc_site_concept_tank(payload):
     # Rows run top-to-bottom down the length (y), crates across the
     # width (x) — same frame the Complex Shape Builder drawing uses.
     d = perimeter_stone_width
-    rotated = (geo['mode'] == 'envelope'
-               and geo['envelope']['orientation'] == 'len_along_width')
-    if rotated:
-        # Long axis across the width: the selected crate tally packs
-        # MODULE_LEN-wide columns and MODULE_WID-deep rows (same floor
-        # math as _envelope_to_rows), so the footprint must be built from
-        # that grid — not from the canonical len_along_length rows —
-        # or the tank volume and the excavation describe different tanks.
-        env_w = float(payload.get('envelope_width_ft'))
-        env_l = float(payload.get('envelope_length_ft'))
-        width_crates  = int(env_w // MODULE_LEN)
-        length_crates = int(env_l // MODULE_WID)
-        if width_crates < 1 or length_crates < 1:
-            return {'error': f'{label}: footprint is too small to fit a crate with the long axis across the width.'}
-        tank_rects = [(0.0, 0.0, width_crates * MODULE_LEN, length_crates * MODULE_WID)]
-    else:
-        # Normalize to the left-most crate so the drawing frame starts
-        # at x = 0 even when every row carries a positive offset.
-        min_off = min(r['offset_crates'] for r in geo['rows'])
-        tank_rects = []
-        for r in geo['rows']:
-            x0 = (r['offset_crates'] - min_off) * MODULE_WID
-            y0 = r['row_index'] * MODULE_LEN
-            tank_rects.append((x0, y0, x0 + r['crate_count'] * MODULE_WID, y0 + MODULE_LEN))
-        width_crates  = max(r['offset_crates'] + r['crate_count'] for r in geo['rows']) - min_off
-        length_crates = geo['n_rows']
+    # Normalize to the left-most crate so the drawing frame starts at
+    # x = 0 even when every row carries a positive offset.
+    min_off = min(r['offset_crates'] for r in geo['rows'])
+    tank_rects = []
+    for r in geo['rows']:
+        x0 = (r['offset_crates'] - min_off) * MODULE_WID
+        y0 = r['row_index'] * MODULE_LEN
+        tank_rects.append((x0, y0, x0 + r['crate_count'] * MODULE_WID, y0 + MODULE_LEN))
+    width_crates  = max(r['offset_crates'] + r['crate_count'] for r in geo['rows']) - min_off
+    length_crates = geo['n_rows']
     bbox_w = max(r[2] for r in tank_rects)
     bbox_l = max(r[3] for r in tank_rects)
     bbox_area = bbox_w * bbox_l
@@ -1278,7 +1265,6 @@ def calc_site_concept_tank(payload):
         'tank_height_ft':         round(tank_height, 3),
         'total_system_depth_ft':  round(total_system_depth, 3),
         'n_rows':                 geo['n_rows'],
-        'crate_orientation':      'len_along_width' if rotated else 'len_along_length',
         'bounding_width_ft':      round(bbox_w, 3),
         'bounding_length_ft':     round(bbox_l, 3),
         'bounding_width_crates':  width_crates,
@@ -1325,8 +1311,6 @@ def calc_site_concept_tank(payload):
         # Drawing data for the plan overlay (ft, tank-local frame:
         # x across width from the left-most crate, y down the length
         # from row 0). The excavation outline is the union of these.
-        # For len_along_width this is one rectangle; the crate grid
-        # inside it is MODULE_LEN wide × MODULE_WID deep.
         'tank_rects_ft':       [[round(v, 4) for v in r] for r in tank_rects],
         'excavation_rects_ft': [[round(v, 4) for v in r] for r in excav_rects],
     }
@@ -5436,7 +5420,9 @@ def build_pt_row_pdf(inputs, results, project_name=None):
 # ══════════════════════════════════════════════════════════════════
 @app.route('/design-tools', methods=['GET'])
 def design_tools_index():
-    return render_template('design_tools.html')
+    # pricing_enabled doubles as the internal-build flag: internal-only
+    # tools (Site Concept Builder) are not rendered on the client BETA.
+    return render_template('design_tools.html', pricing_enabled=PRICING_ENABLED)
 
 
 # ══════════════════════════════════════════════════════════════════
