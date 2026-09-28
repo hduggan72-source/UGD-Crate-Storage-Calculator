@@ -3054,6 +3054,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         form.querySelectorAll('select').forEach(el => { el.selectedIndex = 0; });
         form.querySelectorAll('textarea').forEach(el => { el.value = ''; });
         form.querySelectorAll('input[type="checkbox"]').forEach(el => { el.checked = true; });
+        // Pricing multiplier mirrors are hidden inputs (not cleared above) —
+        // put them back to the 10% defaults so the next project doesn't inherit them.
+        ['formMarkupPct','formFreightPct'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '10';
+        });
         const resultsDiv = document.querySelector('.results');
         if (resultsDiv) resultsDiv.innerHTML = '';
         // Top-bar quick-glance dashboard isn't inside .results (it's server-
@@ -3326,11 +3332,13 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     // Copy the visible Markup % / Freight % (Price Estimation card, outside the
     // form) into their hidden mirrors inside #mainForm, so the multipliers
     // survive Calculate System and are included in the JSON export.
+    // A cleared box is stored as 0, matching how calculateAquaCellPrice()
+    // already treats a blank (parseFloat('') || 0), so it doesn't come back as 10.
     function syncPricingPctHidden() {
         var m = document.getElementById('markupPct'),  hm = document.getElementById('formMarkupPct');
         var f = document.getElementById('freightPct'), hf = document.getElementById('formFreightPct');
-        if (m && hm) hm.value = m.value;
-        if (f && hf) hf.value = f.value;
+        if (m && hm) hm.value = (m.value.trim() === '') ? '0' : m.value;
+        if (f && hf) hf.value = (f.value.trim() === '') ? '0' : f.value;
     }
 
     function calculateAquaCellPrice() {
@@ -3492,12 +3500,16 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     const el = document.querySelector(`[name="${k}"]`);
                     if (el) el.value = data[k];
                 });
-                // Pricing multipliers: hidden mirrors were set above; also update the
-                // visible Markup % / Freight % inputs if the price card is on screen.
-                if (data.pricing_markup_pct != null && document.getElementById('markupPct'))
-                    document.getElementById('markupPct').value = data.pricing_markup_pct;
-                if (data.pricing_freight_pct != null && document.getElementById('freightPct'))
-                    document.getElementById('freightPct').value = data.pricing_freight_pct;
+                // Pricing multipliers: older JSON files predate these keys — fall back
+                // to the 10% defaults rather than keeping the current project's values.
+                // Sets both the hidden mirrors and the visible inputs (if on screen).
+                [['pricing_markup_pct',  'formMarkupPct',  'markupPct'],
+                 ['pricing_freight_pct', 'formFreightPct', 'freightPct']].forEach(([key, hid, vis]) => {
+                    const v = (data[key] != null && data[key] !== '') ? data[key] : '10';
+                    const h = document.getElementById(hid), e = document.getElementById(vis);
+                    if (h) h.value = v;
+                    if (e) e.value = v;
+                });
                 if (autoCalc) {
                     // Drag & drop path: submit the form so Flask recalculates and
                     // renders results immediately — no manual Calculate click needed.
