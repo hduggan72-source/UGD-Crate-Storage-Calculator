@@ -1028,6 +1028,14 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             <input type="hidden" id="formPtrowEnabled" name="ptrow_enabled" value="0">
             {% endif %}
 
+            {% if pricing_enabled %}
+            <!-- Pricing multipliers — mirror the Markup % / Freight % inputs in the
+                 Price Estimation card (which sits OUTSIDE this form) so they POST on
+                 Calculate System and are captured by Export / restored by Import. -->
+            <input type="hidden" id="formMarkupPct"  name="pricing_markup_pct"  value="{{ form_data.get('pricing_markup_pct') or '10' }}">
+            <input type="hidden" id="formFreightPct" name="pricing_freight_pct" value="{{ form_data.get('pricing_freight_pct') or '10' }}">
+            {% endif %}
+
         </form>
 
         <script>
@@ -1217,12 +1225,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
                         <div>
                             <label style="display:block;font-size:12px;opacity:0.7;margin-bottom:4px;">Markup % <span style="font-size:10px;color:#64748b;">(÷ method: 10% agent · 20% market)</span></label>
-                            <input type="number" id="markupPct" step="0.1" placeholder="e.g., 10 or 20" value="10"
+                            <input type="number" id="markupPct" step="0.1" placeholder="e.g., 10 or 20" value="{{ form_data.get('pricing_markup_pct') or '10' }}" oninput="syncPricingPctHidden()"
                                 style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
                         </div>
                         <div>
                             <label style="display:block;font-size:12px;opacity:0.7;margin-bottom:4px;">Freight % of Selling Price</label>
-                            <input type="number" id="freightPct" step="0.1" placeholder="e.g., 10" value="10"
+                            <input type="number" id="freightPct" step="0.1" placeholder="e.g., 10" value="{{ form_data.get('pricing_freight_pct') or '10' }}" oninput="syncPricingPctHidden()"
                                 style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:14px;">
                         </div>
                         <div style="align-self:end;">
@@ -3315,6 +3323,16 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     }
 
     {% if pricing_enabled %}
+    // Copy the visible Markup % / Freight % (Price Estimation card, outside the
+    // form) into their hidden mirrors inside #mainForm, so the multipliers
+    // survive Calculate System and are included in the JSON export.
+    function syncPricingPctHidden() {
+        var m = document.getElementById('markupPct'),  hm = document.getElementById('formMarkupPct');
+        var f = document.getElementById('freightPct'), hf = document.getElementById('formFreightPct');
+        if (m && hm) hm.value = m.value;
+        if (f && hf) hf.value = f.value;
+    }
+
     function calculateAquaCellPrice() {
         // ── Hardcoded floor unit prices (update here on price increase) ──
         const UNIT_PRICES = {
@@ -3447,6 +3465,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     {% endif %}
 
     function exportProject() {
+        if (typeof syncPricingPctHidden === 'function') syncPricingPctHidden();
         const data = {};
         document.querySelectorAll('#mainForm input, #mainForm select, #mainForm textarea').forEach(el => {
             if (el.name) data[el.name] = el.value;
@@ -3473,6 +3492,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     const el = document.querySelector(`[name="${k}"]`);
                     if (el) el.value = data[k];
                 });
+                // Pricing multipliers: hidden mirrors were set above; also update the
+                // visible Markup % / Freight % inputs if the price card is on screen.
+                if (data.pricing_markup_pct != null && document.getElementById('markupPct'))
+                    document.getElementById('markupPct').value = data.pricing_markup_pct;
+                if (data.pricing_freight_pct != null && document.getElementById('freightPct'))
+                    document.getElementById('freightPct').value = data.pricing_freight_pct;
                 if (autoCalc) {
                     // Drag & drop path: submit the form so Flask recalculates and
                     // renders results immediately — no manual Calculate click needed.
