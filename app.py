@@ -48,6 +48,21 @@ def _check_multi_tank_beta_scope():
         abort(404)
 
 
+# ── Keep the invite-only BETA out of search engines ──
+# robots.txt asks crawlers not to crawl; the X-Robots-Tag header tells any
+# crawler that still fetches a page (or PDF/CSV/DXF) not to index it.
+# Neither is access control — anyone with the link can still open the site.
+@app.route('/robots.txt')
+def robots_txt():
+    return app.response_class("User-agent: *\nDisallow: /\n", mimetype='text/plain')
+
+
+@app.after_request
+def _add_noindex_header(response):
+    response.headers['X-Robots-Tag'] = 'noindex, nofollow'
+    return response
+
+
 # ── Module-level crate dimensions (used by all calc functions) ──
 MODULE_WID = 1.9685   # ft
 MODULE_LEN = 3.937    # ft
