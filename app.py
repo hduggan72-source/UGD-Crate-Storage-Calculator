@@ -6223,15 +6223,15 @@ def multi_download_quote():
         q_text(W / 2, y - 10, 'PER-TANK SUMMARY', 'Helvetica-Bold', 8.5, WHITE, 'center')
         y -= 14
 
-        # Per-tank summary columns — W×L removed, space redistributed
+        # Per-tank summary columns — W×L and cover depth removed (cover/FoS
+        # verification lives on the Tank Summary PDF, not the customer quote).
         col_lbl = LQ + 4    # TANK label
-        col_cfg = LQ + 75   # CONFIG
-        col_ht  = LQ + 145  # HT(ft)
-        col_sto = LQ + 205  # TANK FT³
-        col_bu  = LQ + 300  # BASE
-        col_sp  = LQ + 360  # SIDE
-        col_bp  = LQ + 415  # BOT
-        col_cov = LQ + QW - 4  # COVER (right-aligned)
+        col_cfg = LQ + 100  # CONFIG
+        col_ht  = LQ + 190  # HT(ft)
+        col_sto = LQ + 260  # TANK FT³
+        col_bu  = LQ + 350  # BASE
+        col_sp  = LQ + 420  # SIDE
+        col_bp  = LQ + 490  # BOT
 
         hdr_cols = [
             ('TANK',          col_lbl),
@@ -6241,19 +6241,14 @@ def multi_download_quote():
             ('BASE',          col_bu),
             ('SIDE',          col_sp),
             ('BOT',           col_bp),
-            ('COVER DEPTH',   col_cov),
         ]
         q_rect(LQ, y - 13, QW, 13, colors.HexColor('#1a5276'))
         for lbl, x in hdr_cols:
-            if lbl == 'COVER DEPTH':
-                q_text(x, y - 9, lbl, 'Helvetica-Bold', 6.5, WHITE, 'right')
-            else:
-                q_text(x, y - 9, lbl, 'Helvetica-Bold', 6.5, WHITE)
+            q_text(x, y - 9, lbl, 'Helvetica-Bold', 6.5, WHITE)
         y -= 13
 
         for i, r in enumerate(tank_results):
             shade = QLGY if i % 2 == 0 else WHITE
-            cov_str = f"{r['cover_depth']} ft  {'OK' if r['cover_ok'] else 'FAIL'}"
             q_rect(LQ, y - 13, QW, 13, shade)
             q_text(col_lbl, y - 9, r['tank_label'][:16],            'Helvetica-Bold', 7, QNY)
             q_text(col_cfg, y - 9, f"{r['config']}-{r['layers']}", 'Helvetica', 7, BLACK)
@@ -6262,8 +6257,6 @@ def multi_download_quote():
             q_text(col_bu,  y - 9, str(r['base_units']),            'Helvetica', 7, BLACK)
             q_text(col_sp,  y - 9, str(r['side_plates']),           'Helvetica', 7, BLACK)
             q_text(col_bp,  y - 9, str(r['bottom_plates']),         'Helvetica', 7, BLACK)
-            q_text(col_cov, y - 9, cov_str, 'Helvetica', 7,
-                   GREEN if r['cover_ok'] else RED, 'right')
             y -= 13
 
         # Totals row
