@@ -1243,8 +1243,6 @@ def calc_site_concept_tank(payload):
     else:
         base_units    = num_crates * 2
         bottom_plates = 0
-    contingency = max(0, math.ceil(base_units / _MT_PALLETS['base']) * _MT_PALLETS['base'] - base_units)
-
     geo_factor = 1 + geo_waste_pct / 100.0
     geo_tank_sf  = (2 * tank_area + tank_perim * tank_height) * geo_factor
     geo_stone_sf = (2 * excav_area + excav_perim * total_system_depth) * geo_factor
@@ -1252,7 +1250,7 @@ def calc_site_concept_tank(payload):
     bom = _scb_bom({
         'base_units': base_units, 'side_plates': side_plates, 'bottom_plates': bottom_plates,
         'pipe_connectors': pipe_connectors, 'top_adapters_12': top_adapters_12,
-        'top_adapters_16': top_adapters_16, 'contingency': contingency,
+        'top_adapters_16': top_adapters_16,
     })
 
     return {
@@ -1306,8 +1304,9 @@ def calc_site_concept_tank(payload):
         'geotextile_tank_yd2':  round(geo_tank_sf / 9, 1),
         'geotextile_stone_yd2': round(geo_stone_sf / 9, 1),
         'geotextile_total_yd2': round((geo_tank_sf + geo_stone_sf) / 9, 1),
-        # Materials
+        # Materials (official quantities — contingency is NOT in here)
         'bom': bom,
+        'contingency_recommended': _scb_contingency(base_units),
         # Drawing data for the plan overlay (ft, tank-local frame:
         # x across width from the left-most crate, y down the length
         # from row 0). The excavation outline is the union of these.
@@ -1316,13 +1315,26 @@ def calc_site_concept_tank(payload):
     }
 
 
+def _scb_contingency(base_units):
+    """RECOMMENDED contingency base units: round base units up to the next
+    full pallet (CEILING(base/56) × 56 − base — CLAUDE.md §4 formula).
+    Kept OUTSIDE the official BOM and totals on purpose (James,
+    2026-10-06): this concept report only recommends it; the actual
+    contingency is calculated, adjusted and recommended on the priced
+    quote."""
+    qty = max(0, math.ceil(base_units / _MT_PALLETS['base']) * _MT_PALLETS['base'] - base_units)
+    return {'qty': qty, 'weight_lbs': round(qty * _MT_WEIGHTS['base'], 1)}
+
+
 def _scb_bom(qtys):
     """Per-item qty, weight, pallets — same pallet/weight tables and
-    ceil-to-pallet rule as the multi-tank cumulative BOM."""
+    ceil-to-pallet rule as the multi-tank cumulative BOM. Official
+    quantities only: contingency is reported separately
+    (see _scb_contingency)."""
     keys = {
         'base_units': 'base', 'side_plates': 'side', 'bottom_plates': 'bottom',
         'pipe_connectors': 'pipe', 'top_adapters_12': 'adapter12',
-        'top_adapters_16': 'adapter16', 'contingency': 'base',
+        'top_adapters_16': 'adapter16',
     }
     out = {}
     for item, key in keys.items():
@@ -1360,14 +1372,14 @@ def calc_site_concept(payload):
                 'stone_yd3', 'stone_tons', 'geotextile_tank_yd2', 'geotextile_stone_yd2',
                 'geotextile_total_yd2']
     totals = {k: round(sum(t[k] for t in tanks), 2) for k in sum_keys}
-    # Contingency is re-derived from the COMBINED base units (one pallet
-    # round-up for the project), same as the multi-tank cumulative_bom() —
-    # summing each tank's own round-up would overstate it.
     qtys = {item: sum(t['bom'][item]['qty'] for t in tanks) for item in tanks[0]['bom']}
-    qtys['contingency'] = max(0, math.ceil(qtys['base_units'] / _MT_PALLETS['base'])
-                              * _MT_PALLETS['base'] - qtys['base_units'])
     totals['bom'] = _scb_bom(qtys)
+    # Official total weight — excludes the recommended contingency.
     totals['total_weight_lbs'] = round(sum(v['weight_lbs'] for v in totals['bom'].values()), 1)
+    # Recommended contingency for the project: one pallet round-up of the
+    # COMBINED base units (as multi-tank cumulative_bom() does) — summing
+    # each tank's own round-up would overstate it. Not part of the totals.
+    totals['contingency_recommended'] = _scb_contingency(qtys['base_units'])
     totals['tank_count'] = len(tanks)
 
     return {'tanks': tanks, 'totals': totals}
@@ -5356,6 +5368,7 @@ def build_site_concept_pdf(image_data_url, inputs, results, project_name=None):
 
         y = _section_header(c, y, 'MATERIALS')
         y = _scb_bom_table(c, y, r['bom'], r['config'])
+        y = _scb_contingency_note(c, y, r['contingency_recommended'], 'this tank')
         _scb_pdf_footer(c, page, total_pages, project_name, generated_str)
         c.showPage()
 
@@ -5378,12 +5391,14 @@ def build_site_concept_pdf(image_data_url, inputs, results, project_name=None):
     y = _table_total_row(c, y, [(v, x, w, a) for v, (_, x, w, a) in zip(tvals, cols)], LTBLUE, BLUE)
     y -= 10
 
-    y = _section_header(c, y, 'PROJECT MATERIALS (contingency rounded once for the whole project)')
+    y = _section_header(c, y, 'PROJECT MATERIALS')
     y = _scb_bom_table(c, y, tot['bom'], 'SC' if any(r['config'] == 'SC' for r in tanks) else 'EX')
     y = _kv_row(c, y, 'Stone (all tanks)', f"{_scb_n(tot['stone_yd3'], 1)} yd³  ({_scb_n(tot['stone_tons'], 1)} tons)")
     y = _kv_row(c, y, 'Geotextile (all tanks)', f"{_scb_n(tot['geotextile_total_yd2'], 1)} yd²", shade=True)
     y = _kv_row(c, y, 'Excavation (all tanks, vertical sides)', f"{_scb_n(tot['excavation_vol_cy'], 1)} cy")
     y = _highlight_row(c, y - 2, 'TOTAL STORAGE (all tanks)', f"{_scb_n(tot['total_storage_cf'], 1)} cf")
+    y -= 10
+    _scb_contingency_note(c, y, tot['contingency_recommended'], 'project, combined base units')
 
     _draw_disclaimer_block(c, 36, disclaimer_lines_raw=_SITE_CONCEPT_DISCLAIMER_TEXT,
                            bold_triggers=_SITE_CONCEPT_BOLD_TRIGGERS)
@@ -5400,8 +5415,7 @@ def _scb_bom_table(c, y, bom, config):
     cols = [('Item', LM + 5, 220, 'left'), ('Qty', LM + 230, 80, 'right'),
             ('Pallets', LM + 320, 80, 'right'), ('Weight (lbs)', LM + 410, 107, 'right')]
     y = _table_header(c, y, cols)
-    items = [('Base Units', 'base_units'), ('Contingency Units (to full pallet)', 'contingency'),
-             ('Side Plates', 'side_plates')]
+    items = [('Base Units', 'base_units'), ('Side Plates', 'side_plates')]
     if config == 'SC' or bom['bottom_plates']['qty'] > 0:
         items.append(('Bottom Plates', 'bottom_plates'))
     for label, key in (('Pipe Connectors', 'pipe_connectors'), ('12" Top Adapters', 'top_adapters_12'),
@@ -5410,16 +5424,35 @@ def _scb_bom_table(c, y, bom, config):
             items.append((label, key))
     for i, (label, key) in enumerate(items):
         b = bom[key]
-        vals = [label, _scb_n(b['qty']), _scb_n(b['pallets']) if key != 'contingency' else '—',
-                _scb_n(b['weight_lbs'], 1)]
+        vals = [label, _scb_n(b['qty']), _scb_n(b['pallets']), _scb_n(b['weight_lbs'], 1)]
         y = _table_row(c, y, [(v, x, w, a, False, None) for v, (_, x, w, a) in zip(vals, cols)], shade=(i % 2 == 1))
-    base_pallets = math.ceil((bom['base_units']['qty'] + bom['contingency']['qty']) / _MT_PALLETS['base']) \
-        if bom['base_units']['qty'] > 0 else 0
+    total_p = sum(v['pallets'] for v in bom.values())
     total_w = sum(v['weight_lbs'] for v in bom.values())
-    y = _table_total_row(c, y, [('Base-unit pallets incl. contingency', LM + 5, 220, 'left'),
-                                (_scb_n(base_pallets), LM + 320, 80, 'right'),
+    y = _table_total_row(c, y, [('TOTAL (excludes recommended contingency)', LM + 5, 220, 'left'),
+                                (_scb_n(total_p), LM + 320, 80, 'right'),
                                 (_scb_n(total_w, 1), LM + 410, 107, 'right')], LGRAY, NAVY)
     return y - 6
+
+
+def _scb_contingency_note(c, y, cont, scope):
+    """Amber note for the RECOMMENDED contingency — deliberately outside
+    the materials table and every total. Returns y below."""
+    h = 30
+    c.setFillColor(LTAMB)
+    c.setStrokeColor(AMBER)
+    c.setLineWidth(0.6)
+    c.rect(LM, y - h + 4, CW, h, fill=1, stroke=1)
+    c.setFillColor(AMBER)
+    c.setFont('Helvetica-Bold', 8)
+    c.drawString(LM + 6, y - 7,
+                 f"RECOMMENDED CONTINGENCY ({scope}): {_scb_n(cont['qty'])} base units "
+                 f"(~{_scb_n(cont['weight_lbs'], 1)} lbs) \u2014 recommended amount only")
+    c.setFont('Helvetica', 7)
+    c.setFillColor(BLACK)
+    c.drawString(LM + 6, y - 19,
+                 'Rounds base units up to the next full pallet of 56. NOT included in the quantities or totals above; '
+                 'final contingency is set on the priced quote.')
+    return y - h - 4
 
 
 # ══════════════════════════════════════════════════════════════════
