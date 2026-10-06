@@ -5532,6 +5532,15 @@
     function scbRow(label, val) {
         return '<div class="result-row"><span>' + label + '</span><span class="val">' + val + '</span></div>';
     }
+    // Recommended contingency — shown apart from the materials and totals
+    // on purpose: it is a recommendation only; the real contingency is set
+    // on the priced quote.
+    function scbContingencyNote(cont, scope) {
+        return '<div class="disclaimer-box" style="margin:10px 0 0;">' +
+            '<strong>Recommended contingency (' + scope + '): ' + scbFmt(cont.qty) + ' base units</strong> ' +
+            '(~' + scbFmt(cont.weight_lbs) + ' lbs) &mdash; recommended amount only. Rounds base units up to the ' +
+            'next full pallet of 56. Not included in the quantities or totals; final contingency is set on the priced quote.</div>';
+    }
     function scbRenderOutput() {
         const out = document.getElementById('scb_output');
         let html = '';
@@ -5564,12 +5573,11 @@
                 scbRow('<strong>Total</strong>', '<strong>' + scbFmt(r.total_storage_cf, 1) + ' cf</strong>') +
                 '<div style="font-weight:bold; font-size:12px; color:#6b7280; margin:10px 0 4px;">MATERIALS</div>' +
                 scbRow('Base Units', scbFmt(b.base_units.qty) + ' (' + b.base_units.pallets + ' pallets)') +
-                scbRow('Contingency Units', scbFmt(b.contingency.qty)) +
                 scbRow('Side Plates', scbFmt(b.side_plates.qty) + ' (' + b.side_plates.pallets + ' pallets)') +
                 (r.config === 'SC' ? scbRow('Bottom Plates', scbFmt(b.bottom_plates.qty) + ' (' + b.bottom_plates.pallets + ' pallets)') : '') +
                 scbRow('Stone', scbFmt(r.stone_yd3, 1) + ' yd³ (' + scbFmt(r.stone_tons, 1) + ' tons)') +
                 scbRow('Geotextile (tank + stone)', scbFmt(r.geotextile_total_yd2, 1) + ' yd²') +
-                '</div></div></div>';
+                '</div></div>' + scbContingencyNote(r.contingency_recommended, 'this tank') + '</div>';
         }
         const tot = scbState.totals;
         if (tot && scbState.tanks.length) {
@@ -5586,13 +5594,13 @@
                 '</td><td>' + scbFmt(tot.total_storage_cf) + '</td><td>' + scbFmt(tot.excavation_vol_cy, 1) + '</td></tr></tbody></table>' +
                 '<div style="margin-top:10px;">' +
                 scbRow('Base Units', scbFmt(tot.bom.base_units.qty) + ' (' + tot.bom.base_units.pallets + ' pallets)') +
-                scbRow('Contingency Units (project)', scbFmt(tot.bom.contingency.qty)) +
                 scbRow('Side Plates', scbFmt(tot.bom.side_plates.qty) + ' (' + tot.bom.side_plates.pallets + ' pallets)') +
                 scbRow('Bottom Plates', scbFmt(tot.bom.bottom_plates.qty) + ' (' + tot.bom.bottom_plates.pallets + ' pallets)') +
                 scbRow('Stone', scbFmt(tot.stone_yd3, 1) + ' yd³ (' + scbFmt(tot.stone_tons, 1) + ' tons)') +
                 scbRow('Geotextile', scbFmt(tot.geotextile_total_yd2, 1) + ' yd²') +
                 scbRow('Material Weight (crates &amp; plates)', scbFmt(tot.total_weight_lbs) + ' lbs') +
-                '</div><div style="font-size:11px; color:#64748b; margin-top:8px; line-height:1.4;">Conceptual estimate &mdash; quantities come from the crate layout entered, not from the plan image.</div></div>';
+                '</div>' + scbContingencyNote(tot.contingency_recommended, 'project, combined base units') +
+                '<div style="font-size:11px; color:#64748b; margin-top:8px; line-height:1.4;">Conceptual estimate &mdash; quantities come from the crate layout entered, not from the plan image.</div></div>';
         }
         if (!html && scbState.img && scbState.pxPerFt) {
             html = '<div class="empty-state" style="padding:24px;">Click <strong>+ Add Tank</strong> to start building.</div>';

@@ -36,7 +36,7 @@ for cfg in ('SC','EX'):
     check(tag+' side plates', t['bom']['side_plates']['qty']==ct['side_plates'], (t['bom']['side_plates'],ct['side_plates']))
     check(tag+' base units', t['bom']['base_units']['qty']==ct['base_units'])
     check(tag+' bottom plates', t['bom']['bottom_plates']['qty']==ct['bottom_plates'])
-    check(tag+' contingency', t['bom']['contingency']['qty']==ct['contingency'])
+    check(tag+' recommended contingency == calc_tank contingency', t['contingency_recommended']['qty']==ct['contingency'])
     check(tag+' stone tons', close(t['stone_tons'], ct['stone_tons']))
     check(tag+' stone yd3', close(t['stone_yd3'], ct['stone_yd3']))
 
@@ -128,8 +128,15 @@ for orient in ('len_along_width', 'bogus', None):
     check(f'orientation {orient!r}: no negative stone', t['stone_perim_gross_cf'] >= -1e-6)
 # (b) project contingency from combined base units
 code,j=post({'tanks':[{'rows':[{'crate_count':10,'offset_crates':0}],'layers':1},{'rows':[{'crate_count':10,'offset_crates':0}],'layers':1}]})
-check('per-tank contingency 46 each', all(t['bom']['contingency']['qty']==46 for t in j['tanks']))
-check('project contingency 36 (not 92)', j['totals']['bom']['contingency']['qty']==36, j['totals']['bom']['contingency'])
+check('per-tank contingency 46 each', all(t['contingency_recommended']['qty']==46 for t in j['tanks']))
+check('project contingency 36 (not 92)', j['totals']['contingency_recommended']['qty']==36, j['totals']['contingency_recommended'])
+# Contingency is a RECOMMENDATION only — never inside the official BOM / totals (James, 2026-10-06)
+check('contingency not in per-tank BOM', all('contingency' not in t['bom'] for t in j['tanks']))
+check('contingency not in project BOM', 'contingency' not in j['totals']['bom'])
+check('project weight excludes contingency',
+      abs(j['totals']['total_weight_lbs'] - sum(v['weight_lbs'] for v in j['totals']['bom'].values())) < 0.05
+      and j['totals']['total_weight_lbs'] < sum(v['weight_lbs'] for v in j['totals']['bom'].values()) + j['totals']['contingency_recommended']['weight_lbs'])
+check('recommended contingency weight = qty x base-unit weight', abs(j['totals']['contingency_recommended']['weight_lbs'] - 36*A._MT_WEIGHTS['base']) < 0.05)
 # (c) config normalised / rejected
 code,j=post({'tanks':[{'rows':[{'crate_count':4,'offset_crates':0}],'config':'sc'}]})
 t=j['tanks'][0]
@@ -166,7 +173,14 @@ txt = ''.join(pg.extract_text() for pg in rd.pages)
 check('pdf shows server total storage', f"{calc['totals']['total_storage_cf']:,.1f} cf" in txt, calc['totals']['total_storage_cf'])
 for t in calc['tanks']:
     check(f"pdf shows {t['label']} storage + excavation", f"{t['total_storage_cf']:,.1f} cf" in txt and f"{t['excavation_vol_cy']:,.1f} cy" in txt)
-check('pdf project contingency', f"{calc['totals']['bom']['contingency']['qty']:,}" in rd.pages[-1].extract_text())
+last = rd.pages[-1].extract_text()
+check('pdf project contingency shown as recommended', f"RECOMMENDED CONTINGENCY (project, combined base units): {calc['totals']['contingency_recommended']['qty']:,} base units" in last, last[-600:])
+check('pdf notes recommended amount only', 'recommended amount only' in last and 'NOT included in the quantities or totals' in last)
+check('pdf materials total excludes contingency', 'TOTAL (excludes recommended contingency)' in last and 'incl. contingency' not in txt)
+check('pdf project weight = official total', f"{calc['totals']['total_weight_lbs']:,.1f}" in last)
+for k, t in enumerate(calc['tanks']):
+    pg = rd.pages[1 + k].extract_text()
+    check(f"pdf tank {k+1} recommended contingency note", f"RECOMMENDED CONTINGENCY (this tank): {t['contingency_recommended']['qty']:,} base units" in pg)
 r = pdf(two, image=''); check('pdf without image -> 400', r.status_code==400)
 r = pdf({'tanks':[{'rows':[]}]}); check('pdf bad tank -> 400', r.status_code==400)
 r = pdf({'tanks':[{'label':'X'*300,'rows':[{'crate_count':3,'offset_crates':0}]}]}, project=None)
