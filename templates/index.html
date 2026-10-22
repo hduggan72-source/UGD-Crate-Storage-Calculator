@@ -1499,6 +1499,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             var _yd3  = {{ results.stone_backfill_bulk_yd3 }};
                             var _tons = {{ results.stone_backfill_bulk_tons }};
                             window._stoneBulk = { ft3: _ft3, yd3: _yd3, tons: _tons };
+                            window._cadTable  = {{ results.cad_table|tojson }};
                             window.updateStoneUnit = function() {
                                 var sel  = document.getElementById('stoneUnitSelect');
                                 var disp = document.getElementById('stoneBulkDisplay');
@@ -3026,6 +3027,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     <button type="button" class="bottombar-btn" onclick="downloadStagePNG()" style="background:#28a745;color:white;">📈 Stage PNG</button>
     <button type="button" class="bottombar-btn" onclick="openDetailsModal()" style="background:#0f4c81;color:white;border:1px solid #3b82f6;">📋 Details</button>
     <button type="button" class="bottombar-btn" onclick="copyToEmail()" style="background:#6f42c1;color:white;">📋 Copy</button>
+    <button type="button" class="bottombar-btn" onclick="exportCadTableCSV()" style="background:#1e3a8a;color:white;" title="Left-side tables for the CAD plan sheet">📐 CAD Table</button>
 </div>
 
 <script>
@@ -4099,6 +4101,65 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             URL.revokeObjectURL(url);
         })
         .catch(() => alert('Stage CSV failed. Run Calculate System with Stage Storage enabled first.'));
+    }
+
+    // ── CAD TABLE CSV ──
+    // Mirrors the four left-side tables on the CAD plan sheet, row for row,
+    // in a 3-column grid (merged label cells leave column B blank) so it can
+    // be pasted or linked (AutoCAD Data Link) straight into the sheet table.
+    // Values come from the last Calculate System (window._cadTable).
+    // Filename has no date so a re-export can overwrite a linked file.
+    function exportCadTableCSV() {
+        const t = window._cadTable;
+        if (!t) { alert('Please run "Calculate System" first to generate results.'); return; }
+        const f = v => (Number(v) || 0).toFixed(2);
+        const rows = [
+            ['AquaCell Tank Elevations', '', ''],
+            ['Model Type', t.model_type, f(t.tank_height)],
+            ['Min. Surface', 'A', f(t.surface_elev)],
+            ['Top of Stone', 'B', f(t.top_of_stone)],
+            ['Top of AquaCell', 'C', f(t.top_of_tank)],
+            ['AquaCell Bottom', 'D', f(t.tank_bottom)],
+            ['Base Stone', 'E', f(t.base_stone_elev)],
+            ['W x L (ft)', f(t.tank_width), f(t.tank_length)],
+            ['Top of Tank Cover Depth (ft)', '', f(t.cover_stone)],
+            ['Base / Foundation Stone Depth (ft)', '', f(t.base_stone)],
+            ['Perimeter Width (ft)', '', f(t.perimeter_width)],
+            ['AquaCell Tank & Excavation Footprint', '', ''],
+            ['Tank Area (ft²)', '', f(t.tank_area)],
+            ['Tank Perimeter (ft)', '', f(t.tank_perimeter)],
+            ['Excavation Area (ft²)', '', f(t.excav_area)],
+            ['Excavation Perimeter (ft)', '', f(t.excav_perimeter)],
+            ['Total System Depth (ft)', '', f(t.system_depth)],
+            ['Excavation Volume (ft³)', '', f(t.excav_volume)],
+            ['Storage Volume (AquaCell + Stone)', '', ''],
+            ['Layer', 'Gross Vol.', 'Net Storage'],
+            ['Top Cover', f(t.stone_top_gross), f(t.stone_top_net)],
+            ['Perimeter', f(t.stone_perim_gross), f(t.stone_perim_net)],
+            ['Base/Foundation', f(t.stone_base_gross), f(t.stone_base_net)],
+            ['Total Stone', f(t.stone_total_gross), f(t.stone_total_net)],
+            ['AquaCell Tank', f(t.tank_gross), f(t.tank_net)],
+            ['System Total', f(t.system_gross), f(t.system_net)],
+            ['Stone Void Space (%)', '', f(t.stone_void)],
+            ['Geotextile Fabric & Grid Totals', '', ''],
+            ['Geotextile Layer', 'sq ft (ft²)', 'sq yd (yd²)'],
+            ['AquaCell Tank', f(t.geo_tank_ft2), f(t.geo_tank_ft2 / 9)],
+            ['Stone Backfill', f(t.geo_stone_ft2), f(t.geo_stone_ft2 / 9)],
+            ['Total Fabric', f(t.geo_total_ft2), f(t.geo_total_ft2 / 9)],
+            ['Total Woven Geo (PT-ROW™)', f(t.woven_ft2), f(t.woven_ft2 / 9)],
+        ];
+        const esc = c => /[",\n]/.test(String(c)) ? '"' + String(c).replace(/"/g, '""') + '"' : String(c);
+        const csv = '﻿' + rows.map(r => r.map(esc).join(',')).join('\r\n') + '\r\n';
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const projName = (document.getElementById('project_name')?.value || 'Project').trim()
+                            .replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
+        const projNum = (document.getElementById('project_num')?.value || '').trim().replace(/[^a-zA-Z0-9\-_]/g, '_');
+        a.download = [projNum, projName, 'AquaCell_CAD_Table'].filter(Boolean).join('_') + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
     }
 
     function copyToEmail() {
