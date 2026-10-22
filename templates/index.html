@@ -3845,7 +3845,39 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             if (body) body.classList.add('hidden');
         });
     }
-    document.addEventListener('DOMContentLoaded', collapseAllInputCards);
+
+    // Calculate System keeps the user's place: on submit, remember which
+    // left-column sections are open (keyed by header title), then reopen
+    // just those after the page reloads. A fresh GET (nothing saved) and
+    // Import still collapse everything. form.submit() from the drag & drop
+    // import does not fire the submit event, so it is unaffected.
+    const OPEN_CARDS_KEY = 'aquacell_open_input_cards';
+    function cardTitle(header) {
+        return (header.querySelector('span')?.textContent || '').trim();
+    }
+    function restoreInputCardState() {
+        let open = null;
+        try {
+            open = JSON.parse(sessionStorage.getItem(OPEN_CARDS_KEY) || 'null');
+            sessionStorage.removeItem(OPEN_CARDS_KEY);
+        } catch (e) { open = null; }
+        collapseAllInputCards();
+        if (!Array.isArray(open)) return;
+        document.querySelectorAll('.section-card-header').forEach(header => {
+            if (open.includes(cardTitle(header))) {
+                header.classList.remove('collapsed');
+                header.nextElementSibling?.classList.remove('hidden');
+            }
+        });
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+        restoreInputCardState();
+        document.getElementById('mainForm')?.addEventListener('submit', () => {
+            const open = [];
+            document.querySelectorAll('.section-card-header:not(.collapsed)').forEach(h => open.push(cardTitle(h)));
+            try { sessionStorage.setItem(OPEN_CARDS_KEY, JSON.stringify(open)); } catch (e) {}
+        });
+    });
 
     function updateLargePipeTotal() {
         const v18   = parseInt(document.getElementById('large_pipe_18')?.value)    || 0;
@@ -4184,7 +4216,12 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const geogridBottom = document.getElementById('geogridBottomQty')?.value || '0';
 
         // --- Stone Backfill Bulk ---
-        const stoneBulkDisplay = txt('stoneBulkDisplay');
+        // Copy text always reports cubic yards (client-preferred), regardless of
+        // the on-screen unit dropdown. Falls back to the displayed text if the
+        // stone values aren't on the page.
+        const stoneBulkDisplay = (window._stoneBulk && isFinite(window._stoneBulk.yd3))
+            ? window._stoneBulk.yd3.toLocaleString() + ' yd³'
+            : txt('stoneBulkDisplay');
 
         // --- Large diameter pipe connection ---
         const largePipeQty = (document.getElementById('large_pipe_qty')?.value || '0').trim();
