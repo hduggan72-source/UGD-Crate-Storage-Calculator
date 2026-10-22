@@ -1744,6 +1744,55 @@ def index():
         ll_psi, dl_psi_check, fos_live_load, fos_dead_check = calc_live_load_fos(traffic_load, cover_depth, config)
         storage_status = 'PASS' if min_storage <= total_storage else 'FAIL' if min_storage > 0 else None
 
+        # ── CAD layout table export (left-side tables on James's plan sheet) ──
+        # Values only — rendered to CSV client-side by exportCadTableCSV().
+        # Excavation Volume = System Total gross (full excavation footprint ×
+        # total system depth); Total Stone net = sum of all three layers.
+        # Layer net = displayed (0.1-rounded) gross × stone void, matching how
+        # the sheet table is filled in by hand.
+        if shape_mode == 'complex':
+            _cad_excav_perim = complex_excav_perim
+        else:
+            _cad_excav_perim = 2 * (outer_width + outer_length)
+        _cad_top_net   = stone_top_gross   * stone_void
+        _cad_perim_net = stone_perim_gross * stone_void
+        _cad_base_net  = stone_base_gross  * stone_void
+        _cad_stone_net = _cad_top_net + _cad_perim_net + _cad_base_net
+        cad_table = {
+            'model_type':       f"{config}-{layers}",
+            'tank_height':      tank_height,
+            'surface_elev':     surface_elev,
+            'top_of_stone':     tank_bottom_elev + tank_height + cover_stone,
+            'top_of_tank':      tank_bottom_elev + tank_height,
+            'tank_bottom':      tank_bottom_elev,
+            'base_stone_elev':  tank_bottom_elev - base_stone,
+            'tank_width':       tank_width,
+            'tank_length':      tank_length,
+            'cover_stone':      cover_stone,
+            'base_stone':       base_stone,
+            'perimeter_width':  perimeter_stone_width,
+            'tank_area':        tank_footprint,
+            'tank_perimeter':   used_perimeter,
+            'excav_area':       excav_area_for_layers,
+            'excav_perimeter':  _cad_excav_perim,
+            'system_depth':     total_system_depth,
+            'excav_volume':     total_excavation_vol,
+            'stone_top_gross':  stone_top_gross,   'stone_top_net':   _cad_top_net,
+            'stone_perim_gross': stone_perim_gross, 'stone_perim_net': _cad_perim_net,
+            'stone_base_gross': stone_base_gross,  'stone_base_net':  _cad_base_net,
+            'stone_total_gross': stone_layer_total_gross,
+            'stone_total_net':   _cad_stone_net,
+            'tank_gross':       gross_tank_vol,
+            'tank_net':         tank_storage,
+            'system_gross':     total_excavation_vol,
+            'system_net':       tank_storage + _cad_stone_net,
+            'stone_void':       stone_void,
+            'geo_tank_ft2':     geoTank,
+            'geo_stone_ft2':    geoStone,
+            'geo_total_ft2':    geoTotal,
+            'woven_ft2':        ptrow_woven_ft2,
+        }
+
         results = {
             'config': config, 'layers': layers,
             'surface_elev': surface_elev, 'tank_bottom_elev': tank_bottom_elev,
@@ -1811,6 +1860,7 @@ def index():
             'ptrow_total_crates':  ptrow_total_crates,
             'ptrow_woven_yd2':     ptrow_woven_yd2,
             'ptrow_woven_ft2':     ptrow_woven_ft2,
+            'cad_table':           cad_table,
         }
         form_data = request.form
 
