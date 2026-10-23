@@ -2807,10 +2807,9 @@ function autoCalcGeogridTop() {
     const r = window._lastTankResult;
     if (!r) { alert('Calculate this tank first to enable Auto-Calc.'); return; }
     const geoWaste = mtGeoWastePct();
-    const overlap  = 2.0;
-    const w = r.outer_width  + 2 * overlap;
-    const l = r.outer_length + 2 * overlap;
-    const yd2 = Math.ceil(w * l * (1 + geoWaste/100) / 9);
+    // Server's raw top area: excavation + 2 ft overlap each side (complex
+    // shapes offset the excavation outline) — same as single-tank.
+    const yd2 = Math.ceil(r.grid_top_raw_ft2 * (1 + geoWaste/100) / 9);
     document.getElementById('f_geogrid_top_yd2').value = yd2;
     saveDraft();
 }
@@ -2819,7 +2818,7 @@ function autoCalcGeogridBottom() {
     const r = window._lastTankResult;
     if (!r) { alert('Calculate this tank first to enable Auto-Calc.'); return; }
     const geoWaste = mtGeoWastePct();
-    const yd2 = Math.ceil(r.tank_width * r.tank_length * (1 + geoWaste/100) / 9);
+    const yd2 = Math.ceil(r.grid_bottom_raw_ft2 * (1 + geoWaste/100) / 9);
     document.getElementById('f_geogrid_bottom_yd2').value = yd2;
     saveDraft();
 }
