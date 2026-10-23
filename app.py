@@ -4320,8 +4320,10 @@ def calc_tank(t):
         ptrow_woven_yd2 = 0
 
     # ── PVC / Geomembrane liner ────────────────────────────────────────
-    liner_tank_yd2  = math.ceil(geoTank  * (1 + geoWaste/100.0) / 9) if liner_on_tank  else 0
-    liner_stone_yd2 = math.ceil(geoStone * (1 + geoWaste/100.0) / 9) if liner_on_stone else 0
+    # geoTank / geoStone already include the geotextile waste %, so it is
+    # not applied a second time here.
+    liner_tank_yd2  = math.ceil(geoTank  / 9) if liner_on_tank  else 0
+    liner_stone_yd2 = math.ceil(geoStone / 9) if liner_on_stone else 0
     liner_total_yd2 = liner_tank_yd2 + liner_stone_yd2
     stone_yd3  = round(stone_env_vol * 1.10 / 27, 1)
     stone_tons = round(stone_env_vol * 1.10 * 100 / 2000, 2)
