@@ -1304,7 +1304,9 @@ def index():
         # If the estimator already submitted overrides, use those; otherwise auto-calc.
         _geo_overlap = 2.0   # ft beyond excavation perimeter each side
         if shape_mode == 'complex':
-            _geo_top_area = complex_excav_area   # complex mode uses polygon area; no simple W×L to extend
+            # Complex excavation outline offset 2 ft outward: A + P·d + 4d²
+            # (equals (W+2d)(L+2d) for a rectangle).
+            _geo_top_area = complex_excav_area + complex_excav_perim*_geo_overlap + 4*_geo_overlap**2
         else:
             _geo_top_area = (outer_width + 2*_geo_overlap) * (outer_length + 2*_geo_overlap)
         _geo_bottom_area = tank_footprint
@@ -1462,10 +1464,7 @@ def index():
             'geo_tank_raw_ft2':   geoTank_raw,
             'geo_stone_raw_ft2':  geoStone_raw,
             'woven_raw_ft2':      _ptrow_fab_raw,
-            # Complex shapes: _geo_top_area is the bare excavation area, so add
-            # the same 2 ft overlap as an outward offset (A + P·d + 4d²).
-            'grid_top_raw_ft2':   (_geo_top_area if shape_mode != 'complex' else
-                                   complex_excav_area + complex_excav_perim*_geo_overlap + 4*_geo_overlap**2),
+            'grid_top_raw_ft2':   _geo_top_area,
             'grid_bottom_raw_ft2': _geo_bottom_area,
         }
 
