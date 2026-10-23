@@ -4,3 +4,4 @@ pypdf
 requests
 gunicorn
 ezdxf
+openpyxl

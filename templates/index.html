@@ -3053,7 +3053,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     <button type="button" class="bottombar-btn" onclick="downloadStagePNG()" style="background:#28a745;color:white;">📈 Stage PNG</button>
     <button type="button" class="bottombar-btn" onclick="openDetailsModal()" style="background:#0f4c81;color:white;border:1px solid #3b82f6;">📋 Details</button>
     <button type="button" class="bottombar-btn" onclick="copyToEmail()" style="background:#6f42c1;color:white;">📋 Copy</button>
-    <button type="button" class="bottombar-btn" onclick="exportCadTableCSV()" style="background:#1e3a8a;color:white;" title="Left-side tables for the CAD plan sheet">📐 CAD Table</button>
+    <button type="button" class="bottombar-btn" onclick="exportCadTableXLSX()" style="background:#1e3a8a;color:white;" title="CAD plan-sheet tables as an Excel file (raw quantities, no waste)">📐 CAD Table</button>
 </div>
 
 <script>
@@ -4108,31 +4108,35 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     // be pasted or linked (AutoCAD Data Link) straight into the sheet table.
     // Values come from the last Calculate System (window._cadTable).
     // Filename has no date so a re-export can overwrite a linked file.
-    function exportCadTableCSV() {
+    function exportCadTableXLSX() {
         const t = window._cadTable;
         if (!t) { alert('Please run "Calculate System" first to generate results.'); return; }
-        const f = v => (Number(v) || 0).toFixed(2);
+        // Numbers go to the server as real numbers (formatted 0.00 in Excel).
+        const f = v => Math.round((Number(v) || 0) * 100) / 100;
         const num = id => parseFloat(document.getElementById(id)?.value) || 0;
 
         // Net totals follow the on-screen "In Net Total" checkboxes, so the
-        // CSV matches the Total System Storage shown in the results.
+        // table matches the Total System Storage shown in the results.
         const incl = id => { const cb = document.getElementById(id); return cb ? cb.checked : true; };
         const stoneNet = (incl('inclStoneTop')   ? t.stone_top_net   : 0)
                        + (incl('inclStonePerim') ? t.stone_perim_net : 0)
                        + (incl('inclStoneBase')  ? t.stone_base_net  : 0);
         const systemNet = t.tank_net + stoneNet;
 
-        // Liner protection non-woven (AQ-100-03.4) is added to Total Fabric
-        // exactly as the Geotextile card does; only listed when a liner is on.
-        const linerProtFt2 = (num('formLinerTankQty') + num('formLinerStoneQty')) * 9;
-        // Biaxial geogrid (yd², waste included) — only listed when enabled.
+        // Fabric & grid are RAW plan areas — no geotextile waste/overlap %.
+        // Liner protection non-woven (AQ-100-03.4): one layer per selected
+        // liner envelope, equal to that envelope's raw area.
+        const linerProtFt2 = (num('formLinerTankQty')  > 0 ? t.geo_tank_raw_ft2  : 0)
+                           + (num('formLinerStoneQty') > 0 ? t.geo_stone_raw_ft2 : 0);
+        // Biaxial geogrid — only listed when enabled with a quantity. Top keeps
+        // its 2 ft overlap each side; bottom is the tank footprint.
         const gridOn     = !!document.getElementById('geogridEnable')?.checked;
-        const gridTopYd2 = gridOn ? num('geogridTopQty')    : 0;
-        const gridBotYd2 = gridOn ? num('geogridBottomQty') : 0;
-        // Bottom geogrid substitutes tank-floor non-woven (same capped
-        // deduction as the Quote and the "Adjusted Tank Non-Woven" row).
-        const tankFabricFt2  = Math.max(0, t.geo_tank_ft2 - gridBotYd2 * 9);
-        const fabricTotalFt2 = tankFabricFt2 + t.geo_stone_ft2 + linerProtFt2;
+        const gridTopFt2 = (gridOn && num('geogridTopQty')    > 0) ? t.grid_top_raw_ft2    : 0;
+        const gridBotFt2 = (gridOn && num('geogridBottomQty') > 0) ? t.grid_bottom_raw_ft2 : 0;
+        // Bottom geogrid substitutes tank-floor non-woven (capped deduction,
+        // same as the Quote's "Adjusted Tank Non-Woven").
+        const tankFabricFt2  = Math.max(0, t.geo_tank_raw_ft2 - gridBotFt2);
+        const fabricTotalFt2 = tankFabricFt2 + t.geo_stone_raw_ft2 + linerProtFt2;
 
         // Labels match the calculator's own field/result names.
         const rows = [
@@ -4166,25 +4170,33 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             ['Geotextile Fabric & Grid Totals', '', ''],
             ['Geotextile Layer', 'sq ft (ft²)', 'sq yd (yd²)'],
             ['AquaCell Tank', f(tankFabricFt2), f(tankFabricFt2 / 9)],
-            ['Stone Backfill', f(t.geo_stone_ft2), f(t.geo_stone_ft2 / 9)],
+            ['Stone Backfill', f(t.geo_stone_raw_ft2), f(t.geo_stone_raw_ft2 / 9)],
             ...(linerProtFt2 > 0 ? [['Liner Protection Layer (AQ-100-03.4)', f(linerProtFt2), f(linerProtFt2 / 9)]] : []),
             ['Total Fabric', f(fabricTotalFt2), f(fabricTotalFt2 / 9)],
-            ['Total Woven Geo (PT-ROW™)', f(t.woven_ft2), f(t.woven_ft2 / 9)],
-            ...(gridTopYd2 > 0 ? [['Top / Cover Geogrid', f(gridTopYd2 * 9), f(gridTopYd2)]] : []),
-            ...(gridBotYd2 > 0 ? [['Bottom / Tank Base Geogrid', f(gridBotYd2 * 9), f(gridBotYd2)]] : []),
+            ['Total Woven Geo (PT-ROW™)', f(t.woven_raw_ft2), f(t.woven_raw_ft2 / 9)],
+            ...(gridTopFt2 > 0 ? [['Top / Cover Geogrid', f(gridTopFt2), f(gridTopFt2 / 9)]] : []),
+            ...(gridBotFt2 > 0 ? [['Bottom / Tank Base Geogrid', f(gridBotFt2), f(gridBotFt2 / 9)]] : []),
         ];
-        const esc = c => /[",\n]/.test(String(c)) ? '"' + String(c).replace(/"/g, '""') + '"' : String(c);
-        const csv = '\uFEFF' + rows.map(r => r.map(esc).join(',')).join('\r\n') + '\r\n';
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
+
         const projName = (document.getElementById('project_name')?.value || 'Project').trim()
                             .replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
         const projNum = (document.getElementById('project_num')?.value || '').trim().replace(/[^a-zA-Z0-9\-_]/g, '_');
-        a.download = [projNum, projName, 'AquaCell_CAD_Table'].filter(Boolean).join('_') + '.csv';
-        a.click();
-        URL.revokeObjectURL(url);
+        fetch('/download_cad_table_xlsx', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rows })
+        })
+        .then(r => { if (!r.ok) throw new Error('CAD Table export failed'); return r.blob(); })
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            // No date in the name, so a re-export can save over a linked file.
+            a.download = [projNum, projName, 'AquaCell_CAD_Table'].filter(Boolean).join('_') + '.xlsx';
+            a.click();
+            URL.revokeObjectURL(url);
+        })
+        .catch(() => alert('CAD Table export failed. Run Calculate System and try again.'));
     }
 
     function copyToEmail() {
