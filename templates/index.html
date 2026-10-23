@@ -1704,12 +1704,13 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     <script>
                     (function(){
                         // Raw geometry values from server for geogrid auto-calc
+                        // Raw geogrid areas from the server (same values its default
+                        // quantities use): top = excavation + 2 ft overlap each side,
+                        // bottom = tank footprint. Correct for Complex Shape too.
                         window._geogridRaw = {
-                            outerWidth:  {{ (results.tank_width + 2 * form_data.get('perimeter_stone_width', 1.0)|float)|round(4) }},
-                            outerLength: {{ (results.tank_length + 2 * form_data.get('perimeter_stone_width', 1.0)|float)|round(4) }},
-                            tankWidth:   {{ results.tank_width }},
-                            tankLength:  {{ results.tank_length }},
-                            geoWaste:    {{ results.geoWaste }},
+                            topAreaFt2:    {{ results.cad_table.grid_top_raw_ft2 }},
+                            bottomAreaFt2: {{ results.cad_table.grid_bottom_raw_ft2 }},
+                            geoWaste:      {{ results.geoWaste }},
                         };
 
                         function updateCombinedDisplay() {
@@ -1728,10 +1729,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         window.calcGeogridTop = function() {
                             var g = window._geogridRaw;
                             if (!g) return;
-                            var overlap = 2;   // 2 ft beyond perimeter stone each side
-                            var w = g.outerWidth  + 2 * overlap;
-                            var l = g.outerLength + 2 * overlap;
-                            var areaSqFt = w * l * (1 + g.geoWaste / 100);
+                            var areaSqFt = g.topAreaFt2 * (1 + g.geoWaste / 100);
                             var areaSqYd = Math.ceil(areaSqFt / 9);
                             document.getElementById('geogridTopQty').value = areaSqYd;
                             document.getElementById('formGeogridTop').value = areaSqYd;
@@ -1741,7 +1739,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         window.calcGeogridBottom = function() {
                             var g = window._geogridRaw;
                             if (!g) return;
-                            var areaSqFt = g.tankWidth * g.tankLength * (1 + g.geoWaste / 100);
+                            var areaSqFt = g.bottomAreaFt2 * (1 + g.geoWaste / 100);
                             var areaSqYd = Math.ceil(areaSqFt / 9);
                             document.getElementById('geogridBottomQty').value = areaSqYd;
                             document.getElementById('formGeogridBottom').value = areaSqYd;
