@@ -4291,6 +4291,17 @@ def calc_tank(t):
     # Contingency: round up base_units to next full pallet
     contingency = max(0, math.ceil(base_units / _MT_PALLETS['base']) * _MT_PALLETS['base'] - base_units)
 
+    # Raw geogrid areas for the editor's Auto-Calc (same as single-tank):
+    # top = excavation + 2 ft overlap each side, bottom = tank footprint.
+    # Complex Shape offsets the excavation outline outward: A + P·d + 4d².
+    _mt_grid_overlap = 2.0
+    if shape_mode == 'complex':
+        grid_top_raw_ft2    = complex_excav_area + complex_excav_perim*_mt_grid_overlap + 4*_mt_grid_overlap**2
+        grid_bottom_raw_ft2 = complex_tank_area
+    else:
+        grid_top_raw_ft2    = (outer_width + 2*_mt_grid_overlap) * (outer_length + 2*_mt_grid_overlap)
+        grid_bottom_raw_ft2 = tank_width * tank_length
+
     # Geotextile
     excav_area = outer_width * outer_length if shape_mode != 'complex' else (complex_excav_area or 0)
     if shape_mode == 'complex':
@@ -4454,6 +4465,8 @@ def calc_tank(t):
         'ptrow_crate_vol':    _ptrow_crate_vol,
         'ptrow_layer_ht':     round(_ptrow_layer_ht, 4),
         # Geogrid
+        'grid_top_raw_ft2':    round(grid_top_raw_ft2, 4),
+        'grid_bottom_raw_ft2': round(grid_bottom_raw_ft2, 4),
         'geogrid_top_yd2':    geogrid_top_yd2,
         'geogrid_bottom_yd2': geogrid_bottom_yd2,
         # Liner
