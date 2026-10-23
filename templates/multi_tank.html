@@ -2084,7 +2084,6 @@ function setMtGeoUnit(unit) {
 // Per-tank result card + editor liner hints — unit-aware value painter
 function renderGeoDisplays(r) {
     const a = mtAreaLbl();
-    const geoWaste = r.geoWaste || 20;
 
     // Geotextile (server values are ft²-native). Grand total includes the
     // liner-protection non-woven (yd²-native, AQ-100-03.4 Note C) when present.
@@ -2796,11 +2795,18 @@ function toggleLinerSection(on, doSave) {
     if (doSave) saveDraft();
 }
 
+// Geotextile waste % from the editor. 0 is a valid entry — only a blank
+// or invalid field falls back to the 20% default.
+function mtGeoWastePct() {
+    const v = parseFloat(document.getElementById('f_geoWaste')?.value);
+    return isNaN(v) ? 20 : v;
+}
+
 // ── Geogrid Auto-Calc ──────────────────────────────────────────────
 function autoCalcGeogridTop() {
     const r = window._lastTankResult;
     if (!r) { alert('Calculate this tank first to enable Auto-Calc.'); return; }
-    const geoWaste = parseFloat(document.getElementById('f_geoWaste').value) || 20;
+    const geoWaste = mtGeoWastePct();
     const overlap  = 2.0;
     const w = r.outer_width  + 2 * overlap;
     const l = r.outer_length + 2 * overlap;
@@ -2812,7 +2818,7 @@ function autoCalcGeogridTop() {
 function autoCalcGeogridBottom() {
     const r = window._lastTankResult;
     if (!r) { alert('Calculate this tank first to enable Auto-Calc.'); return; }
-    const geoWaste = parseFloat(document.getElementById('f_geoWaste').value) || 20;
+    const geoWaste = mtGeoWastePct();
     const yd2 = Math.ceil(r.tank_width * r.tank_length * (1 + geoWaste/100) / 9);
     document.getElementById('f_geogrid_bottom_yd2').value = yd2;
     saveDraft();
@@ -2897,7 +2903,7 @@ function setMtPtrowMethod(m) {
 function renderPtrowFlowTable() {
     var r   = window._lastTankResult;
     var lh  = r ? r.ptrow_layer_ht || 1.394 : 1.394;
-    var gw  = parseFloat(document.getElementById('f_geoWaste')?.value) || 20;
+    var gw  = mtGeoWastePct();
     var tbody = document.getElementById('ptrowFlowTableBody');
     if (!tbody) return;
     while (tbody.children.length > window._ptrowFlowAreas.length) tbody.removeChild(tbody.lastChild);
@@ -2958,7 +2964,7 @@ function renderPtrowTable() {
     const r   = window._lastTankResult;
     const vol = r ? r.ptrow_crate_vol || 10.25 : 10.25;
     const lh  = r ? r.ptrow_layer_ht  || 1.394 : 1.394;
-    const gw  = parseFloat(document.getElementById('f_geoWaste')?.value) || 20;
+    const gw  = mtGeoWastePct();
 
     const tbody = document.getElementById('ptrowTableBody');
     if (!tbody) return;
@@ -3048,7 +3054,7 @@ function updatePtrowOutputs(knownTotal) {
     const r   = window._lastTankResult;
     const vol = r ? r.ptrow_crate_vol || 10.25 : 10.25;
     const lh  = r ? r.ptrow_layer_ht  || 1.394 : 1.394;
-    const gw  = parseFloat(document.getElementById('f_geoWaste')?.value) || 20;
+    const gw  = mtGeoWastePct();
 
     let total = 0;
     if (knownTotal !== undefined) {
@@ -3150,7 +3156,7 @@ function copyToClipboard() {
     const fmtI = v => Math.round(v).toLocaleString();
 
     // Waste label — matches single-tank format
-    const wastePct  = parseFloat(document.getElementById('f_geoWaste')?.value) || 20;
+    const wastePct  = mtGeoWastePct();
     const wasteLabel = `  (+${wastePct}% waste)`;
 
     // Per-tank breakdown lines

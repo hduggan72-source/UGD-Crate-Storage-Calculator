@@ -4169,7 +4169,9 @@ def calc_tank(t):
     cover_stone      = float(t.get('cover_stone', 1.0) or 1.0)
     base_stone       = float(t.get('base_stone', 0.333) or 0.333)
     stone_void       = float(t.get('stone_void', 0.40) or 0.40)
-    geoWaste         = int(t.get('geoWaste', 20) or 20)
+    # 0% waste is valid — only a missing/blank value falls back to 20.
+    _gw              = t.get('geoWaste', 20)
+    geoWaste         = int(float(_gw)) if _gw not in (None, '') else 20
     pipe_connectors  = int(t.get('pipe_connectors', 0) or 0)
     top_adapters_12  = int(t.get('top_adapters_12', 0) or 0)
     top_adapters_16  = int(t.get('top_adapters_16', 0) or 0)
