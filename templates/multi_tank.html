@@ -2129,10 +2129,11 @@ function renderGeoDisplays(r) {
         }
     }
 
-    // Liner qty hints in the editor (ceil to whole yd² first — purchase qty)
+    // Liner qty hints in the editor (ceil to whole yd² first — purchase qty).
+    // r.geoTank / r.geoStone already include the waste %, so it isn't re-applied.
     if (r.geoTank && r.geoStone) {
-        const lnkT = Math.ceil(r.geoTank  * (1 + geoWaste/100) / 9);
-        const lnkS = Math.ceil(r.geoStone * (1 + geoWaste/100) / 9);
+        const lnkT = Math.ceil(r.geoTank  / 9);
+        const lnkS = Math.ceil(r.geoStone / 9);
         const lnkTEl = document.getElementById('linerTankQtyDisplay');
         const lnkSEl = document.getElementById('linerStoneQtyDisplay');
         if (lnkTEl) lnkTEl.textContent = mtAreaFromYd2(lnkT).toLocaleString() + ' ' + a;
