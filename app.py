@@ -1462,7 +1462,10 @@ def index():
             'geo_tank_raw_ft2':   geoTank_raw,
             'geo_stone_raw_ft2':  geoStone_raw,
             'woven_raw_ft2':      _ptrow_fab_raw,
-            'grid_top_raw_ft2':   _geo_top_area,
+            # Complex shapes: _geo_top_area is the bare excavation area, so add
+            # the same 2 ft overlap as an outward offset (A + P·d + 4d²).
+            'grid_top_raw_ft2':   (_geo_top_area if shape_mode != 'complex' else
+                                   complex_excav_area + complex_excav_perim*_geo_overlap + 4*_geo_overlap**2),
             'grid_bottom_raw_ft2': _geo_bottom_area,
         }
 
