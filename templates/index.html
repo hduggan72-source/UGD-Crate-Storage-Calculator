@@ -3696,7 +3696,9 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
 
     function drawSection(ctx, state, b) {
         const tankBottomElev = parseFloat(document.getElementById('tank_bottom_elev').value) || 0;
-        const baseStoneDepth = parseFloat(document.getElementById('base_stone').value) || 0.333;
+        // 0 is a valid base stone depth — only fall back when blank/invalid.
+        const baseStoneRaw   = parseFloat(document.getElementById('base_stone').value);
+        const baseStoneDepth = isNaN(baseStoneRaw) ? 0.333 : baseStoneRaw;
 
         const bottomOfBaseStone = tankBottomElev - baseStoneDepth;
         const heights = LAYER_HT[state.config] || LAYER_HT.SC;
@@ -4251,8 +4253,11 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             if (m) systemDepth = m[1];
         } else if (tankHeight !== '—') {
             // Fallback: calculate from inputs
-            const baseStoneVal  = parseFloat(document.querySelector('[name="base_stone"]')?.value  || '0.333') || 0.333;
-            const coverStoneVal = parseFloat(document.querySelector('[name="cover_stone"]')?.value || '1.0')   || 1.0;
+            // 0 is a valid stone depth — only fall back when blank/invalid.
+            const baseStoneRaw  = parseFloat(document.querySelector('[name="base_stone"]')?.value);
+            const coverStoneRaw = parseFloat(document.querySelector('[name="cover_stone"]')?.value);
+            const baseStoneVal  = isNaN(baseStoneRaw)  ? 0.333 : baseStoneRaw;
+            const coverStoneVal = isNaN(coverStoneRaw) ? 1.0   : coverStoneRaw;
             systemDepth = (parseFloat(tankHeight) + baseStoneVal + coverStoneVal).toFixed(2);
         }
 
