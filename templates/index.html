@@ -1872,8 +1872,10 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             var onTank  = document.getElementById('linerOnTank').checked;
                             var onStone = document.getElementById('linerOnStone').checked;
 
-                            var tankYd2  = onTank  ? Math.ceil(_linerTankFt2  * (1 + _geoWaste/100) / 9) : 0;
-                            var stoneYd2 = onStone ? Math.ceil(_linerStoneFt2 * (1 + _geoWaste/100) / 9) : 0;
+                            // results.geoTank / geoStone already include the geotextile
+                            // waste %, so it is not applied a second time here.
+                            var tankYd2  = onTank  ? Math.ceil(_linerTankFt2  / 9) : 0;
+                            var stoneYd2 = onStone ? Math.ceil(_linerStoneFt2 / 9) : 0;
                             var combined = tankYd2 + stoneYd2;
 
                             var tInp = document.getElementById('linerTankQty');
