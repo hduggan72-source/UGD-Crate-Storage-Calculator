@@ -4123,11 +4123,14 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         // Liner protection non-woven (AQ-100-03.4) is added to Total Fabric
         // exactly as the Geotextile card does; only listed when a liner is on.
         const linerProtFt2 = (num('formLinerTankQty') + num('formLinerStoneQty')) * 9;
-        const fabricTotalFt2 = t.geo_total_ft2 + linerProtFt2;
         // Biaxial geogrid (yd², waste included) — only listed when enabled.
         const gridOn     = !!document.getElementById('geogridEnable')?.checked;
         const gridTopYd2 = gridOn ? num('geogridTopQty')    : 0;
         const gridBotYd2 = gridOn ? num('geogridBottomQty') : 0;
+        // Bottom geogrid substitutes tank-floor non-woven (same capped
+        // deduction as the Quote and the "Adjusted Tank Non-Woven" row).
+        const tankFabricFt2  = Math.max(0, t.geo_tank_ft2 - gridBotYd2 * 9);
+        const fabricTotalFt2 = tankFabricFt2 + t.geo_stone_ft2 + linerProtFt2;
 
         // Labels match the calculator's own field/result names.
         const rows = [
@@ -4151,16 +4154,16 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             ['Excavation Volume (ft³)', '', f(t.excav_volume)],
             ['Storage Volume (AquaCell + Stone)', '', ''],
             ['Layer', 'Gross Vol.', 'Net Storage'],
-            ['Top Cover', f(t.stone_top_gross), f(t.stone_top_net)],
-            ['Perimeter', f(t.stone_perim_gross), f(t.stone_perim_net)],
-            ['Base/Foundation', f(t.stone_base_gross), f(t.stone_base_net)],
+            ['Top Cover', f(t.stone_top_gross), incl('inclStoneTop') ? f(t.stone_top_net) : 'Excluded'],
+            ['Perimeter', f(t.stone_perim_gross), incl('inclStonePerim') ? f(t.stone_perim_net) : 'Excluded'],
+            ['Base/Foundation', f(t.stone_base_gross), incl('inclStoneBase') ? f(t.stone_base_net) : 'Excluded'],
             ['Total Stone', f(t.stone_total_gross), f(stoneNet)],
             ['AquaCell Tank', f(t.tank_gross), f(t.tank_net)],
             ['System Total', f(t.system_gross), f(systemNet)],
             ['Stone Void Ratio', '', f(t.stone_void)],
             ['Geotextile Fabric & Grid Totals', '', ''],
             ['Geotextile Layer', 'sq ft (ft²)', 'sq yd (yd²)'],
-            ['AquaCell Tank', f(t.geo_tank_ft2), f(t.geo_tank_ft2 / 9)],
+            ['AquaCell Tank', f(tankFabricFt2), f(tankFabricFt2 / 9)],
             ['Stone Backfill', f(t.geo_stone_ft2), f(t.geo_stone_ft2 / 9)],
             ...(linerProtFt2 > 0 ? [['Liner Protection Layer (AQ-100-03.4)', f(linerProtFt2), f(linerProtFt2 / 9)]] : []),
             ['Total Fabric', f(fabricTotalFt2), f(fabricTotalFt2 / 9)],
