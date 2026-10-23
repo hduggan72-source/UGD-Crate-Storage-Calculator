@@ -352,7 +352,8 @@
     This is the main calculator — it's what loads by default. Every result is a <strong>preliminary,
     conceptual estimate</strong>; the Engineer of Record is responsible for final design and verification.
     The form runs top to bottom in six collapsible cards on the left; results build on the right as soon as
-    you click <b>Calculate</b>.
+    you click <b>Calculate</b>. The cards start collapsed, and any you open stay open after Calculate so you
+    don't lose your place.
   </p>
 
   <!-- ══ 1. PROJECT INFO ══ -->
@@ -519,7 +520,14 @@
       <li><div><b>📋 Details</b> — opens the AquaCell detail sheet library to attach standard details to your
         submittal.</div></li>
       <li><div><b>📋 Copy</b> — copies a plain-text summary of the results to your clipboard, ready to paste
-        into an email.</div></li>
+        into an email. Stone backfill is always given in <b>cubic yards (yd³)</b> in the copied text, no
+        matter which unit the Stone Backfill card is set to on screen.</div></li>
+      <li><div><b>📐 CAD Table</b> — a <code>.csv</code> of the four left&#8288;-&#8288;side tables on the CAD
+        plan sheet (Tank Elevations, Tank &amp; Excavation Footprint, Storage Volume, and Geotextile Fabric
+        &amp; Grid Totals), row for row in the same order and labels as the sheet, so the values can be
+        pasted — or linked with AutoCAD Data Link — straight into the sheet's table. Run <b>Calculate</b>
+        first. The filename has no date, so re&#8288;-&#8288;exporting for the same project can save over
+        a linked file.</div></li>
     </ol>
 
     <div class="callout note">
