@@ -1563,8 +1563,10 @@ def index():
             stone_storage_env  = max(0.0, stone_envelope_volume - void_fill_vol)
             total_stone_storage   = stone_storage_env * stone_void
             total_storage         = tank_storage + total_stone_storage
-            geoTank  = round((2*complex_tank_area + effective_perim*tank_height) * (1 + geoWaste/100.0), 1)
-            geoStone = round((2*complex_excav_area + complex_excav_perim*total_system_depth) * (1 + geoWaste/100.0), 1)
+            geoTank_raw  = 2*complex_tank_area + effective_perim*tank_height
+            geoStone_raw = 2*complex_excav_area + complex_excav_perim*total_system_depth
+            geoTank  = round(geoTank_raw  * (1 + geoWaste/100.0), 1)
+            geoStone = round(geoStone_raw * (1 + geoWaste/100.0), 1)
             geoTotal = round(geoTank + geoStone, 1)
             used_perimeter = round(effective_perim, 2)
             tank_width     = round(snapped_known, 2)
@@ -1594,8 +1596,10 @@ def index():
                 bottom_plates = 0
             tank_top_bottom_area = 2 * tank_width * tank_length
             tank_sides_area      = used_perimeter * tank_height
-            geoTank  = round((tank_top_bottom_area + tank_sides_area) * (1 + geoWaste/100.0), 1)
-            geoStone = round((outer_width*outer_length*2 + outer_width*total_system_depth*2 + outer_length*total_system_depth*2) * (1 + geoWaste/100.0), 1)
+            geoTank_raw  = tank_top_bottom_area + tank_sides_area
+            geoStone_raw = outer_width*outer_length*2 + outer_width*total_system_depth*2 + outer_length*total_system_depth*2
+            geoTank  = round(geoTank_raw  * (1 + geoWaste/100.0), 1)
+            geoStone = round(geoStone_raw * (1 + geoWaste/100.0), 1)
             geoTotal = round(geoTank + geoStone, 1)
             complex_tank_area = complex_tank_perim = complex_excav_area = complex_excav_perim = None
             complex_gross_area  = None
@@ -1699,10 +1703,12 @@ def index():
             _ptrow_row_len   = ptrow_total_crates * MODULE_LEN
             _ptrow_fab_w     = MODULE_WID + 2*ptrow_layer_ht + 2*ptrow_wrap_ext
             _ptrow_fab_l     = _ptrow_row_len + 2*ptrow_wrap_ext
-            _ptrow_fab_ft2   = _ptrow_fab_w * _ptrow_fab_l * (1 + geoWaste/100.0)
+            _ptrow_fab_raw   = _ptrow_fab_w * _ptrow_fab_l
+            _ptrow_fab_ft2   = _ptrow_fab_raw * (1 + geoWaste/100.0)
             ptrow_woven_yd2  = math.ceil(_ptrow_fab_ft2 / 9)
             ptrow_woven_ft2  = round(_ptrow_fab_ft2, 1)
         else:
+            _ptrow_fab_raw   = 0.0
             ptrow_woven_yd2  = 0
             ptrow_woven_ft2  = 0.0
             ptrow_crate_vol  = round(ptrow_crate_vol, 4)
@@ -1785,10 +1791,13 @@ def index():
             'tank_net':         tank_storage,
             'system_gross':     total_excavation_vol,
             'stone_void':       stone_void,
-            'geo_tank_ft2':     geoTank,
-            'geo_stone_ft2':    geoStone,
-            'geo_total_ft2':    geoTotal,
-            'woven_ft2':        ptrow_woven_ft2,
+            # Raw areas (no geotextile waste %) — what the CAD table exports.
+            # Geogrid top keeps its 2 ft overlap each side; bottom = tank footprint.
+            'geo_tank_raw_ft2':   geoTank_raw,
+            'geo_stone_raw_ft2':  geoStone_raw,
+            'woven_raw_ft2':      _ptrow_fab_raw,
+            'grid_top_raw_ft2':   _geo_top_area,
+            'grid_bottom_raw_ft2': _geo_bottom_area,
         }
 
         results = {
@@ -8368,6 +8377,51 @@ def download_dxf():
 # ══════════════════════════════════════════════════════════════════
 #  DOWNLOAD STAGE STORAGE CSV
 # ══════════════════════════════════════════════════════════════════
+
+@app.route('/download_cad_table_xlsx', methods=['POST'])
+def download_cad_table_xlsx():
+    """CAD Table export as .xlsx. The browser builds the rows (they depend on
+    on-screen toggles: stone inclusion, liner, geogrid) and posts them here as
+    JSON [[label, col_b, col_c], ...]; numbers are written as real numbers with
+    a 0.00 format so AutoCAD Data Link shows 1.00, not 1. Filename is set
+    client-side via a.download."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment
+
+    data = request.get_json(silent=True) or {}
+    rows = data.get('rows')
+    if not isinstance(rows, list) or not rows or len(rows) > 200:
+        return jsonify({'error': 'No table rows provided'}), 400
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'CAD Table'
+    bold = Font(bold=True)
+    for r_idx, row in enumerate(rows, start=1):
+        if not isinstance(row, list) or len(row) != 3:
+            return jsonify({'error': f'Row {r_idx} must have 3 cells'}), 400
+        is_title = row[1] in ('', None) and row[2] in ('', None)
+        for c_idx, val in enumerate(row, start=1):
+            if isinstance(val, bool) or not isinstance(val, (str, int, float, type(None))):
+                return jsonify({'error': f'Row {r_idx} has an invalid cell'}), 400
+            cell = ws.cell(row=r_idx, column=c_idx, value=None if val == '' else val)
+            if isinstance(val, (int, float)):
+                cell.number_format = '0.00'
+                cell.alignment = Alignment(horizontal='right')
+            elif c_idx > 1:
+                cell.alignment = Alignment(horizontal='center')
+            if is_title:
+                cell.font = bold
+    ws.column_dimensions['A'].width = 40
+    ws.column_dimensions['B'].width = 14
+    ws.column_dimensions['C'].width = 14
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name='AquaCell_CAD_Table.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
 
 @app.route('/download_stage_csv', methods=['POST'])
 def download_stage_csv():
