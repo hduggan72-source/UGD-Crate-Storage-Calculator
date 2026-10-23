@@ -1747,9 +1747,10 @@ def index():
         # ── CAD layout table export (left-side tables on James's plan sheet) ──
         # Values only — rendered to CSV client-side by exportCadTableCSV().
         # Excavation Volume = System Total gross (full excavation footprint ×
-        # total system depth); Total Stone net = sum of all three layers.
-        # Layer net = displayed (0.1-rounded) gross × stone void, matching how
-        # the sheet table is filled in by hand.
+        # total system depth). Layer net = displayed (0.1-rounded) gross ×
+        # stone void, matching how the sheet table is filled in by hand.
+        # Total Stone / System Total net are summed client-side from the
+        # layers whose "In Net Total" box is checked, so they match the screen.
         if shape_mode == 'complex':
             _cad_excav_perim = complex_excav_perim
         else:
@@ -1757,7 +1758,6 @@ def index():
         _cad_top_net   = stone_top_gross   * stone_void
         _cad_perim_net = stone_perim_gross * stone_void
         _cad_base_net  = stone_base_gross  * stone_void
-        _cad_stone_net = _cad_top_net + _cad_perim_net + _cad_base_net
         cad_table = {
             'model_type':       f"{config}-{layers}",
             'tank_height':      tank_height,
@@ -1781,11 +1781,9 @@ def index():
             'stone_perim_gross': stone_perim_gross, 'stone_perim_net': _cad_perim_net,
             'stone_base_gross': stone_base_gross,  'stone_base_net':  _cad_base_net,
             'stone_total_gross': stone_layer_total_gross,
-            'stone_total_net':   _cad_stone_net,
             'tank_gross':       gross_tank_vol,
             'tank_net':         tank_storage,
             'system_gross':     total_excavation_vol,
-            'system_net':       tank_storage + _cad_stone_net,
             'stone_void':       stone_void,
             'geo_tank_ft2':     geoTank,
             'geo_stone_ft2':    geoStone,

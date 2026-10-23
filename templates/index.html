@@ -4115,20 +4115,40 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const t = window._cadTable;
         if (!t) { alert('Please run "Calculate System" first to generate results.'); return; }
         const f = v => (Number(v) || 0).toFixed(2);
+        const num = id => parseFloat(document.getElementById(id)?.value) || 0;
+
+        // Net totals follow the on-screen "In Net Total" checkboxes, so the
+        // CSV matches the Total System Storage shown in the results.
+        const incl = id => { const cb = document.getElementById(id); return cb ? cb.checked : true; };
+        const stoneNet = (incl('inclStoneTop')   ? t.stone_top_net   : 0)
+                       + (incl('inclStonePerim') ? t.stone_perim_net : 0)
+                       + (incl('inclStoneBase')  ? t.stone_base_net  : 0);
+        const systemNet = t.tank_net + stoneNet;
+
+        // Liner protection non-woven (AQ-100-03.4) is added to Total Fabric
+        // exactly as the Geotextile card does; only listed when a liner is on.
+        const linerProtFt2 = (num('formLinerTankQty') + num('formLinerStoneQty')) * 9;
+        const fabricTotalFt2 = t.geo_total_ft2 + linerProtFt2;
+        // Biaxial geogrid (yd², waste included) — only listed when enabled.
+        const gridOn     = !!document.getElementById('geogridEnable')?.checked;
+        const gridTopYd2 = gridOn ? num('geogridTopQty')    : 0;
+        const gridBotYd2 = gridOn ? num('geogridBottomQty') : 0;
+
+        // Labels match the calculator's own field/result names.
         const rows = [
             ['AquaCell Tank Elevations', '', ''],
             ['Model Type', t.model_type, f(t.tank_height)],
-            ['Min. Surface', 'A', f(t.surface_elev)],
-            ['Top of Stone', 'B', f(t.top_of_stone)],
-            ['Top of AquaCell', 'C', f(t.top_of_tank)],
-            ['AquaCell Bottom', 'D', f(t.tank_bottom)],
-            ['Base Stone', 'E', f(t.base_stone_elev)],
+            ['Surface Elevation', 'A', f(t.surface_elev)],
+            ['Top of Cover Stone', 'B', f(t.top_of_stone)],
+            ['Top of Tank', 'C', f(t.top_of_tank)],
+            ['Bottom of Tank', 'D', f(t.tank_bottom)],
+            ['Bottom of Base Stone', 'E', f(t.base_stone_elev)],
             ['W x L (ft)', f(t.tank_width), f(t.tank_length)],
-            ['Top of Tank Cover Depth (ft)', '', f(t.cover_stone)],
-            ['Base / Foundation Stone Depth (ft)', '', f(t.base_stone)],
-            ['Perimeter Width (ft)', '', f(t.perimeter_width)],
+            ['Cover Stone Depth (ft)', '', f(t.cover_stone)],
+            ['Base Stone Depth (ft)', '', f(t.base_stone)],
+            ['Perimeter Stone Width (ft)', '', f(t.perimeter_width)],
             ['AquaCell Tank & Excavation Footprint', '', ''],
-            ['Tank Area (ft²)', '', f(t.tank_area)],
+            ['Tank Footprint Area (ft²)', '', f(t.tank_area)],
             ['Tank Perimeter (ft)', '', f(t.tank_perimeter)],
             ['Excavation Area (ft²)', '', f(t.excav_area)],
             ['Excavation Perimeter (ft)', '', f(t.excav_perimeter)],
@@ -4139,19 +4159,22 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             ['Top Cover', f(t.stone_top_gross), f(t.stone_top_net)],
             ['Perimeter', f(t.stone_perim_gross), f(t.stone_perim_net)],
             ['Base/Foundation', f(t.stone_base_gross), f(t.stone_base_net)],
-            ['Total Stone', f(t.stone_total_gross), f(t.stone_total_net)],
+            ['Total Stone', f(t.stone_total_gross), f(stoneNet)],
             ['AquaCell Tank', f(t.tank_gross), f(t.tank_net)],
-            ['System Total', f(t.system_gross), f(t.system_net)],
-            ['Stone Void Space (%)', '', f(t.stone_void)],
+            ['System Total', f(t.system_gross), f(systemNet)],
+            ['Stone Void Ratio', '', f(t.stone_void)],
             ['Geotextile Fabric & Grid Totals', '', ''],
             ['Geotextile Layer', 'sq ft (ft²)', 'sq yd (yd²)'],
             ['AquaCell Tank', f(t.geo_tank_ft2), f(t.geo_tank_ft2 / 9)],
             ['Stone Backfill', f(t.geo_stone_ft2), f(t.geo_stone_ft2 / 9)],
-            ['Total Fabric', f(t.geo_total_ft2), f(t.geo_total_ft2 / 9)],
+            ...(linerProtFt2 > 0 ? [['Liner Protection Layer (AQ-100-03.4)', f(linerProtFt2), f(linerProtFt2 / 9)]] : []),
+            ['Total Fabric', f(fabricTotalFt2), f(fabricTotalFt2 / 9)],
             ['Total Woven Geo (PT-ROW™)', f(t.woven_ft2), f(t.woven_ft2 / 9)],
+            ...(gridTopYd2 > 0 ? [['Top / Cover Geogrid', f(gridTopYd2 * 9), f(gridTopYd2)]] : []),
+            ...(gridBotYd2 > 0 ? [['Bottom / Tank Base Geogrid', f(gridBotYd2 * 9), f(gridBotYd2)]] : []),
         ];
         const esc = c => /[",\n]/.test(String(c)) ? '"' + String(c).replace(/"/g, '""') + '"' : String(c);
-        const csv = '﻿' + rows.map(r => r.map(esc).join(',')).join('\r\n') + '\r\n';
+        const csv = '\uFEFF' + rows.map(r => r.map(esc).join(',')).join('\r\n') + '\r\n';
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
