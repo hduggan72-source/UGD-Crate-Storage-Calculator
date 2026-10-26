@@ -1195,6 +1195,27 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 });
             };
 
+            // Project import: replace the island rows + toggle state from a saved
+            // JSON. `rows` is mutated in place (window._voidRows shares the array).
+            window.loadVoidRows = function(list, enabled) {
+                rows.length = 0;
+                (list || []).forEach(function(r, i) {
+                    rows.push({
+                        label: r.label || ('Island ' + (i + 1)),
+                        area:  parseFloat(r.area)  || 0,
+                        dim:   parseFloat(r.dim)   || 0,
+                        perim: parseFloat(r.perim) || 0
+                    });
+                });
+                if (rows.length === 0) rows.push({ label: 'Island 1', area: 0, dim: 0, perim: 0 });
+                var tg = document.getElementById('voidToggle');
+                if (tg) tg.checked = !!enabled;
+                if (tbodyEl) tbodyEl.innerHTML = '';
+                window.toggleVoidSection(!!enabled);
+                renderVoidTable();
+                syncVoidHidden();
+            };
+
             // Recompute snapped previews when perimeter stone width changes
             var psw = document.querySelector('[name="perimeter_stone_width"]');
             if (psw) psw.addEventListener('input', renderVoidTable);
@@ -2512,6 +2533,30 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                             window.syncPtrowHidden();
                         };
 
+                        // Project import: replace PT-ROW rows / method / toggle from a
+                        // saved JSON (keys ptrow_*). Only defined when the card is on screen.
+                        window.loadPtrowState = function(d) {
+                            rows.length = 0;
+                            flowRows.length = 0;
+                            for (var i = 0; i < 100 && ('ptrow_label_' + i) in d; i++) {
+                                rows.push({ label: d['ptrow_label_' + i], wqv: parseFloat(d['ptrow_wqv_' + i]) || 0,
+                                            pct: parseFloat(d['ptrow_pct_' + i]) || 10 });
+                            }
+                            for (var j = 0; j < 100 && ('ptrow_flow_label_' + j) in d; j++) {
+                                flowRows.push({ label: d['ptrow_flow_label_' + j], cfs: parseFloat(d['ptrow_flow_cfs_' + j]) || 0 });
+                            }
+                            if (rows.length === 0) rows.push({ label: 'Area 1', wqv: 0, pct: 10 });
+                            if (flowRows.length === 0) flowRows.push({ label: 'Area 1', cfs: 0 });
+                            var on = d.ptrow_enabled === '1';
+                            document.getElementById('ptrowToggle').checked = on;
+                            document.getElementById('ptrowBody').style.display = on ? 'block' : 'none';
+                            ['ptrowRows', 'ptrowFlowRows'].forEach(function(id) {
+                                var tb = document.getElementById(id); if (tb) tb.innerHTML = '';
+                            });
+                            window.setPtrowMethod(d.ptrow_method === 'flow' ? 'flow' : 'volume');
+                            renderTable();
+                        };
+
                         // Restore toggle state from server
                         {% if results.ptrow_enabled %}
                         document.getElementById('ptrowToggle').checked = true;
@@ -3476,11 +3521,17 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
 
     function exportProject() {
         if (typeof syncPricingPctHidden === 'function') syncPricingPctHidden();
+        // Re-sync the indexed hidden inputs (void_*_N, ptrow_*) from their JS state first
+        if (window.syncVoidHidden) syncVoidHidden();
+        if (window.syncPtrowHidden) syncPtrowHidden();
         const data = {};
         document.querySelectorAll('#mainForm input, #mainForm select, #mainForm textarea').forEach(el => {
             if (el.name) data[el.name] = el.value;
         });
-        const proj = (document.getElementById('project_name').value || 'Project').trim().replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
+        // PT-ROW inputs live in the results card, OUTSIDE #mainForm — add them explicitly
+        const ptrowBox = document.getElementById('ptrowHiddenInputs');
+        if (ptrowBox) ptrowBox.querySelectorAll('input').forEach(el => { data[el.name] = el.value; });
+        const proj =(document.getElementById('project_name').value || 'Project').trim().replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
         const ts = new Date().toISOString().slice(0,10);
         const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
         const url = URL.createObjectURL(blob);
@@ -3489,6 +3540,37 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         a.download = `AquaCell_${proj}_${ts}.json`;
         a.click();
         URL.revokeObjectURL(url);
+    }
+
+    // Void Space islands and PT-ROW rows are indexed fields (void_*_N / ptrow_*_N)
+    // backed by JS state, so setting same-named inputs is not enough on import.
+    function restoreVoidAndPtrow(data) {
+        // Void Space Entry — always reset (older JSONs have none → clear current project's)
+        const voidList = [];
+        for (let i = 0; i < 40 && ('void_area_' + i) in data; i++) {
+            voidList.push({ label: data['void_label_' + i], area: data['void_area_' + i],
+                            dim: data['void_dim_' + i], perim: data['void_perim_' + i] });
+        }
+        if (window.loadVoidRows) loadVoidRows(voidList, data.void_enabled === '1');
+
+        // PT-ROW — card exists only after a calculation; otherwise stage the fields in the
+        // form so they POST on the next Calculate (injectPtrowToForm leaves them alone
+        // when the card is absent).
+        const form = document.getElementById('mainForm');
+        if (window.loadPtrowState) {
+            loadPtrowState(data);
+        } else if (form) {
+            form.querySelectorAll('input[name^="ptrow_"]').forEach(el => {
+                if (el.id !== 'formPtrowEnabled') el.remove();
+            });
+            Object.keys(data).forEach(k => {
+                if (/^ptrow_/.test(k) && k !== 'ptrow_enabled') {
+                    const inp = document.createElement('input');
+                    inp.type = 'hidden'; inp.name = k; inp.value = data[k];
+                    form.appendChild(inp);
+                }
+            });
+        }
     }
 
     function importProject(event, autoCalc) {
@@ -3502,6 +3584,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                     const el = document.querySelector(`[name="${k}"]`);
                     if (el) el.value = data[k];
                 });
+                restoreVoidAndPtrow(data);
                 // Pricing multipliers: older JSON files predate these keys — fall back
                 // to the 10% defaults rather than keeping the current project's values.
                 // Sets both the hidden mirrors and the visible inputs (if on screen).
