@@ -2538,11 +2538,11 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                         window.loadPtrowState = function(d) {
                             rows.length = 0;
                             flowRows.length = 0;
-                            for (var i = 0; i < 100 && ('ptrow_label_' + i) in d; i++) {
+                            for (var i = 0; ('ptrow_label_' + i) in d; i++) {
                                 rows.push({ label: d['ptrow_label_' + i], wqv: parseFloat(d['ptrow_wqv_' + i]) || 0,
                                             pct: parseFloat(d['ptrow_pct_' + i]) || 10 });
                             }
-                            for (var j = 0; j < 100 && ('ptrow_flow_label_' + j) in d; j++) {
+                            for (var j = 0; ('ptrow_flow_label_' + j) in d; j++) {
                                 flowRows.push({ label: d['ptrow_flow_label_' + j], cfs: parseFloat(d['ptrow_flow_cfs_' + j]) || 0 });
                             }
                             if (rows.length === 0) rows.push({ label: 'Area 1', wqv: 0, pct: 10 });
