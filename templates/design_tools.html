@@ -4778,6 +4778,7 @@
         calcError: null,
         calcSeq: 0,
         calcTimer: null,
+        calcPending: false, // an edit is waiting on (or in) a recalculation
     };
     const scbPdf = { doc: null, pageNum: 1, pageCount: 0, rendering: false };
 
@@ -5288,6 +5289,7 @@
         return p;
     }
     function scbScheduleCalc(delay) {
+        scbState.calcPending = true;
         clearTimeout(scbState.calcTimer);
         scbState.calcTimer = setTimeout(scbRunCalc, delay === undefined ? SCB_CALC_DELAY_MS : delay);
     }
@@ -5296,6 +5298,7 @@
         if (scbState.tanks.length === 0) {
             scbState.totals = null;
             scbState.calcError = null;
+            scbState.calcPending = false;
             scbRenderOutput();
             scbRedraw();
             return;
@@ -5314,17 +5317,20 @@
             data = await resp.json();
             if (seq !== scbState.calcSeq) return;   // a newer edit superseded this one
             if (!resp.ok || data.error) {
+                scbState.calcPending = false;
                 scbState.calcError = data.error || ('Calculation failed (HTTP ' + resp.status + ').');
                 scbRenderOutput();
                 return;
             }
         } catch (err) {
             if (seq !== scbState.calcSeq) return;
+            scbState.calcPending = false;
             scbState.calcError = 'Request failed: ' + err.message;
             scbRenderOutput();
             return;
         }
         scbState.calcError = null;
+        scbState.calcPending = false;
         ids.forEach(function (id, i) {
             const t = scbState.tanks.find(function (x) { return x.id === id; });
             if (t) t.result = data.tanks[i];
@@ -5706,6 +5712,7 @@
     function scbCopyToEmail() {
         const rs = scbState.tanks.filter(function (t) { return t.result; }).map(function (t) { return t.result; });
         const tot = scbState.totals;
+        if (scbState.calcPending) { scbSetStatus('Still calculating — try Copy again in a moment.'); return; }
         if (!rs.length || !tot) { scbSetStatus('Add a tank and let it calculate before copying.'); return; }
         if (scbState.calcError) { scbSetStatus('Fix the error shown under the plan before copying.'); return; }
 
@@ -5825,6 +5832,7 @@
         URL.revokeObjectURL(url);
     }
     function scbReadyResults() {
+        if (scbState.calcPending) { scbSetStatus('Still calculating — try the export again in a moment.'); return null; }
         if (scbState.calcError) { scbSetStatus('Fix the error shown under the plan before exporting.'); return null; }
         const tanks = scbState.tanks.filter(function (t) { return t.result; });
         if (!tanks.length) { scbSetStatus('Add a tank and let it calculate before exporting.'); return null; }
@@ -5894,6 +5902,14 @@
         if (!t) { scbSetStatus('Select the tank to export (click it in the Tanks list).'); return; }
         const r = t.result;
         const ci = r.calculator_import;
+        // The Single-Tank calculator reads Fabric Waste as a whole number
+        // (the Multi-Tank calculator accepts fractions). Refuse rather than
+        // round, which would silently change the fabric takeoff.
+        if (!Number.isInteger(Number(r.geo_waste_pct))) {
+            scbSetStatus('The Single-Tank calculator takes whole-number fabric waste only. Set "' + r.label +
+                '" to a whole % (now ' + r.geo_waste_pct + '%) or use the Multi-Tank export.');
+            return;
+        }
         const proj = scbGetVal('scb_project').trim();
         const data = {
             project_name: proj, project_num: '', location: '', site_address: '',
@@ -5916,6 +5932,12 @@
             pipe_connectors: String(r.bom.pipe_connectors.qty),
             top_adapters_12: String(r.bom.top_adapters_12.qty),
             top_adapters_16: String(r.bom.top_adapters_16.qty),
+            // Not in the Concept Builder: explicit zero / off so importing
+            // over an existing project cannot inherit its accessories.
+            geogrid_enabled: '0', geogrid_top_yd2: '0', geogrid_bottom_yd2: '0',
+            large_pipe_qty: '0', large_pipe_18: '0', large_pipe_24: '0', large_pipe_36: '0', large_pipe_gt36: '0',
+            liner_on_tank: '0', liner_on_stone: '0', liner_tank_yd2: '0', liner_stone_yd2: '0',
+            ptrow_enabled: '0', contingency_units: '0',
         };
         scbDownloadJSON(data, 'AquaCell_' + scbFileSafe(proj, 'Project') + '_' + scbFileSafe(r.label, 'Tank') + '_' +
             new Date().toISOString().slice(0, 10) + '.json');

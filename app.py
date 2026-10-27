@@ -1327,12 +1327,13 @@ def calc_site_concept_tank(payload):
         # Complex Shape inputs that make the single / multi-tank
         # calculators reproduce this tank (JSON export → import).
         'calculator_import': _scb_calculator_import(
-            crates_layer, width_crates, tank_area, tank_perim, excav_area, excav_perim),
+            crates_layer, width_crates, tank_area, tank_perim, excav_area, excav_perim,
+            side_plates, layers * side_multiplier),
     }
 
 
 def _scb_calculator_import(crates_layer, width_crates, tank_area, tank_perim,
-                           excav_area, excav_perim):
+                           excav_area, excav_perim, side_plates, plate_factor):
     """Complex Shape fields for the single / multi-tank calculators.
 
     Those calculators take a scaled area plus ONE known dimension, derive
@@ -1343,7 +1344,10 @@ def _scb_calculator_import(crates_layer, width_crates, tank_area, tank_perim,
     known dimension and area up by < 0.001 so the floor() snap lands on
     exactly a × b — float noise can never drop a crate. Crate count, BOM,
     snapped area and fabric then match this tank exactly; perimeter and
-    excavation values are passed straight through. Storage can differ by
+    excavation values are passed through at 3 decimals (the calculators'
+    input step); the tank perimeter is nudged in 0.001 steps, if needed,
+    so the receiving calculator rounds to the same side-plate count.
+    Storage can differ by
     up to ~0.3% because calc_tank() rounds the snapped width / length to
     2 decimals before computing its perimeter-stone volume."""
     n = int(crates_layer)
@@ -1352,12 +1356,26 @@ def _scb_calculator_import(crates_layer, width_crates, tank_area, tank_perim,
     b = n // a
     known = (math.floor(a * MODULE_WID * 1000) + 1) / 1000.0
     scaled = (math.floor(known * b * MODULE_LEN * 1000) + 1) / 1000.0
+
+    # Side plates = round(perimeter x layers x multiplier / 5.17) is an
+    # integer step function; display rounding of the perimeter can cross
+    # a .5 boundary, so verify and nudge.
+    perim = round(tank_perim, 3)
+    for k in range(0, 41):
+        for sign in (1, -1):
+            cand = round(perim + sign * 0.001 * k, 3)
+            if round(cand * plate_factor / 5.17) == side_plates:
+                perim = cand
+                break
+        else:
+            continue
+        break
     return {
         'complex_scaled_area': scaled,
         'complex_known_dim':   known,
-        'complex_tank_perim':  round(tank_perim, 2),
-        'complex_excav_area':  round(excav_area, 2),
-        'complex_excav_perim': round(excav_perim, 2),
+        'complex_tank_perim':  perim,
+        'complex_excav_area':  round(excav_area, 3),
+        'complex_excav_perim': round(excav_perim, 3),
         'crates_known': a,
         'crates_other': b,
         'footprint_sf': round(tank_area, 2),
