@@ -190,5 +190,75 @@ r = pdf(many); check('pdf 25 tanks -> 27 pages', r.status_code==200 and len(PdfR
 A.PRICING_ENABLED=False
 r = pdf(two); check('pdf on BETA build -> 404', r.status_code==404)
 A.PRICING_ENABLED=True
+# 12. Waste / overage labelling, sf fabric, hundredths heights (James's PDF markup, 2026-10-27)
+one = {'tanks':[{'label':'SC-2','config':'SC','layers':2,'mode':'rows',
+        'rows':[{'crate_count':n,'offset_crates':9-n} for n in range(1,10)],'perimeter_stone_width':1}]}
+calc1 = c.post('/design-tools/calculate', json={'calc_type':'site_concept','inputs':one}).get_json()
+t1, tot1 = calc1['tanks'][0], calc1['totals']
+check('stone overage pct = 10 (tank + totals)', t1['stone_overage_pct']==10 and tot1['stone_overage_pct']==10)
+check('stone yd3 = envelope x 1.10 / 27', close(t1['stone_yd3'], t1['stone_env_cf']*1.10/27, 0.06), (t1['stone_yd3'], t1['stone_env_cf']))
+check('stone tons = envelope x 1.10 x 100 lb/cf / 2000', close(t1['stone_tons'], t1['stone_env_cf']*1.10*100/2000, 0.06))
+check('geotextile sf = yd2 x 9 (tank/stone/total)',
+      all(close(t1[f'geotextile_{k}_sf'], t1[f'geotextile_{k}_yd2']*9, 0.5) for k in ('tank','stone','total')))
+check('geotextile total = tank + envelope (waste in both)', close(t1['geotextile_total_sf'], t1['geotextile_tank_sf']+t1['geotextile_stone_sf'], 0.11))
+check('totals carry sf + waste pcts', tot1['geotextile_total_sf']==round(t1['geotextile_total_sf'],2) and tot1['geo_waste_pcts']==[20.0])
+mixed = {'tanks':[dict(one['tanks'][0], geo_waste_pct=10), dict(one['tanks'][0], label='B', geo_waste_pct=20)]}
+cm = c.post('/design-tools/calculate', json={'calc_type':'site_concept','inputs':mixed}).get_json()
+check('mixed waste pcts listed sorted', cm['totals']['geo_waste_pcts']==[10.0, 20.0], cm['totals'].get('geo_waste_pcts'))
+check('waste note: single pct', A._scb_waste_note([20.0])=='incl. 20% waste')
+check('waste note: range', A._scb_waste_note([10.0,20.0])=='incl. 10-20% waste (varies by tank)')
+rd1 = PdfReader(io.BytesIO(pdf(one).data)); p2 = rd1.pages[1].extract_text(); p3 = rd1.pages[2].extract_text(); p1 = rd1.pages[0].extract_text()
+h, dpt = t1['tank_height_ft'], t1['total_system_depth_ft']
+check('pdf height to hundredths', f'{h:.2f} ft' in p2 and f'{h:.3f} ft' not in p2, h)
+check('pdf system depth to hundredths', f'{dpt:.2f} ft' in p2 and f'{dpt:.3f} ft' not in p2, dpt)
+check('pdf stone quantity notes 10% overage', 'Stone Quantity (incl. 10% overage)' in p2, p2)
+check('pdf geotextile in sf, no yd2', f"{t1['geotextile_total_sf']:,.1f} sf" in p2 and 'yd²' not in p2 and 'yd²' not in p3)
+check('pdf geotextile lines each note waste', p2.count('incl. 20% waste') == 3, p2.count('incl. 20% waste'))
+check('pdf p3 stone overage note', 'Stone (all tanks) — incl. 10% overage' in p3, p3)
+check('pdf p3 geotextile waste note + sf', 'Geotextile (all tanks) — incl. 20% waste' in p3 and f"{tot1['geotextile_total_sf']:,.1f} sf" in p3)
+check('pdf p3 excavation + storage notes', 'net, no overage' in p3 and 'net, no waste/overage' in p3)
+check('pdf p1 stone overage note', 'Stone (incl. 10% overage)' in p1)
+rdm = PdfReader(io.BytesIO(pdf(mixed).data))
+check('pdf p3 mixed waste range', 'incl. 10-20% waste (varies by tank)' in rdm.pages[-1].extract_text())
+
+# 13. calculator_import: the single / multi-tank Complex Shape fields must reproduce the tank
+import re
+random.seed(11); badn = 0; bad_snap = 0
+shapes = [one['tanks'][0]['rows']] + [[{'crate_count':random.randint(1,12),'offset_crates':random.randint(0,6)} for _ in range(random.randint(1,12))] for _ in range(120)]
+shapes += [[{'crate_count':17,'offset_crates':0}], [{'crate_count':1,'offset_crates':0}]*13, [{'crate_count':1,'offset_crates':0}]]  # prime / thin
+for rows in shapes:
+    for cfg, lay in (('SC',1),('EX',3)):
+        code, j = post({'tanks':[{'config':cfg,'layers':lay,'rows':rows,'perimeter_stone_width':1.25,'cover_stone':0.8,'base_stone':0.5,'stone_void':0.38,'geo_waste_pct':15}]})
+        t = j['tanks'][0]; ci = t['calculator_import']
+        mt = A.calc_tank({'config':cfg,'layers':lay,'shape_mode':'complex',
+                          'complex_scaled_area':ci['complex_scaled_area'],'complex_known_dim':ci['complex_known_dim'],
+                          'complex_tank_perim':ci['complex_tank_perim'],'complex_excav_area':ci['complex_excav_area'],
+                          'complex_excav_perim':ci['complex_excav_perim'],'cover_stone':0.8,'base_stone':0.5,
+                          'perimeter_stone_width':1.25,'stone_void':0.38,'geoWaste':15})
+        ok = (mt['num_crates']==t['num_crates'] and mt['base_units']==t['bom']['base_units']['qty']
+              and mt['side_plates']==t['bom']['side_plates']['qty'] and mt['bottom_plates']==t['bom']['bottom_plates']['qty']
+              and close(mt['tank_storage'], t['tank_storage_cf'], 0.1)
+              # calc_tank rounds snapped width/length to 2 decimals before its perimeter-stone volume -> <= ~0.3% on total
+              and abs(mt['total_storage']-t['total_storage_cf']) <= max(3.0, 0.004*t['total_storage_cf'])
+              and close(mt['stone_yd3'], t['stone_yd3'], 0.1) and close(mt['geoTank'], t['geotextile_tank_sf'], 0.2)
+              and close(mt['geoStone'], t['geotextile_stone_sf'], 0.2))
+        if not ok: badn += 1
+        if ci['crates_known']*ci['crates_other'] != t['crates_layer']: bad_snap += 1
+check('import fields reproduce crates/BOM/storage/stone/fabric via calc_tank (SC+EX, 123 shapes)', badn==0, badn)
+check('equivalent grid a x b == crates per layer', bad_snap==0, bad_snap)
+# 3-decimal values only (single-tank inputs use step=0.001)
+check('import fields are 3-decimal clean',
+      all(abs(round(ci[k]*1000)-ci[k]*1000) < 1e-6 for k in ('complex_scaled_area','complex_known_dim')), ci)
+# single-tank page accepts the same fields and snaps to the same grid
+code, j = post(one); ci = j['tanks'][0]['calculator_import']
+form = {'config':'SC','layers':'2','shape_mode':'complex','complex_scaled_area':str(ci['complex_scaled_area']),
+        'complex_known_dim':str(ci['complex_known_dim']),'complex_tank_perim':str(ci['complex_tank_perim']),
+        'complex_excav_area':str(ci['complex_excav_area']),'complex_excav_perim':str(ci['complex_excav_perim']),
+        'cover_stone':'1','base_stone':'0.333','perimeter_stone_width':'1','stone_void':'0.4','geoWaste':'20',
+        'traffic_load':'HS20','void_enabled':'0'}
+r = c.post('/', data=form)
+html = re.sub(r'\s+', ' ', r.get_data(as_text=True))
+check('single-tank page renders imported tank (200)', r.status_code==200)
+check('single-tank snapped grid matches', f"({ci['crates_known']} × {ci['crates_other']} crates/layer)" in html, ci)
 print('FAILS', fails)
 sys.exit(1 if fails else 0)
