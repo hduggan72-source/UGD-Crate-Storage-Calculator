@@ -1046,6 +1046,10 @@ def calc_complex_shape_builder(payload):
 # ══════════════════════════════════════════════════════════════════
 _SCB_TOL = 1e-9
 _SCB_MAX_TANKS = 25
+# Stone purchase overage — same 10% allowance calc_tank() applies to
+# "Total Estimated Stone Backfill Volume (with 10%)". Applied to the stone
+# yd³ / tons only; storage credit is always the net (void) volume.
+_SCB_STONE_OVERAGE_PCT = 10
 
 
 def _scb_num(payload, key, default):
@@ -1232,8 +1236,9 @@ def calc_site_concept_tank(payload):
 
     # Stone is still placed when its storage credit is excluded, so the
     # purchase quantity stays gross (same as calc_tank).
-    stone_yd3  = stone_env_vol * 1.10 / 27
-    stone_tons = stone_env_vol * 1.10 * 100 / 2000
+    stone_factor = 1 + _SCB_STONE_OVERAGE_PCT / 100.0
+    stone_yd3  = stone_env_vol * stone_factor / 27
+    stone_tons = stone_env_vol * stone_factor * 100 / 2000
 
     # ── Materials (mirrors calc_tank) ────────────────────────────────
     side_plates = round(tank_perim * (layers * side_multiplier) / 5.17)
@@ -1300,7 +1305,14 @@ def calc_site_concept_tank(payload):
         'stone_env_cf':   round(stone_env_vol, 1),
         'stone_yd3':      round(stone_yd3, 1),
         'stone_tons':     round(stone_tons, 2),
+        'stone_overage_pct': _SCB_STONE_OVERAGE_PCT,
         'geo_waste_pct':  round(geo_waste_pct, 1),
+        # Fabric quantities already include the waste % (tank, envelope and
+        # total are each multiplied by it). Reported in sf; yd² kept for
+        # any existing consumer.
+        'geotextile_tank_sf':   round(geo_tank_sf, 1),
+        'geotextile_stone_sf':  round(geo_stone_sf, 1),
+        'geotextile_total_sf':  round(geo_tank_sf + geo_stone_sf, 1),
         'geotextile_tank_yd2':  round(geo_tank_sf / 9, 1),
         'geotextile_stone_yd2': round(geo_stone_sf / 9, 1),
         'geotextile_total_yd2': round((geo_tank_sf + geo_stone_sf) / 9, 1),
@@ -1312,6 +1324,43 @@ def calc_site_concept_tank(payload):
         # from row 0). The excavation outline is the union of these.
         'tank_rects_ft':       [[round(v, 4) for v in r] for r in tank_rects],
         'excavation_rects_ft': [[round(v, 4) for v in r] for r in excav_rects],
+        # Complex Shape inputs that make the single / multi-tank
+        # calculators reproduce this tank (JSON export → import).
+        'calculator_import': _scb_calculator_import(
+            crates_layer, width_crates, tank_area, tank_perim, excav_area, excav_perim),
+    }
+
+
+def _scb_calculator_import(crates_layer, width_crates, tank_area, tank_perim,
+                           excav_area, excav_perim):
+    """Complex Shape fields for the single / multi-tank calculators.
+
+    Those calculators take a scaled area plus ONE known dimension, derive
+    the other dimension (area / known) and snap BOTH down to whole crate
+    modules. A stepped shape has no single width × length, so choose an
+    equivalent crate grid a × b with a·b == crates per layer (a = the
+    divisor of the crate count nearest the bounding width) and pad the
+    known dimension and area up by < 0.001 so the floor() snap lands on
+    exactly a × b — float noise can never drop a crate. Crate count, BOM,
+    snapped area and fabric then match this tank exactly; perimeter and
+    excavation values are passed straight through. Storage can differ by
+    up to ~0.3% because calc_tank() rounds the snapped width / length to
+    2 decimals before computing its perimeter-stone volume."""
+    n = int(crates_layer)
+    divisors = [d for d in range(1, n + 1) if n % d == 0]
+    a = min(divisors, key=lambda d: (abs(d - width_crates), -d))
+    b = n // a
+    known = (math.floor(a * MODULE_WID * 1000) + 1) / 1000.0
+    scaled = (math.floor(known * b * MODULE_LEN * 1000) + 1) / 1000.0
+    return {
+        'complex_scaled_area': scaled,
+        'complex_known_dim':   known,
+        'complex_tank_perim':  round(tank_perim, 2),
+        'complex_excav_area':  round(excav_area, 2),
+        'complex_excav_perim': round(excav_perim, 2),
+        'crates_known': a,
+        'crates_other': b,
+        'footprint_sf': round(tank_area, 2),
     }
 
 
@@ -1369,7 +1418,8 @@ def calc_site_concept(payload):
 
     sum_keys = ['num_crates', 'tank_footprint_sf', 'excavation_area_sf', 'excavation_vol_cf',
                 'excavation_vol_cy', 'tank_storage_cf', 'stone_storage_cf', 'total_storage_cf',
-                'stone_yd3', 'stone_tons', 'geotextile_tank_yd2', 'geotextile_stone_yd2',
+                'stone_yd3', 'stone_tons', 'geotextile_tank_sf', 'geotextile_stone_sf',
+                'geotextile_total_sf', 'geotextile_tank_yd2', 'geotextile_stone_yd2',
                 'geotextile_total_yd2']
     totals = {k: round(sum(t[k] for t in tanks), 2) for k in sum_keys}
     qtys = {item: sum(t['bom'][item]['qty'] for t in tanks) for item in tanks[0]['bom']}
@@ -1381,6 +1431,10 @@ def calc_site_concept(payload):
     # each tank's own round-up would overstate it. Not part of the totals.
     totals['contingency_recommended'] = _scb_contingency(qtys['base_units'])
     totals['tank_count'] = len(tanks)
+    totals['stone_overage_pct'] = _SCB_STONE_OVERAGE_PCT
+    # Fabric waste can differ tank to tank — report the distinct values so
+    # the project total is labelled honestly.
+    totals['geo_waste_pcts'] = sorted({t['geo_waste_pct'] for t in tanks})
 
     return {'tanks': tanks, 'totals': totals}
 
@@ -5242,6 +5296,16 @@ def _scb_n(v, dec=0):
     return f'{v:,.{dec}f}'
 
 
+def _scb_waste_note(pcts):
+    """'incl. 20% waste' — or a range when tanks use different fabric
+    waste percentages (the project total mixes them)."""
+    def f(v):
+        return f'{v:g}'
+    if len(pcts) == 1:
+        return f'incl. {f(pcts[0])}% waste'
+    return f'incl. {f(pcts[0])}-{f(pcts[-1])}% waste (varies by tank)'
+
+
 def _draw_scb_tank_plan(c, x0, y0, w, h, r):
     """Plan-view schematic of one tank (unrotated: crate long axis runs
     down the page). Excavation outline, crates, overall dimensions."""
@@ -5347,7 +5411,8 @@ def build_site_concept_pdf(image_data_url, inputs, results, project_name=None):
     ly = _scb_kv(c, xl, ly, half, 'Tank Footprint (all tanks)', f"{_scb_n(tot['tank_footprint_sf'], 1)} sf")
     ry = _scb_kv(c, xr, y, half, 'Total Storage', f"{_scb_n(tot['total_storage_cf'], 1)} cf", bold_row=True)
     ry = _scb_kv(c, xr, ry, half, 'Excavation', f"{_scb_n(tot['excavation_vol_cy'], 1)} cy", shade=True)
-    ry = _scb_kv(c, xr, ry, half, 'Stone', f"{_scb_n(tot['stone_yd3'], 1)} yd³ ({_scb_n(tot['stone_tons'], 1)} tons)")
+    ry = _scb_kv(c, xr, ry, half, f"Stone (incl. {tot['stone_overage_pct']:g}% overage)",
+                 f"{_scb_n(tot['stone_yd3'], 1)} yd³ ({_scb_n(tot['stone_tons'], 1)} tons)")
     y = min(ly, ry) - 8
 
     bar_h = 16
@@ -5407,8 +5472,8 @@ def build_site_concept_pdf(image_data_url, inputs, results, project_name=None):
                      f"{_scb_n(r['bounding_width_ft'], 2)} × {_scb_n(r['bounding_length_ft'], 2)} ft")
         ly = _scb_kv(c, xl, ly, half, 'Crates Wide × Rows Long',
                      f"{r['bounding_width_crates']} × {r['bounding_length_crates']}", shade=True)
-        ly = _scb_kv(c, xl, ly, half, 'Tank Height', f"{_scb_n(r['tank_height_ft'], 3)} ft")
-        ly = _scb_kv(c, xl, ly, half, 'Total System Depth (base+tank+cover)', f"{_scb_n(r['total_system_depth_ft'], 3)} ft", shade=True)
+        ly = _scb_kv(c, xl, ly, half, 'Tank Height', f"{_scb_n(r['tank_height_ft'], 2)} ft")
+        ly = _scb_kv(c, xl, ly, half, 'Total System Depth (base+tank+cover)', f"{_scb_n(r['total_system_depth_ft'], 2)} ft", shade=True)
         ly = _scb_kv(c, xl, ly, half, 'Tank Footprint', f"{_scb_n(r['tank_footprint_sf'], 1)} sf")
         ly = _scb_kv(c, xl, ly, half, 'Tank Perimeter', f"{_scb_n(r['tank_perimeter_ft'], 1)} ft", shade=True)
         ly = _scb_kv(c, xl, ly, half, 'Fill Efficiency (vs. bounding box)', f"{_scb_n(r['fill_efficiency_pct'], 1)}%")
@@ -5437,11 +5502,13 @@ def build_site_concept_pdf(image_data_url, inputs, results, project_name=None):
         ry = _scb_col_header(c, xr, y, half, 'STONE & FABRIC')
         ry = _scb_kv(c, xr, ry, half, 'Cover / Base Stone Depth', f"{_scb_n(r['cover_stone_ft'], 3)} / {_scb_n(r['base_stone_ft'], 3)} ft")
         ry = _scb_kv(c, xr, ry, half, 'Stone Void Ratio', f"{_scb_n(r['stone_void'] * 100, 1)}%", shade=True)
-        ry = _scb_kv(c, xr, ry, half, 'Stone Quantity', f"{_scb_n(r['stone_yd3'], 1)} yd³  ({_scb_n(r['stone_tons'], 1)} tons)")
-        ry = _scb_kv(c, xr, ry, half, 'Geotextile — Tank', f"{_scb_n(r['geotextile_tank_yd2'], 1)} yd²", shade=True)
-        ry = _scb_kv(c, xr, ry, half, 'Geotextile — Stone Envelope', f"{_scb_n(r['geotextile_stone_yd2'], 1)} yd²")
-        ry = _scb_kv(c, xr, ry, half, f"Geotextile — Total (incl. {_scb_n(r['geo_waste_pct'], 0)}% waste)",
-                     f"{_scb_n(r['geotextile_total_yd2'], 1)} yd²", shade=True)
+        waste = f"incl. {r['geo_waste_pct']:g}% waste"
+        ry = _scb_kv(c, xr, ry, half, f"Stone Quantity (incl. {r['stone_overage_pct']:g}% overage)",
+                     f"{_scb_n(r['stone_yd3'], 1)} yd³  ({_scb_n(r['stone_tons'], 1)} tons)")
+        ry = _scb_kv(c, xr, ry, half, f'Geotextile — Tank ({waste})', f"{_scb_n(r['geotextile_tank_sf'], 1)} sf", shade=True)
+        ry = _scb_kv(c, xr, ry, half, f'Geotextile — Stone Envelope ({waste})', f"{_scb_n(r['geotextile_stone_sf'], 1)} sf")
+        ry = _scb_kv(c, xr, ry, half, f'Geotextile — Total ({waste})',
+                     f"{_scb_n(r['geotextile_total_sf'], 1)} sf", shade=True)
         y = min(ly, ry) - 8
 
         y = _section_header(c, y, 'MATERIALS')
@@ -5471,10 +5538,14 @@ def build_site_concept_pdf(image_data_url, inputs, results, project_name=None):
 
     y = _section_header(c, y, 'PROJECT MATERIALS')
     y = _scb_bom_table(c, y, tot['bom'], 'SC' if any(r['config'] == 'SC' for r in tanks) else 'EX')
-    y = _kv_row(c, y, 'Stone (all tanks)', f"{_scb_n(tot['stone_yd3'], 1)} yd³  ({_scb_n(tot['stone_tons'], 1)} tons)")
-    y = _kv_row(c, y, 'Geotextile (all tanks)', f"{_scb_n(tot['geotextile_total_yd2'], 1)} yd²", shade=True)
-    y = _kv_row(c, y, 'Excavation (all tanks, vertical sides)', f"{_scb_n(tot['excavation_vol_cy'], 1)} cy")
-    y = _highlight_row(c, y - 2, 'TOTAL STORAGE (all tanks)', f"{_scb_n(tot['total_storage_cf'], 1)} cf")
+    y = _kv_row(c, y, f"Stone (all tanks) — incl. {tot['stone_overage_pct']:g}% overage",
+                f"{_scb_n(tot['stone_yd3'], 1)} yd³  ({_scb_n(tot['stone_tons'], 1)} tons)")
+    y = _kv_row(c, y, f"Geotextile (all tanks) — {_scb_waste_note(tot['geo_waste_pcts'])}",
+                f"{_scb_n(tot['geotextile_total_sf'], 1)} sf", shade=True)
+    y = _kv_row(c, y, 'Excavation (all tanks, vertical sides) — net, no overage',
+                f"{_scb_n(tot['excavation_vol_cy'], 1)} cy")
+    y = _highlight_row(c, y - 2, 'TOTAL STORAGE (all tanks) — net, no waste/overage',
+                       f"{_scb_n(tot['total_storage_cf'], 1)} cf")
     y -= 10
     _scb_contingency_note(c, y, tot['contingency_recommended'], 'project, combined base units')
 

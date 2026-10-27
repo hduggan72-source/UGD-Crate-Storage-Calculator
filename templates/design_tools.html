@@ -1459,11 +1459,17 @@
                 <div style="display:flex; flex-direction:column; gap:4px; font-size:12.5px;">
                     <label style="display:flex; align-items:center; gap:6px; margin:0; font-weight:normal;"><input type="checkbox" id="scb_show_grid" checked onchange="scbRedraw()" style="width:auto; margin:0;"> Crate grid</label>
                     <label style="display:flex; align-items:center; gap:6px; margin:0; font-weight:normal;"><input type="checkbox" id="scb_show_excav" checked onchange="scbRedraw()" style="width:auto; margin:0;"> Excavation outline</label>
+                    <label style="display:flex; align-items:center; gap:6px; margin:0; font-weight:normal;"><input type="checkbox" id="scb_show_label" checked onchange="scbRedraw()" style="width:auto; margin:0;"> Tank labels <span style="color:var(--muted);">(turn off for small tanks)</span></label>
                 </div>
 
                 <div style="display:flex; gap:8px; margin-top:12px;">
                     <button type="button" class="calc-btn secondary" style="flex:1;" onclick="scbExportPNG()">Export PNG</button>
                     <button type="button" id="scb_pdf_btn" class="calc-btn" style="flex:1;" onclick="scbExportPDF()">Download Estimate PDF</button>
+                </div>
+                <div style="display:flex; gap:8px; margin-top:8px;">
+                    <button type="button" class="calc-btn" style="flex:1; background:#6f42c1; color:#fff;" onclick="scbCopyToEmail()" title="Copy results as email text (same format as the Single &amp; Multi-Tank calculators)">&#128203; Copy</button>
+                    <button type="button" class="calc-btn secondary" style="flex:1;" onclick="scbExportJSONMulti()" title="All tanks &mdash; import into the Multi-Tank calculator">Export JSON &mdash; Multi-Tank</button>
+                    <button type="button" class="calc-btn secondary" style="flex:1;" onclick="scbExportJSONSingle()" title="Selected tank only &mdash; import into the Single-Tank calculator">Export JSON &mdash; Single-Tank</button>
                 </div>
                 <div id="scb_status" style="font-size:12px; color:var(--muted); margin-top:8px;"></div>
             </div>
@@ -5508,7 +5514,9 @@
         strokeSegs(scbUnionEdges(r.tank_rects_ft));
         ctx.setLineDash([]);
 
-        // Label — counter-rotated so it always reads upright.
+        // Label — counter-rotated so it always reads upright. Optional: on a
+        // small tank the box covers the crates (Display > Tank labels).
+        if (!document.getElementById('scb_show_label').checked) { ctx.restore(); return; }
         ctx.rotate(-(t.rot || 0) * Math.PI / 180);
         const line1 = t.label || 'Tank';
         const line2 = r.config + ' · ' + r.layers + 'L · ' + scbFmt(bw, 1) + ' × ' + scbFmt(bl, 1) + ' ft · ' +
@@ -5558,7 +5566,7 @@
                 '<div style="font-weight:bold; font-size:12px; color:#6b7280; margin:4px 0;">DIMENSIONS</div>' +
                 scbRow('Tank (bounding)', scbFmt(r.bounding_width_ft, 2) + ' × ' + scbFmt(r.bounding_length_ft, 2) + ' ft (' +
                     r.bounding_width_crates + ' × ' + r.bounding_length_crates + ' crates)') +
-                scbRow('Tank Height / System Depth', scbFmt(r.tank_height_ft, 3) + ' ft / ' + scbFmt(r.total_system_depth_ft, 3) + ' ft') +
+                scbRow('Tank Height / System Depth', scbFmt(r.tank_height_ft, 2) + ' ft / ' + scbFmt(r.total_system_depth_ft, 2) + ' ft') +
                 scbRow('Footprint / Perimeter', scbFmt(r.tank_footprint_sf, 1) + ' sf / ' + scbFmt(r.tank_perimeter_ft, 1) + ' ft') +
                 scbRow('Fill Efficiency', scbFmt(r.fill_efficiency_pct, 1) + '%') +
                 scbRow('Crates / Layer &middot; Total', scbFmt(r.crates_layer) + ' &middot; ' + scbFmt(r.num_crates)) +
@@ -5575,8 +5583,8 @@
                 scbRow('Base Units', scbFmt(b.base_units.qty) + ' (' + b.base_units.pallets + ' pallets)') +
                 scbRow('Side Plates', scbFmt(b.side_plates.qty) + ' (' + b.side_plates.pallets + ' pallets)') +
                 (r.config === 'SC' ? scbRow('Bottom Plates', scbFmt(b.bottom_plates.qty) + ' (' + b.bottom_plates.pallets + ' pallets)') : '') +
-                scbRow('Stone', scbFmt(r.stone_yd3, 1) + ' yd³ (' + scbFmt(r.stone_tons, 1) + ' tons)') +
-                scbRow('Geotextile (tank + stone)', scbFmt(r.geotextile_total_yd2, 1) + ' yd²') +
+                scbRow('Stone <small>(incl. ' + r.stone_overage_pct + '% overage)</small>', scbFmt(r.stone_yd3, 1) + ' yd³ (' + scbFmt(r.stone_tons, 1) + ' tons)') +
+                scbRow('Geotextile (tank + stone) <small>(incl. ' + scbFmt(r.geo_waste_pct, 0) + '% waste)</small>', scbFmt(r.geotextile_total_sf, 1) + ' sf') +
                 '</div></div>' + scbContingencyNote(r.contingency_recommended, 'this tank') + '</div>';
         }
         const tot = scbState.totals;
@@ -5596,8 +5604,8 @@
                 scbRow('Base Units', scbFmt(tot.bom.base_units.qty) + ' (' + tot.bom.base_units.pallets + ' pallets)') +
                 scbRow('Side Plates', scbFmt(tot.bom.side_plates.qty) + ' (' + tot.bom.side_plates.pallets + ' pallets)') +
                 scbRow('Bottom Plates', scbFmt(tot.bom.bottom_plates.qty) + ' (' + tot.bom.bottom_plates.pallets + ' pallets)') +
-                scbRow('Stone', scbFmt(tot.stone_yd3, 1) + ' yd³ (' + scbFmt(tot.stone_tons, 1) + ' tons)') +
-                scbRow('Geotextile', scbFmt(tot.geotextile_total_yd2, 1) + ' yd²') +
+                scbRow('Stone <small>(incl. ' + tot.stone_overage_pct + '% overage)</small>', scbFmt(tot.stone_yd3, 1) + ' yd³ (' + scbFmt(tot.stone_tons, 1) + ' tons)') +
+                scbRow('Geotextile <small>(' + scbWasteNote(tot.geo_waste_pcts) + ')</small>', scbFmt(tot.geotextile_total_sf, 1) + ' sf') +
                 scbRow('Material Weight (crates &amp; plates)', scbFmt(tot.total_weight_lbs) + ' lbs') +
                 '</div>' + scbContingencyNote(tot.contingency_recommended, 'project, combined base units') +
                 '<div style="font-size:11px; color:#64748b; margin-top:8px; line-height:1.4;">Conceptual estimate &mdash; quantities come from the crate layout entered, not from the plan image.</div></div>';
@@ -5679,6 +5687,240 @@
 
     // Tank fields start open, filled with the new-tank defaults.
     scbSyncEditor();
+
+    // ── WASTE / OVERAGE LABELS ──
+    // 'incl. 20% waste' — or a range when tanks use different fabric waste.
+    function scbWasteNote(pcts) {
+        const f = function (v) { return String(Number(v)); };
+        if (!pcts || !pcts.length) return 'incl. waste';
+        if (pcts.length === 1) return 'incl. ' + f(pcts[0]) + '% waste';
+        return 'incl. ' + f(pcts[0]) + '-' + f(pcts[pcts.length - 1]) + '% waste (varies by tank)';
+    }
+
+    // ── COPY (TO EMAIL) ──
+    // Same text layout as copyToEmail() (Single-Tank, used for exactly one
+    // tank) and copyToClipboard() (Multi-Tank, used for two or more). Every
+    // number is a server result — nothing is computed here. Lines the
+    // Concept Builder has no data for (minimum storage) print "—", as the
+    // other calculators do.
+    function scbCopyToEmail() {
+        const rs = scbState.tanks.filter(function (t) { return t.result; }).map(function (t) { return t.result; });
+        const tot = scbState.totals;
+        if (!rs.length || !tot) { scbSetStatus('Add a tank and let it calculate before copying.'); return; }
+        if (scbState.calcError) { scbSetStatus('Fix the error shown under the plan before copying.'); return; }
+
+        const fmt = function (v) { return parseFloat(v).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }); };
+        const fmtI = function (v) { return Math.round(v).toLocaleString(); };
+        const pcts = tot.geo_waste_pcts || [];
+        const wasteLabel = pcts.length === 1
+            ? '  (+' + Number(pcts[0]) + '% waste)'
+            : '  (+' + Number(pcts[0]) + '-' + Number(pcts[pcts.length - 1]) + '% waste)';
+        const stoneNote = 'with ' + tot.stone_overage_pct + '%';
+        const b = tot.bom;
+        let lines;
+
+        if (rs.length === 1) {
+            const r = rs[0];
+            lines = [
+                'AquaCell Proposed System',
+                '',
+                'Tank Configuration/Layers:                        ' + r.config + '/' + r.layers + ' Layer(s)',
+                'Minimum Required Storage (ft³):                   —',
+                'AquaCell Tank Storage (ft³):                      ' + fmt(r.tank_storage_cf),
+                'Stone Backfill Storage (ft³):                     ' + fmt(r.stone_storage_cf),
+                'Total System Storage (ft³):                       ' + fmt(r.total_storage_cf),
+                'Base Unit (3091506) ea.:                          ' + fmtI(b.base_units.qty),
+                'Side Plates (2476600003) ea.:                     ' + fmtI(b.side_plates.qty),
+                'Bottom Plate (2476600001) ea.:                    ' + fmtI(b.bottom_plates.qty),
+                '8-12" Pipe Connectors (2476631200) ea.:           ' + fmtI(b.pipe_connectors.qty),
+                '12" Top Adapters (3085857) ea.:                   ' + fmtI(b.top_adapters_12.qty),
+                '16" Top Adapters (2476842000) ea.:                ' + fmtI(b.top_adapters_16.qty),
+                'AquaCell Tank Wrap Geotextile (ft²):              ' + fmt(r.geotextile_tank_sf) + wasteLabel,
+                'Stone Backfill Envelope Geotextile (ft²):         ' + fmt(r.geotextile_stone_sf) + wasteLabel,
+                'Total Geotextile (ft²):                           ' + fmt(r.geotextile_total_sf) + wasteLabel,
+                'Total Estimated Stone Backfill Volume (' + stoneNote + '): ' + fmt(r.stone_yd3) + ' yd³',
+            ];
+        } else {
+            const divider = '-'.repeat(70);
+            const tankLines = [];
+            rs.forEach(function (r, i) {
+                tankLines.push('  Tank ' + (i + 1) + ': ' + r.label + '  |  ' + r.config + '-' + r.layers + '  |  ' +
+                    scbFmt(r.bounding_width_ft, 2) + 'ft × ' + scbFmt(r.bounding_length_ft, 2) + 'ft (bounding)  |  ' +
+                    scbFmt(r.tank_height_ft, 2) + 'ft ht');
+                tankLines.push('           Storage: ' + fmt(r.tank_storage_cf) + ' ft³ (tank)  |  Cover Stone: ' + scbFmt(r.cover_stone_ft, 2) + 'ft');
+                tankLines.push('           Base: ' + r.bom.base_units.qty + '  Side: ' + r.bom.side_plates.qty + '  Bot: ' + r.bom.bottom_plates.qty);
+            });
+            lines = [
+                'AquaCell Proposed Multi-Tank System',
+                '',
+                'Total AquaCell Tanks:                              ' + rs.length,
+                'Minimum Required Project Storage (ft³):            —',
+                'AquaCell Total All Tanks Storage (ft³):           ' + fmt(tot.tank_storage_cf),
+                'Stone Backfill All Project Storage (ft³):          ' + fmt(tot.stone_storage_cf),
+                'System Total Project Storage (ft³):                ' + fmt(tot.total_storage_cf),
+                '',
+                divider,
+                'PER-TANK BREAKDOWN',
+                divider,
+            ].concat(tankLines, [
+                divider,
+                '',
+                'Base Units (3091506) ea.:                          ' + fmtI(b.base_units.qty),
+                'Side Plates (2476600003) ea.:                      ' + fmtI(b.side_plates.qty),
+                'Bottom Plates (2476600001) ea.:                    ' + fmtI(b.bottom_plates.qty),
+                '8-12" Pipe Connectors (2476631200) ea.:            ' + fmtI(b.pipe_connectors.qty),
+                '12" Top Adapters (3085857) ea.:                    ' + fmtI(b.top_adapters_12.qty),
+                '16" Top Adapters (2476842000) ea.:                 ' + fmtI(b.top_adapters_16.qty),
+                'Contingency Base Units (pallet fill, recommended) ea.: ' + fmtI(tot.contingency_recommended.qty),
+                '',
+                'Non-Woven Geo — Tank Wrap (ft²):                   ' + fmt(tot.geotextile_tank_sf) + wasteLabel,
+                'Non-Woven Geo — Backfill Envelope (ft²):           ' + fmt(tot.geotextile_stone_sf) + wasteLabel,
+                'Total Non-Woven Geotextile (ft²):                  ' + fmt(tot.geotextile_total_sf) + wasteLabel,
+                'Total Estimated Stone Backfill Volume (' + stoneNote + '):  ' + fmt(tot.stone_yd3) + ' CU YD',
+            ]);
+        }
+
+        const text = lines.join('\n');
+        const done = function () { scbSetStatus('Copied to clipboard — paste into your email.'); };
+        const fallback = function () {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            let ok = false;
+            try { ok = document.execCommand('copy'); } catch (e) {}
+            document.body.removeChild(ta);
+            if (ok) done(); else scbSetStatus('Copy failed — your browser blocked clipboard access.');
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done).catch(fallback);
+        } else {
+            fallback();
+        }
+    }
+
+    // ── EXPORT JSON (import into the Single- or Multi-Tank calculator) ──
+    // Same file layouts those calculators export. Only fields the Concept
+    // Builder knows are filled; the rest are blank for manual entry.
+    // Complex Shape fields come from the server (result.calculator_import),
+    // so the imported tank reproduces this tank's crates, storage and BOM.
+    // Traffic load is the one exception to "blank": neither calculator's
+    // dropdown has a blank option, so it carries each calculator's default.
+    function scbNum(v) { return String(Number(v)); }
+    function scbFileSafe(s, fallback) {
+        const c = String(s == null ? '' : s).trim().replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
+        return c || fallback;
+    }
+    function scbDownloadJSON(obj, filename) {
+        const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;     // filename set client-side (app convention)
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+    function scbReadyResults() {
+        if (scbState.calcError) { scbSetStatus('Fix the error shown under the plan before exporting.'); return null; }
+        const tanks = scbState.tanks.filter(function (t) { return t.result; });
+        if (!tanks.length) { scbSetStatus('Add a tank and let it calculate before exporting.'); return null; }
+        return tanks;
+    }
+    // One tank in the Multi-Tank calculator's tank-object shape
+    // (multi_tank.html defaultTankData), Complex Shape mode.
+    function scbMultiTankObject(r) {
+        const ci = r.calculator_import;
+        return {
+            tank_label: r.label,
+            config: r.config, layers: String(r.layers), traffic_load: 'HS20',
+            known_width: '', known_length: '',
+            shape_mode: 'complex',
+            complex_scaled_area: scbNum(ci.complex_scaled_area),
+            complex_known_dim: scbNum(ci.complex_known_dim),
+            complex_tank_perim: scbNum(ci.complex_tank_perim),
+            complex_excav_area: scbNum(ci.complex_excav_area),
+            complex_excav_perim: scbNum(ci.complex_excav_perim),
+            surface_elev: '', tank_bottom_elev: '',
+            cover_stone: scbNum(r.cover_stone_ft), base_stone: scbNum(r.base_stone_ft),
+            perimeter_stone_width: scbNum(r.perimeter_stone_width_ft), stone_void: scbNum(r.stone_void),
+            geoWaste: scbNum(r.geo_waste_pct), min_storage: '0',
+            stone_top_included: !!r.stone_top_included, stone_perim_included: !!r.stone_perim_included,
+            stone_base_included: !!r.stone_base_included,
+            tank_notes: '',
+            pipe_connectors: String(r.bom.pipe_connectors.qty),
+            top_adapters_12: String(r.bom.top_adapters_12.qty),
+            top_adapters_16: String(r.bom.top_adapters_16.qty),
+            geogrid_top_yd2: 0, geogrid_bottom_yd2: 0,
+            large_pipe_qty: 0, large_pipe_18: 0, large_pipe_24: 0, large_pipe_36: 0, large_pipe_gt36: 0,
+            ptrow_enabled: false, ptrow_areas: [{ label: 'Area 1', wqv: 0, pct: 10 }],
+            ptrow_flow_areas: [{ label: 'Area 1', cfs: 0 }], ptrow_method: 'volume',
+            liner_on_tank: false, liner_on_stone: false,
+            geogrid_enabled: false, liner_enabled: false,
+        };
+    }
+    function scbExportJSONMulti() {
+        const tanks = scbReadyResults();
+        if (!tanks) return;
+        const proj = scbGetVal('scb_project').trim();
+        const payload = {
+            version: 1,
+            exported: new Date().toISOString(),
+            project: {
+                name: proj, num: '', client: '', location: '', site_address: '',
+                estimator: '', estimator_email: '', notes: '',
+            },
+            tanks: tanks.map(function (t) { return scbMultiTankObject(t.result); }),
+            // null = "not calculated yet"; the Multi-Tank calculator
+            // recalculates on Calculate System.
+            results: tanks.map(function () { return null; }),
+        };
+        scbDownloadJSON(payload, 'AquaCell_MultiTank_' + scbFileSafe(proj, 'Project') + '_' +
+            new Date().toISOString().slice(0, 10) + '.json');
+        scbSetStatus(tanks.length > 5
+            ? 'JSON exported. NOTE: the Multi-Tank calculator holds 5 tanks per project — it will import the first 5 of these ' + tanks.length + '.'
+            : 'JSON exported — import it in the Multi-Tank calculator.');
+    }
+    // Single-Tank file = flat {form field name: value}, like exportProject().
+    function scbExportJSONSingle() {
+        const tanks = scbReadyResults();
+        if (!tanks) return;
+        const sel = scbActive();
+        let t = sel && sel.result ? sel : null;
+        if (!t && tanks.length === 1) t = tanks[0];
+        if (!t) { scbSetStatus('Select the tank to export (click it in the Tanks list).'); return; }
+        const r = t.result;
+        const ci = r.calculator_import;
+        const proj = scbGetVal('scb_project').trim();
+        const data = {
+            project_name: proj, project_num: '', location: '', site_address: '',
+            client: '', estimator: '', estimator_email: '', project_notes: '',
+            config: r.config, layers: String(r.layers), min_storage: '',
+            shape_mode: 'complex', known_width: '', known_length: '',
+            complex_scaled_area: scbNum(ci.complex_scaled_area),
+            complex_known_dim: scbNum(ci.complex_known_dim),
+            complex_tank_perim: scbNum(ci.complex_tank_perim),
+            complex_excav_area: scbNum(ci.complex_excav_area),
+            complex_excav_perim: scbNum(ci.complex_excav_perim),
+            void_enabled: '0',
+            surface_elev: '', tank_bottom_elev: '',
+            cover_stone: scbNum(r.cover_stone_ft), base_stone: scbNum(r.base_stone_ft),
+            perimeter_stone_width: scbNum(r.perimeter_stone_width_ft), stone_void: scbNum(r.stone_void),
+            geoWaste: scbNum(r.geo_waste_pct),
+            stone_top_included: r.stone_top_included ? '1' : '0',
+            stone_perim_included: r.stone_perim_included ? '1' : '0',
+            stone_base_included: r.stone_base_included ? '1' : '0',
+            pipe_connectors: String(r.bom.pipe_connectors.qty),
+            top_adapters_12: String(r.bom.top_adapters_12.qty),
+            top_adapters_16: String(r.bom.top_adapters_16.qty),
+        };
+        scbDownloadJSON(data, 'AquaCell_' + scbFileSafe(proj, 'Project') + '_' + scbFileSafe(r.label, 'Tank') + '_' +
+            new Date().toISOString().slice(0, 10) + '.json');
+        scbSetStatus('JSON exported for "' + r.label + '" — import it in the Single-Tank calculator.');
+    }
 
     // ── EXPORT PNG (plan + tanks + watermark strip) ──
     // Filename is set client-side via a.download (app convention).
