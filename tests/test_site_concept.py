@@ -260,5 +260,24 @@ r = c.post('/', data=form)
 html = re.sub(r'\s+', ' ', r.get_data(as_text=True))
 check('single-tank page renders imported tank (200)', r.status_code==200)
 check('single-tank snapped grid matches', f"({ci['crates_known']} × {ci['crates_other']} crates/layer)" in html, ci)
+# 14. Review follow-up: import perimeter must reproduce the side-plate count exactly
+def _sp(rows, cfg, lay):
+    code, j = post({'tanks':[{'config':cfg,'layers':lay,'rows':rows}]}); t = j['tanks'][0]; ci = t['calculator_import']
+    mt = A.calc_tank({'config':cfg,'layers':lay,'shape_mode':'complex','complex_scaled_area':ci['complex_scaled_area'],
+                      'complex_known_dim':ci['complex_known_dim'],'complex_tank_perim':ci['complex_tank_perim'],
+                      'complex_excav_area':ci['complex_excav_area'],'complex_excav_perim':ci['complex_excav_perim'],
+                      'cover_stone':1.0,'base_stone':0.333,'perimeter_stone_width':1.0,'stone_void':0.4,'geoWaste':20})
+    return t['bom']['side_plates']['qty'], mt['side_plates'], ci
+a, b, ci = _sp([{'crate_count':2,'offset_crates':0}]*8, 'EX', 8)
+check('EX 8-layer 8x2 side plates 165 == calc_tank (was 166 at 2dp perimeter)', a == 165 and b == 165, (a, b, ci['complex_tank_perim']))
+random.seed(5); bad = []
+for _ in range(400):
+    rows = [{'crate_count':random.randint(1,12),'offset_crates':random.randint(0,6)} for _ in range(random.randint(1,12))]
+    for cfg, lay in (('SC',random.randint(1,8)), ('EX',random.randint(1,8))):
+        a, b, ci = _sp(rows, cfg, lay)
+        if a != b: bad.append((cfg, lay, a, b))
+check('side plates match calc_tank on 800 random tank/layer combos', not bad, bad[:3])
+check('import dims are 3-decimal clean (perimeter + excavation)',
+      all(abs(round(ci[k]*1000)-ci[k]*1000) < 1e-6 for k in ('complex_tank_perim','complex_excav_area','complex_excav_perim')), ci)
 print('FAILS', fails)
 sys.exit(1 if fails else 0)
