@@ -7728,6 +7728,8 @@ _DXF_LAYER_HEIGHTS = {
     'EX': [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073],
 }
 
+_DXF_VOID_RATIO = {'SC': 0.95486, 'EX': 0.92633}
+
 _DXF_DISCLAIMER = (
     "DISCLAIMER: This is a computed conceptual layout only, not a stamped "
     "construction drawing. Native AquaCell DWG detail sheets remain the "
@@ -8011,6 +8013,31 @@ def _dxf_add_caption(layout, x, box_bottom, caption_lines):
         y -= height * 1.5
 
 
+def _dxf_table_width_in(lines):
+    """Paper-space width (inches) needed for the project data table's widest
+    line, at the small text size — used to reserve its sheet column before
+    the plan/section boxes are laid out."""
+    return max(_dxf_text_w(line, _DXF_PAPER_TEXT_SMALL_IN) for line in lines) + 0.3
+
+
+def _dxf_add_table(layout, box, title, lines):
+    """Draw the project data table directly in paper space — a plain
+    stacked text block (no grid lines), matching this sheet's existing
+    typographic convention (plan-view notes, section-view captions) rather
+    than a bordered spreadsheet grid. Fixed inches, no viewport/scale is
+    needed since this is static text, not model-space geometry."""
+    bx0, _, _, by1 = box
+    ts = _DXF_PAPER_TEXT_SMALL_IN
+    y = by1 - _DXF_PAPER_CAPTION_IN
+    layout.add_text(title, height=_DXF_PAPER_CAPTION_IN, dxfattribs={'layer': 'AQUACELL-TABLE'}) \
+          .set_placement((bx0, y))
+    y -= _DXF_PAPER_CAPTION_IN * 1.6
+    for line in lines:
+        layout.add_text(line, height=ts, dxfattribs={'layer': 'AQUACELL-TABLE'}) \
+              .set_placement((bx0, y))
+        y -= ts * 1.6
+
+
 @app.route('/download_dxf', methods=['POST'])
 def download_dxf():
 
@@ -8038,6 +8065,11 @@ def download_dxf():
     tank_bottom_elev = float(tank_bottom_elev_raw) if tank_bottom_elev_raw != '' else 0.0
     cover_stone      = float(request.form.get('cover_stone', 1.0) or 1.0)
     base_stone       = float(request.form.get('base_stone', 0.333) or 0.333)
+    perimeter_stone_width = float(request.form.get('perimeter_stone_width', 1.0) or 1.0)
+    stone_void            = float(request.form.get('stone_void', 0.40) or 0.40)
+    stone_top_included   = request.form.get('stone_top_included',   '1') == '1'
+    stone_perim_included = request.form.get('stone_perim_included', '1') == '1'
+    stone_base_included  = request.form.get('stone_base_included',  '1') == '1'
 
     if shape_mode == 'complex':
         return ('DXF export currently supports rectangular tanks only — '
@@ -8071,6 +8103,23 @@ def download_dxf():
     bottom_of_stone_elev = tank_bottom_elev - base_stone
     cover_depth           = surface_elev - tank_top_elev
 
+    # Total storage — mirrors the single-tank rectangular-path formula used
+    # by the main calculate route / download_pdf / download_quote (same
+    # void ratio, same per-component stone split and inclusion toggles), not
+    # re-derived independently.
+    tank_footprint_area = tank_width * tank_length
+    tank_storage = tank_footprint_area * tank_height * _DXF_VOID_RATIO[config]
+    outer_width  = tank_width  + 2 * perimeter_stone_width
+    outer_length = tank_length + 2 * perimeter_stone_width
+    excav_area_for_storage = outer_width * outer_length
+    stone_top_net   = excav_area_for_storage * cover_stone * stone_void
+    stone_perim_net = (excav_area_for_storage - tank_footprint_area) * tank_height * stone_void
+    stone_base_net  = excav_area_for_storage * base_stone * stone_void
+    total_storage = (tank_storage
+                      + (stone_top_net   if stone_top_included   else 0.0)
+                      + (stone_perim_net if stone_perim_included else 0.0)
+                      + (stone_base_net  if stone_base_included  else 0.0))
+
     doc = ezdxf.new('R2010', setup=True)
     doc.header['$INSUNITS'] = 2  # feet
     msp = doc.modelspace()
@@ -8081,6 +8130,7 @@ def download_dxf():
         ('AQUACELL-DIMS',       1),
         ('AQUACELL-TEXT',       7),
         ('AQUACELL-TITLEBLOCK', 7),
+        ('AQUACELL-TABLE',      7),
     ):
         if name not in doc.layers:
             doc.layers.add(name=name, color=color)
@@ -8144,14 +8194,37 @@ def download_dxf():
     titleblock = _dxf_titleblock_template()
     tb_k, tb_ox, tb_oy, (cx0, cy0, cx1, cy1) = _dxf_titleblock_placement(titleblock, printable_w, printable_h)
 
+    # Project data table — Model Type, elevations A-E (when entered), W x L,
+    # footprint, and total storage. Built here (before the view boxes are
+    # laid out) so its reserved sheet column can be sized to its own text.
+    table_title = 'PROJECT DATA TABLE'
+    table_lines = [f'MODEL TYPE: {config}-{layers}   ({tank_height:.2f} FT)']
+    if section_elevations_provided:
+        table_lines += [
+            f'A  SURFACE ELEV:      {surface_elev:.2f}',
+            f'B  TOP OF STONE:      {top_of_stone_elev:.2f}',
+            f'C  TOP OF TANK:       {tank_top_elev:.2f}',
+            f'D  BOTTOM OF TANK:    {tank_bottom_elev:.2f}',
+            f'E  BOT. BASE STONE:   {bottom_of_stone_elev:.2f}',
+        ]
+    else:
+        table_lines.append('ELEVATIONS (A-E) NOT ENTERED')
+    table_lines += [
+        f'W x L:          {tank_width:.2f} x {tank_length:.2f} FT',
+        f'FOOTPRINT:      {tank_footprint_area:,.2f} FT²',
+        f'TOTAL STORAGE:  {total_storage:,.2f} FT³',
+    ]
+    table_col_w = _dxf_table_width_in([table_title] + table_lines)
+
     pad  = _DXF_VIEW_PAD_IN
     view_y0 = cy0 + _DXF_CAPTION_BAND_IN
     view_y1 = cy1 - pad
+    table_box = (cx1 - table_col_w + pad, view_y0, cx1 - pad, view_y1)
     if section_elevations_provided:
-        plan_box    = (cx0 + pad, view_y0, cx1 - _DXF_SECTION_COLUMN_IN - pad, view_y1)
-        section_box = (cx1 - _DXF_SECTION_COLUMN_IN + pad, view_y0, cx1 - pad, view_y1)
+        plan_box    = (cx0 + pad, view_y0, cx1 - table_col_w - _DXF_SECTION_COLUMN_IN - pad, view_y1)
+        section_box = (cx1 - table_col_w - _DXF_SECTION_COLUMN_IN + pad, view_y0, cx1 - table_col_w - pad, view_y1)
     else:
-        plan_box    = (cx0 + pad, view_y0, cx1 - pad, view_y1)
+        plan_box    = (cx0 + pad, view_y0, cx1 - table_col_w - pad, view_y1)
         section_box = None
 
     # ══════════════════════════════════════════════════════════════
@@ -8435,10 +8508,12 @@ def download_dxf():
             'HORIZONTAL WIDTH NOT TO SCALE — ELEVATIONS AS ENTERED',
         ], frozen_layers=plan_layers)
     else:
-        _dxf_add_caption(sheet, cx1 - _DXF_SECTION_COLUMN_IN + pad, view_y0, [
+        _dxf_add_caption(sheet, cx1 - table_col_w - _DXF_SECTION_COLUMN_IN + pad, view_y0, [
             'CROSS-SECTION OMITTED',
             'Surface and/or tank bottom elevation not entered.',
         ])
+
+    _dxf_add_table(sheet, table_box, table_title, table_lines)
 
     # Title block SCALE: the one standard scale when every view shares it,
     # otherwise "AS NOTED" and the captions carry each view's scale.
