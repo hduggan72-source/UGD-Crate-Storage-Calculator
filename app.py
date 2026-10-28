@@ -8013,11 +8013,16 @@ def _dxf_add_caption(layout, x, box_bottom, caption_lines):
         y -= height * 1.5
 
 
-def _dxf_table_width_in(lines):
+def _dxf_table_width_in(title, lines):
     """Paper-space width (inches) needed for the project data table's widest
-    line, at the small text size — used to reserve its sheet column before
-    the plan/section boxes are laid out."""
-    return max(_dxf_text_w(line, _DXF_PAPER_TEXT_SMALL_IN) for line in lines) + 0.3
+    line — used to reserve its sheet column before the plan/section boxes
+    are laid out. The title is measured at the caption text height (it's
+    drawn larger than the data lines in _dxf_add_table below); measuring it
+    at the smaller data-line height here under-reserves the column and lets
+    the title overrun the sheet border."""
+    title_w = _dxf_text_w(title, _DXF_PAPER_CAPTION_IN)
+    lines_w = max((_dxf_text_w(line, _DXF_PAPER_TEXT_IN) for line in lines), default=0)
+    return max(title_w, lines_w) + 0.3
 
 
 def _dxf_add_table(layout, box, title, lines):
@@ -8025,9 +8030,11 @@ def _dxf_add_table(layout, box, title, lines):
     stacked text block (no grid lines), matching this sheet's existing
     typographic convention (plan-view notes, section-view captions) rather
     than a bordered spreadsheet grid. Fixed inches, no viewport/scale is
-    needed since this is static text, not model-space geometry."""
+    needed since this is static text, not model-space geometry. Data lines
+    use the same text height as viewport captions (_DXF_PAPER_TEXT_IN) so
+    this table doesn't read smaller than the rest of the sheet."""
     bx0, _, _, by1 = box
-    ts = _DXF_PAPER_TEXT_SMALL_IN
+    ts = _DXF_PAPER_TEXT_IN
     y = by1 - _DXF_PAPER_CAPTION_IN
     layout.add_text(title, height=_DXF_PAPER_CAPTION_IN, dxfattribs={'layer': 'AQUACELL-TABLE'}) \
           .set_placement((bx0, y))
@@ -8214,17 +8221,24 @@ def download_dxf():
         f'FOOTPRINT:      {tank_footprint_area:,.2f} FT²',
         f'TOTAL STORAGE:  {total_storage:,.2f} FT³',
     ]
-    table_col_w = _dxf_table_width_in([table_title] + table_lines)
+    table_col_w = _dxf_table_width_in(table_title, table_lines)
 
     pad  = _DXF_VIEW_PAD_IN
     view_y0 = cy0 + _DXF_CAPTION_BAND_IN
     view_y1 = cy1 - pad
-    table_box = (cx1 - table_col_w + pad, view_y0, cx1 - pad, view_y1)
+    # table_box's own right edge sits `pad` inside the true border (cx1), same
+    # inset every other box uses; its width is exactly table_col_w, which
+    # already has its own safety margin baked in (see _dxf_table_width_in) —
+    # so table_left is the single new "effective right border" the
+    # plan/section carve-out below uses in place of cx1, with its own `pad`
+    # gap preserved between the table and whatever sits to its left.
+    table_left = cx1 - pad - table_col_w
+    table_box  = (table_left, view_y0, cx1 - pad, view_y1)
     if section_elevations_provided:
-        plan_box    = (cx0 + pad, view_y0, cx1 - table_col_w - _DXF_SECTION_COLUMN_IN - pad, view_y1)
-        section_box = (cx1 - table_col_w - _DXF_SECTION_COLUMN_IN + pad, view_y0, cx1 - table_col_w - pad, view_y1)
+        plan_box    = (cx0 + pad, view_y0, table_left - _DXF_SECTION_COLUMN_IN - pad, view_y1)
+        section_box = (table_left - _DXF_SECTION_COLUMN_IN + pad, view_y0, table_left - pad, view_y1)
     else:
-        plan_box    = (cx0 + pad, view_y0, cx1 - table_col_w - pad, view_y1)
+        plan_box    = (cx0 + pad, view_y0, table_left - pad, view_y1)
         section_box = None
 
     # ══════════════════════════════════════════════════════════════
@@ -8508,7 +8522,7 @@ def download_dxf():
             'HORIZONTAL WIDTH NOT TO SCALE — ELEVATIONS AS ENTERED',
         ], frozen_layers=plan_layers)
     else:
-        _dxf_add_caption(sheet, cx1 - table_col_w - _DXF_SECTION_COLUMN_IN + pad, view_y0, [
+        _dxf_add_caption(sheet, table_left - _DXF_SECTION_COLUMN_IN + pad, view_y0, [
             'CROSS-SECTION OMITTED',
             'Surface and/or tank bottom elevation not entered.',
         ])
