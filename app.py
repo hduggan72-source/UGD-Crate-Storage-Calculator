@@ -8487,8 +8487,9 @@ def download_cad_table_xlsx():
     """CAD Table export as .xlsx. The browser builds the rows (they depend on
     on-screen toggles: stone inclusion, liner, geogrid) and posts them here as
     JSON [[label, col_b, col_c], ...]; numbers are written as real numbers with
-    a 0.00 format so AutoCAD Data Link shows 1.00, not 1. Filename is set
-    client-side via a.download."""
+    a 0.00 format so AutoCAD Data Link shows 1.00, not 1. A cell sent as
+    {"int": n} is a whole-number count (BOM quantities) written with a 0
+    format. Filename is set client-side via a.download."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment
 
@@ -8506,11 +8507,17 @@ def download_cad_table_xlsx():
             return jsonify({'error': f'Row {r_idx} must have 3 cells'}), 400
         is_title = row[1] in ('', None) and row[2] in ('', None)
         for c_idx, val in enumerate(row, start=1):
+            is_count = False
+            if isinstance(val, dict):
+                n = val.get('int')
+                if set(val) != {'int'} or isinstance(n, bool) or not isinstance(n, (int, float)):
+                    return jsonify({'error': f'Row {r_idx} has an invalid cell'}), 400
+                val, is_count = int(round(n)), True
             if isinstance(val, bool) or not isinstance(val, (str, int, float, type(None))):
                 return jsonify({'error': f'Row {r_idx} has an invalid cell'}), 400
             cell = ws.cell(row=r_idx, column=c_idx, value=None if val == '' else val)
             if isinstance(val, (int, float)):
-                cell.number_format = '0.00'
+                cell.number_format = '0' if is_count else '0.00'
                 cell.alignment = Alignment(horizontal='right')
             elif c_idx > 1:
                 cell.alignment = Alignment(horizontal='center')
