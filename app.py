@@ -8489,7 +8489,8 @@ def download_cad_table_xlsx():
     JSON [[label, col_b, col_c], ...]; numbers are written as real numbers with
     a 0.00 format so AutoCAD Data Link shows 1.00, not 1. A cell sent as
     {"int": n} is a whole-number count (BOM quantities) written with a 0
-    format. Filename is set client-side via a.download."""
+    format. Title rows (text in A only) are merged A:C; rows with column B
+    blank are merged A:B. Filename is set client-side via a.download."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment
 
@@ -8523,6 +8524,13 @@ def download_cad_table_xlsx():
                 cell.alignment = Alignment(horizontal='center')
             if is_title:
                 cell.font = bold
+        # Merged cells: a title row (text in A only) spans A:C, centered; a
+        # row with column B blank merges A:B so the label spans both.
+        if is_title:
+            ws.merge_cells(start_row=r_idx, start_column=1, end_row=r_idx, end_column=3)
+            ws.cell(row=r_idx, column=1).alignment = Alignment(horizontal='center')
+        elif row[1] in ('', None):
+            ws.merge_cells(start_row=r_idx, start_column=1, end_row=r_idx, end_column=2)
     ws.column_dimensions['A'].width = 40
     ws.column_dimensions['B'].width = 14
     ws.column_dimensions['C'].width = 14
