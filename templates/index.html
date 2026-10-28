@@ -4219,8 +4219,26 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         const tankFabricFt2  = Math.max(0, t.geo_tank_raw_ft2 - gridBotFt2);
         const fabricTotalFt2 = tankFabricFt2 + t.geo_stone_raw_ft2 + linerProtFt2;
 
+        // Bill of Materials quantities, read from the BOM card on screen (no
+        // contingency). Fixed row count — every component is always listed,
+        // 0 when unused — so Data Link cells below never shift.
+        const bomQty = id => {
+            const el = document.getElementById(id);
+            return { int: el ? (parseInt((el.textContent || el.value || '').replace(/,/g, '')) || 0) : 0 };
+        };
+
         // Labels match the calculator's own field/result names.
         const rows = [
+            ['Total System Storage (ft³)', '', f(systemNet)],
+            ['Bill of Materials', '', ''],
+            ['Item', '', 'Qty'],
+            ['Base Unit (3091506)', '', bomQty('bom_base_units')],
+            ['Side Plate (2476600003)', '', bomQty('bom_side_plates')],
+            ['Bottom Plate (2476600001)', '', bomQty('bom_bottom_plates')],
+            ['8-12" Pipe Connectors (2476631200)', '', bomQty('bom_pipe_connectors')],
+            ['12" Top Adapters (3085857)', '', bomQty('bom_top_adapters_12')],
+            ['16" Top Adapters (2476842000)', '', bomQty('bom_top_adapters_16')],
+            ['Large Diameter Pipe Connection', '', bomQty('large_pipe_qty')],
             ['AquaCell Tank Elevations', '', ''],
             ['Model Type', t.model_type, f(t.tank_height)],
             ['Surface Elevation', 'A', f(t.surface_elev)],
