@@ -8218,8 +8218,8 @@ def download_dxf():
         table_lines.append('ELEVATIONS (A-E) NOT ENTERED')
     table_lines += [
         f'W x L:          {tank_width:.2f} x {tank_length:.2f} FT',
-        f'FOOTPRINT:      {tank_footprint_area:,.2f} FT²',
-        f'TOTAL STORAGE:  {total_storage:,.2f} FT³',
+        f'FOOTPRINT:      {tank_footprint_area:,.2f} SQ FT',
+        f'TOTAL STORAGE:  {total_storage:,.2f} CU FT',
     ]
     table_col_w = _dxf_table_width_in(table_title, table_lines)
 
