@@ -8252,7 +8252,7 @@ def download_dxf():
         f'PROJECT: {(project_name or "Project").strip()}',
         f'CONFIGURATION: {config_label}',
         f'MODULES PER LAYER (AS DRAWN): {modules_per_layer:,} ({crates_wide} wide x {crates_long} long)',
-        f'TOTAL MODULES, ALL LAYERS: {num_crates:,} ({layers}-LAYER {config} — stacking not shown in plan view)',
+        f'TOTAL MODULES, ALL LAYERS: {num_crates:,} ({layers}-LAYER {config} - stacking not shown in plan view)',
         f'FOOTPRINT: {tank_width:.2f} ft x {tank_length:.2f} ft',
         f'GENERATED: {generated_str}',
     ]
@@ -8263,9 +8263,9 @@ def download_dxf():
             scope = 'tank envelope'
         else:
             scope = 'stone envelope'
-        text_lines.append(f'LINER: Selected ({scope}) — geometry not shown, callout only')
+        text_lines.append(f'LINER: Selected ({scope}) - geometry not shown, callout only')
     if not section_elevations_provided:
-        text_lines.insert(0, 'CROSS-SECTION VIEW OMITTED — Estimated Surface Elevation and/or '
+        text_lines.insert(0, 'CROSS-SECTION VIEW OMITTED - Estimated Surface Elevation and/or '
                              'AquaCell Tank Bottom Elevation were not entered.')
     disc_lines = textwrap.wrap(_DXF_DISCLAIMER, width=110)
 
@@ -8361,7 +8361,7 @@ def download_dxf():
             cover_text = f'ACTUAL COVER DEPTH: {cover_depth:.2f} FT'
         else:
             cover_text = (f'WARNING: TOP OF TANK IS {abs(cover_depth):.2f} FT ABOVE PROPOSED '
-                          'SURFACE — INVALID ELEVATIONS, VERIFY INPUTS')
+                          'SURFACE - INVALID ELEVATIONS, VERIFY INPUTS')
         # Wrapped so the warning form still fits the section's sheet column.
         cover_lines = textwrap.wrap(cover_text, width=44)
         # Two lines, not one long string: at the section column's fixed paper
@@ -8370,7 +8370,7 @@ def download_dxf():
         # off the sheet edge at every scale — no scale choice makes it any
         # narrower on paper. Splitting it the way the plan view's own caption
         # lines already are is what actually shortens it.
-        section_title_line1 = 'CROSS-SECTION — VERTICAL TO SCALE, HORIZONTAL NOT TO SCALE'
+        section_title_line1 = 'CROSS-SECTION - VERTICAL TO SCALE, HORIZONTAL NOT TO SCALE'
         section_title_line2 = f'GENERATED: {generated_str}'
         section_disc_lines = textwrap.wrap(_DXF_DISCLAIMER, width=60)
 
@@ -8513,13 +8513,13 @@ def download_dxf():
                       if layer.dxf.name.startswith('AQUACELL-SECTION-')]
     _dxf_add_view(sheet, plan_box, plan, plan_scale, [
         f'PLAN VIEW    SCALE: {_dxf_scale_label(plan_scale, plan_scale_std)}',
-        f'{config}-{layers} AQUACELL — {crates_wide} x {crates_long} MODULES PER LAYER — '
+        f'{config}-{layers} AQUACELL - {crates_wide} x {crates_long} MODULES PER LAYER - '
         f'FOOTPRINT {tank_width:.2f} FT x {tank_length:.2f} FT',
     ], frozen_layers=section_layers)
     if section_elevations_provided:
         _dxf_add_view(sheet, section_box, sec, section_scale, [
             f'CROSS-SECTION    SCALE: {_dxf_scale_label(section_scale, section_scale_std)} (VERTICAL)',
-            'HORIZONTAL WIDTH NOT TO SCALE — ELEVATIONS AS ENTERED',
+            'HORIZONTAL WIDTH NOT TO SCALE - ELEVATIONS AS ENTERED',
         ], frozen_layers=plan_layers)
     else:
         _dxf_add_caption(sheet, table_left - _DXF_SECTION_COLUMN_IN + pad, view_y0, [
