@@ -3225,6 +3225,13 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         formData.set('liner_on_tank',  document.getElementById('formLinerOnTank')?.value  ?? '0');
         formData.set('liner_on_stone', document.getElementById('formLinerOnStone')?.value ?? '0');
 
+        // Stone inclusion toggles — checkboxes are dropped from FormData
+        // entirely when unchecked, so the DXF's total-storage figure must
+        // read these mirror hidden inputs explicitly, same as downloadPDF().
+        formData.set('stone_top_included',   document.getElementById('hiddenStoneTopIncl')?.value   ?? '1');
+        formData.set('stone_perim_included', document.getElementById('hiddenStonePerimIncl')?.value ?? '1');
+        formData.set('stone_base_included',  document.getElementById('hiddenStoneBaseIncl')?.value  ?? '1');
+
         const projectName = (document.getElementById('project_name').value || 'Project').trim()
                             .replace(/[^a-zA-Z0-9\-_ ]/g, '_').replace(/\s+/g, '_');
         fetch('/download_dxf', { method: 'POST', body: formData })
