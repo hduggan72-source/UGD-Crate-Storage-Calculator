@@ -5921,6 +5921,12 @@
             complex_tank_perim: scbNum(ci.complex_tank_perim),
             complex_excav_area: scbNum(ci.complex_excav_area),
             complex_excav_perim: scbNum(ci.complex_excav_perim),
+            // Real stepped-shape geometry ([[x0,y0,x1,y1], ...] ft, one row per
+            // entry, tank-local frame) — lets the DXF export draw the actual
+            // shape instead of the scaled-rectangle equivalent above, which
+            // calculator_import still provides as the storage/BOM-matching
+            // fallback for calculators and views that don't use rows.
+            complex_rows: JSON.stringify(r.tank_rects_ft),
             void_enabled: '0',
             surface_elev: '', tank_bottom_elev: '',
             cover_stone: scbNum(r.cover_stone_ft), base_stone: scbNum(r.base_stone_ft),
