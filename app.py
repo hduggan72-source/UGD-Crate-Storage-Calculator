@@ -8378,12 +8378,6 @@ def download_dxf():
         f'FOOTPRINT: {footprint_detail}',
         f'GENERATED: {generated_str}',
     ]
-    if shape_mode == 'complex':
-        rows_summary = '; '.join(
-            f'R{i + 1}: {cols} mod @ {round(x0 / _DXF_MODULE_WID)} mod offset'
-            for i, ((x0, y0, x1, y1), cols) in enumerate(zip(shifted_rows, row_cols))
-        )
-        text_lines.extend(textwrap.wrap(f'ROWS: {rows_summary}', width=100))
     if liner_on_tank or liner_on_stone:
         if liner_on_tank and liner_on_stone:
             scope = 'tank + stone envelope'
