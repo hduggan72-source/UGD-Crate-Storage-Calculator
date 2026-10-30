@@ -3594,6 +3594,14 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         reader.onload = e => {
             try {
                 const data = JSON.parse(e.target.result);
+                // Reset first, not just overwrite: an older/different JSON
+                // that predates complex_rows (or was built outside Site
+                // Concept Builder) won't carry this key at all, and without
+                // this reset the PREVIOUS project's row geometry would stay
+                // in this hidden field — the DXF export would then draw the
+                // wrong tank's shape under the newly-imported project's name.
+                const complexRowsEl = document.getElementById('complexRows');
+                if (complexRowsEl) complexRowsEl.value = '';
                 Object.keys(data).forEach(k => {
                     const el = document.querySelector(`[name="${k}"]`);
                     if (el) el.value = data[k];
