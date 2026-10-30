@@ -8078,30 +8078,85 @@ def download_dxf():
     stone_perim_included = request.form.get('stone_perim_included', '1') == '1'
     stone_base_included  = request.form.get('stone_base_included',  '1') == '1'
 
-    if shape_mode == 'complex':
-        return ('DXF export currently supports rectangular tanks only — '
-                'complex-shape layouts are not yet supported.'), 400
-
     if layers < 1 or layers > 8:
         return 'Layer count must be between 1 and 8.', 400
-
-    crates_wide = math.floor(known_width  / _DXF_MODULE_WID)
-    crates_long = math.floor(known_length / _DXF_MODULE_LEN)
-    if crates_wide <= 0 or crates_long <= 0:
-        return 'Enter valid tank dimensions before exporting a DXF.', 400
 
     # Hard cap on per-layer module count — this route builds one in-memory
     # BLOCKREF entity per module, so unbounded input dimensions (e.g. a
     # stray/malicious 10,000 x 10,000 ft request) could otherwise generate
     # millions of entities and exhaust a web worker. 20,000 modules/layer is
     # far beyond any real AquaCell project footprint.
-    if crates_wide * crates_long > 20000:
-        return ('Footprint is too large for DXF export (over 20,000 modules per '
-                'layer). Contact Wavin for large-project CAD support.'), 400
+    _DXF_MAX_MODULES_PER_LAYER = 20000
 
-    tank_width  = crates_wide * _DXF_MODULE_WID
-    tank_length = crates_long * _DXF_MODULE_LEN
-    num_crates  = crates_wide * crates_long * layers
+    if shape_mode == 'complex':
+        complex_rows_raw = (request.form.get('complex_rows', '') or '').strip()
+        if not complex_rows_raw:
+            return ('This complex-shape tank has no row geometry attached — '
+                     're-import it from the Site Concept Builder\'s JSON export '
+                     'before exporting a DXF.'), 400
+        try:
+            row_rects_in = json.loads(complex_rows_raw)
+        except (TypeError, ValueError):
+            return 'Invalid complex-shape row geometry (complex_rows is not valid JSON).', 400
+        if not isinstance(row_rects_in, list) or not row_rects_in:
+            return 'Invalid complex-shape row geometry (complex_rows must be a non-empty list).', 400
+        if len(row_rects_in) > _MAX_SHAPE_ROWS:
+            return f'Too many rows in complex-shape geometry (limit {_MAX_SHAPE_ROWS}).', 400
+
+        row_rects = []
+        for r in row_rects_in:
+            if (not isinstance(r, (list, tuple)) or len(r) != 4
+                    or any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in r)):
+                return 'Invalid complex-shape row geometry (each row must be [x0, y0, x1, y1]).', 400
+            x0, y0, x1, y1 = (float(v) for v in r)
+            if x1 <= x0 or y1 <= y0:
+                return 'Invalid complex-shape row geometry (a row has non-positive width/length).', 400
+            row_rects.append((x0, y0, x1, y1))
+
+        bbox_x0 = min(r[0] for r in row_rects)
+        bbox_y0 = min(r[1] for r in row_rects)
+        bbox_x1 = max(r[2] for r in row_rects)
+        bbox_y1 = max(r[3] for r in row_rects)
+        # Shift so the bounding box's own bottom-left corner sits at the
+        # drawing origin, matching the (0,0)-anchored convention the
+        # rectangular path below (and the dimensioning/table code shared by
+        # both paths) already assumes.
+        shifted_rows = [(x0 - bbox_x0, y0 - bbox_y0, x1 - bbox_x0, y1 - bbox_y0)
+                         for (x0, y0, x1, y1) in row_rects]
+
+        row_cols = []
+        for (x0, y0, x1, y1) in shifted_rows:
+            cols = round((x1 - x0) / _DXF_MODULE_WID)
+            if cols <= 0:
+                return 'Invalid complex-shape row geometry (a row is narrower than one module).', 400
+            row_cols.append(cols)
+
+        modules_per_layer = sum(row_cols)
+        if modules_per_layer > _DXF_MAX_MODULES_PER_LAYER:
+            return (f'Footprint is too large for DXF export (over '
+                     f'{_DXF_MAX_MODULES_PER_LAYER:,} modules per layer). Contact Wavin '
+                     'for large-project CAD support.'), 400
+
+        crates_wide = crates_long = None  # not meaningful for a stepped footprint
+        tank_width  = bbox_x1 - bbox_x0   # bounding box, not a true W x L
+        tank_length = bbox_y1 - bbox_y0
+        num_crates  = modules_per_layer * layers
+        tank_footprint_area = sum((x1 - x0) * (y1 - y0) for (x0, y0, x1, y1) in shifted_rows)
+    else:
+        crates_wide = math.floor(known_width  / _DXF_MODULE_WID)
+        crates_long = math.floor(known_length / _DXF_MODULE_LEN)
+        if crates_wide <= 0 or crates_long <= 0:
+            return 'Enter valid tank dimensions before exporting a DXF.', 400
+        modules_per_layer = crates_wide * crates_long
+        if modules_per_layer > _DXF_MAX_MODULES_PER_LAYER:
+            return (f'Footprint is too large for DXF export (over '
+                     f'{_DXF_MAX_MODULES_PER_LAYER:,} modules per layer). Contact Wavin '
+                     'for large-project CAD support.'), 400
+
+        tank_width  = crates_wide * _DXF_MODULE_WID
+        tank_length = crates_long * _DXF_MODULE_LEN
+        num_crates  = modules_per_layer * layers
+        tank_footprint_area = tank_width * tank_length
 
     layer_heights = _DXF_LAYER_HEIGHTS[config]
     tank_height   = layer_heights[layers - 1] if layers <= len(layer_heights) else layer_heights[-1]
@@ -8113,12 +8168,21 @@ def download_dxf():
     # Total storage — mirrors the single-tank rectangular-path formula used
     # by the main calculate route / download_pdf / download_quote (same
     # void ratio, same per-component stone split and inclusion toggles), not
-    # re-derived independently.
-    tank_footprint_area = tank_width * tank_length
+    # re-derived independently. The complex-shape excavation footprint comes
+    # from the Site Concept Builder's own complex_excav_area/perim fields
+    # (same fields + same auto-estimate fallback already used by the main
+    # calculate route and download_stage_csv for this shape mode), not a new
+    # rectangle union computed here.
     tank_storage = tank_footprint_area * tank_height * _DXF_VOID_RATIO[config]
-    outer_width  = tank_width  + 2 * perimeter_stone_width
-    outer_length = tank_length + 2 * perimeter_stone_width
-    excav_area_for_storage = outer_width * outer_length
+    if shape_mode == 'complex':
+        excav_area_for_storage = float(request.form.get('complex_excav_area', 0) or 0)
+        if excav_area_for_storage <= 0:
+            excav_area_for_storage = ((tank_width  + 2 * perimeter_stone_width)
+                                       * (tank_length + 2 * perimeter_stone_width))
+    else:
+        outer_width  = tank_width  + 2 * perimeter_stone_width
+        outer_length = tank_length + 2 * perimeter_stone_width
+        excav_area_for_storage = outer_width * outer_length
     stone_top_net   = excav_area_for_storage * cover_stone * stone_void
     stone_perim_net = (excav_area_for_storage - tank_footprint_area) * tank_height * stone_void
     stone_base_net  = excav_area_for_storage * base_stone * stone_void
@@ -8154,20 +8218,36 @@ def download_dxf():
             format='xy', close=True, dxfattribs={'layer': 'AQUACELL-MODULES'},
         )
 
-    # Origin at the bottom-left corner of the footprint; columns run along X
-    # (module width), rows run along Y (module length) — matches the
-    # crates_wide/crates_long convention used everywhere else in this app.
-    for row in range(crates_long):
-        for col in range(crates_wide):
-            msp.add_blockref(
-                block_name, (col * _DXF_MODULE_WID, row * _DXF_MODULE_LEN),
-                dxfattribs={'layer': 'AQUACELL-MODULES'},
+    if shape_mode == 'complex':
+        # One real per-crate INSERT per module, placed along each row's own
+        # rectangle — not a uniform grid. Each row is drawn as its own closed
+        # footprint outline (no polygon union across rows), matching how the
+        # Site Concept Builder itself represents a stepped tank.
+        for (x0, y0, x1, y1), cols in zip(shifted_rows, row_cols):
+            for col in range(cols):
+                msp.add_blockref(
+                    block_name, (x0 + col * _DXF_MODULE_WID, y0),
+                    dxfattribs={'layer': 'AQUACELL-MODULES'},
+                )
+            msp.add_lwpolyline(
+                [(x0, y0), (x1, y0), (x1, y1), (x0, y1)],
+                format='xy', close=True, dxfattribs={'layer': 'AQUACELL-FOOTPRINT'},
             )
+    else:
+        # Origin at the bottom-left corner of the footprint; columns run along X
+        # (module width), rows run along Y (module length) — matches the
+        # crates_wide/crates_long convention used everywhere else in this app.
+        for row in range(crates_long):
+            for col in range(crates_wide):
+                msp.add_blockref(
+                    block_name, (col * _DXF_MODULE_WID, row * _DXF_MODULE_LEN),
+                    dxfattribs={'layer': 'AQUACELL-MODULES'},
+                )
 
-    msp.add_lwpolyline(
-        [(0, 0), (tank_width, 0), (tank_width, tank_length), (0, tank_length)],
-        format='xy', close=True, dxfattribs={'layer': 'AQUACELL-FOOTPRINT'},
-    )
+        msp.add_lwpolyline(
+            [(0, 0), (tank_width, 0), (tank_width, tank_length), (0, tank_length)],
+            format='xy', close=True, dxfattribs={'layer': 'AQUACELL-FOOTPRINT'},
+        )
 
     # ══════════════════════════════════════════════════════════════
     #  SHEET SETUP — 24x36 paper-space layout with the Wavin title block.
@@ -8216,8 +8296,10 @@ def download_dxf():
         ]
     else:
         table_lines.append('ELEVATIONS (A-E) NOT ENTERED')
+    dims_line = (f'BOUNDING BOX:   {tank_width:.2f} x {tank_length:.2f} FT' if shape_mode == 'complex'
+                 else f'W x L:          {tank_width:.2f} x {tank_length:.2f} FT')
     table_lines += [
-        f'W x L:          {tank_width:.2f} x {tank_length:.2f} FT',
+        dims_line,
         f'FOOTPRINT:      {tank_footprint_area:,.2f} SQ FT',
         f'TOTAL STORAGE:  {total_storage:,.2f} CU FT',
     ]
@@ -8247,15 +8329,27 @@ def download_dxf():
 
     generated_str = datetime.datetime.now().strftime('%m/%d/%Y')
     config_label  = 'SC - Standard Capacity' if config == 'SC' else 'EX - Extra Strong'
-    modules_per_layer = crates_wide * crates_long
+    if shape_mode == 'complex':
+        modules_per_layer_detail = f'{modules_per_layer:,} (stepped footprint, {len(shifted_rows)} rows)'
+        footprint_detail = (f'{tank_footprint_area:,.2f} sq ft '
+                             f'(bounding box {tank_width:.2f} ft x {tank_length:.2f} ft)')
+    else:
+        modules_per_layer_detail = f'{modules_per_layer:,} ({crates_wide} wide x {crates_long} long)'
+        footprint_detail = f'{tank_width:.2f} ft x {tank_length:.2f} ft'
     text_lines = [
         f'PROJECT: {(project_name or "Project").strip()}',
         f'CONFIGURATION: {config_label}',
-        f'MODULES PER LAYER (AS DRAWN): {modules_per_layer:,} ({crates_wide} wide x {crates_long} long)',
+        f'MODULES PER LAYER (AS DRAWN): {modules_per_layer_detail}',
         f'TOTAL MODULES, ALL LAYERS: {num_crates:,} ({layers}-LAYER {config} - stacking not shown in plan view)',
-        f'FOOTPRINT: {tank_width:.2f} ft x {tank_length:.2f} ft',
+        f'FOOTPRINT: {footprint_detail}',
         f'GENERATED: {generated_str}',
     ]
+    if shape_mode == 'complex':
+        rows_summary = '; '.join(
+            f'R{i + 1}: {cols} mod @ {round(x0 / _DXF_MODULE_WID)} mod offset'
+            for i, ((x0, y0, x1, y1), cols) in enumerate(zip(shifted_rows, row_cols))
+        )
+        text_lines.extend(textwrap.wrap(f'ROWS: {rows_summary}', width=100))
     if liner_on_tank or liner_on_stone:
         if liner_on_tank and liner_on_stone:
             scope = 'tank + stone envelope'
@@ -8511,10 +8605,15 @@ def download_dxf():
     plan_layers    = ['AQUACELL-FOOTPRINT', 'AQUACELL-MODULES', 'AQUACELL-DIMS', 'AQUACELL-TEXT']
     section_layers = [layer.dxf.name for layer in doc.layers
                       if layer.dxf.name.startswith('AQUACELL-SECTION-')]
+    if shape_mode == 'complex':
+        plan_caption_line2 = (f'{config}-{layers} AQUACELL - {modules_per_layer:,} MODULES PER LAYER - '
+                               f'FOOTPRINT {tank_footprint_area:,.2f} SQ FT (STEPPED SHAPE)')
+    else:
+        plan_caption_line2 = (f'{config}-{layers} AQUACELL - {crates_wide} x {crates_long} MODULES PER LAYER - '
+                               f'FOOTPRINT {tank_width:.2f} FT x {tank_length:.2f} FT')
     _dxf_add_view(sheet, plan_box, plan, plan_scale, [
         f'PLAN VIEW    SCALE: {_dxf_scale_label(plan_scale, plan_scale_std)}',
-        f'{config}-{layers} AQUACELL - {crates_wide} x {crates_long} MODULES PER LAYER - '
-        f'FOOTPRINT {tank_width:.2f} FT x {tank_length:.2f} FT',
+        plan_caption_line2,
     ], frozen_layers=section_layers)
     if section_elevations_provided:
         _dxf_add_view(sheet, section_box, sec, section_scale, [

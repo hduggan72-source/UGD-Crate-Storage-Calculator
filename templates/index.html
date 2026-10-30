@@ -816,6 +816,12 @@
                         </label>
                         <input type="number" step="0.001" name="complex_excav_perim" id="complexExcavPerim" min="0" placeholder="Leave blank to auto-estimate" value="{{ form_data.get('complex_excav_perim', '') }}">
 
+                        <!-- Row-rectangle geometry ([[x0,y0,x1,y1], ...] in feet, tank-local
+                             frame) from Site Concept Builder's JSON export — not manually
+                             entered. When present, the DXF export draws the real stepped
+                             shape instead of rejecting shape_mode=complex. -->
+                        <input type="hidden" name="complex_rows" id="complexRows" value="{{ form_data.get('complex_rows', '') }}">
+
                         <!-- Void Space Entry -->
                         <div style="margin-top:14px;padding-top:12px;border-top:1px dashed rgba(180,83,9,0.45);">
                             <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:bold;cursor:pointer;margin-bottom:0;">
@@ -3195,8 +3201,9 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
 
     function downloadDXF() {
         const shapeMode = document.getElementById('shapeModeInput')?.value || 'rectangle';
-        if (shapeMode === 'complex') {
-            alert('DXF export currently supports rectangular tanks only — complex-shape layouts are not yet supported.');
+        if (shapeMode === 'complex' && !document.getElementById('complexRows')?.value) {
+            alert('This complex-shape tank has no row geometry attached — re-import it from the '
+                + 'Site Concept Builder\'s JSON export before exporting a DXF.');
             return;
         }
 
