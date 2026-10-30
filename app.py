@@ -8120,8 +8120,15 @@ def download_dxf():
         # Shift so the bounding box's own bottom-left corner sits at the
         # drawing origin, matching the (0,0)-anchored convention the
         # rectangular path below (and the dimensioning/table code shared by
-        # both paths) already assumes.
-        shifted_rows = [(x0 - bbox_x0, y0 - bbox_y0, x1 - bbox_x0, y1 - bbox_y0)
+        # both paths) already assumes. Y is ALSO flipped (bbox_y1 - y, not
+        # y - bbox_y0): row_index increases going DOWN the page in both
+        # scbDrawTank()'s canvas (increasing y = increasing canvas-Y = down
+        # on screen) and _draw_scb_tank_plan()'s PDF schematic (which
+        # explicitly reverses this same y for ReportLab's upward Y axis).
+        # DXF model space is also upward-Y like ReportLab, so without the
+        # same reversal here a non-symmetric stepped tank would come out
+        # top-to-bottom mirrored versus the real site layout.
+        shifted_rows = [(x0 - bbox_x0, bbox_y1 - y1, x1 - bbox_x0, bbox_y1 - y0)
                          for (x0, y0, x1, y1) in row_rects]
 
         row_cols = []
@@ -8165,6 +8172,20 @@ def download_dxf():
     bottom_of_stone_elev = tank_bottom_elev - base_stone
     cover_depth           = surface_elev - tank_top_elev
 
+    # Void Space Entry has no drawable position (it only carries an area/
+    # dimension pair, not a location within the footprint), so a complex-
+    # shape DXF export can't cut a hole for it the way the main calculate
+    # route nets it out of footprint/crate-count/storage. Reject rather than
+    # draw and total every row at full size while the app's own calculated
+    # figures (and BOM) already reflect the void — the two would silently
+    # disagree.
+    if shape_mode == 'complex':
+        _void_check = parse_void_spaces(request.form, perimeter_stone_width, tank_height)
+        if _void_check['active']:
+            return ('DXF export does not yet support a complex-shape tank with an active '
+                     'Void Space Entry — the drawing can\'t represent the obstruction\'s '
+                     'position. Disable Void Space Entry before exporting, or contact Wavin.'), 400
+
     # Total storage — mirrors the single-tank rectangular-path formula used
     # by the main calculate route / download_pdf / download_quote (same
     # void ratio, same per-component stone split and inclusion toggles), not
@@ -8177,8 +8198,21 @@ def download_dxf():
     if shape_mode == 'complex':
         excav_area_for_storage = float(request.form.get('complex_excav_area', 0) or 0)
         if excav_area_for_storage <= 0:
-            excav_area_for_storage = ((tank_width  + 2 * perimeter_stone_width)
-                                       * (tank_length + 2 * perimeter_stone_width))
+            # Same snapped-equivalent-rectangle fallback the main calculate
+            # route and download_stage_csv use for this shape mode — NOT the
+            # drawn shape's own bounding box, which can be a materially
+            # different (larger) rectangle for a stepped footprint and would
+            # make this export's TOTAL STORAGE disagree with the calculated
+            # system.
+            complex_scaled_area = float(request.form.get('complex_scaled_area', 0) or 0)
+            complex_known_dim   = float(request.form.get('complex_known_dim', 0) or 0)
+            other_dim     = complex_scaled_area / complex_known_dim if complex_known_dim > 0 else 0
+            crates_known  = math.floor(complex_known_dim / _DXF_MODULE_WID) if complex_known_dim > 0 else 0
+            crates_other  = math.floor(other_dim / _DXF_MODULE_LEN) if other_dim > 0 else 0
+            snapped_known = crates_known * _DXF_MODULE_WID
+            snapped_other = crates_other * _DXF_MODULE_LEN
+            excav_area_for_storage = ((snapped_known + 2 * perimeter_stone_width)
+                                       * (snapped_other + 2 * perimeter_stone_width))
     else:
         outer_width  = tank_width  + 2 * perimeter_stone_width
         outer_length = tank_length + 2 * perimeter_stone_width
