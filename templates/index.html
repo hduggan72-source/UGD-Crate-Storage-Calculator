@@ -822,6 +822,14 @@
                              shape instead of rejecting shape_mode=complex. -->
                         <input type="hidden" name="complex_rows" id="complexRows" value="{{ form_data.get('complex_rows', '') }}">
 
+                        <!-- Drawn void/obstruction rectangles ([[x0,y0,x1,y1], ...] ft, same
+                             tank-local frame as complex_rows) from Site Concept Builder's
+                             "Draw Void" tool — not manually entered. Paired by index with the
+                             void_area_N/void_dim_N fields below (which the Builder auto-fills
+                             from the same drawn rectangle), so the DXF export can draw the
+                             real hole instead of just netting an area. -->
+                        <input type="hidden" name="complex_voids" id="complexVoids" value="{{ form_data.get('complex_voids', '') }}">
+
                         <!-- Void Space Entry -->
                         <div style="margin-top:14px;padding-top:12px;border-top:1px dashed rgba(180,83,9,0.45);">
                             <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:bold;cursor:pointer;margin-bottom:0;">
@@ -3602,6 +3610,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
                 // wrong tank's shape under the newly-imported project's name.
                 const complexRowsEl = document.getElementById('complexRows');
                 if (complexRowsEl) complexRowsEl.value = '';
+                const complexVoidsEl = document.getElementById('complexVoids');
+                if (complexVoidsEl) complexVoidsEl.value = '';
                 Object.keys(data).forEach(k => {
                     const el = document.querySelector(`[name="${k}"]`);
                     if (el) el.value = data[k];
