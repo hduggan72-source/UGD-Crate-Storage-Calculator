@@ -8188,13 +8188,50 @@ def download_dxf():
                 if (not isinstance(v, (list, tuple)) or len(v) != 4
                         or any(isinstance(n, bool) or not isinstance(n, (int, float)) for n in v)):
                     return 'Invalid complex-shape void geometry (each void must be [x0, y0, x1, y1]).', 400
-                vx0, vy0, vx1, vy1 = (float(n) for n in v)
+                # Rounded to the same 4 decimals as tank_rects_ft itself
+                # (calc_site_concept_tank's own 'round(v, 4)') — the void
+                # comes from a separate, unrounded JS float computation
+                # (scbSnapToGrid), and without matching precision a void
+                # meant to land exactly on a row boundary can differ from
+                # that boundary by ~1e-15 ft, enough for the row-overlap
+                # check below to treat an adjacent row as touched too.
+                vx0, vy0, vx1, vy1 = (round(float(n), 4) for n in v)
                 if vx1 <= vx0 or vy1 <= vy0:
                     return 'Invalid complex-shape void geometry (a void has non-positive width/length).', 400
                 sx0, sy0 = max(vx0 - bbox_x0, 0.0), max(bbox_y1 - vy1, 0.0)
                 sx1, sy1 = min(vx1 - bbox_x0, tank_width), min(bbox_y1 - vy0, tank_length)
                 if sx1 > sx0 and sy1 > sy0:
                     shifted_voids.append((sx0, sy0, sx1, sy1))
+
+        # complex_voids (Site Concept Builder's export) and the Void Space
+        # Entry rows it auto-filled are two independently-editable sources
+        # of truth, only ever synced at the moment of that export — nothing
+        # re-syncs complex_voids if the user then toggles Void Space Entry
+        # off, or edits/deletes/adds a row directly in this calculator.
+        # Trust the drawn geometry only when it still agrees with what's
+        # actually on the form right now; otherwise it's this stale.
+        if not (request.form.get('void_enabled', '0') == '1'):
+            shifted_voids = []  # entry disabled — nothing to draw, regardless of stale geometry
+        elif shifted_voids:
+            _active_void_areas = []
+            i = 0
+            while f'void_area_{i}' in request.form:
+                try:
+                    _area = float(request.form.get(f'void_area_{i}', 0) or 0)
+                    _dim  = float(request.form.get(f'void_dim_{i}',  0) or 0)
+                except ValueError:
+                    return 'Invalid Void Space Entry data.', 400
+                if _area > 0 and _dim > 0:
+                    _active_void_areas.append(_area)
+                i += 1
+            _drawn_areas = [round((x1 - x0) * (y1 - y0), 2) for (x0, y0, x1, y1) in shifted_voids]
+            _row_areas   = _active_void_areas
+            _consistent = (len(_drawn_areas) == len(_row_areas)
+                            and all(abs(a - b) <= 0.5 for a, b in zip(_drawn_areas, _row_areas)))
+            if not _consistent:
+                return ('This tank\'s drawn void geometry no longer matches its Void Space Entry '
+                         'rows (one was edited, added, or removed after import) — re-import from '
+                         'Site Concept Builder, or disable Void Space Entry before exporting.'), 400
 
         # Each row, clipped around any voids that overlap it — 0, 1, or more
         # pieces per row (a void landing mid-row splits it into two). Every
