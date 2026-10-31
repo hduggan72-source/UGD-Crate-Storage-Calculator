@@ -8045,6 +8045,34 @@ def _dxf_add_table(layout, box, title, lines):
         y -= ts * 1.6
 
 
+def _clip_row_by_voids(row_rect, voids):
+    """Subtract any overlapping void rectangles from one row's own strip,
+    splitting it into 0+ sub-rectangles. Both row_rect and each void are
+    (x0, y0, x1, y1) in the same tank-local frame, and every boundary is
+    grid-snapped to a whole module width/length, so a void's Y-range either
+    fully covers a row's Y-strip or misses it entirely — never a partial-
+    height cut — which reduces clipping to plain 1-D interval subtraction
+    along X. Voids are applied one at a time so two voids landing in the
+    same row (rare, but not disallowed) still clip correctly in sequence."""
+    x0, y0, x1, y1 = row_rect
+    spans = [(x0, x1)]
+    for vx0, vy0, vx1, vy1 in voids:
+        if vy1 <= y0 or vy0 >= y1:
+            continue  # void's Y-range doesn't touch this row's strip
+        next_spans = []
+        for sx0, sx1 in spans:
+            ox0, ox1 = max(sx0, vx0), min(sx1, vx1)
+            if ox0 >= ox1:
+                next_spans.append((sx0, sx1))  # no overlap on this span
+                continue
+            if sx0 < ox0:
+                next_spans.append((sx0, ox0))  # remainder left of the void
+            if ox1 < sx1:
+                next_spans.append((ox1, sx1))  # remainder right of the void
+        spans = next_spans
+    return [(sx0, y0, sx1, y1) for sx0, sx1 in spans if sx1 > sx0]
+
+
 @app.route('/download_dxf', methods=['POST'])
 def download_dxf():
 
@@ -8131,24 +8159,76 @@ def download_dxf():
         shifted_rows = [(x0 - bbox_x0, bbox_y1 - y1, x1 - bbox_x0, bbox_y1 - y0)
                          for (x0, y0, x1, y1) in row_rects]
 
-        row_cols = []
         for (x0, y0, x1, y1) in shifted_rows:
-            cols = round((x1 - x0) / _DXF_MODULE_WID)
-            if cols <= 0:
+            if round((x1 - x0) / _DXF_MODULE_WID) <= 0:
                 return 'Invalid complex-shape row geometry (a row is narrower than one module).', 400
-            row_cols.append(cols)
 
+        crates_wide = crates_long = None  # not meaningful for a stepped footprint
+        tank_width  = bbox_x1 - bbox_x0   # bounding box, not a true W x L
+        tank_length = bbox_y1 - bbox_y0
+
+        # Site Concept Builder's drawn voids (grid-snapped obstruction
+        # rectangles) — optional. Parsed in the SAME tank-local frame as
+        # complex_rows, then shifted/flipped the same way so they stay
+        # registered to shifted_rows, and clamped to the tank's own bounding
+        # box (defensive against any rounding at the edges — a void can't
+        # remove area outside the tank it was drawn on).
+        complex_voids_raw = (request.form.get('complex_voids', '') or '').strip()
+        shifted_voids = []
+        if complex_voids_raw:
+            try:
+                void_rects_in = json.loads(complex_voids_raw)
+            except (TypeError, ValueError):
+                return 'Invalid complex-shape void geometry (complex_voids is not valid JSON).', 400
+            if not isinstance(void_rects_in, list):
+                return 'Invalid complex-shape void geometry (complex_voids must be a list).', 400
+            if len(void_rects_in) > _MAX_SHAPE_ROWS:
+                return f'Too many voids in complex-shape geometry (limit {_MAX_SHAPE_ROWS}).', 400
+            for v in void_rects_in:
+                if (not isinstance(v, (list, tuple)) or len(v) != 4
+                        or any(isinstance(n, bool) or not isinstance(n, (int, float)) for n in v)):
+                    return 'Invalid complex-shape void geometry (each void must be [x0, y0, x1, y1]).', 400
+                vx0, vy0, vx1, vy1 = (float(n) for n in v)
+                if vx1 <= vx0 or vy1 <= vy0:
+                    return 'Invalid complex-shape void geometry (a void has non-positive width/length).', 400
+                sx0, sy0 = max(vx0 - bbox_x0, 0.0), max(bbox_y1 - vy1, 0.0)
+                sx1, sy1 = min(vx1 - bbox_x0, tank_width), min(bbox_y1 - vy0, tank_length)
+                if sx1 > sx0 and sy1 > sy0:
+                    shifted_voids.append((sx0, sy0, sx1, sy1))
+
+        # Each row, clipped around any voids that overlap it — 0, 1, or more
+        # pieces per row (a void landing mid-row splits it into two). Every
+        # figure below (module count, footprint, storage) is computed from
+        # these clipped pieces so plan view, project data table, and BOM all
+        # already reflect the hole, instead of being netted out separately.
+        drawn_pieces = []
+        for row in shifted_rows:
+            for piece in _clip_row_by_voids(row, shifted_voids):
+                px0, py0, px1, py1 = piece
+                cols = round((px1 - px0) / _DXF_MODULE_WID)
+                if cols > 0:
+                    drawn_pieces.append((piece, cols))
+
+        if shifted_voids and not drawn_pieces:
+            return ('This complex-shape tank\'s void geometry removes the entire footprint — '
+                     'nothing left to draw. Check the void placement.'), 400
+
+        row_cols = [cols for (_, cols) in drawn_pieces]
         modules_per_layer = sum(row_cols)
         if modules_per_layer > _DXF_MAX_MODULES_PER_LAYER:
             return (f'Footprint is too large for DXF export (over '
                      f'{_DXF_MAX_MODULES_PER_LAYER:,} modules per layer). Contact Wavin '
                      'for large-project CAD support.'), 400
 
-        crates_wide = crates_long = None  # not meaningful for a stepped footprint
-        tank_width  = bbox_x1 - bbox_x0   # bounding box, not a true W x L
-        tank_length = bbox_y1 - bbox_y0
-        num_crates  = modules_per_layer * layers
-        tank_footprint_area = sum((x1 - x0) * (y1 - y0) for (x0, y0, x1, y1) in shifted_rows)
+        num_crates = modules_per_layer * layers
+        tank_footprint_area = sum((x1 - x0) * (y1 - y0) for (x0, y0, x1, y1), _ in drawn_pieces)
+        # Gross (pre-void) footprint — the difference is the void's own
+        # physically-excavated-but-unfilled area, netted out of perimeter
+        # stone below the same way the main calculate route already nets it:
+        # excavation itself stays FULL footprint (voids are dug and
+        # re-filled), only the tank/stone storage credit shrinks.
+        _gross_footprint_area = sum((x1 - x0) * (y1 - y0) for (x0, y0, x1, y1) in shifted_rows)
+        void_area = _gross_footprint_area - tank_footprint_area
     else:
         crates_wide = math.floor(known_width  / _DXF_MODULE_WID)
         crates_long = math.floor(known_length / _DXF_MODULE_LEN)
@@ -8164,6 +8244,7 @@ def download_dxf():
         tank_length = crates_long * _DXF_MODULE_LEN
         num_crates  = modules_per_layer * layers
         tank_footprint_area = tank_width * tank_length
+        void_area = 0.0
 
     layer_heights = _DXF_LAYER_HEIGHTS[config]
     tank_height   = layer_heights[layers - 1] if layers <= len(layer_heights) else layer_heights[-1]
@@ -8172,19 +8253,18 @@ def download_dxf():
     bottom_of_stone_elev = tank_bottom_elev - base_stone
     cover_depth           = surface_elev - tank_top_elev
 
-    # Void Space Entry has no drawable position (it only carries an area/
-    # dimension pair, not a location within the footprint), so a complex-
-    # shape DXF export can't cut a hole for it the way the main calculate
-    # route nets it out of footprint/crate-count/storage. Reject rather than
-    # draw and total every row at full size while the app's own calculated
-    # figures (and BOM) already reflect the void — the two would silently
-    # disagree.
-    if shape_mode == 'complex':
+    # A void entered through Void Space Entry (area + one dimension, no
+    # position) can't be drawn — there's nothing telling this route WHERE in
+    # the footprint it sits. complex_voids (Site Concept Builder's drawn,
+    # positioned obstruction rectangles, already clipped into drawn_pieces
+    # above) is what actually lets a complex-shape export draw a hole;
+    # reject only when the tank has an active void with no such position.
+    if shape_mode == 'complex' and not shifted_voids:
         _void_check = parse_void_spaces(request.form, perimeter_stone_width, tank_height)
         if _void_check['active']:
             return ('DXF export does not yet support a complex-shape tank with an active '
-                     'Void Space Entry — the drawing can\'t represent the obstruction\'s '
-                     'position. Disable Void Space Entry before exporting, or contact Wavin.'), 400
+                     'Void Space Entry that has no drawn position — re-draw the obstruction in '
+                     'the Site Concept Builder, or disable Void Space Entry before exporting.'), 400
 
     # Total storage — mirrors the single-tank rectangular-path formula used
     # by the main calculate route / download_pdf / download_quote (same
@@ -8218,7 +8298,7 @@ def download_dxf():
         outer_length = tank_length + 2 * perimeter_stone_width
         excav_area_for_storage = outer_width * outer_length
     stone_top_net   = excav_area_for_storage * cover_stone * stone_void
-    stone_perim_net = (excav_area_for_storage - tank_footprint_area) * tank_height * stone_void
+    stone_perim_net = (excav_area_for_storage - tank_footprint_area - void_area) * tank_height * stone_void
     stone_base_net  = excav_area_for_storage * base_stone * stone_void
     total_storage = (tank_storage
                       + (stone_top_net   if stone_top_included   else 0.0)
@@ -8236,6 +8316,7 @@ def download_dxf():
         ('AQUACELL-TEXT',       7),
         ('AQUACELL-TITLEBLOCK', 7),
         ('AQUACELL-TABLE',      7),
+        ('AQUACELL-VOID',       30),
     ):
         if name not in doc.layers:
             doc.layers.add(name=name, color=color)
@@ -8253,11 +8334,12 @@ def download_dxf():
         )
 
     if shape_mode == 'complex':
-        # One real per-crate INSERT per module, placed along each row's own
-        # rectangle — not a uniform grid. Each row is drawn as its own closed
-        # footprint outline (no polygon union across rows), matching how the
-        # Site Concept Builder itself represents a stepped tank.
-        for (x0, y0, x1, y1), cols in zip(shifted_rows, row_cols):
+        # One real per-crate INSERT per module, placed along each drawn
+        # piece's own rectangle — not a uniform grid. Each piece (a whole row,
+        # or one side of a row a void split in two) is drawn as its own
+        # closed footprint outline (no polygon union across pieces), matching
+        # how the Site Concept Builder itself represents a stepped tank.
+        for (x0, y0, x1, y1), cols in drawn_pieces:
             for col in range(cols):
                 msp.add_blockref(
                     block_name, (x0 + col * _DXF_MODULE_WID, y0),
@@ -8267,6 +8349,17 @@ def download_dxf():
                 [(x0, y0), (x1, y0), (x1, y1), (x0, y1)],
                 format='xy', close=True, dxfattribs={'layer': 'AQUACELL-FOOTPRINT'},
             )
+        # Void rectangles themselves — drawn as a closed outline plus a
+        # diagonal cross (the standard CAD convention for "opening/void"),
+        # on their own layer, so the obstruction is visible on the drawing
+        # itself and not just named in the plan-view note above.
+        for (vx0, vy0, vx1, vy1) in shifted_voids:
+            msp.add_lwpolyline(
+                [(vx0, vy0), (vx1, vy0), (vx1, vy1), (vx0, vy1)],
+                format='xy', close=True, dxfattribs={'layer': 'AQUACELL-VOID'},
+            )
+            msp.add_line((vx0, vy0), (vx1, vy1), dxfattribs={'layer': 'AQUACELL-VOID'})
+            msp.add_line((vx0, vy1), (vx1, vy0), dxfattribs={'layer': 'AQUACELL-VOID'})
     else:
         # Origin at the bottom-left corner of the footprint; columns run along X
         # (module width), rows run along Y (module length) — matches the
@@ -8386,6 +8479,9 @@ def download_dxf():
         else:
             scope = 'stone envelope'
         text_lines.append(f'LINER: Selected ({scope}) - geometry not shown, callout only')
+    if shape_mode == 'complex' and shifted_voids:
+        text_lines.append(f'VOID(S): {len(shifted_voids)} obstruction(s) shown, '
+                           f'{void_area:,.2f} sq ft excluded from footprint')
     if not section_elevations_provided:
         text_lines.insert(0, 'CROSS-SECTION VIEW OMITTED - Estimated Surface Elevation and/or '
                              'AquaCell Tank Bottom Elevation were not entered.')
@@ -8630,7 +8726,7 @@ def download_dxf():
 
     # Each viewport freezes the other view's layers so neither can bleed
     # into the other's window whatever region the viewport aspect exposes.
-    plan_layers    = ['AQUACELL-FOOTPRINT', 'AQUACELL-MODULES', 'AQUACELL-DIMS', 'AQUACELL-TEXT']
+    plan_layers    = ['AQUACELL-FOOTPRINT', 'AQUACELL-MODULES', 'AQUACELL-DIMS', 'AQUACELL-TEXT', 'AQUACELL-VOID']
     section_layers = [layer.dxf.name for layer in doc.layers
                       if layer.dxf.name.startswith('AQUACELL-SECTION-')]
     if shape_mode == 'complex':
