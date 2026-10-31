@@ -1441,6 +1441,20 @@
                         </div>
                     </div>
 
+                    <div class="section-card" id="scb_void_card">
+                        <div class="section-card-header">Voids / Obstructions (this tank)</div>
+                        <div class="section-card-body">
+                            <div id="scb_void_list" style="display:flex; flex-direction:column; gap:4px; margin-bottom:8px;"></div>
+                            <button type="button" id="scb_void_btn" class="calc-btn secondary" style="width:100%;" onclick="scbStartVoidDraw()">+ Draw Void</button>
+                            <div style="font-size:11px; color:#64748b; margin-top:6px; line-height:1.4;">
+                                Click, then drag a box over this tank on the plan to mark an
+                                obstruction (manhole, utility, etc.) — snaps to the crate grid.
+                                Carried into the Single-Tank calculator's Void Space Entry on
+                                export, and drawn as a real hole in the DXF.
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="section-card">
                         <div class="section-card-header">Stone &amp; Fabric (this tank)</div>
                         <div class="section-card-body">
@@ -4779,6 +4793,9 @@
         calcSeq: 0,
         calcTimer: null,
         calcPending: false, // an edit is waiting on (or in) a recalculation
+        voidDrawing: false, // true while "+ Draw Void" is armed/dragging
+        voidTankId: null,   // which tank the armed void tool targets
+        voidDraft: null,    // {start:{x,y}, current:{x,y}} tank-local ft, while dragging
     };
     const scbPdf = { doc: null, pageNum: 1, pageCount: 0, rendering: false };
 
@@ -5077,6 +5094,10 @@
             baseStone: '0.333',
             stoneVoid: '0.40',
             geoWaste: '20',
+            voids: [],           // [{id, label, x0, y0, x1, y1}] tank-local ft,
+                                  // grid-snapped — drawn obstructions, never
+                                  // sent to the backend calculator (see
+                                  // scbStartVoidDraw)
             result: null,        // last good backend result for this tank
         };
     }
@@ -5151,6 +5172,7 @@
         document.getElementById('scb_editor_title').textContent =
             isDraft ? 'New Tank (set up, then click + Add Tank)' : 'Selected Tank';
         document.getElementById('scb_delete_btn').style.display = isDraft ? 'none' : '';
+        document.getElementById('scb_void_card').style.display = isDraft ? 'none' : '';
         scbSetVal('scb_label', t.label);
         scbSetVal('scb_config', t.config);
         scbSetVal('scb_layers', t.layers);
@@ -5164,6 +5186,7 @@
         scbSetVal('scb_geo_waste', t.geoWaste);
         scbShowMode(t.mode);
         scbRenderRows();
+        scbRenderVoidList();
     }
     // Every editor field routes here: copy fields into the active tank
     // (raw strings — the backend parses them, so a typed 0 stays 0),
@@ -5192,6 +5215,100 @@
         if (!t) return;
         t.rot = (((t.rot + (dir === -1 ? -90 : 90)) % 360) + 360) % 360;
         scbSetVal('scb_rot', t.rot);
+        scbRedraw();
+    }
+
+    // ── VOIDS / OBSTRUCTIONS ──
+    // Drawn purely client-side on top of a calculated tank's own geometry —
+    // never fed back into the row/envelope payload this tool sends to the
+    // backend, so nothing about the existing crate-count/storage/BOM
+    // calculation changes. A void only affects what gets exported (it
+    // auto-fills the Single-Tank calculator's existing Void Space Entry
+    // area/dimension fields) and what the DXF export draws.
+    function scbSnapToGrid(t, f) {
+        const bw = t.result.bounding_width_ft, bl = t.result.bounding_length_ft;
+        let x = Math.round(f.x / SCB_MODULE_WID) * SCB_MODULE_WID;
+        let y = Math.round(f.y / SCB_MODULE_LEN) * SCB_MODULE_LEN;
+        x = Math.max(0, Math.min(x, bw));
+        y = Math.max(0, Math.min(y, bl));
+        return { x: x, y: y };
+    }
+    // Snapping only clamps to the tank's bounding BOX, which for a stepped
+    // shape can be bigger than its actual occupied footprint (a void drawn
+    // over a notch would claim area no row ever had). Checked at module-cell
+    // granularity against the tank's own real row rectangles — a void must
+    // land entirely on real tank footprint, never partially on it.
+    function scbVoidFullyInsideTank(t, x0, y0, x1, y1) {
+        const rects = t.result.tank_rects_ft;
+        const eps = 1e-4; // matches the 4-decimal rounding tank_rects_ft itself uses
+        const colStart = Math.round(x0 / SCB_MODULE_WID), colEnd = Math.round(x1 / SCB_MODULE_WID);
+        const rowStart = Math.round(y0 / SCB_MODULE_LEN), rowEnd = Math.round(y1 / SCB_MODULE_LEN);
+        for (let r = rowStart; r < rowEnd; r++) {
+            const cellY0 = r * SCB_MODULE_LEN, cellY1 = (r + 1) * SCB_MODULE_LEN;
+            const rowRect = rects.find(function (q) {
+                return Math.abs(q[1] - cellY0) < eps && Math.abs(q[3] - cellY1) < eps;
+            });
+            if (!rowRect) return false;
+            for (let c = colStart; c < colEnd; c++) {
+                const cellX0 = c * SCB_MODULE_WID, cellX1 = (c + 1) * SCB_MODULE_WID;
+                if (cellX0 < rowRect[0] - eps || cellX1 > rowRect[2] + eps) return false;
+            }
+        }
+        return true;
+    }
+    // Two overlapping voids would double-count their shared area in the
+    // exported void_area_N fields (each void's own full area, independent
+    // of the others) while the DXF export only removes the union once —
+    // disallowing the overlap is simpler and more robust than trying to
+    // keep two independently-maintained area totals in sync.
+    function scbVoidOverlapsExisting(t, x0, y0, x1, y1) {
+        return (t.voids || []).some(function (v) {
+            return x0 < v.x1 && x1 > v.x0 && y0 < v.y1 && y1 > v.y0;
+        });
+    }
+    function scbStartVoidDraw() {
+        const t = scbActive();
+        if (!t) { scbSetStatus('Select a tank first.'); return; }
+        if (!t.result) { scbSetStatus('Let this tank calculate before adding a void.'); return; }
+        scbState.voidDrawing = true;
+        scbState.voidTankId = t.id;
+        scbState.voidDraft = null;
+        scbSetStatus('Drag a box over "' + (t.label || 'this tank') + '" on the plan to mark the obstruction.');
+    }
+    function scbRenderVoidList() {
+        const box = document.getElementById('scb_void_list');
+        if (!box) return;
+        box.innerHTML = '';
+        const t = scbActive();
+        if (!t || !(t.voids || []).length) {
+            box.innerHTML = '<div style="font-size:12px; color:#94a3b8;">None yet.</div>';
+            return;
+        }
+        t.voids.forEach(function (v) {
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex; align-items:center; gap:6px; padding:4px 6px; ' +
+                'border-radius:6px; background:var(--highlight); font-size:12px;';
+            const name = document.createElement('span');
+            name.style.cssText = 'flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+            name.textContent = (v.label || 'Void') + ' — ' + (v.x1 - v.x0).toFixed(1) + ' × ' +
+                (v.y1 - v.y0).toFixed(1) + ' ft';
+            const del = document.createElement('button');
+            del.type = 'button';
+            del.textContent = '×';
+            del.title = 'Delete this void';
+            del.style.cssText = 'border:none; background:none; color:#b91c1c; font-weight:bold; ' +
+                'cursor:pointer; font-size:15px; line-height:1; padding:0 2px;';
+            del.addEventListener('click', function () { scbDeleteVoid(v.id); });
+            row.appendChild(name);
+            row.appendChild(del);
+            box.appendChild(row);
+        });
+    }
+    function scbDeleteVoid(voidId) {
+        const t = scbActive();
+        if (!t) return;
+        t.voids = (t.voids || []).filter(function (v) { return v.id !== voidId; });
+        scbRenderVoidList();
         scbRedraw();
     }
     function scbShowMode(mode) {
@@ -5520,6 +5637,34 @@
         strokeSegs(scbUnionEdges(r.tank_rects_ft));
         ctx.setLineDash([]);
 
+        // Voids / obstructions — hatched red rectangles so they read clearly
+        // as "excluded", distinct from the tank body and excavation fills.
+        (t.voids || []).forEach(function (v) {
+            const vx0 = X(v.x0), vy0 = Y(v.y0), vx1 = X(v.x1), vy1 = Y(v.y1);
+            ctx.fillStyle = 'rgba(220, 38, 38, 0.22)';
+            ctx.fillRect(vx0, vy0, vx1 - vx0, vy1 - vy0);
+            ctx.strokeStyle = '#dc2626';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(vx0, vy0, vx1 - vx0, vy1 - vy0);
+            ctx.beginPath();
+            ctx.moveTo(vx0, vy0); ctx.lineTo(vx1, vy1);
+            ctx.moveTo(vx0, vy1); ctx.lineTo(vx1, vy0);
+            ctx.stroke();
+        });
+        // Live preview of a void currently being dragged out on THIS tank.
+        if (scbState.voidDrawing && scbState.voidTankId === t.id && scbState.voidDraft) {
+            const d = scbState.voidDraft;
+            const px0 = X(Math.min(d.start.x, d.current.x)), px1 = X(Math.max(d.start.x, d.current.x));
+            const py0 = Y(Math.min(d.start.y, d.current.y)), py1 = Y(Math.max(d.start.y, d.current.y));
+            ctx.fillStyle = 'rgba(220, 38, 38, 0.14)';
+            ctx.fillRect(px0, py0, px1 - px0, py1 - py0);
+            ctx.strokeStyle = '#dc2626';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 4]);
+            ctx.strokeRect(px0, py0, px1 - px0, py1 - py0);
+            ctx.setLineDash([]);
+        }
+
         // Label — counter-rotated so it always reads upright. Optional: on a
         // small tank the box covers the crates (Display > Tank labels).
         if (!document.getElementById('scb_show_label').checked) { ctx.restore(); return; }
@@ -5641,6 +5786,14 @@
                 }
                 return;
             }
+            if (scbState.voidDrawing) {
+                const vt = scbState.tanks.find(function (x) { return x.id === scbState.voidTankId; });
+                if (!vt || !vt.result) { scbState.voidDrawing = false; return; }
+                const snapped = scbSnapToGrid(vt, scbToTankFt(vt, p));
+                scbState.voidDraft = { start: snapped, current: snapped };
+                scbRedraw();
+                return;
+            }
             const t = scbHitTest(p);
             if (!t) return;
             if (scbState.activeId !== t.id) scbSelectTank(t.id);
@@ -5650,6 +5803,14 @@
             cv.style.cursor = 'grabbing';
         });
         cv.addEventListener('mousemove', function (ev) {
+            if (scbState.voidDrawing && scbState.voidDraft) {
+                const vt = scbState.tanks.find(function (x) { return x.id === scbState.voidTankId; });
+                if (!vt) return;
+                const p = scbEventToCanvas(ev);
+                scbState.voidDraft.current = scbSnapToGrid(vt, scbToTankFt(vt, p));
+                scbRedraw();
+                return;
+            }
             if (!scbState.dragging) return;
             const t = scbActive();
             if (!t) return;
@@ -5659,6 +5820,32 @@
             scbRedraw();
         });
         window.addEventListener('mouseup', function () {
+            if (scbState.voidDrawing && scbState.voidDraft) {
+                const vt = scbState.tanks.find(function (x) { return x.id === scbState.voidTankId; });
+                const d = scbState.voidDraft;
+                const x0 = Math.min(d.start.x, d.current.x), x1 = Math.max(d.start.x, d.current.x);
+                const y0 = Math.min(d.start.y, d.current.y), y1 = Math.max(d.start.y, d.current.y);
+                scbState.voidDrawing = false;
+                scbState.voidDraft = null;
+                if (!vt || x1 <= x0 || y1 <= y0) {
+                    scbSetStatus('Void needs at least one module of width/length — try again.');
+                } else if (!scbVoidFullyInsideTank(vt, x0, y0, x1, y1)) {
+                    scbSetStatus('Void must be drawn entirely within the tank\'s own footprint (not just its bounding box) — try again.');
+                } else if (scbVoidOverlapsExisting(vt, x0, y0, x1, y1)) {
+                    scbSetStatus('Void overlaps an existing one on this tank — delete the other first, or draw a non-overlapping box.');
+                } else {
+                    if (!vt.voids) vt.voids = [];
+                    vt.voids.push({
+                        id: 'scb_v' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                        label: 'Void ' + (vt.voids.length + 1),
+                        x0: x0, y0: y0, x1: x1, y1: y1,
+                    });
+                    scbRenderVoidList();
+                    scbSetStatus('Void added. Click + Draw Void again for another.');
+                }
+                scbRedraw();
+                return;
+            }
             if (scbState.dragging) {
                 scbState.dragging = false;
                 scbCanvas().style.cursor = 'crosshair';
@@ -5911,6 +6098,19 @@
             return;
         }
         const proj = scbGetVal('scb_project').trim();
+        // Drawn voids (see scbStartVoidDraw) auto-fill the Single-Tank
+        // calculator's own Void Space Entry fields (area + one dimension —
+        // it has no position of its own) so the storage/BOM netting James
+        // already trusts keeps working unchanged; complex_voids separately
+        // carries each void's real position so the DXF export can draw the
+        // actual hole instead of just netting an area.
+        const voids = t.voids || [];
+        const voidFields = {};
+        voids.forEach(function (v, i) {
+            voidFields['void_area_' + i] = scbNum((v.x1 - v.x0) * (v.y1 - v.y0));
+            voidFields['void_dim_' + i] = scbNum(v.x1 - v.x0);
+            voidFields['void_label_' + i] = v.label || ('Void ' + (i + 1));
+        });
         const data = {
             project_name: proj, project_num: '', location: '', site_address: '',
             client: '', estimator: '', estimator_email: '', project_notes: '',
@@ -5927,7 +6127,10 @@
             // calculator_import still provides as the storage/BOM-matching
             // fallback for calculators and views that don't use rows.
             complex_rows: JSON.stringify(r.tank_rects_ft),
-            void_enabled: '0',
+            // Drawn void rectangles ([[x0,y0,x1,y1], ...] ft, same tank-local
+            // frame as complex_rows) — optional; see voidFields above.
+            complex_voids: JSON.stringify(voids.map(function (v) { return [v.x0, v.y0, v.x1, v.y1]; })),
+            void_enabled: voids.length ? '1' : '0',
             surface_elev: '', tank_bottom_elev: '',
             cover_stone: scbNum(r.cover_stone_ft), base_stone: scbNum(r.base_stone_ft),
             perimeter_stone_width: scbNum(r.perimeter_stone_width_ft), stone_void: scbNum(r.stone_void),
@@ -5945,6 +6148,7 @@
             liner_on_tank: '0', liner_on_stone: '0', liner_tank_yd2: '0', liner_stone_yd2: '0',
             ptrow_enabled: '0', contingency_units: '0',
         };
+        Object.assign(data, voidFields);
         scbDownloadJSON(data, 'AquaCell_' + scbFileSafe(proj, 'Project') + '_' + scbFileSafe(r.label, 'Tank') + '_' +
             new Date().toISOString().slice(0, 10) + '.json');
         scbSetStatus('JSON exported for "' + r.label + '" — import it in the Single-Tank calculator.');
