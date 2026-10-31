@@ -5238,6 +5238,11 @@
     // over a notch would claim area no row ever had). Checked at module-cell
     // granularity against the tank's own real row rectangles — a void must
     // land entirely on real tank footprint, never partially on it.
+    // tank_rects_ft is itself already void-aware (calc_site_concept_tank
+    // returns it clipped around any existing voids), so a row an earlier
+    // void has split can appear here as two or more separate pieces at the
+    // same Y — every piece at that row is checked, not just the first
+    // match, and each module cell only needs to be covered by ONE of them.
     function scbVoidFullyInsideTank(t, x0, y0, x1, y1) {
         const rects = t.result.tank_rects_ft;
         const eps = 1e-4; // matches the 4-decimal rounding tank_rects_ft itself uses
@@ -5245,13 +5250,16 @@
         const rowStart = Math.round(y0 / SCB_MODULE_LEN), rowEnd = Math.round(y1 / SCB_MODULE_LEN);
         for (let r = rowStart; r < rowEnd; r++) {
             const cellY0 = r * SCB_MODULE_LEN, cellY1 = (r + 1) * SCB_MODULE_LEN;
-            const rowRect = rects.find(function (q) {
+            const rowPieces = rects.filter(function (q) {
                 return Math.abs(q[1] - cellY0) < eps && Math.abs(q[3] - cellY1) < eps;
             });
-            if (!rowRect) return false;
+            if (!rowPieces.length) return false;
             for (let c = colStart; c < colEnd; c++) {
                 const cellX0 = c * SCB_MODULE_WID, cellX1 = (c + 1) * SCB_MODULE_WID;
-                if (cellX0 < rowRect[0] - eps || cellX1 > rowRect[2] + eps) return false;
+                const covered = rowPieces.some(function (q) {
+                    return cellX0 >= q[0] - eps && cellX1 <= q[2] + eps;
+                });
+                if (!covered) return false;
             }
         }
         return true;
@@ -5310,6 +5318,7 @@
         t.voids = (t.voids || []).filter(function (v) { return v.id !== voidId; });
         scbRenderVoidList();
         scbRedraw();
+        scbScheduleCalc(0);
     }
     function scbShowMode(mode) {
         document.getElementById('scb_env_section').style.display = mode === 'envelope' ? '' : 'none';
@@ -5396,6 +5405,7 @@
             base_stone: t.baseStone,
             stone_void: t.stoneVoid,
             geo_waste_pct: t.geoWaste,
+            voids: (t.voids || []).map(function (v) { return [v.x0, v.y0, v.x1, v.y1]; }),
         };
         if (t.mode === 'envelope') {
             p.envelope_width_ft = t.envW;
@@ -5842,6 +5852,7 @@
                     });
                     scbRenderVoidList();
                     scbSetStatus('Void added. Click + Draw Void again for another.');
+                    scbScheduleCalc(0);
                 }
                 scbRedraw();
                 return;
@@ -6126,7 +6137,11 @@
             // shape instead of the scaled-rectangle equivalent above, which
             // calculator_import still provides as the storage/BOM-matching
             // fallback for calculators and views that don't use rows.
-            complex_rows: JSON.stringify(r.tank_rects_ft),
+            // Unclipped (full_tank_rects_ft, not tank_rects_ft) — the single-
+            // tank calculator's own DXF export clips rows around
+            // complex_voids itself; exporting already-clipped rows here
+            // would double-clip.
+            complex_rows: JSON.stringify(r.full_tank_rects_ft),
             // Drawn void rectangles ([[x0,y0,x1,y1], ...] ft, same tank-local
             // frame as complex_rows) — optional; see voidFields above.
             complex_voids: JSON.stringify(voids.map(function (v) { return [v.x0, v.y0, v.x1, v.y1]; })),

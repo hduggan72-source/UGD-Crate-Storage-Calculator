@@ -1180,10 +1180,6 @@ def calc_site_concept_tank(payload):
     # Area and perimeter are recomputed unrounded here (the builder's
     # returned values are rounded for display) so the storage figures
     # match calc_tank() to the decimal on a plain rectangle.
-    crates_layer = geo['total_crates_layer']
-    num_crates   = geo['total_crates_all_layers']
-    tank_area    = crates_layer * MODULE_WID * MODULE_LEN
-
     # Rows run top-to-bottom down the length (y), crates across the
     # width (x) — same frame the Complex Shape Builder drawing uses.
     d = perimeter_stone_width
@@ -1200,7 +1196,49 @@ def calc_site_concept_tank(payload):
     bbox_w = max(r[2] for r in tank_rects)
     bbox_l = max(r[3] for r in tank_rects)
     bbox_area = bbox_w * bbox_l
-    _, tank_perim = _scb_rect_union(tank_rects)
+
+    # Drawn voids (the "Draw Void" tool) — optional, same tank-local frame
+    # tank_rects already uses (no shift/flip needed here, unlike the DXF
+    # export's separate paper-space convention). Validated with the same
+    # rigor as download_dxf()'s complex_voids parsing.
+    void_rects_in = payload.get('voids', []) or []
+    if not isinstance(void_rects_in, list):
+        return {'error': f'{label}: void geometry must be a list.'}
+    if len(void_rects_in) > _MAX_SHAPE_ROWS:
+        return {'error': f'{label}: too many voids (limit {_MAX_SHAPE_ROWS}).'}
+    void_rects = []
+    for v in void_rects_in:
+        if (not isinstance(v, (list, tuple)) or len(v) != 4
+                or any(isinstance(n, bool) or not isinstance(n, (int, float)) for n in v)):
+            return {'error': f'{label}: each void must be [x0, y0, x1, y1].'}
+        vx0, vy0, vx1, vy1 = (round(float(n), 4) for n in v)
+        if vx1 <= vx0 or vy1 <= vy0:
+            return {'error': f'{label}: a void has non-positive width/length.'}
+        # Clamped to the tank's own bounding box — defensive, a void can't
+        # remove area outside the tank it was drawn on.
+        vx0, vy0 = max(vx0, 0.0), max(vy0, 0.0)
+        vx1, vy1 = min(vx1, bbox_w), min(vy1, bbox_l)
+        if vx1 > vx0 and vy1 > vy0:
+            void_rects.append((vx0, vy0, vx1, vy1))
+
+    # Every row clipped around any overlapping voids — a no-op per row when
+    # void_rects is empty, so crates_layer/num_crates/tank_area/tank_perim
+    # below need no separate "has voids" branch; they're simply correct
+    # either way.
+    clipped_rects = []
+    for row in tank_rects:
+        clipped_rects.extend(_clip_row_by_voids(row, void_rects))
+    if void_rects and not clipped_rects:
+        return {'error': f'{label}: void geometry removes the entire footprint.'}
+
+    crates_layer = sum(round((x1 - x0) / MODULE_WID) for (x0, y0, x1, y1) in clipped_rects)
+    num_crates   = crates_layer * layers
+    tank_area    = crates_layer * MODULE_WID * MODULE_LEN
+    # Area removed by voids — excavation itself stays full footprint below
+    # (voids are dug and re-filled), only the tank/stone credit shrinks.
+    void_area = sum((x1 - x0) * (y1 - y0) for (x0, y0, x1, y1) in tank_rects) - tank_area
+
+    _, tank_perim = _scb_rect_union(clipped_rects)
     excav_rects = [(x0 - d, y0 - d, x1 + d, y1 + d) for (x0, y0, x1, y1) in tank_rects]
     excav_area, excav_perim = _scb_rect_union(excav_rects)
 
@@ -1221,7 +1259,12 @@ def calc_site_concept_tank(payload):
     stone_env_vol   = total_excav_vol - gross_tank_vol
 
     stone_top_gross   = excav_area * cover_stone
-    stone_perim_gross = (excav_area - tank_area) * tank_height
+    # Perimeter stone is excavation minus tank minus the void's own area —
+    # the void earns no stone credit either (same "by others" treatment the
+    # non-positional Void Space Entry already applies), while top/base
+    # stone and the purchased stone envelope volume below are unaffected
+    # (they blanket the full excavation footprint regardless of the void).
+    stone_perim_gross = (excav_area - tank_area - void_area) * tank_height
     stone_base_gross  = excav_area * base_stone
     stone_top_net     = stone_top_gross * stone_void
     stone_perim_net   = stone_perim_gross * stone_void
@@ -1322,8 +1365,15 @@ def calc_site_concept_tank(payload):
         # Drawing data for the plan overlay (ft, tank-local frame:
         # x across width from the left-most crate, y down the length
         # from row 0). The excavation outline is the union of these.
-        'tank_rects_ft':       [[round(v, 4) for v in r] for r in tank_rects],
+        'tank_rects_ft':       [[round(v, 4) for v in r] for r in clipped_rects],
+        # Unclipped row geometry (pre-void) — kept separately because the
+        # single-tank calculator's own DXF export (complex_rows) already
+        # clips rows around complex_voids itself; exporting the already-
+        # clipped tank_rects_ft there would double-clip (harmless since
+        # it's idempotent, but needlessly fragile).
+        'full_tank_rects_ft':  [[round(v, 4) for v in r] for r in tank_rects],
         'excavation_rects_ft': [[round(v, 4) for v in r] for r in excav_rects],
+        'voids_ft':            [[round(v, 4) for v in r] for r in void_rects],
         # Complex Shape inputs that make the single / multi-tank
         # calculators reproduce this tank (JSON export → import).
         'calculator_import': _scb_calculator_import(
@@ -5380,6 +5430,17 @@ def _draw_scb_tank_plan(c, x0, y0, w, h, r):
     c.setLineWidth(1.4)
     for sx0, sy0, sx1, sy1 in _scb_union_edges(tk):
         c.line(X(sx0), Y(sy0), X(sx1), Y(sy1))
+
+    # Voids/obstructions — outline + diagonal cross, matching the DXF
+    # export's AQUACELL-VOID convention (and the canvas's own red hatch),
+    # so the obstruction reads the same way across every output.
+    if r.get('voids_ft'):
+        c.setStrokeColor(colors.HexColor('#dc2626'))
+        c.setLineWidth(1.0)
+        for q in r['voids_ft']:
+            c.rect(X(q[0]), Y(q[3]), (q[2] - q[0]) * s, (q[3] - q[1]) * s, fill=0, stroke=1)
+            c.line(X(q[0]), Y(q[1]), X(q[2]), Y(q[3]))
+            c.line(X(q[0]), Y(q[3]), X(q[2]), Y(q[1]))
 
     # Overall tank dimensions (bounding): width above, length at left.
     bw, bl = r['bounding_width_ft'], r['bounding_length_ft']
