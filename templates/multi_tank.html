@@ -756,7 +756,7 @@
                 </div>
                 <div class="input-group">
                     <label>Configuration</label>
-                    <select id="f_config" onchange="saveDraft()">
+                    <select id="f_config" onchange="syncSCOnlyLayers(); saveDraft()">
                         <option value="SC">SC — Standard</option>
                         <option value="EX">EX — Extra Strong</option>
                     </select>
@@ -772,6 +772,8 @@
                         <option value="6">6</option>
                         <option value="7">7</option>
                         <option value="8">8</option>
+                        <option value="9" class="sc-only-layer">9 (SC only)</option>
+                        <option value="10" class="sc-only-layer">10 (SC only)</option>
                     </select>
                 </div>
                 <div class="input-group">
@@ -1735,6 +1737,7 @@ function loadEditor(idx) {
         const el = document.getElementById('f_' + f);
         if (el) el.value = tanks[idx][f] !== undefined ? tanks[idx][f] : '';
     });
+    syncSCOnlyLayers();
 
     // Restore shape mode
     window._mtShapeMode = tanks[idx].shape_mode || 'rectangle';
@@ -1783,6 +1786,16 @@ function loadEditor(idx) {
         // so normal saveDraft() behavior resumes after the editor load.
         window._loadingEditor = false;
     }
+}
+
+// SC-9 / SC-10 are SC-only (internal): hide them when EX is selected, fall back to 8.
+function syncSCOnlyLayers() {
+    const cfg = document.getElementById('f_config').value;
+    const sel = document.getElementById('f_layers');
+    Array.from(sel.options).forEach(function (o) {
+        if (parseInt(o.value, 10) > 8) { o.disabled = cfg !== 'SC'; o.hidden = cfg !== 'SC'; }
+    });
+    if (cfg !== 'SC' && parseInt(sel.value, 10) > 8) sel.value = '8';
 }
 
 function saveDraft() {

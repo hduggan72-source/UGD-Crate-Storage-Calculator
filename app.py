@@ -28,6 +28,20 @@ app = Flask(__name__)
 PRICING_ENABLED = os.environ.get("PRICING_ENABLED", "True").strip().lower() != "false"
 BETA_ENABLED    = os.environ.get("BETA_ENABLED", "True").strip().lower() != "false"
 
+# ── Cumulative stack height (ft) per layer count — SINGLE SOURCE OF TRUTH ─────
+# Every calculator route, PDF/DXF export and CONFIG_DATA reads these two lists.
+# SC-9 / SC-10 are INTERNAL pricing/design-tool options only (not on standard
+# Wavin documentation, which stops at SC-8). Their heights extend the SC-8
+# value by a 1.3125 ft per-layer step, as specified by James — they are NOT
+# from AQ-200-01. EX is deliberately limited to 8 layers.
+# Step = 1.3125 ft/layer: SC-9 = 10.581 + 1.3125 = 11.8935 -> 11.894 (round half up,
+# written as a literal because Python's round() gives 11.893 on that float);
+# SC-10 = 10.581 + 2 x 1.3125 = 13.206. JS tables in index.html mirror these.
+SC_LAYER_HEIGHTS = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581,
+                    11.894,    # SC-9
+                    13.206]    # SC-10
+EX_LAYER_HEIGHTS = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
+
 
 @app.before_request
 def _check_beta_enabled():
@@ -1629,11 +1643,11 @@ def index():
         MODULE_LEN = 3.937
 
         if config == 'SC':
-            layer_heights   = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]
+            layer_heights   = SC_LAYER_HEIGHTS
             void_ratio      = 0.95486
             side_multiplier = 1.312336
         else:
-            layer_heights   = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
+            layer_heights   = EX_LAYER_HEIGHTS
             void_ratio      = 0.92633
             side_multiplier = 1.509186351
 
@@ -2024,7 +2038,7 @@ CW = PW - LM - RM # usable content width = 522
 # ── Multi-Tank shared constants ──
 CONFIG_DATA = {
     'SC': {
-        'layer_heights':   [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581],
+        'layer_heights':   SC_LAYER_HEIGHTS,
         'void_ratio':      0.95486,
         'side_multiplier': 1.312336,
         'max_strength':    70,
@@ -2032,7 +2046,7 @@ CONFIG_DATA = {
         'max_cover':       14.4,
     },
     'EX': {
-        'layer_heights':   [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073],
+        'layer_heights':   EX_LAYER_HEIGHTS,
         'void_ratio':      0.92633,
         'side_multiplier': 1.509186351,
         'max_strength':    100,
@@ -7293,11 +7307,11 @@ def download_pdf():
     MODULE_LEN = 3.937
 
     if config == 'SC':
-        layer_heights   = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]
+        layer_heights   = SC_LAYER_HEIGHTS
         void_ratio      = 0.95486
         side_multiplier = 1.312336
     else:
-        layer_heights   = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
+        layer_heights   = EX_LAYER_HEIGHTS
         void_ratio      = 0.92633
         side_multiplier = 1.509186351
 
@@ -7785,8 +7799,8 @@ _DXF_MODULE_LEN = 3.937
 # tables used everywhere else in this app (download_pdf, the main calculate
 # route, and the LAYER_HT table in index.html's client-side schematic).
 _DXF_LAYER_HEIGHTS = {
-    'SC': [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581],
-    'EX': [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073],
+    'SC': SC_LAYER_HEIGHTS,
+    'EX': EX_LAYER_HEIGHTS,
 }
 
 _DXF_VOID_RATIO = {'SC': 0.95486, 'EX': 0.92633}
@@ -8167,8 +8181,11 @@ def download_dxf():
     stone_perim_included = request.form.get('stone_perim_included', '1') == '1'
     stone_base_included  = request.form.get('stone_base_included',  '1') == '1'
 
-    if layers < 1 or layers > 8:
-        return 'Layer count must be between 1 and 8.', 400
+    _dxf_cfg_heights = _DXF_LAYER_HEIGHTS.get(config)
+    if _dxf_cfg_heights is None:
+        return 'Unknown configuration.', 400
+    if layers < 1 or layers > len(_dxf_cfg_heights):
+        return f'Layer count for {config} must be between 1 and {len(_dxf_cfg_heights)}.', 400
 
     # Hard cap on per-layer module count — this route builds one in-memory
     # BLOCKREF entity per module, so unbounded input dimensions (e.g. a
@@ -8975,10 +8992,10 @@ def download_stage_csv():
     MODULE_LEN = 3.937
 
     if config == 'SC':
-        layer_heights = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]
+        layer_heights = SC_LAYER_HEIGHTS
         void_ratio    = 0.95486
     else:
-        layer_heights = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
+        layer_heights = EX_LAYER_HEIGHTS
         void_ratio    = 0.92633
 
     tank_height        = layer_heights[layers-1] if layers <= len(layer_heights) else layer_heights[-1]
@@ -9149,11 +9166,11 @@ def download_quote():
       MODULE_LEN = 3.937
 
       if config == 'SC':
-          layer_heights   = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]
+          layer_heights   = SC_LAYER_HEIGHTS
           void_ratio      = 0.95486
           side_multiplier = 1.312336
       else:
-          layer_heights   = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
+          layer_heights   = EX_LAYER_HEIGHTS
           void_ratio      = 0.92633
           side_multiplier = 1.509186351
 
@@ -9301,10 +9318,10 @@ def download_quote():
       large_pipe_qty  = _lp18 + _lp24 + _lp36 + _lpgt36 or int(request.form.get('large_pipe_qty', 0) or 0)
       large_pipe_desc = 'LARGE DIAMETER PIPE CONNECTION (18\u201336\u2033) \u2014 GEOTEXTILE BOOT / ABUTMENT'
       if config == 'SC':
-          _q_layer_heights = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]
+          _q_layer_heights = SC_LAYER_HEIGHTS
           _q_void_ratio    = 0.95486
       else:
-          _q_layer_heights = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
+          _q_layer_heights = EX_LAYER_HEIGHTS
           _q_void_ratio    = 0.92633
       _q_ptrow_ht  = _q_layer_heights[0]
       _q_ptrow_vol = MODULE_WID * MODULE_LEN * _q_ptrow_ht * _q_void_ratio

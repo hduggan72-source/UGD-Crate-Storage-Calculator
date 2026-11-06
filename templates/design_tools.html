@@ -1379,7 +1379,7 @@
                             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                                 <div>
                                     <label>Configuration</label>
-                                    <select id="scb_config" onchange="scbEditorChanged()">
+                                    <select id="scb_config" onchange="scbSyncSCOnlyLayers(); scbEditorChanged()">
                                         <option value="SC">SC — Standard</option>
                                         <option value="EX">EX — Extra Strong</option>
                                     </select>
@@ -1391,6 +1391,7 @@
                                         <option value="3">3</option><option value="4">4</option>
                                         <option value="5">5</option><option value="6">6</option>
                                         <option value="7">7</option><option value="8">8</option>
+                                        <option value="9" class="sc-only-layer">9 (SC only)</option><option value="10" class="sc-only-layer">10 (SC only)</option>
                                     </select>
                                 </div>
                             </div>
@@ -5166,6 +5167,16 @@
     function scbSetVal(id, v) { document.getElementById(id).value = v; }
     function scbGetVal(id) { return document.getElementById(id).value; }
 
+    // SC-9 / SC-10 are SC-only (internal): hide them when EX is selected, fall back to 8.
+    function scbSyncSCOnlyLayers() {
+        const cfg = document.getElementById('scb_config').value;
+        const sel = document.getElementById('scb_layers');
+        Array.from(sel.options).forEach(function (o) {
+            if (parseInt(o.value, 10) > 8) { o.disabled = cfg !== 'SC'; o.hidden = cfg !== 'SC'; }
+        });
+        if (cfg !== 'SC' && parseInt(sel.value, 10) > 8) sel.value = '8';
+    }
+
     function scbSyncEditor() {
         const isDraft = !scbActive();
         const t = scbEditTarget();
@@ -5175,6 +5186,7 @@
         document.getElementById('scb_void_card').style.display = isDraft ? 'none' : '';
         scbSetVal('scb_label', t.label);
         scbSetVal('scb_config', t.config);
+        scbSyncSCOnlyLayers();
         scbSetVal('scb_layers', t.layers);
         scbSetVal('scb_env_w', t.envW);
         scbSetVal('scb_env_l', t.envL);
