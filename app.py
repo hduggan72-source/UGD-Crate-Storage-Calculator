@@ -28,6 +28,20 @@ app = Flask(__name__)
 PRICING_ENABLED = os.environ.get("PRICING_ENABLED", "True").strip().lower() != "false"
 BETA_ENABLED    = os.environ.get("BETA_ENABLED", "True").strip().lower() != "false"
 
+# ── Cumulative stack height (ft) per layer count — SINGLE SOURCE OF TRUTH ─────
+# Every calculator route, PDF/DXF export and CONFIG_DATA reads these two lists.
+# SC-9 / SC-10 are INTERNAL pricing/design-tool options only (not on standard
+# Wavin documentation, which stops at SC-8). Their heights extend the SC-8
+# value by a 1.3125 ft per-layer step, as specified by James — they are NOT
+# from AQ-200-01. EX is deliberately limited to 8 layers.
+# Step = 1.3125 ft/layer: SC-9 = 10.581 + 1.3125 = 11.8935 -> 11.894 (round half up,
+# written as a literal because Python's round() gives 11.893 on that float);
+# SC-10 = 10.581 + 2 x 1.3125 = 13.206. JS tables in index.html mirror these.
+SC_LAYER_HEIGHTS = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581,
+                    11.894,    # SC-9
+                    13.206]    # SC-10
+EX_LAYER_HEIGHTS = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
+
 
 @app.before_request
 def _check_beta_enabled():
@@ -1579,11 +1593,11 @@ def index():
         MODULE_LEN = 3.937
 
         if config == 'SC':
-            layer_heights   = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]
+            layer_heights   = SC_LAYER_HEIGHTS
             void_ratio      = 0.95486
             side_multiplier = 1.312336
         else:
-            layer_heights   = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
+            layer_heights   = EX_LAYER_HEIGHTS
             void_ratio      = 0.92633
             side_multiplier = 1.509186351
 
@@ -1974,7 +1988,7 @@ CW = PW - LM - RM # usable content width = 522
 # ── Multi-Tank shared constants ──
 CONFIG_DATA = {
     'SC': {
-        'layer_heights':   [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581],
+        'layer_heights':   SC_LAYER_HEIGHTS,
         'void_ratio':      0.95486,
         'side_multiplier': 1.312336,
         'max_strength':    70,
@@ -1982,7 +1996,7 @@ CONFIG_DATA = {
         'max_cover':       14.4,
     },
     'EX': {
-        'layer_heights':   [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073],
+        'layer_heights':   EX_LAYER_HEIGHTS,
         'void_ratio':      0.92633,
         'side_multiplier': 1.509186351,
         'max_strength':    100,
@@ -2226,6 +2240,51 @@ def _table_total_row(c, y, cells, bg, fg):
             c.drawString(x_abs, y - 3, str(text))
     _rule(c, y - rh + 3, thickness=0.25)
     return y - rh
+
+
+# ── SC-9 / SC-10 internal-configuration footnote ──────────────────────────────
+# SC-9 and SC-10 exist only in internal pricing/design tools; standard Wavin
+# documentation stops at SC-8. Any PDF that includes such a tank carries a
+# one-line footnote on every page (drawn by _FootnoteCanvas.showPage, so it
+# lands on all pages including the last without touching each page builder).
+_SC_EXTENDED_FOOTNOTE = (
+    "NOTE: SC-9/SC-10 are internal configurations beyond standard Wavin documentation (SC-1 to SC-8); "
+    "heights extend SC-8 at 1.3125 ft/layer (not AQ-200-01)."
+)
+
+def _sc_extended_footnote(tank_like):
+    """Return the footnote text if any tank is SC with > 8 layers, else None.
+    tank_like: iterable of dicts carrying 'config' and 'layers' (strings or numbers)."""
+    for t in tank_like or []:
+        try:
+            if str(t.get('config', '')).upper() == 'SC' and int(float(t.get('layers') or 0)) > 8:
+                return _SC_EXTENDED_FOOTNOTE
+        except (TypeError, ValueError, AttributeError):
+            continue
+    return None
+
+
+class _FootnoteCanvas(canvas.Canvas):
+    """Canvas that stamps an optional footnote on every page as it is finished.
+    on_bar=True  -> white text inside the 30pt navy footer bar (above its text line)
+    on_bar=False -> gray text in the bottom margin of free-form quote pages"""
+    def __init__(self, *args, footnote=None, on_bar=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._fn_text = footnote
+        self._fn_on_bar = on_bar
+
+    def showPage(self):
+        if self._fn_text:
+            self.saveState()
+            self.setFont('Helvetica-Oblique', 5.5)
+            if self._fn_on_bar:
+                self.setFillColor(colors.HexColor('#FFFFFF'))
+                self.drawString(LM, 20, self._fn_text)
+            else:
+                self.setFillColor(colors.HexColor('#555555'))
+                self.drawString(28, 8, self._fn_text)
+            self.restoreState()
+        super().showPage()
 
 
 def _draw_footer(c, page_num, total_pages, project_name, generated_str):
@@ -5413,7 +5472,8 @@ def build_site_concept_pdf(image_data_url, inputs, results, project_name=None):
     """results = calc_site_concept(inputs). Returns a BytesIO at 0."""
     import base64 as _b64
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = _FootnoteCanvas(buffer, pagesize=letter, on_bar=True,
+                        footnote=_sc_extended_footnote((inputs or {}).get('tanks')))
     generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
     tanks = results['tanks']
     tot = results['totals']
@@ -6281,7 +6341,7 @@ def multi_download_quote():
 
         # ── PDF Canvas ──────────────────────────────────────────────
         buffer = io.BytesIO()
-        c = canvas.Canvas(buffer, pagesize=letter)
+        c = _FootnoteCanvas(buffer, pagesize=letter, footnote=_sc_extended_footnote(tanks_in))
         W, H = letter
 
         # ── Quote helpers ────────────────────────────────────────────
@@ -6813,7 +6873,7 @@ def multi_download_tank_summary():
         tank_results = [calc_tank(t) for t in tanks_in]
 
         buffer = io.BytesIO()
-        c = canvas.Canvas(buffer, pagesize=letter)
+        c = _FootnoteCanvas(buffer, pagesize=letter, footnote=_sc_extended_footnote(tanks_in))
         W, H = letter
 
         QNY  = colors.HexColor('#003366')
@@ -7232,11 +7292,11 @@ def download_pdf():
     MODULE_LEN = 3.937
 
     if config == 'SC':
-        layer_heights   = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]
+        layer_heights   = SC_LAYER_HEIGHTS
         void_ratio      = 0.95486
         side_multiplier = 1.312336
     else:
-        layer_heights   = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
+        layer_heights   = EX_LAYER_HEIGHTS
         void_ratio      = 0.92633
         side_multiplier = 1.509186351
 
@@ -7405,7 +7465,8 @@ def download_pdf():
     #  BUILD PDF
     # ════════════════════════════════════════════════════════════
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = _FootnoteCanvas(buffer, pagesize=letter, on_bar=True,
+                        footnote=_sc_extended_footnote([{'config': config, 'layers': layers}]))
 
     # ─────────────────────────────────────────────────────────
     #  PAGE 1 — Technical Summary (NO disclaimer here)
@@ -7724,8 +7785,8 @@ _DXF_MODULE_LEN = 3.937
 # tables used everywhere else in this app (download_pdf, the main calculate
 # route, and the LAYER_HT table in index.html's client-side schematic).
 _DXF_LAYER_HEIGHTS = {
-    'SC': [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581],
-    'EX': [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073],
+    'SC': SC_LAYER_HEIGHTS,
+    'EX': EX_LAYER_HEIGHTS,
 }
 
 _DXF_VOID_RATIO = {'SC': 0.95486, 'EX': 0.92633}
@@ -8078,8 +8139,11 @@ def download_dxf():
     stone_perim_included = request.form.get('stone_perim_included', '1') == '1'
     stone_base_included  = request.form.get('stone_base_included',  '1') == '1'
 
-    if layers < 1 or layers > 8:
-        return 'Layer count must be between 1 and 8.', 400
+    _dxf_cfg_heights = _DXF_LAYER_HEIGHTS.get(config)
+    if _dxf_cfg_heights is None:
+        return 'Unknown configuration.', 400
+    if layers < 1 or layers > len(_dxf_cfg_heights):
+        return f'Layer count for {config} must be between 1 and {len(_dxf_cfg_heights)}.', 400
 
     # Hard cap on per-layer module count — this route builds one in-memory
     # BLOCKREF entity per module, so unbounded input dimensions (e.g. a
@@ -8781,10 +8845,10 @@ def download_stage_csv():
     MODULE_LEN = 3.937
 
     if config == 'SC':
-        layer_heights = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]
+        layer_heights = SC_LAYER_HEIGHTS
         void_ratio    = 0.95486
     else:
-        layer_heights = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
+        layer_heights = EX_LAYER_HEIGHTS
         void_ratio    = 0.92633
 
     tank_height        = layer_heights[layers-1] if layers <= len(layer_heights) else layer_heights[-1]
@@ -8955,11 +9019,11 @@ def download_quote():
       MODULE_LEN = 3.937
 
       if config == 'SC':
-          layer_heights   = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]
+          layer_heights   = SC_LAYER_HEIGHTS
           void_ratio      = 0.95486
           side_multiplier = 1.312336
       else:
-          layer_heights   = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
+          layer_heights   = EX_LAYER_HEIGHTS
           void_ratio      = 0.92633
           side_multiplier = 1.509186351
 
@@ -9107,10 +9171,10 @@ def download_quote():
       large_pipe_qty  = _lp18 + _lp24 + _lp36 + _lpgt36 or int(request.form.get('large_pipe_qty', 0) or 0)
       large_pipe_desc = 'LARGE DIAMETER PIPE CONNECTION (18\u201336\u2033) \u2014 GEOTEXTILE BOOT / ABUTMENT'
       if config == 'SC':
-          _q_layer_heights = [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581]
+          _q_layer_heights = SC_LAYER_HEIGHTS
           _q_void_ratio    = 0.95486
       else:
-          _q_layer_heights = [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
+          _q_layer_heights = EX_LAYER_HEIGHTS
           _q_void_ratio    = 0.92633
       _q_ptrow_ht  = _q_layer_heights[0]
       _q_ptrow_vol = MODULE_WID * MODULE_LEN * _q_ptrow_ht * _q_void_ratio
@@ -9146,7 +9210,8 @@ def download_quote():
 
       # ── Build PDF using canvas (matching template layout) ────────
       buffer = io.BytesIO()
-      c = canvas.Canvas(buffer, pagesize=letter)
+      c = _FootnoteCanvas(buffer, pagesize=letter,
+                          footnote=_sc_extended_footnote([{'config': config, 'layers': layers}]))
       W, H = letter   # 612 x 792
 
       # ── Helpers local to quote ────────────────────────────────────

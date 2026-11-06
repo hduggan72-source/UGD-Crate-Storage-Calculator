@@ -744,8 +744,8 @@
                     </select>
                     <label>Number of Layers</label>
                     <select name="layers" id="layers">
-                        {% for n in range(1,9) %}
-                        <option value="{{ n }}" {{ 'selected' if form_data.get('layers') == n|string else '' }}>{{ n }}</option>
+                        {% for n in range(1,11) %}
+                        <option value="{{ n }}" {{ 'selected' if form_data.get('layers') == n|string else '' }}>{{ n }}{{ ' (SC only)' if n > 8 else '' }}</option>
                         {% endfor %}
                     </select>
                     <label>Minimum Required Storage Volume (ft³)
@@ -3661,7 +3661,8 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     const CRATE_WID_FT = 1.9685;
 
     const LAYER_HT = {
-        SC: [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581],
+        // SC-9 / SC-10 (11.894 / 13.206) = SC-8 + 1.3125 ft/layer; internal only — mirrors app.py SC_LAYER_HEIGHTS
+        SC: [1.394, 2.707, 4.019, 5.331, 6.644, 7.956, 9.268, 10.581, 11.894, 13.206],
         EX: [1.509, 3.018, 4.528, 6.037, 7.546, 9.055, 10.564, 12.073]
     };
 
@@ -4103,6 +4104,17 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     })();
     document.getElementById('knownWidth').addEventListener('input', renderSheet);
     document.getElementById('layers').addEventListener('change', renderSheet);
+    // SC-9 / SC-10 are SC-only: hide layers > 8 when EX is selected (and fall back to 8).
+    function syncSCOnlyLayers() {
+        const cfg = document.getElementById('modelType').value;
+        const sel = document.getElementById('layers');
+        Array.from(sel.options).forEach(function (o) {
+            if (parseInt(o.value, 10) > 8) { o.disabled = cfg !== 'SC'; o.hidden = cfg !== 'SC'; }
+        });
+        if (cfg !== 'SC' && parseInt(sel.value, 10) > 8) sel.value = '8';
+    }
+    document.getElementById('modelType').addEventListener('change', syncSCOnlyLayers);
+    syncSCOnlyLayers();
     document.getElementById('modelType').addEventListener('change', renderSheet);
     document.getElementById('tank_bottom_elev').addEventListener('input', renderSheet);
     document.getElementById('base_stone').addEventListener('input', renderSheet);
