@@ -2292,6 +2292,51 @@ def _table_total_row(c, y, cells, bg, fg):
     return y - rh
 
 
+# ── SC-9 / SC-10 internal-configuration footnote ──────────────────────────────
+# SC-9 and SC-10 exist only in internal pricing/design tools; standard Wavin
+# documentation stops at SC-8. Any PDF that includes such a tank carries a
+# one-line footnote on every page (drawn by _FootnoteCanvas.showPage, so it
+# lands on all pages including the last without touching each page builder).
+_SC_EXTENDED_FOOTNOTE = (
+    "NOTE: SC-9/SC-10 are internal configurations beyond standard Wavin documentation (SC-1 to SC-8); "
+    "heights extend SC-8 at 1.3125 ft/layer (not AQ-200-01)."
+)
+
+def _sc_extended_footnote(tank_like):
+    """Return the footnote text if any tank is SC with > 8 layers, else None.
+    tank_like: iterable of dicts carrying 'config' and 'layers' (strings or numbers)."""
+    for t in tank_like or []:
+        try:
+            if str(t.get('config', '')).upper() == 'SC' and int(float(t.get('layers') or 0)) > 8:
+                return _SC_EXTENDED_FOOTNOTE
+        except (TypeError, ValueError, AttributeError):
+            continue
+    return None
+
+
+class _FootnoteCanvas(canvas.Canvas):
+    """Canvas that stamps an optional footnote on every page as it is finished.
+    on_bar=True  -> white text inside the 30pt navy footer bar (above its text line)
+    on_bar=False -> gray text in the bottom margin of free-form quote pages"""
+    def __init__(self, *args, footnote=None, on_bar=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._fn_text = footnote
+        self._fn_on_bar = on_bar
+
+    def showPage(self):
+        if self._fn_text:
+            self.saveState()
+            self.setFont('Helvetica-Oblique', 5.5)
+            if self._fn_on_bar:
+                self.setFillColor(colors.HexColor('#FFFFFF'))
+                self.drawString(LM, 20, self._fn_text)
+            else:
+                self.setFillColor(colors.HexColor('#555555'))
+                self.drawString(28, 8, self._fn_text)
+            self.restoreState()
+        super().showPage()
+
+
 def _draw_footer(c, page_num, total_pages, project_name, generated_str):
     """Navy footer bar at the bottom of every page."""
     c.setFillColor(NAVY)
@@ -5488,7 +5533,8 @@ def build_site_concept_pdf(image_data_url, inputs, results, project_name=None):
     """results = calc_site_concept(inputs). Returns a BytesIO at 0."""
     import base64 as _b64
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = _FootnoteCanvas(buffer, pagesize=letter, on_bar=True,
+                        footnote=_sc_extended_footnote((inputs or {}).get('tanks')))
     generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
     tanks = results['tanks']
     tot = results['totals']
@@ -6356,7 +6402,7 @@ def multi_download_quote():
 
         # ── PDF Canvas ──────────────────────────────────────────────
         buffer = io.BytesIO()
-        c = canvas.Canvas(buffer, pagesize=letter)
+        c = _FootnoteCanvas(buffer, pagesize=letter, footnote=_sc_extended_footnote(tanks_in))
         W, H = letter
 
         # ── Quote helpers ────────────────────────────────────────────
@@ -6888,7 +6934,7 @@ def multi_download_tank_summary():
         tank_results = [calc_tank(t) for t in tanks_in]
 
         buffer = io.BytesIO()
-        c = canvas.Canvas(buffer, pagesize=letter)
+        c = _FootnoteCanvas(buffer, pagesize=letter, footnote=_sc_extended_footnote(tanks_in))
         W, H = letter
 
         QNY  = colors.HexColor('#003366')
@@ -7480,7 +7526,8 @@ def download_pdf():
     #  BUILD PDF
     # ════════════════════════════════════════════════════════════
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = _FootnoteCanvas(buffer, pagesize=letter, on_bar=True,
+                        footnote=_sc_extended_footnote([{'config': config, 'layers': layers}]))
 
     # ─────────────────────────────────────────────────────────
     #  PAGE 1 — Technical Summary (NO disclaimer here)
@@ -9357,7 +9404,8 @@ def download_quote():
 
       # ── Build PDF using canvas (matching template layout) ────────
       buffer = io.BytesIO()
-      c = canvas.Canvas(buffer, pagesize=letter)
+      c = _FootnoteCanvas(buffer, pagesize=letter,
+                          footnote=_sc_extended_footnote([{'config': config, 'layers': layers}]))
       W, H = letter   # 612 x 792
 
       # ── Helpers local to quote ────────────────────────────────────
