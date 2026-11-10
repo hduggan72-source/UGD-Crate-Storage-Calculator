@@ -694,7 +694,7 @@ $('lines').addEventListener('input', e => {
   const invalid = raw !== '' && (v == null || v < 0);
   el.classList.toggle('bad', invalid);
   if (invalid) return;
-  if (f === 'target'){ l.target = v; S.mode = 'custom'; }
+  if (f === 'target'){ l.target = v == null ? null : r2(v); S.mode = 'custom'; }   // unit prices are held to whole cents
   else if (f === 'cost'){
     l.cost = v;
     const costs = store.get(K_COSTS, {});
@@ -702,7 +702,7 @@ $('lines').addEventListener('input', e => {
     S.lines.forEach(x => { if (x.part === l.part) x.cost = v; });   // same part (e.g. contingency) shares one cost
     store.set(K_COSTS, costs);
   } else if (f === 'orig'){
-    if (v == null){ l.orig = null; l.origEdited = false; } else { l.orig = v; l.origEdited = true; }
+    if (v == null){ l.orig = null; l.origEdited = false; } else { l.orig = r2(v); l.origEdited = true; }
     reallocateOrig();
     if (S.mode === 'original') applyMode('original', true);
   }
@@ -721,7 +721,7 @@ bindMeta('fQuoteNum', v => S.quote.num = v);
 bindMeta('fQuoteDate', v => S.quote.dateISO = v);
 bindMeta('fNote', v => S.note = v);
 $('fOrigTotal').addEventListener('input', () => {
-  S.quote.total = num($('fOrigTotal').value);
+  { const t = num($('fOrigTotal').value); S.quote.total = (t == null || t < 0) ? null : r2(t); }
   reallocateOrig();
   if (S.mode === 'original') applyMode('original', true);
   recalc();
