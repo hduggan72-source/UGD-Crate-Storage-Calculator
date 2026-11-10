@@ -61,6 +61,40 @@ def _check_multi_tank_beta_scope():
         abort(404)
 
 
+# SC-9 / SC-10 are INTERNAL options (standard Wavin documentation stops at SC-8).
+# The client-facing BETA (PRICING_ENABLED=False) must never offer or accept them:
+# the single-tank dropdown stops at 8 (index.html) and this check rejects any
+# hand-posted layer count above 8 on every route, form or JSON.
+_BETA_MAX_LAYERS = 8
+
+def _layer_values_in_request():
+    vals = [request.form.get('layers'), request.args.get('layers')]
+    j = request.get_json(silent=True)
+    if isinstance(j, dict):
+        vals.append(j.get('layers'))
+        inp = j.get('inputs')
+        containers = [inp] if isinstance(inp, dict) else []
+        for holder in [j] + containers:
+            tanks = holder.get('tanks')
+            if isinstance(tanks, list):
+                containers.extend(t for t in tanks if isinstance(t, dict))
+        for cdict in containers:
+            vals.append(cdict.get('layers'))
+    return vals
+
+@app.before_request
+def _check_beta_layer_cap():
+    if PRICING_ENABLED or request.method != 'POST':
+        return None
+    for v in _layer_values_in_request():
+        try:
+            if v not in (None, '') and int(float(v)) > _BETA_MAX_LAYERS:
+                return f'Layer count above {_BETA_MAX_LAYERS} is not available in this build.', 400
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
 # ── Module-level crate dimensions (used by all calc functions) ──
 MODULE_WID = 1.9685   # ft
 MODULE_LEN = 3.937    # ft
