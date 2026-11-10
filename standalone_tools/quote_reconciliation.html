@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AquaCell Quote Reconciliation</title>
+<style>
+:root{
+  --bg:#f8f9fa; --card:#ffffff; --text:#212529; --muted:#6c757d; --accent:#007bff;
+  --border:#dee2e6; --hl:#e7f3ff; --g:#2e9e5b; --y:#e0a800; --r:#d6362f;
+  --warn-bg:#fff6dc; --warn-bd:#e8c766; --bad-bg:#fde8e7; --bad-bd:#e69a96; --info-bg:#eaf2fb; --info-bd:#a9c8ec;
+  --navy:#0f1e3c;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f172a; --card:#1e2937; --text:#e2e8f0; --muted:#94a3b8; --accent:#60a5fa;
+    --border:#334155; --hl:#1e3a8a; --g:#3ec47c; --y:#f0bc2a; --r:#f0625b;
+    --warn-bg:#3a3014; --warn-bd:#7a6420; --bad-bg:#43201f; --bad-bd:#8a3a37; --info-bg:#172a46; --info-bd:#2f5385;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+.topbar{background:var(--navy);color:#fff;padding:12px 20px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.topbar h1{font-size:17px;margin:0;font-weight:600}
+.topbar .sub{font-size:12px;opacity:.9}
+.tabs{display:flex;gap:4px;padding:10px 20px 0;border-bottom:1px solid var(--border);background:var(--card);flex-wrap:wrap}
+.tab{border:1px solid transparent;border-bottom:none;background:none;color:var(--muted);padding:9px 16px;cursor:pointer;font-size:14px;border-radius:6px 6px 0 0}
+.tab[aria-selected="true"]{background:var(--bg);color:var(--text);border-color:var(--border);font-weight:600;margin-bottom:-1px}
+main{max-width:1280px;margin:0 auto;padding:16px 20px 60px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px}
+.card h2{font-size:15px;margin:0 0 12px}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+input[type=text],input[type=date],select,textarea{width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);font-size:14px;font-family:inherit}
+input.in{text-align:right;width:92px;padding:5px 7px}
+input.est{font-style:italic;border-style:dashed}
+input.bad{border-color:var(--r)}
+button,.btn{font-family:inherit;font-size:13px;border:1px solid var(--border);background:var(--card);color:var(--text);padding:7px 12px;border-radius:5px;cursor:pointer}
+button:hover,.btn:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.danger{color:var(--r)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.on{background:var(--hl);border-color:var(--accent);font-weight:600}
+.drop{border:2px dashed var(--border);border-radius:8px;padding:14px;text-align:center;cursor:pointer;display:block}
+.drop.over{border-color:var(--accent);background:var(--hl)}
+.drop input{display:none}
+.drop .t{font-weight:600}
+.status{font-size:12px;margin-top:6px;color:var(--muted);min-height:16px}
+.status.ok{color:var(--g)} .status.err{color:var(--r)}
+.note{border:1px solid;border-radius:6px;padding:8px 11px;margin:0 0 8px;font-size:13px}
+.note.warn{background:var(--warn-bg);border-color:var(--warn-bd)}
+.note.bad{background:var(--bad-bg);border-color:var(--bad-bd)}
+.note.info{background:var(--info-bg);border-color:var(--info-bd)}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+th,td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:12px;color:var(--muted);text-align:right;white-space:nowrap}
+th.l,td.l,td.item{text-align:left}
+td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+tfoot td{font-weight:700;border-top:2px solid var(--border);border-bottom:none}
+.part{font-weight:600}
+.desc{font-size:12px;color:var(--muted)}
+.tag{font-size:11px;background:var(--hl);border-radius:3px;padding:1px 5px;margin-left:4px;font-weight:400}
+.flag{font-size:11px;color:var(--r);display:block}
+.sub{font-size:11px;color:var(--muted)}
+.cards{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.stat{border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--card)}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .v{font-size:22px;font-weight:700;margin:2px 0}
+.stat .d{font-size:12px;color:var(--muted)}
+.pos{color:var(--g)} .neg{color:var(--r)}
+.pill{display:inline-block;border-radius:12px;padding:2px 10px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap}
+.pill.green{background:var(--g)} .pill.yellow{background:var(--y);color:#222} .pill.red{background:var(--r)} .pill.none{background:var(--muted)}
+.meter{position:relative;height:10px;border-radius:5px;min-width:110px;background:linear-gradient(90deg,var(--g) 0 25%,var(--y) 25% 75%,var(--r) 75% 100%)}
+.meter .mk{position:absolute;top:-3px;width:4px;height:16px;background:var(--text);border-radius:2px;transform:translateX(-50%)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.spacer{flex:1}
+.dim{opacity:.55}
+.hidden{display:none}
+.small{font-size:12px;color:var(--muted)}
+@media print{.topbar,.tabs,.noprint{display:none}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1>AquaCell Quote Reconciliation</h1>
+    <div class="sub">Internal estimating tool &mdash; contains cost &amp; margin data. Do not share this page or its backup files outside Wavin.</div>
+  </div>
+  <div class="row noprint">
+    <button id="btnBackup">Export backup</button>
+    <label class="btn" for="fileBackup">Import backup</label>
+    <input type="file" id="fileBackup" accept=".json,application/json" class="hidden">
+  </div>
+</div>
+
+<div class="tabs noprint" role="tablist">
+  <button class="tab" role="tab" id="tabRecon" aria-selected="true">Reconcile a quote</button>
+  <button class="tab" role="tab" id="tabBoard" aria-selected="false">Quote Board <span id="boardBadge"></span></button>
+</div>
+
+<main>
+<div id="storageBanner"></div>
+
+<!-- ============================ RECONCILE ============================ -->
+<section id="paneRecon">
+
+  <div class="card">
+    <h2>1. Load files</h2>
+    <div class="grid g2">
+      <div>
+        <label class="drop" id="dropCsv">
+          <input type="file" id="fileCsv" accept=".csv,text/csv">
+          <div class="t">Current pricing export (.csv)</div>
+          <div class="small">From the single- or multi-tank calculator &mdash; click or drop here</div>
+        </label>
+        <div class="status" id="stCsv"></div>
+      </div>
+      <div>
+        <label class="drop" id="dropPdf">
+          <input type="file" id="filePdf" accept=".pdf,application/pdf">
+          <div class="t">Original quote / PO (.pdf)</div>
+          <div class="small">Reads quote date, subtotal and quantities &mdash; click or drop here</div>
+        </label>
+        <div class="status" id="stPdf"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2. Quote details <span class="small">(auto-filled &mdash; verify and correct)</span></h2>
+    <div class="grid g4">
+      <div><label class="f" for="fProjNum">Project # (from CSV)</label><input type="text" id="fProjNum"></div>
+      <div><label class="f" for="fProjName">Project name</label><input type="text" id="fProjName"></div>
+      <div><label class="f" for="fClient">Client</label><input type="text" id="fClient"></div>
+      <div><label class="f" for="fLoc">Location</label><input type="text" id="fLoc"></div>
+      <div><label class="f" for="fQuoteNum">Quote # (from PDF, unverified)</label><input type="text" id="fQuoteNum"></div>
+      <div><label class="f" for="fQuoteDate">Quote date</label><input type="date" id="fQuoteDate"></div>
+      <div><label class="f" for="fOrigTotal">Original quoted subtotal ($)</label><input type="text" id="fOrigTotal" inputmode="decimal"></div>
+      <div><label class="f" for="fFreight">Freight estimate (% of sell, excluded from margin)</label><input type="text" id="fFreight" inputmode="decimal"></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <span id="ageNow"></span>
+      <div id="ageMeter" style="width:240px"></div>
+      <span class="small">Green 0&ndash;30 days &middot; Yellow 31&ndash;90 &middot; Red over 90</span>
+    </div>
+  </div>
+
+  <div id="warnings"></div>
+
+  <div class="card">
+    <h2>3. Line-by-line pricing</h2>
+    <div class="row noprint" style="margin-bottom:10px">
+      <span class="small">Set target sell price for all lines:</span>
+      <button id="modeCurrent">Current pricing</button>
+      <button id="modeOriginal">Honor original quote</button>
+      <span class="small">or</span>
+      <input type="text" id="pctVal" inputmode="decimal" placeholder="e.g. -3.2" style="width:80px">
+      <button id="modePct">Apply % to current</button>
+      <span class="small">&mdash; or type a target price directly in any line.</span>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th class="l">Item</th><th>Qty</th><th>Current sell</th>
+          <th title="The quote PDF shows only a subtotal, so original line prices are estimated unless you enter them">Original (est.)</th>
+          <th>Target sell</th><th>Your unit cost</th>
+          <th>Margin @ current</th><th>Margin @ target</th><th>Ext. target</th><th>Ext. margin $</th>
+        </tr></thead>
+        <tbody id="lines"><tr><td colspan="10" class="small" style="padding:20px">Load a pricing CSV to begin.</td></tr></tbody>
+        <tfoot id="foot"></tfoot>
+      </table>
+    </div>
+    <div class="small" style="margin-top:8px">Margin = (sell &minus; cost) &divide; sell. Freight is excluded. Unit costs are remembered in this browser by part number.</div>
+  </div>
+
+  <div class="cards" id="summary"></div>
+
+  <div class="card" style="margin-top:16px">
+    <h2>4. Save &amp; export</h2>
+    <div class="grid g2">
+      <div>
+        <label class="f" for="fNote">Optional note added to the export for customer service</label>
+        <input type="text" id="fNote" placeholder="e.g. Pricing honored per quote dated 1/27/2026">
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="btnExport" disabled>Download CSV for customer service</button>
+      <button id="btnSave" disabled>Save to Quote Board</button>
+      <button id="btnReset" class="danger">Clear this screen</button>
+    </div>
+    <div class="small" style="margin-top:8px">The customer-service CSV uses the same columns as the calculator export with your target prices in the Sell columns. It contains no cost or margin data.</div>
+    <div class="status" id="stSave"></div>
+  </div>
+</section>
+
+<!-- ============================ BOARD ============================ -->
+<section id="paneBoard" class="hidden">
+  <div class="cards" id="boardStats" style="margin-bottom:16px"></div>
+  <div class="card">
+    <div class="row" style="margin-bottom:10px">
+      <h2 style="margin:0">Quote Board</h2>
+      <span class="spacer"></span>
+      <label class="small" for="boardFilter">Show</label>
+      <select id="boardFilter" style="width:auto">
+        <option value="open">Open quotes</option>
+        <option value="all">All</option>
+      </select>
+    </div>
+    <div class="small" id="plInfo" style="margin-bottom:8px"></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th class="l">Age</th><th class="l">Project</th><th>Quote date</th><th>Quoted subtotal</th>
+          <th title="Change in floor-priced extended value since the prices were saved, using the most recently loaded CSV">Floor price change</th>
+          <th class="l">Status</th><th></th>
+        </tr></thead>
+        <tbody id="boardBody"></tbody>
+      </table>
+    </div>
+    <div class="small" style="margin-top:10px">Data lives only in this browser on this computer. Use <b>Export backup</b> regularly. Clearing browser data erases it.</div>
+  </div>
+</section>
+</main>
+
+<script>
+/* ───────────────────────── helpers ───────────────────────── */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// 0 is a valid value everywhere: blank -> null, never coerced with ||
+function num(v){
+  if (v == null) return null;
+  const s = String(v).replace(/[$,\s]/g, '');
+  if (s === '') return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+const r2 = x => Math.round((x + Number.EPSILON) * 100) / 100;
+const fmt$ = x => x == null ? '—' : (x < 0 ? '-' : '') + '$' + Math.abs(x).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtPct = x => x == null ? '—' : (x * 100).toFixed(1) + '%';
+const fmtInt = x => x == null ? '—' : Number(x).toLocaleString('en-US');
+const inputVal = x => x == null ? '' : r2(x).toFixed(2);
+const mdy = d => ('0'+(d.getMonth()+1)).slice(-2) + ('0'+d.getDate()).slice(-2) + d.getFullYear();
+const slash = d => ('0'+(d.getMonth()+1)).slice(-2) + '/' + ('0'+d.getDate()).slice(-2) + '/' + d.getFullYear();
+const safeName = s => String(s || '').trim().replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '');
+
+function mdyToISO(s){
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(s || '').trim());
+  if (!m) return '';
+  return m[3] + '-' + ('0'+m[1]).slice(-2) + '-' + ('0'+m[2]).slice(-2);
+}
+function isoToSlash(iso){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+  return m ? (+m[2]) + '/' + (+m[3]) + '/' + m[1] : '';
+}
+// Whole calendar days between an ISO date and today (UTC math, so DST never shifts the count)
+function daysSince(iso){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+  if (!m) return null;
+  const t = new Date();
+  const a = Date.UTC(+m[1], +m[2]-1, +m[3]);
+  const b = Date.UTC(t.getFullYear(), t.getMonth(), t.getDate());
+  return Math.floor((b - a) / 86400000);
+}
+function bucket(days){
+  if (days == null) return 'none';
+  if (days <= 30) return 'green';
+  if (days <= 90) return 'yellow';
+  return 'red';
+}
+function pillHTML(days){
+  const b = bucket(days);
+  if (b === 'none') return '<span class="pill none">NO DATE</span>';
+  return '<span class="pill ' + b + '">' + days + ' DAYS &middot; ' + b.toUpperCase() + '</span>';
+}
+function meterHTML(days){
+  if (days == null) return '';
+  const pos = Math.max(0, Math.min(days, 120)) / 120 * 100;
+  return '<div class="meter" title="' + days + ' days"><span class="mk" style="left:' + pos + '%"></span></div>';
+}
+function download(blob, filename){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;               // filename is set client-side
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+/* ───────────────────────── storage (browser only) ───────────────────────── */
+const K_COSTS = 'qr_costs_v1', K_PROJ = 'qr_projects_v1', K_PL = 'qr_pricelist_v1', K_BK = 'qr_lastbackup_v1';
+const store = {
+  ok: true, mem: {},
+  get(k, def){
+    try { const v = localStorage.getItem(k); return v == null ? def : JSON.parse(v); }
+    catch(e){ this.ok = false; return (k in this.mem) ? this.mem[k] : def; }
+  },
+  set(k, v){
+    this.mem[k] = v;
+    try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){ this.ok = false; }
+  }
+};
+try { localStorage.setItem('qr_probe', '1'); localStorage.removeItem('qr_probe'); } catch(e){ store.ok = false; }
+
+/* ───────────────────────── state ───────────────────────── */
+const S = emptyState();
+function emptyState(){
+  return {
+    meta: {projectName:'', projectNum:'', client:'', location:'', estimator:'', email:'', generated:''},
+    quote: {num:'', dateISO:'', total:null},
+    freightPct: null, mode: 'current', note: '',
+    lines: [],            // {ln, part, desc, qty, floor, sell, contingency, key, orig, origEdited, target, cost}
+    csvName: '', csvTotalSell: null, pdf: null
+  };
+}
+function resetState(){ Object.assign(S, emptyState()); }
+
+/* ───────────────────────── CSV parsing ───────────────────────── */
+function parseCSV(text){
+  const rows = []; let row = [], f = '', q = false;
+  text = text.replace(/^﻿/, '');
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (q){
+      if (c === '"'){ if (text[i+1] === '"'){ f += '"'; i++; } else q = false; }
+      else f += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(f); f = ''; }
+    else if (c === '\n' || c === '\r'){
+      if (c === '\r' && text[i+1] === '\n') i++;
+      row.push(f); f = ''; rows.push(row); row = [];
+    } else f += c;
+  }
+  if (f !== '' || row.length){ row.push(f); rows.push(row); }
+  return rows;
+}
+function moneyCell(s){ return num(s); }
+
+function parsePriceCsv(text){
+  const rows = parseCSV(text);
+  const meta = {}; let hi = -1;
+  for (let i = 0; i < rows.length; i++){
+    const r = rows[i];
+    if (r[0] && r[0].trim() === 'Line' && r[1] && r[1].trim() === 'Part #'){ hi = i; break; }
+    if (r[0] && r.length > 1) meta[r[0].trim()] = (r[1] || '').trim();
+  }
+  if (hi < 0) throw new Error('This does not look like an AquaCell price export (header row "Line, Part #, …" not found).');
+  const H = rows[hi].map(s => s.trim());
+  const ix = n => H.indexOf(n);
+  const need = ['Part #','Description','Qty','Floor Unit Price','Sell Unit Price'];
+  for (const n of need) if (ix(n) < 0) throw new Error('CSV is missing the "' + n + '" column.');
+  const lines = []; let freightPct = null, totalSell = null;
+  for (let i = hi + 1; i < rows.length; i++){
+    const r = rows[i];
+    for (const c of r){
+      const m = /ESTIMATED FREIGHT \(([\d.]+)%\)/i.exec(c || '');
+      if (m) freightPct = Number(m[1]);
+      if (/TOTAL SELL PRICE/i.test(c || '')) totalSell = moneyCell(r[ix('Extended Sell')]);
+    }
+    const part = (r[ix('Part #')] || '').trim();
+    if (!part) continue;
+    const qty = num(r[ix('Qty')]), floor = moneyCell(r[ix('Floor Unit Price')]), sell = moneyCell(r[ix('Sell Unit Price')]);
+    if (qty == null || floor == null || sell == null) throw new Error('Could not read numbers on CSV line "' + (r[0] || part) + '".');
+    const desc = (r[ix('Description')] || '').trim();
+    lines.push({ln: (r[ix('Line')] || '').trim(), part, desc, qty, floor, sell});
+  }
+  if (!lines.length) throw new Error('No component lines found in the CSV.');
+  return {meta, lines, freightPct, totalSell};
+}
+const lineKey = (part, desc) => part + (/contingency/i.test(desc || '') ? '|C' : '');
+
+function applyCSV(p, fileName){
+  const pn = p.meta['Project #'] || '';
+  const keep = S.lines.length > 0 && S.meta.projectNum && S.meta.projectNum === pn;
+  const old = {};
+  if (keep) S.lines.forEach(l => old[l.key] = l);
+  const keepQuote = keep ? S.quote : {num:'', dateISO:'', total:null};
+  const keepPdf = keep ? S.pdf : null;
+  const keepMode = keep ? S.mode : 'current';
+  const keepFreight = keep ? S.freightPct : null;
+  const keepNote = keep ? S.note : '';
+  resetState();
+  S.quote = keepQuote; S.pdf = keepPdf; S.mode = keepMode; S.note = keepNote;
+  S.meta = {
+    projectName: p.meta['Project Name'] || '', projectNum: pn, client: p.meta['Client'] || '',
+    location: p.meta['Location'] || '', estimator: p.meta['Estimator'] || '', email: p.meta['Email'] || '',
+    generated: p.meta['Generated'] || ''
+  };
+  S.freightPct = keepFreight != null ? keepFreight : (p.freightPct != null ? p.freightPct : 10);
+  S.csvName = fileName; S.csvTotalSell = p.totalSell;
+  const costs = store.get(K_COSTS, {});
+  S.lines = p.lines.map(l => {
+    const key = lineKey(l.part, l.desc), o = old[key];
+    return Object.assign({}, l, {
+      key, contingency: /contingency/i.test(l.desc),
+      orig: o ? o.orig : null, origEdited: o ? o.origEdited : false,
+      target: o ? o.target : l.sell,
+      cost: (costs[l.part] != null) ? costs[l.part] : null
+    });
+  });
+  // remember latest floor price list (used by the Quote Board)
+  const floors = {}; p.lines.forEach(l => floors[l.part] = l.floor);
+  store.set(K_PL, {loadedAt: Date.now(), csvGenerated: S.meta.generated, floors});
+  reallocateOrig();
+  if (S.mode === 'current') S.lines.forEach(l => l.target = l.sell);
+  else if (S.mode === 'original') applyMode('original', true);
+}
+
+/* ───────────────────────── PDF parsing ───────────────────────── */
+const PDFJS_VER = '3.11.174';
+let pdfJsPromise = null;
+function loadPdfJs(){
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (pdfJsPromise) return pdfJsPromise;
+  pdfJsPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/' + PDFJS_VER + '/pdf.min.js';
+    s.onload = () => {
+      try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/' + PDFJS_VER + '/pdf.worker.min.js'; } catch(e){}
+      resolve(window.pdfjsLib);
+    };
+    s.onerror = () => { pdfJsPromise = null; reject(new Error('Could not load the PDF reader (network blocked?). Enter the quote date and subtotal manually.')); };
+    document.head.appendChild(s);
+  });
+  return pdfJsPromise;
+}
+async function pdfRows(file){
+  const lib = await loadPdfJs();
+  const buf = new Uint8Array(await file.arrayBuffer());
+  const doc = await lib.getDocument({data: buf}).promise;
+  const rows = [];
+  for (let p = 1; p <= doc.numPages; p++){
+    const tc = await (await doc.getPage(p)).getTextContent();
+    const items = tc.items.filter(i => i.str && i.str.trim()).map(i => ({s: i.str, x: i.transform[4], y: i.transform[5]}));
+    items.sort((a, b) => b.y - a.y || a.x - b.x);
+    let cur = null;
+    for (const it of items){
+      if (cur && Math.abs(it.y - cur.y) <= 3) cur.items.push(it);
+      else { cur = {y: it.y, items: [it]}; rows.push(cur); }
+    }
+  }
+  return rows.map(r => r.items.sort((a, b) => a.x - b.x).map(i => i.s.trim()).join(' ').replace(/\s+/g, ' ').trim());
+}
+function parseQuoteRows(rows){
+  const text = rows.join('\n');
+  const out = {date: '', total: null, num: '', lines: [], textLen: text.length};
+  const d = /\bDATE\s+(\d{1,2}\/\d{1,2}\/\d{4})/.exec(text);          // "Plans Dated:" does not match
+  if (d) out.date = mdyToISO(d[1]);
+  const t = /SUB-TOTAL\s+\$\s*([\d,]+\.\d{2})/.exec(text);             // first SUB-TOTAL = component table
+  if (t) out.total = num(t[1]);
+  const n = /\b(\d{4}-\d{2})\b/.exec(text);
+  if (n) out.num = n[1];
+  for (const r of rows){
+    const m = /^(\d+)\s+(\d{6,10})\s+(.*?)\s*(\d[\d,]*)\s+EACH\b/.exec(r);
+    if (!m) continue;
+    const desc = m[3];
+    out.lines.push({ln: m[1], part: m[2], desc, qty: num(m[4]), key: lineKey(m[2], desc)});
+  }
+  return out;
+}
+function applyPdf(res, fileName){
+  S.pdf = {name: fileName, lines: res.lines, date: res.date, total: res.total, num: res.num};
+  if (res.date) S.quote.dateISO = res.date;
+  if (res.total != null) S.quote.total = res.total;
+  if (res.num) S.quote.num = res.num;
+  reallocateOrig();
+  if (S.mode === 'original') applyMode('original', true);
+}
+
+/* ───────────────────────── calculations ───────────────────────── */
+// The quote PDF only prints a subtotal. Original line prices are estimated by scaling current sell
+// prices so the lines add up to the quoted subtotal; any line the user types in is held fixed.
+function reallocateOrig(){
+  const L = S.lines, tot = S.quote.total;
+  if (!L.length) return;
+  if (tot == null){ L.forEach(l => { if (!l.origEdited) l.orig = null; }); return; }
+  let editedSum = 0, uneditedCur = 0;
+  L.forEach(l => { if (l.origEdited && l.orig != null) editedSum += l.qty * l.orig; else uneditedCur += l.qty * l.sell; });
+  const remaining = tot - editedSum;
+  L.forEach(l => {
+    if (l.origEdited && l.orig != null) return;
+    l.origEdited = false;
+    l.orig = (uneditedCur > 0) ? r2(l.sell * remaining / uneditedCur) : null;
+  });
+}
+function applyMode(mode, quiet){
+  S.mode = mode;
+  S.lines.forEach(l => {
+    if (mode === 'current') l.target = l.sell;
+    else if (mode === 'original' && l.orig != null) l.target = l.orig;
+  });
+  if (!quiet){ renderTable(); recalc(); }
+}
+const margin = (sell, cost) => (sell == null || cost == null || sell <= 0) ? null : (sell - cost) / sell;
+
+function calc(){
+  const c = {cur:0, orig:0, tgt:0, cost:0, floor:0, missingCost:0, origKnown:true, below:[]};
+  S.lines.forEach(l => {
+    const q = l.qty;
+    c.cur += r2(q * l.sell); c.floor += r2(q * l.floor);
+    if (l.orig == null) c.origKnown = false; else c.orig += r2(q * l.orig);
+    c.tgt += r2(q * (l.target == null ? 0 : l.target));
+    if (l.cost == null) c.missingCost++; else c.cost += r2(q * l.cost);
+    if (q > 0 && l.target != null && l.target < l.floor - 0.0049) c.below.push(l);
+  });
+  c.haveCost = S.lines.length > 0 && c.missingCost === 0;
+  c.mCur = c.haveCost ? margin(c.cur, c.cost) : null;
+  c.mTgt = c.haveCost ? margin(c.tgt, c.cost) : null;
+  c.freight = r2(c.tgt * (S.freightPct == null ? 0 : S.freightPct) / 100);
+  return c;
+}
+
+/* ───────────────────────── rendering: reconcile ───────────────────────── */
+function renderTable(){
+  const tb = $('lines');
+  if (!S.lines.length){ tb.innerHTML = '<tr><td colspan="10" class="small" style="padding:20px">Load a pricing CSV to begin.</td></tr>'; $('foot').innerHTML = ''; return; }
+  tb.innerHTML = S.lines.map((l, i) => (
+    '<tr data-i="' + i + '">' +
+    '<td class="item"><div class="part">' + esc(l.ln) + '. ' + esc(l.part) + (l.contingency ? '<span class="tag">contingency</span>' : '') + '</div>' +
+      '<div class="desc">' + esc(l.desc) + '</div><span class="flag" id="fl' + i + '"></span></td>' +
+    '<td class="num">' + fmtInt(l.qty) + '<div class="sub" id="qm' + i + '"></div></td>' +
+    '<td class="num">' + fmt$(l.sell) + '<div class="sub">floor ' + fmt$(l.floor) + '</div></td>' +
+    '<td class="num"><input class="in" data-f="orig" inputmode="decimal" aria-label="Original unit price"></td>' +
+    '<td class="num"><input class="in" data-f="target" inputmode="decimal" aria-label="Target sell unit price"></td>' +
+    '<td class="num"><input class="in" data-f="cost" inputmode="decimal" aria-label="Unit cost"></td>' +
+    '<td class="num" id="mc' + i + '"></td><td class="num" id="mt' + i + '"></td>' +
+    '<td class="num" id="et' + i + '"></td><td class="num" id="em' + i + '"></td></tr>'
+  )).join('');
+  $('foot').innerHTML = '<tr><td class="l">Totals</td><td></td><td class="num" id="tCur"></td><td class="num" id="tOrig"></td><td class="num" id="tTgt"></td><td class="num" id="tCost"></td><td class="num" id="tMc"></td><td class="num" id="tMt"></td><td class="num" id="tEt"></td><td class="num" id="tEm"></td></tr>';
+}
+function setVal(el, v){ if (el && document.activeElement !== el) el.value = v; }
+function recalc(){
+  if (!S.lines.length){
+    $('summary').innerHTML = ''; $('warnings').innerHTML = ''; renderAge();
+    $('btnExport').disabled = true; $('btnSave').disabled = true;
+    ['modeCurrent','modeOriginal'].forEach(id => $(id).classList.remove('on'));
+    $('modeOriginal').disabled = true;
+    return;
+  }
+  const c = calc();
+  const pdfQty = {};
+  if (S.pdf) S.pdf.lines.forEach(p => pdfQty[p.key] = p.qty);
+  S.lines.forEach((l, i) => {
+    const row = document.querySelector('#lines tr[data-i="' + i + '"]'); if (!row) return;
+    const o = row.querySelector('[data-f=orig]'), t = row.querySelector('[data-f=target]'), k = row.querySelector('[data-f=cost]');
+    setVal(o, inputVal(l.orig)); o.classList.toggle('est', !l.origEdited);
+    setVal(t, inputVal(l.target)); setVal(k, inputVal(l.cost));
+    const q = l.qty, mC = margin(l.sell, l.cost), mT = margin(l.target, l.cost);
+    $('mc' + i).textContent = fmtPct(mC);
+    $('mt' + i).textContent = fmtPct(mT);
+    $('et' + i).textContent = fmt$(l.target == null ? null : r2(q * l.target));
+    $('em' + i).textContent = (l.cost == null || l.target == null) ? '—' : fmt$(r2(q * (l.target - l.cost)));
+    const fl = [];
+    if (l.target != null && l.target < l.floor - 0.0049 && q > 0) fl.push('Below current floor price');
+    $('fl' + i).textContent = fl.join(' · ');
+    let qm = '';
+    if (S.pdf){
+      const pq = pdfQty[l.key];
+      if (pq == null) qm = 'not on PDF'; else if (pq !== q) qm = 'PDF qty ' + fmtInt(pq);
+    }
+    const qe = $('qm' + i); qe.textContent = qm; qe.className = 'sub' + (qm ? ' neg' : '');
+  });
+  $('tCur').textContent = fmt$(c.cur);
+  $('tOrig').textContent = c.origKnown ? fmt$(c.orig) : '—';
+  $('tTgt').textContent = fmt$(c.tgt);
+  $('tCost').textContent = c.haveCost ? fmt$(c.cost) : '—';
+  $('tMc').textContent = fmtPct(c.mCur); $('tMt').textContent = fmtPct(c.mTgt);
+  $('tEt').textContent = fmt$(c.tgt);
+  $('tEm').textContent = c.haveCost ? fmt$(r2(c.tgt - c.cost)) : '—';
+  ['modeCurrent','modeOriginal'].forEach(id => $(id).classList.remove('on'));
+  if (S.mode === 'current') $('modeCurrent').classList.add('on');
+  if (S.mode === 'original') $('modeOriginal').classList.add('on');
+  $('modeOriginal').disabled = !c.origKnown;
+  renderSummary(c); renderWarnings(c); renderAge();
+  $('btnExport').disabled = !S.lines.length;
+  $('btnSave').disabled = !S.lines.length;
+}
+function renderSummary(c){
+  if (!S.lines.length){ $('summary').innerHTML = ''; return; }
+  const dCur = r2(c.tgt - c.cur), dCurPct = c.cur > 0 ? dCur / c.cur : null;
+  const cls = x => x < -0.005 ? 'neg' : (x > 0.005 ? 'pos' : '');
+  const cards = [];
+  cards.push('<div class="stat"><div class="k">Target total (excl. freight)</div><div class="v">' + fmt$(c.tgt) + '</div>' +
+    '<div class="d">vs current pricing ' + fmt$(c.cur) + ': <span class="' + cls(dCur) + '">' + fmt$(dCur) + (dCurPct == null ? '' : ' (' + (dCurPct*100).toFixed(1) + '%)') + '</span></div></div>');
+  if (S.quote.total != null){
+    const dQ = r2(c.tgt - S.quote.total);
+    cards.push('<div class="stat"><div class="k">Original quoted subtotal</div><div class="v">' + fmt$(S.quote.total) + '</div>' +
+      '<div class="d">Target vs original: <span class="' + cls(dQ) + '">' + fmt$(dQ) + '</span></div></div>');
+  }
+  if (c.haveCost){
+    const mDollCur = r2(c.cur - c.cost), mDollTgt = r2(c.tgt - c.cost);
+    const pts = (c.mTgt - c.mCur) * 100;
+    cards.push('<div class="stat"><div class="k">Margin at target</div><div class="v">' + fmtPct(c.mTgt) + '</div>' +
+      '<div class="d">' + fmt$(mDollTgt) + ' &middot; current pricing: ' + fmtPct(c.mCur) + ' (' + fmt$(mDollCur) + ')</div></div>');
+    cards.push('<div class="stat"><div class="k">Margin impact vs current pricing</div><div class="v ' + cls(pts) + '">' + (pts >= 0 ? '+' : '') + pts.toFixed(1) + ' pts</div>' +
+      '<div class="d"><span class="' + cls(mDollTgt - mDollCur) + '">' + fmt$(r2(mDollTgt - mDollCur)) + '</span> margin dollars</div></div>');
+  } else {
+    cards.push('<div class="stat"><div class="k">Margin</div><div class="v">—</div><div class="d">Enter a unit cost on every line (' + c.missingCost + ' missing).</div></div>');
+  }
+  cards.push('<div class="stat"><div class="k">Estimated freight (' + (S.freightPct == null ? 0 : S.freightPct) + '%)</div><div class="v">' + fmt$(c.freight) + '</div>' +
+    '<div class="d">Total with freight ' + fmt$(r2(c.tgt + c.freight)) + ' &middot; not in margin</div></div>');
+  $('summary').innerHTML = cards.join('');
+}
+function renderWarnings(c){
+  const w = [];
+  const add = (cls, html) => w.push('<div class="note ' + cls + '">' + html + '</div>');
+  if (!S.lines.length){ $('warnings').innerHTML = ''; return; }
+  if (S.meta.generated){
+    const g = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(S.meta.generated);
+    if (g){
+      const iso = g[3] + '-' + ('0'+g[1]).slice(-2) + '-' + ('0'+g[2]).slice(-2);
+      const age = daysSince(iso);
+      if (age != null && age > 0) add('info', 'The CSV was generated ' + esc(S.meta.generated) + ' (' + age + ' day' + (age === 1 ? '' : 's') + ' ago). Confirm it reflects today\'s pricing.');
+    }
+  }
+  if (S.quote.total == null) add('info', 'Original quoted subtotal is not set. Enter it above to enable "Honor original quote".');
+  else if (S.lines.some(l => !l.origEdited))
+    add('info', 'The quote PDF shows only a subtotal, not line prices. Original line prices are <b>estimated</b> by scaling current prices to the quoted subtotal (dashed boxes). Type a price into any Original box to override it.');
+  if (c.origKnown && S.quote.total != null && Math.abs(c.orig - S.quote.total) > 0.05)
+    add('warn', 'Estimated original line prices add to ' + fmt$(c.orig) + ' vs quoted subtotal ' + fmt$(S.quote.total) + ' (rounding to whole cents).');
+  if (S.pdf){
+    const csvKeys = {}; S.lines.forEach(l => csvKeys[l.key] = l);
+    const bad = [];
+    S.pdf.lines.forEach(p => {
+      const l = csvKeys[p.key];
+      if (!l && p.qty > 0) bad.push(esc(p.part) + (p.key.endsWith('|C') ? ' contingency' : '') + ' (PDF qty ' + fmtInt(p.qty) + ', not in CSV)');
+      else if (l && l.qty !== p.qty) bad.push(esc(p.part) + (l.contingency ? ' contingency' : '') + ' (CSV ' + fmtInt(l.qty) + ' vs PDF ' + fmtInt(p.qty) + ')');
+    });
+    S.lines.forEach(l => { if (l.qty > 0 && !S.pdf.lines.some(p => p.key === l.key)) bad.push(esc(l.part) + (l.contingency ? ' contingency' : '') + ' (in CSV, not found on PDF)'); });
+    if (bad.length) add('bad', '<b>Quantities differ between the CSV and the PDF:</b> ' + bad.join('; ') + '. Scaled original prices assume the same quantities.');
+    if (!S.pdf.lines.length) add('warn', 'No component lines could be read from the PDF. It may be scanned or laid out differently. Check the fields above manually.');
+    if (S.pdf.num && S.meta.projectNum && S.pdf.num !== S.meta.projectNum)
+      add('warn', 'PDF shows number ' + esc(S.pdf.num) + ' but the CSV Project # is ' + esc(S.meta.projectNum) + '. Confirm these are the same job.');
+  }
+  if (c.below.length) add('warn', 'Target is below the current floor price on: ' + c.below.map(l => esc(l.part) + (l.contingency ? ' (contingency)' : '')).join(', ') + '.');
+  $('warnings').innerHTML = w.join('');
+}
+function renderAge(){
+  const d = daysSince(S.quote.dateISO);
+  $('ageNow').innerHTML = pillHTML(d);
+  $('ageMeter').innerHTML = meterHTML(d);
+}
+function syncFields(){
+  $('fProjNum').value = S.meta.projectNum; $('fProjName').value = S.meta.projectName;
+  $('fClient').value = S.meta.client; $('fLoc').value = S.meta.location;
+  $('fQuoteNum').value = S.quote.num; $('fQuoteDate').value = S.quote.dateISO;
+  $('fOrigTotal').value = inputVal(S.quote.total);
+  $('fFreight').value = S.freightPct == null ? '' : String(S.freightPct);
+  $('fNote').value = S.note || '';
+}
+function renderAll(){ syncFields(); renderTable(); recalc(); }
+
+/* ───────────────────────── events: reconcile ───────────────────────── */
+function setStatus(id, msg, cls){ const e = $(id); e.textContent = msg; e.className = 'status' + (cls ? ' ' + cls : ''); }
+
+async function handleCsv(file){
+  if (!file) return;
+  try {
+    const p = parsePriceCsv(await file.text());
+    applyCSV(p, file.name);
+    renderAll(); renderBoard();
+    const diff = (p.totalSell != null) ? Math.abs(p.totalSell - S.lines.reduce((a, l) => a + r2(l.qty * l.sell), 0)) : 0;
+    setStatus('stCsv', 'Loaded ' + file.name + ' — ' + S.lines.length + ' lines' + (diff > 0.02 ? ' (WARNING: line sum differs from file total by ' + fmt$(diff) + ')' : ''), diff > 0.02 ? 'err' : 'ok');
+  } catch(e){ setStatus('stCsv', e.message, 'err'); }
+}
+async function handlePdf(file){
+  if (!file) return;
+  setStatus('stPdf', 'Reading PDF…');
+  try {
+    const res = parseQuoteRows(await pdfRows(file));
+    if (!res.textLen){ setStatus('stPdf', 'No text found — this PDF may be a scan. Enter the quote date and subtotal manually.', 'err'); return; }
+    applyPdf(res, file.name);
+    renderAll();
+    const got = [res.date ? 'date ' + isoToSlash(res.date) : 'date NOT found', res.total != null ? 'subtotal ' + fmt$(res.total) : 'subtotal NOT found', res.lines.length + ' lines'];
+    setStatus('stPdf', 'Read ' + file.name + ' — ' + got.join(', ') + '. Verify below.', (res.date && res.total != null) ? 'ok' : 'err');
+  } catch(e){ setStatus('stPdf', e.message || String(e), 'err'); }
+}
+function wireDrop(dropId, inputId, handler){
+  const d = $(dropId), i = $(inputId);
+  i.addEventListener('change', () => { handler(i.files[0]); i.value = ''; });
+  ['dragover','dragenter'].forEach(ev => d.addEventListener(ev, e => { e.preventDefault(); d.classList.add('over'); }));
+  ['dragleave','drop'].forEach(ev => d.addEventListener(ev, e => { e.preventDefault(); d.classList.remove('over'); }));
+  d.addEventListener('drop', e => handler(e.dataTransfer.files[0]));
+}
+wireDrop('dropCsv', 'fileCsv', handleCsv);
+wireDrop('dropPdf', 'filePdf', handlePdf);
+
+$('lines').addEventListener('input', e => {
+  const el = e.target, f = el.dataset.f; if (!f) return;
+  const l = S.lines[+el.closest('tr').dataset.i];
+  const raw = el.value.trim(), v = num(raw);
+  const invalid = raw !== '' && (v == null || v < 0);
+  el.classList.toggle('bad', invalid);
+  if (invalid) return;
+  if (f === 'target'){ l.target = v; S.mode = 'custom'; }
+  else if (f === 'cost'){
+    l.cost = v;
+    const costs = store.get(K_COSTS, {});
+    if (v == null) delete costs[l.part]; else costs[l.part] = v;
+    S.lines.forEach(x => { if (x.part === l.part) x.cost = v; });   // same part (e.g. contingency) shares one cost
+    store.set(K_COSTS, costs);
+  } else if (f === 'orig'){
+    if (v == null){ l.orig = null; l.origEdited = false; } else { l.orig = v; l.origEdited = true; }
+    reallocateOrig();
+    if (S.mode === 'original') applyMode('original', true);
+  }
+  recalc();
+});
+$('lines').addEventListener('change', e => { if (e.target.dataset.f) recalc(); });
+// normalise to 2 decimals once the user leaves the field
+$('lines').addEventListener('focusout', () => setTimeout(recalc, 0));
+
+function bindMeta(id, set){ $(id).addEventListener('input', () => { set($(id).value); recalc(); }); }
+bindMeta('fProjNum', v => S.meta.projectNum = v);
+bindMeta('fProjName', v => S.meta.projectName = v);
+bindMeta('fClient', v => S.meta.client = v);
+bindMeta('fLoc', v => S.meta.location = v);
+bindMeta('fQuoteNum', v => S.quote.num = v);
+bindMeta('fQuoteDate', v => S.quote.dateISO = v);
+bindMeta('fNote', v => S.note = v);
+$('fOrigTotal').addEventListener('input', () => {
+  S.quote.total = num($('fOrigTotal').value);
+  reallocateOrig();
+  if (S.mode === 'original') applyMode('original', true);
+  recalc();
+});
+$('fOrigTotal').addEventListener('blur', () => { $('fOrigTotal').value = inputVal(S.quote.total); });
+$('fFreight').addEventListener('input', () => { const v = num($('fFreight').value); S.freightPct = (v == null || v < 0) ? null : v; recalc(); });
+
+$('modeCurrent').addEventListener('click', () => applyMode('current'));
+$('modeOriginal').addEventListener('click', () => applyMode('original'));
+$('modePct').addEventListener('click', () => {
+  const p = num($('pctVal').value); if (p == null) return;
+  S.mode = 'custom';
+  S.lines.forEach(l => l.target = r2(l.sell * (1 + p / 100)));
+  renderTable(); recalc();
+});
+$('btnReset').addEventListener('click', () => {
+  if (S.lines.length && !confirm('Clear everything on this screen? (Saved Quote Board entries and remembered costs are not affected.)')) return;
+  resetState(); renderAll(); setStatus('stCsv', ''); setStatus('stPdf', ''); setStatus('stSave', '');
+});
+
+/* ───────────────────────── export for customer service ───────────────────────── */
+function csvField(v){ const s = String(v == null ? '' : v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function buildCsCsv(){
+  const c = calc(), rows = [];
+  rows.push(['AquaCell Order Pricing Export']);
+  rows.push(['Generated', slash(new Date())]);
+  rows.push(['Project Name', S.meta.projectName]);
+  rows.push(['Project #', S.meta.projectNum]);
+  rows.push(['Client', S.meta.client]);
+  rows.push(['Location', S.meta.location]);
+  rows.push(['Estimator', S.meta.estimator]);
+  rows.push(['Email', S.meta.email]);
+  if (S.note && S.note.trim()) rows.push(['Note', S.note.trim()]);
+  rows.push([]);
+  rows.push(['Line','Part #','Description','Qty','Unit','Floor Unit Price','Sell Unit Price','Extended Floor','Extended Sell']);
+  S.lines.forEach(l => {
+    if (l.qty === 0) return;
+    const t = l.target == null ? 0 : l.target;
+    rows.push([l.ln, l.part, l.desc, l.qty, 'EACH', fmt$(l.floor), fmt$(t), fmt$(r2(l.qty * l.floor)), fmt$(r2(l.qty * t))]);
+  });
+  rows.push([]);
+  rows.push(['','','','','TOTAL FLOOR COST','','', fmt$(c.floor), '']);
+  rows.push(['','','','','TOTAL SELL PRICE','','','', fmt$(c.tgt)]);
+  rows.push(['','','','','ESTIMATED FREIGHT (' + (S.freightPct == null ? 0 : S.freightPct).toFixed(1) + '%)','','','', fmt$(c.freight)]);
+  return rows.map(r => r.map(csvField).join(',')).join('\r\n') + '\r\n';
+}
+$('btnExport').addEventListener('click', () => {
+  const name = ['AquaCell_PriceExport', safeName(S.meta.projectNum), safeName(S.meta.projectName), mdy(new Date()), 'ADJUSTED'].filter(Boolean).join('_') + '.csv';
+  download(new Blob([buildCsCsv()], {type: 'text/csv'}), name);
+});
+
+/* ───────────────────────── Quote Board ───────────────────────── */
+let P = store.get(K_PROJ, []);
+const STATUSES = ['Open', 'Re-quoted', 'Ordered', 'Dead'];
+function persistProjects(){ store.set(K_PROJ, P); }
+
+$('btnSave').addEventListener('click', () => {
+  if (!S.meta.projectNum.trim() && !S.meta.projectName.trim()){ setStatus('stSave', 'Enter a project # or name first.', 'err'); return; }
+  if (!S.quote.dateISO){ setStatus('stSave', 'Enter the quote date first — the age meter depends on it.', 'err'); return; }
+  const c = calc();
+  const id = (S.meta.projectNum.trim() || S.meta.projectName.trim()) + '|' + S.quote.dateISO;
+  const prev = P.find(p => p.id === id);
+  const rec = {
+    id, projectNum: S.meta.projectNum, projectName: S.meta.projectName, client: S.meta.client, location: S.meta.location,
+    estimator: S.meta.estimator, email: S.meta.email, quoteNum: S.quote.num, quoteDate: S.quote.dateISO,
+    quotedSubtotal: S.quote.total, targetTotal: r2(c.tgt), freightPct: S.freightPct, mode: S.mode,
+    status: prev ? prev.status : 'Open', savedAt: Date.now(),
+    lines: S.lines.map(l => ({ln: l.ln, part: l.part, desc: l.desc, qty: l.qty, floor: l.floor, sell: l.sell,
+      orig: l.orig, origEdited: l.origEdited, target: l.target}))
+  };
+  if (prev) P[P.indexOf(prev)] = rec; else P.push(rec);
+  persistProjects(); renderBoard();
+  setStatus('stSave', (prev ? 'Updated' : 'Saved') + ' on the Quote Board.', 'ok');
+});
+
+function floorDelta(p){
+  const pl = store.get(K_PL, null); if (!pl) return null;
+  let a = 0, b = 0;
+  p.lines.forEach(l => {
+    const nf = pl.floors[l.part];
+    if (l.floor == null || nf == null) return;
+    a += l.qty * l.floor; b += l.qty * nf;
+  });
+  if (a <= 0) return null;
+  return {abs: r2(b - a), pct: (b - a) / a};
+}
+function renderBoard(){
+  P = store.get(K_PROJ, P);
+  const f = $('boardFilter').value;
+  const list = P.filter(p => f === 'all' || p.status === 'Open')
+    .map(p => ({p, d: daysSince(p.quoteDate)}))
+    .sort((a, b) => (b.d == null ? -1 : b.d) - (a.d == null ? -1 : a.d));
+  const open = P.filter(p => p.status === 'Open').map(p => bucket(daysSince(p.quoteDate)));
+  const nG = open.filter(x => x === 'green').length, nY = open.filter(x => x === 'yellow').length, nR = open.filter(x => x === 'red').length;
+  const up = P.filter(p => p.status === 'Open').filter(p => { const d = floorDelta(p); return d && d.pct > 0.0005; }).length;
+  $('boardBadge').textContent = (nY + nR) ? '(' + (nY + nR) + ')' : '';
+  $('boardStats').innerHTML =
+    '<div class="stat"><div class="k">Open &middot; 0&ndash;30 days</div><div class="v" style="color:var(--g)">' + nG + '</div></div>' +
+    '<div class="stat"><div class="k">Open &middot; 31&ndash;90 days</div><div class="v" style="color:var(--y)">' + nY + '</div></div>' +
+    '<div class="stat"><div class="k">Open &middot; over 90 days</div><div class="v" style="color:var(--r)">' + nR + '</div></div>' +
+    '<div class="stat"><div class="k">Open quotes with floor price increases</div><div class="v">' + up + '</div></div>';
+  const pl = store.get(K_PL, null);
+  $('plInfo').textContent = pl ? 'Price change column compares each quote against the floor prices in the last CSV loaded here (' + (pl.csvGenerated || new Date(pl.loadedAt).toLocaleDateString()) + ').'
+    : 'Load any pricing CSV to enable the floor price change column.';
+  if (!list.length){ $('boardBody').innerHTML = '<tr><td colspan="7" class="small" style="padding:20px">No quotes saved yet. Reconcile a quote and click "Save to Quote Board".</td></tr>'; return; }
+  $('boardBody').innerHTML = list.map(({p, d}) => {
+    const fd = floorDelta(p);
+    const fdTxt = !fd ? '—' : '<span class="' + (fd.pct > 0.0005 ? 'neg' : (fd.pct < -0.0005 ? 'pos' : '')) + '">' + (fd.pct >= 0 ? '+' : '') + (fd.pct * 100).toFixed(1) + '% (' + fmt$(fd.abs) + ')</span>';
+    const dim = p.status !== 'Open' ? ' class="dim"' : '';
+    return '<tr' + dim + '><td style="min-width:150px">' + pillHTML(d) + '<div style="margin-top:6px">' + meterHTML(d) + '</div></td>' +
+      '<td class="item"><div class="part">' + esc(p.projectNum) + ' &mdash; ' + esc(p.projectName) + '</div><div class="desc">' + esc(p.client) + (p.location ? ' &middot; ' + esc(p.location) : '') + '</div></td>' +
+      '<td class="num">' + esc(isoToSlash(p.quoteDate)) + '</td>' +
+      '<td class="num">' + fmt$(p.quotedSubtotal) + '</td>' +
+      '<td class="num">' + fdTxt + '</td>' +
+      '<td><select data-id="' + esc(p.id) + '" class="stsel" style="width:auto">' + STATUSES.map(s => '<option' + (s === p.status ? ' selected' : '') + '>' + s + '</option>').join('') + '</select></td>' +
+      '<td class="num"><button data-open="' + esc(p.id) + '">Open</button> <button class="danger" data-del="' + esc(p.id) + '">Delete</button></td></tr>';
+  }).join('');
+}
+$('boardFilter').addEventListener('change', renderBoard);
+$('boardBody').addEventListener('change', e => {
+  if (!e.target.classList.contains('stsel')) return;
+  const p = P.find(x => x.id === e.target.dataset.id); if (!p) return;
+  p.status = e.target.value; persistProjects(); renderBoard();
+});
+$('boardBody').addEventListener('click', e => {
+  const o = e.target.dataset.open, d = e.target.dataset.del;
+  if (o){
+    const p = P.find(x => x.id === o); if (!p) return;
+    resetState();
+    S.meta = {projectName: p.projectName, projectNum: p.projectNum, client: p.client, location: p.location, estimator: p.estimator || '', email: p.email || '', generated: ''};
+    S.quote = {num: p.quoteNum || '', dateISO: p.quoteDate, total: p.quotedSubtotal};
+    S.freightPct = p.freightPct; S.mode = p.mode || 'custom';
+    const costs = store.get(K_COSTS, {});
+    S.lines = p.lines.map(l => Object.assign({}, l, {key: lineKey(l.part, l.desc), contingency: /contingency/i.test(l.desc), cost: costs[l.part] != null ? costs[l.part] : null}));
+    setStatus('stCsv', 'Restored saved quote. Load a fresh CSV to compare against today\'s pricing.', 'ok'); setStatus('stPdf', ''); setStatus('stSave', '');
+    showTab('recon'); renderAll();
+  } else if (d){
+    const p = P.find(x => x.id === d);
+    if (p && confirm('Delete "' + (p.projectNum || p.projectName) + '" from the Quote Board? This cannot be undone.')){
+      P = P.filter(x => x.id !== d); persistProjects(); renderBoard();
+    }
+  }
+});
+
+/* ───────────────────────── tabs, backup, banners ───────────────────────── */
+function showTab(t){
+  const recon = t === 'recon';
+  $('paneRecon').classList.toggle('hidden', !recon); $('paneBoard').classList.toggle('hidden', recon);
+  $('tabRecon').setAttribute('aria-selected', recon); $('tabBoard').setAttribute('aria-selected', !recon);
+  if (!recon) renderBoard();
+}
+$('tabRecon').addEventListener('click', () => showTab('recon'));
+$('tabBoard').addEventListener('click', () => showTab('board'));
+
+$('btnBackup').addEventListener('click', () => {
+  const data = {app: 'aquacell-quote-reconciliation', version: 1, exportedAt: new Date().toISOString(),
+    costs: store.get(K_COSTS, {}), projects: store.get(K_PROJ, []), pricelist: store.get(K_PL, null)};
+  download(new Blob([JSON.stringify(data, null, 1)], {type: 'application/json'}), 'AquaCell_QuoteRecon_Backup_' + mdy(new Date()) + '.json');
+  store.set(K_BK, Date.now()); renderBanner();
+});
+$('fileBackup').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (d.app !== 'aquacell-quote-reconciliation' || !Array.isArray(d.projects) || typeof d.costs !== 'object') throw new Error('Not a Quote Reconciliation backup file.');
+    if (!confirm('Replace everything stored in this browser (' + P.length + ' saved quotes) with the backup (' + d.projects.length + ' quotes)?')) return;
+    store.set(K_COSTS, d.costs || {}); store.set(K_PROJ, d.projects); if (d.pricelist) store.set(K_PL, d.pricelist);
+    P = d.projects; renderBoard(); renderBanner(); alert('Backup restored.');
+  } catch(err){ alert('Could not import: ' + err.message); }
+});
+function renderBanner(){
+  const msgs = [];
+  if (!store.ok) msgs.push('<div class="note bad"><b>Browser storage is unavailable</b> (private window or blocked site data). Costs and the Quote Board will NOT be remembered. Export a backup before closing.</div>');
+  else {
+    const hasData = store.get(K_PROJ, []).length > 0, last = store.get(K_BK, null);
+    if (hasData && (!last || (Date.now() - last) > 14 * 86400000))
+      msgs.push('<div class="note warn">' + (last ? 'Last backup was ' + Math.floor((Date.now() - last) / 86400000) + ' days ago.' : 'You have not exported a backup yet.') + ' Saved quotes exist only in this browser. Click <b>Export backup</b>.</div>');
+  }
+  $('storageBanner').innerHTML = msgs.join('');
+}
+
+renderBanner(); renderAll(); renderBoard();
+</script>
+</body>
+</html>
