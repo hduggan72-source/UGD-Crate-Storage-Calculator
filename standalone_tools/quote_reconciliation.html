@@ -292,14 +292,16 @@ function download(blob, filename){
 /* ───────────────────────── storage (browser only) ───────────────────────── */
 const K_COSTS = 'qr_costs_v1', K_PROJ = 'qr_projects_v1', K_PL = 'qr_pricelist_v1', K_BK = 'qr_lastbackup_v1';
 const store = {
-  ok: true, mem: {},
+  ok: true, mem: {}, failed: {},
   get(k, def){
+    if (this.failed[k]) return (k in this.mem) ? this.mem[k] : def;   // a write failed: the in-memory copy is newer
     try { const v = localStorage.getItem(k); return v == null ? def : JSON.parse(v); }
     catch(e){ this.ok = false; return (k in this.mem) ? this.mem[k] : def; }
   },
   set(k, v){
     this.mem[k] = v;
-    try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){ this.ok = false; }
+    try { localStorage.setItem(k, JSON.stringify(v)); delete this.failed[k]; }
+    catch(e){ this.ok = false; this.failed[k] = true; }
   }
 };
 try { localStorage.setItem('qr_probe', '1'); localStorage.removeItem('qr_probe'); } catch(e){ store.ok = false; }
@@ -308,7 +310,7 @@ try { localStorage.setItem('qr_probe', '1'); localStorage.removeItem('qr_probe')
 const S = emptyState();
 function emptyState(){
   return {
-    meta: {projectName:'', projectNum:'', client:'', location:'', estimator:'', email:'', generated:''},
+    meta: {projectName:'', projectNum:'', client:'', location:'', siteAddress:null, estimator:'', email:'', generated:''},
     quote: {num:'', dateISO:'', total:null},
     freightPct: null, mode: 'current', note: '',
     lines: [],            // {ln, part, desc, qty, floor, sell, contingency, key, orig, origEdited, target, cost}
@@ -373,7 +375,8 @@ const lineKey = (part, desc) => part + (/contingency/i.test(desc || '') ? '|C' :
 
 function applyCSV(p, fileName){
   const pn = p.meta['Project #'] || '';
-  const keep = S.lines.length > 0 && S.meta.projectNum && S.meta.projectNum === pn;
+  const first = S.lines.length === 0;      // nothing loaded yet: keep any PDF / quote details already read
+  const keep = first || (S.meta.projectNum && S.meta.projectNum === pn);
   const old = {};
   if (keep) S.lines.forEach(l => old[l.key] = l);
   const keepQuote = keep ? S.quote : {num:'', dateISO:'', total:null};
@@ -385,7 +388,8 @@ function applyCSV(p, fileName){
   S.quote = keepQuote; S.pdf = keepPdf; S.mode = keepMode; S.note = keepNote;
   S.meta = {
     projectName: p.meta['Project Name'] || '', projectNum: pn, client: p.meta['Client'] || '',
-    location: p.meta['Location'] || '', estimator: p.meta['Estimator'] || '', email: p.meta['Email'] || '',
+    location: p.meta['Location'] || '', siteAddress: (p.meta['Site Address'] !== undefined ? p.meta['Site Address'] : null),
+    estimator: p.meta['Estimator'] || '', email: p.meta['Email'] || '',
     generated: p.meta['Generated'] || ''
   };
   S.freightPct = keepFreight != null ? keepFreight : (p.freightPct != null ? p.freightPct : 10);
@@ -496,7 +500,7 @@ function applyMode(mode, quiet){
 const margin = (sell, cost) => (sell == null || cost == null || sell <= 0) ? null : (sell - cost) / sell;
 
 function calc(){
-  const c = {cur:0, orig:0, tgt:0, cost:0, floor:0, missingCost:0, origKnown:true, below:[]};
+  const c = {cur:0, orig:0, tgt:0, cost:0, floor:0, missingCost:0, origKnown:true, below:[], blank:[]};
   S.lines.forEach(l => {
     const q = l.qty;
     c.cur += r2(q * l.sell); c.floor += r2(q * l.floor);
@@ -504,6 +508,7 @@ function calc(){
     c.tgt += r2(q * (l.target == null ? 0 : l.target));
     if (l.cost == null) c.missingCost++; else c.cost += r2(q * l.cost);
     if (q > 0 && l.target != null && l.target < l.floor - 0.0049) c.below.push(l);
+    if (q > 0 && l.target == null) c.blank.push(l);
   });
   c.haveCost = S.lines.length > 0 && c.missingCost === 0;
   c.mCur = c.haveCost ? margin(c.cur, c.cost) : null;
@@ -574,7 +579,7 @@ function recalc(){
   if (S.mode === 'original') $('modeOriginal').classList.add('on');
   $('modeOriginal').disabled = !c.origKnown;
   renderSummary(c); renderWarnings(c); renderAge();
-  $('btnExport').disabled = !S.lines.length;
+  $('btnExport').disabled = !S.lines.length || c.blank.length > 0;
   $('btnSave').disabled = !S.lines.length;
 }
 function renderSummary(c){
@@ -634,6 +639,7 @@ function renderWarnings(c){
     if (S.pdf.num && S.meta.projectNum && S.pdf.num !== S.meta.projectNum)
       add('warn', 'PDF shows number ' + esc(S.pdf.num) + ' but the CSV Project # is ' + esc(S.meta.projectNum) + '. Confirm these are the same job.');
   }
+  if (c.blank.length) add('bad', '<b>Target sell price is blank on:</b> ' + c.blank.map(l => esc(l.part) + (l.contingency ? ' (contingency)' : '')).join(', ') + '. Export is disabled until every line has a price (type 0 if a free line is intended).');
   if (c.below.length) add('warn', 'Target is below the current floor price on: ' + c.below.map(l => esc(l.part) + (l.contingency ? ' (contingency)' : '')).join(', ') + '.');
   $('warnings').innerHTML = w.join('');
 }
@@ -752,6 +758,7 @@ function buildCsCsv(){
   rows.push(['Project #', S.meta.projectNum]);
   rows.push(['Client', S.meta.client]);
   rows.push(['Location', S.meta.location]);
+  if (S.meta.siteAddress != null) rows.push(['Site Address', S.meta.siteAddress]);   // present on multi-tank exports
   rows.push(['Estimator', S.meta.estimator]);
   rows.push(['Email', S.meta.email]);
   if (S.note && S.note.trim()) rows.push(['Note', S.note.trim()]);
@@ -769,6 +776,7 @@ function buildCsCsv(){
   return rows.map(r => r.map(csvField).join(',')).join('\r\n') + '\r\n';
 }
 $('btnExport').addEventListener('click', () => {
+  if (calc().blank.length) return;
   const name = ['AquaCell_PriceExport', safeName(S.meta.projectNum), safeName(S.meta.projectName), mdy(new Date()), 'ADJUSTED'].filter(Boolean).join('_') + '.csv';
   download(new Blob([buildCsCsv()], {type: 'text/csv'}), name);
 });
@@ -786,7 +794,7 @@ $('btnSave').addEventListener('click', () => {
   const prev = P.find(p => p.id === id);
   const rec = {
     id, projectNum: S.meta.projectNum, projectName: S.meta.projectName, client: S.meta.client, location: S.meta.location,
-    estimator: S.meta.estimator, email: S.meta.email, quoteNum: S.quote.num, quoteDate: S.quote.dateISO,
+    estimator: S.meta.estimator, email: S.meta.email, siteAddress: S.meta.siteAddress, quoteNum: S.quote.num, quoteDate: S.quote.dateISO,
     quotedSubtotal: S.quote.total, targetTotal: r2(c.tgt), freightPct: S.freightPct, mode: S.mode,
     status: prev ? prev.status : 'Open', savedAt: Date.now(),
     lines: S.lines.map(l => ({ln: l.ln, part: l.part, desc: l.desc, qty: l.qty, floor: l.floor, sell: l.sell,
@@ -851,7 +859,7 @@ $('boardBody').addEventListener('click', e => {
   if (o){
     const p = P.find(x => x.id === o); if (!p) return;
     resetState();
-    S.meta = {projectName: p.projectName, projectNum: p.projectNum, client: p.client, location: p.location, estimator: p.estimator || '', email: p.email || '', generated: ''};
+    S.meta = {projectName: p.projectName, projectNum: p.projectNum, client: p.client, location: p.location, siteAddress: (p.siteAddress != null ? p.siteAddress : null), estimator: p.estimator || '', email: p.email || '', generated: ''};
     S.quote = {num: p.quoteNum || '', dateISO: p.quoteDate, total: p.quotedSubtotal};
     S.freightPct = p.freightPct; S.mode = p.mode || 'custom';
     const costs = store.get(K_COSTS, {});
