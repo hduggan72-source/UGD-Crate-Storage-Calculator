@@ -69,7 +69,9 @@ _BETA_MAX_LAYERS = 8
 
 def _layer_values_in_request():
     vals = [request.form.get('layers'), request.args.get('layers')]
-    j = request.get_json(silent=True)
+    # force=True: the JSON handlers parse with force=True (any Content-Type), so
+    # the guard must too, or a text/plain body would slip past the cap.
+    j = request.get_json(force=True, silent=True)
     if isinstance(j, dict):
         vals.append(j.get('layers'))
         inp = j.get('inputs')
