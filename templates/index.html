@@ -3076,7 +3076,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
 <div class="bottombar">
     <button type="submit" form="mainForm" class="bottombar-btn" style="background:#007bff;color:white;">▶ Calculate</button>
     {% if pricing_enabled %}
-    <button type="button" class="bottombar-btn" onclick="downloadQuote()" style="background:#e67e22;color:white;">📄 Quote</button>
+    <button type="button" class="bottombar-btn" onclick="openQuoteTypeModal()" style="background:#e67e22;color:white;">📄 Quote</button>
     {% endif %}
     <button type="button" class="bottombar-btn" onclick="downloadPDF()" style="background:#28a745;color:white;">⬇ Report</button>
     <button type="button" class="bottombar-btn" onclick="downloadDXF()" style="background:#4b5563;color:white;">⬇ DXF</button>
@@ -3496,7 +3496,37 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
     }
 
 
-    function downloadQuote() {
+    // Quote type chooser: "Distribution" or "Market" (sets the PDF header only;
+    // percentages are whatever is currently entered in the pricing fields).
+    function openQuoteTypeModal() {
+        let m = document.getElementById('quoteTypeModal');
+        if (!m) {
+            m = document.createElement('div');
+            m.id = 'quoteTypeModal';
+            m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+            m.innerHTML =
+                '<div style="background:#ffffff;border-radius:8px;padding:22px 26px;min-width:280px;max-width:90vw;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,0.35);">' +
+                '<div style="font-size:16px;font-weight:700;color:#1e3a8a;margin-bottom:6px;">Quote Type</div>' +
+                '<div style="font-size:13px;color:#555555;margin-bottom:16px;">Distribution or Market?</div>' +
+                '<div style="display:flex;gap:10px;justify-content:center;">' +
+                '<button type="button" data-qt="distribution" style="padding:9px 16px;border:0;border-radius:5px;background:#e67e22;color:#ffffff;font-weight:700;cursor:pointer;">Distribution</button>' +
+                '<button type="button" data-qt="market" style="padding:9px 16px;border:0;border-radius:5px;background:#1e3a8a;color:#ffffff;font-weight:700;cursor:pointer;">Market</button>' +
+                '<button type="button" data-qt="cancel" style="padding:9px 16px;border:1px solid #999999;border-radius:5px;background:#ffffff;color:#333333;cursor:pointer;">Cancel</button>' +
+                '</div></div>';
+            m.addEventListener('click', function (e) {
+                const qt = e.target.getAttribute && e.target.getAttribute('data-qt');
+                if (qt || e.target === m) {
+                    m.style.display = 'none';
+                    if (qt === 'distribution' || qt === 'market') downloadQuote(qt);
+                }
+            });
+            document.body.appendChild(m);
+        }
+        m.style.display = 'flex';
+    }
+
+    function downloadQuote(quoteType) {
+        quoteType = (quoteType === 'market') ? 'market' : 'distribution';
         const form = document.getElementById('mainForm');
         const formData = new FormData(form);
 
@@ -3509,6 +3539,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
         formData.append('markupPct',          document.getElementById('hiddenMarkupPct').value          || '0');
         // Explicitly pass project number to guarantee filename
         formData.set('project_num', document.getElementById('project_num')?.value || '');
+        formData.set('quote_type', quoteType);
         // PT-ROW™ data
         injectPtrowToFormData(formData);
         // Void Space data
@@ -3533,7 +3564,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             a.href = url;
             const projNum = (document.getElementById('project_num')?.value || '').trim().replace(/[^a-zA-Z0-9\-_]/g,'_');
             const qDate = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'');
-            const qParts = [projNum, projectName, 'AquaCell_Quote', qDate].filter(Boolean).join('_');
+            const qParts = [projNum, projectName, 'AquaCell_Quote', quoteType === 'market' ? 'Market' : 'Distribution', qDate].filter(Boolean).join('_');
             a.download = `${qParts}.pdf`;
             a.click();
             URL.revokeObjectURL(url);
@@ -4291,11 +4322,11 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             ['Large Diameter Pipe Connection', '', bomQty('large_pipe_qty')],
             ['AquaCell Tank Elevations', '', ''],
             ['Model Type', t.model_type, f(t.tank_height)],
-            ['Surface Elevation', 'A', f(t.surface_elev)],
-            ['Top of Cover Stone', 'B', f(t.top_of_stone)],
-            ['Top of Tank', 'C', f(t.top_of_tank)],
-            ['Bottom of Tank', 'D', f(t.tank_bottom)],
-            ['Bottom of Base Stone', 'E', f(t.base_stone_elev)],
+            ['Surface Elevation (ft)', 'A', f(t.surface_elev)],
+            ['Top of Cover Stone (ft)', 'B', f(t.top_of_stone)],
+            ['Top of Tank (ft)', 'C', f(t.top_of_tank)],
+            ['Bottom of Tank (ft)', 'D', f(t.tank_bottom)],
+            ['Bottom of Base Stone (ft)', 'E', f(t.base_stone_elev)],
             ['W x L (ft)', f(t.tank_width), f(t.tank_length)],
             ['Cover Stone Depth (ft)', '', f(t.cover_stone)],
             ['Base Stone Depth (ft)', '', f(t.base_stone)],
@@ -4308,7 +4339,7 @@ HS-25: min cover SC = 2.5 ft | EX = 1.83 ft">?</span>
             ['Total System Depth (ft)', '', f(t.system_depth)],
             ['Excavation Volume (ft³)', '', f(t.excav_volume)],
             ['Storage Volume (AquaCell + Stone)', '', ''],
-            ['Layer', 'Gross Vol.', 'Net Storage'],
+            ['Layer', 'Gross Vol. (ft³)', 'Net Storage (ft³)'],
             ['Top Cover', f(t.stone_top_gross), incl('inclStoneTop') ? f(t.stone_top_net) : 'Excluded'],
             ['Perimeter', f(t.stone_perim_gross), incl('inclStonePerim') ? f(t.stone_perim_net) : 'Excluded'],
             ['Base/Foundation', f(t.stone_base_gross), incl('inclStoneBase') ? f(t.stone_base_net) : 'Excluded'],
