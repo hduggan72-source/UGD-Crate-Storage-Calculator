@@ -9013,6 +9013,8 @@ def download_cad_table_xlsx():
     ws = wb.active
     ws.title = 'CAD Table'
     bold = Font(bold=True)
+    # Row 1 (Total System Storage) is the at-a-glance figure: slightly larger + bold.
+    headline = Font(bold=True, size=14)
     for r_idx, row in enumerate(rows, start=1):
         if not isinstance(row, list) or len(row) != 3:
             return jsonify({'error': f'Row {r_idx} must have 3 cells'}), 400
@@ -9034,6 +9036,8 @@ def download_cad_table_xlsx():
                 cell.alignment = Alignment(horizontal='center')
             if is_title:
                 cell.font = bold
+            if r_idx == 1:
+                cell.font = headline
         # Merged cells: a title row (text in A only) spans A:C, centered; a
         # row with column B blank merges A:B so the label spans both.
         if is_title:
@@ -9226,6 +9230,7 @@ def download_quote():
       contingency_overridden = request.form.get('contingency_overridden', '0')
       project_notes    = request.form.get('project_notes', '')
       shape_mode       = request.form.get('shape_mode', 'rectangle')
+      quote_type       = 'market' if request.form.get('quote_type', 'distribution') == 'market' else 'distribution'
 
       # ── Hardcoded floor unit prices — update here on price change ──
       FLOOR_PRICES = {
@@ -9498,7 +9503,14 @@ def download_quote():
       q_text(LQ + 4, y - 52, 'An Orbia business.', 'Helvetica-Oblique', 7, GRAY)
 
       # "MATERIALS QUOTE" title (center)
-      q_text(W/2, y - 14, 'MATERIALS QUOTE', 'Helvetica-Bold', 20, QNY, 'center')
+      # Quote type suffix (Distribution / Market); font shrinks if needed so
+      # the title stays clear of the logo and project-number box.
+      _q_title = 'MATERIALS QUOTE: ' + ('MARKET' if quote_type == 'market' else 'DISTRIBUTION')
+      _q_tsz = 20
+      _q_max_w = 2 * min(W/2 - (LQ + 134), (W - RQ - 144) - W/2)
+      while _q_tsz > 10 and c.stringWidth(_q_title, 'Helvetica-Bold', _q_tsz) > _q_max_w:
+          _q_tsz -= 0.5
+      q_text(W/2, y - 14, _q_title, 'Helvetica-Bold', _q_tsz, QNY, 'center')
 
       # Project number box (top-right) — no "An Orbia business." here
       q_rect(W - RQ - 140, y - 52, 140, 52, QLGY)
@@ -9784,7 +9796,7 @@ def download_quote():
       safe_num     = (project_num or '').strip().replace(' ', '_')
       name_parts   = '_'.join(filter(None, [safe_num, safe_name]))
       return send_file(buffer, as_attachment=True,
-                       download_name=f'AquaCell_Quote_{name_parts}_{datetime.datetime.now().strftime("%m%d%Y")}.pdf',
+                       download_name=f'AquaCell_Quote_{name_parts}_{"Market" if quote_type == "market" else "Distribution"}_{datetime.datetime.now().strftime("%m%d%Y")}.pdf',
                        mimetype='application/pdf')
 
   except Exception as e:
