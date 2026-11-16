@@ -5204,7 +5204,7 @@ def build_stage_storage_pdf(summary, rows, chart_data_url, project_name=None):
     (may be empty — the chart section is then omitted). Returns a BytesIO at 0."""
     import base64 as _b64
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = _new_pdf_canvas(buffer)
     generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
     BOTTOM = 40
     state = {'page': 0}
