@@ -2263,7 +2263,7 @@ def build_buoyancy_pdf(inputs, results, project_name=None):
     band_h = 64
     c.setFillColor(NAVY)
     c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
-    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    logo_path = os.path.join(app.static_folder, 'Wavin logo white.png')
     if logo_path and os.path.exists(logo_path):
         try:
             img = ImageReader(logo_path)
@@ -2513,7 +2513,7 @@ def build_loading_truck_pdf(inputs, results, project_name=None):
     band_h = 64
     c.setFillColor(NAVY)
     c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
-    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    logo_path = os.path.join(app.static_folder, 'Wavin logo white.png')
     if logo_path and os.path.exists(logo_path):
         try:
             img = ImageReader(logo_path)
@@ -2672,7 +2672,7 @@ def build_loading_outrigger_pdf(inputs, results, project_name=None):
     band_h = 64
     c.setFillColor(NAVY)
     c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
-    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    logo_path = os.path.join(app.static_folder, 'Wavin logo white.png')
     if logo_path and os.path.exists(logo_path):
         try:
             img = ImageReader(logo_path)
@@ -2862,7 +2862,7 @@ def build_excavation_slope_pdf(inputs, results, project_name=None):
     band_h = 64
     c.setFillColor(NAVY)
     c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
-    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    logo_path = os.path.join(app.static_folder, 'Wavin logo white.png')
     if logo_path and os.path.exists(logo_path):
         try:
             img = ImageReader(logo_path)
@@ -3098,7 +3098,7 @@ def build_stepped_backfill_pdf(inputs, results, project_name=None):
     band_h = 64
     c.setFillColor(NAVY)
     c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
-    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    logo_path = os.path.join(app.static_folder, 'Wavin logo white.png')
     if logo_path and os.path.exists(logo_path):
         try:
             img = ImageReader(logo_path)
@@ -3302,7 +3302,7 @@ def build_min_cover_burial_pdf(inputs, results, project_name=None):
     band_h = 64
     c.setFillColor(NAVY)
     c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
-    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    logo_path = os.path.join(app.static_folder, 'Wavin logo white.png')
     if logo_path and os.path.exists(logo_path):
         try:
             img = ImageReader(logo_path)
@@ -3513,7 +3513,7 @@ def build_min_dist_struct_pdf(inputs, results, project_name=None):
     band_h = 64
     c.setFillColor(NAVY)
     c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
-    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    logo_path = os.path.join(app.static_folder, 'Wavin logo white.png')
     if logo_path and os.path.exists(logo_path):
         try:
             img = ImageReader(logo_path)
@@ -3764,7 +3764,7 @@ def build_complex_shape_pdf(inputs, results, project_name=None):
         band_h = 64
         c.setFillColor(NAVY)
         c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
-        logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+        logo_path = os.path.join(app.static_folder, 'Wavin logo white.png')
         if logo_path and os.path.exists(logo_path):
             try:
                 img = ImageReader(logo_path)
@@ -4476,7 +4476,7 @@ def build_crate_comparison_pdf(inputs, results, project_name=None):
     band_h = 64
     c.setFillColor(NAVY)
     c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
-    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    logo_path = os.path.join(app.static_folder, 'Wavin logo white.png')
     if logo_path and os.path.exists(logo_path):
         try:
             img = ImageReader(logo_path)
@@ -4653,7 +4653,7 @@ def build_site_overlay_pdf(image_data_url, project_name=None, meta=None):
     band_h = 64
     c.setFillColor(NAVY)
     c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
-    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    logo_path = os.path.join(app.static_folder, 'Wavin logo white.png')
     if logo_path and os.path.exists(logo_path):
         try:
             img = ImageReader(logo_path)
@@ -5067,7 +5067,7 @@ def build_pt_row_pdf(inputs, results, project_name=None):
     band_h = 64
     c.setFillColor(NAVY)
     c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
-    logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+    logo_path = os.path.join(app.static_folder, 'Wavin logo white.png')
     if logo_path and os.path.exists(logo_path):
         try:
             img = ImageReader(logo_path)
@@ -5214,7 +5214,7 @@ def build_stage_storage_pdf(summary, rows, chart_data_url, project_name=None):
         band_h = 64
         c.setFillColor(NAVY)
         c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
-        logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+        logo_path = os.path.join(app.static_folder, 'Wavin logo white.png')
         if os.path.exists(logo_path):
             try:
                 c.drawImage(ImageReader(logo_path), LM, PH - band_h + 8, width=160, height=46,
@@ -5668,7 +5668,6 @@ def multi_download_quote():
                             preserveAspectRatio=True, mask='auto')
             except Exception:
                 pass
-        q_text(LQ + 4, y - 52, 'An Orbia business.', 'Helvetica-Oblique', 7, GRAY)
         q_text(W / 2, y - 14, 'MULTI-TANK MATERIALS QUOTE', 'Helvetica-Bold', 18, QNY, 'center')
         q_text(W / 2, y - 28, f'{len(tank_results)} Tank(s)  |  Combined AquaCell System',
                'Helvetica', 9, GRAY, 'center')
@@ -6725,7 +6724,7 @@ def download_pdf():
     storage_status  = 'PASS' if min_storage > 0 and total_storage >= min_storage else ('FAIL' if min_storage > 0 else None)
 
     generated_str = datetime.datetime.now().strftime('%m/%d/%Y %H:%M')
-    logo_path     = os.path.join(app.static_folder, 'aquacell-logo.png')
+    logo_path     = os.path.join(app.static_folder, 'Wavin logo white.png')
     traffic_map   = {'H10': 'H-10', 'HS20': 'HS-20', 'HS25': 'HS-25'}
     tl_label      = traffic_map.get(traffic_load, traffic_load)
     stone_void_pct = int(round(stone_void * 100))
@@ -8407,7 +8406,7 @@ def download_quote():
       # ════════════════════════════════════════
       y = H - 28
 
-      # Logo box (top-left) + "An Orbia business." tagline below
+      # Logo (top-left) — plain Wavin logo, no tagline
       if logo_path and os.path.exists(logo_path):
           try:
               img = ImageReader(logo_path)
@@ -8415,7 +8414,6 @@ def download_quote():
                           preserveAspectRatio=True, mask='auto')
           except Exception:
               pass
-      q_text(LQ + 4, y - 52, 'An Orbia business.', 'Helvetica-Oblique', 7, GRAY)
 
       # "MATERIALS QUOTE" title (center)
       # Quote type suffix (Distribution / Market); font shrinks if needed so
@@ -8427,7 +8425,7 @@ def download_quote():
           _q_tsz -= 0.5
       q_text(W/2, y - 14, _q_title, 'Helvetica-Bold', _q_tsz, QNY, 'center')
 
-      # Project number box (top-right) — no "An Orbia business." here
+      # Project number box (top-right)
       q_rect(W - RQ - 140, y - 52, 140, 52, QLGY)
       q_text(W - RQ - 70, y - 20, project_num if project_num else '—', 'Helvetica-Bold', 18, QNY, 'center')
 
