@@ -24,7 +24,7 @@
         * { box-sizing: border-box; }
 
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Nunito', Arial, sans-serif;
             margin: 0;
             background: var(--bg);
             color: var(--text);
@@ -34,12 +34,6 @@
             display: flex;
             flex-direction: column;
         }
-
-        /* ── BRAND FONTS (Wavin global team: Nunito body, Lora Bold headers) — self-hosted OFL fonts ── */
-        @font-face { font-family: 'Lora'; font-weight: 700; font-style: normal; font-display: swap;
-                     src: url('/static/fonts/Lora-Bold.ttf') format('truetype'); }
-        @font-face { font-family: 'Nunito'; font-weight: 400; font-style: normal; font-display: swap;
-                     src: url('/static/fonts/Nunito-Regular.ttf') format('truetype'); }
 
         /* ── TOP BAR ── */
         .topbar {
@@ -412,6 +406,7 @@
         .ss-table tbody tr:nth-child(even) { background:rgba(0,0,0,0.03); }
         .ss-table-scroll { max-height:420px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; }
     </style>
+    <link rel="stylesheet" href="/static/brand-fonts.css">
 </head>
 <body>
 
