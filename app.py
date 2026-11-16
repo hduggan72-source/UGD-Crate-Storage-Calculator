@@ -20,6 +20,28 @@ from ezdxf.addons import Importer
 app = Flask(__name__)
 
 # ══════════════════════════════════════════════════════════════════
+#  PDF FONTS — Wavin brand fonts (global team direction, Nov 2026)
+#  Body = Nunito, headers = Lora Bold. Both are SIL OFL fonts bundled in
+#  static/fonts/ (licence texts alongside). If any file is missing or fails
+#  to register, every PDF falls back to built-in Helvetica so exports never
+#  break because of a font problem.
+# ══════════════════════════════════════════════════════════════════
+_F_REG, _F_BOLD, _F_OBL, _F_HEAD = 'Helvetica', 'Helvetica-Bold', 'Helvetica-Oblique', 'Helvetica-Bold'
+try:
+    from reportlab.pdfbase import pdfmetrics as _pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont as _TTFont
+    _FONT_DIR = os.path.join(app.static_folder, 'fonts')
+    for _name, _file in (('Nunito', 'Nunito-Regular.ttf'), ('Nunito-Bold', 'Nunito-Bold.ttf'),
+                         ('Nunito-Italic', 'Nunito-Italic.ttf'), ('Nunito-BoldItalic', 'Nunito-BoldItalic.ttf'),
+                         ('Lora-Bold', 'Lora-Bold.ttf')):
+        _pdfmetrics.registerFont(_TTFont(_name, os.path.join(_FONT_DIR, _file)))
+    _pdfmetrics.registerFontFamily('Nunito', normal='Nunito', bold='Nunito-Bold',
+                                   italic='Nunito-Italic', boldItalic='Nunito-BoldItalic')
+    _F_REG, _F_BOLD, _F_OBL, _F_HEAD = 'Nunito', 'Nunito-Bold', 'Nunito-Italic', 'Lora-Bold'
+except Exception as _font_err:  # pragma: no cover - fallback path
+    print(f'[PDF fonts] Nunito/Lora unavailable, using Helvetica: {_font_err}')
+
+# ══════════════════════════════════════════════════════════════════
 #  CLIENT-FACING BETA CONFIG
 #  PRICING_ENABLED : set to "False" in Render env to strip all cost/quote
 #                     UI, JS, and routes for the client-facing BETA build.
@@ -1585,9 +1607,9 @@ def _draw_beta_watermark(c):
     c.rotate(45)
     c.setFillColor(RED)
     c.setFillAlpha(0.14)
-    c.setFont('Helvetica-Bold', 40)
+    c.setFont(_F_BOLD, 40)
     c.drawCentredString(0, 10, 'BETA — SUBJECT TO CHANGE')
-    c.setFont('Helvetica-Bold', 15)
+    c.setFont(_F_BOLD, 15)
     c.drawCentredString(0, -34, 'Tool in Beta Testing / Development — Not for Construction')
     c.restoreState()
 
@@ -1762,14 +1784,19 @@ def _section_header(c, y, title):
     c.setFillColor(NAVY)
     c.rect(LM, y - band_h + 4, CW, band_h, fill=1, stroke=0)
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 8.5)
-    c.drawString(LM + 6, y - band_h + 8, title)
+    c.setFont(_F_HEAD, 8.5)
+    _x = LM + 6
+    if title.startswith('\u25a0'):          # ■ marker — drawn as a square, not a glyph
+        c.rect(_x, y - band_h + 8, 5.5, 5.5, fill=1, stroke=0)
+        _x += 12
+        title = title.lstrip('\u25a0 ')
+    c.drawString(_x, y - band_h + 8, title)
     return y - band_h - 2
 
 def _sub_label(c, y, text):
     """Small all-caps group label (e.g. ELEVATIONS). Returns y below."""
     c.setFillColor(GRAY)
-    c.setFont('Helvetica-Bold', 6.5)
+    c.setFont(_F_BOLD, 6.5)
     c.drawString(LM + 5, y - 3, text)
     return y - 11
 
@@ -1780,10 +1807,10 @@ def _kv_row(c, y, label, value, val_color=BLACK, shade=False):
         c.setFillColor(LGRAY)
         c.rect(LM, y - rh + 3, CW, rh, fill=1, stroke=0)
     c.setFillColor(GRAY)
-    c.setFont('Helvetica', 7.5)
+    c.setFont(_F_REG, 7.5)
     c.drawString(LM + 5, y - 3, label)
     c.setFillColor(val_color)
-    c.setFont('Helvetica-Bold', 7.5)
+    c.setFont(_F_BOLD, 7.5)
     c.drawRightString(LM + CW - 5, y - 3, str(value))
     _rule(c, y - rh + 3, thickness=0.25)
     return y - rh
@@ -1802,10 +1829,10 @@ def _highlight_row(c, y, label, value, bg=LTBLUE, fg=BLUE, label_color=None):
     c.setFillColor(bg)
     c.rect(LM, y - rh + 3, CW, rh, fill=1, stroke=0)
     c.setFillColor(label_color if label_color else fg)
-    c.setFont('Helvetica-Bold', 8.5)
+    c.setFont(_F_BOLD, 8.5)
     c.drawString(LM + 5, y - 3, label)
     c.setFillColor(fg)
-    c.setFont('Helvetica-Bold', 8.5)
+    c.setFont(_F_BOLD, 8.5)
     c.drawRightString(LM + CW - 5, y - 3, str(value))
     _rule(c, y - rh + 3, thickness=0.25)
     return y - rh
@@ -1820,7 +1847,7 @@ def _table_header(c, y, cols):
     c.setFillColor(BLUE)
     c.rect(LM, y - rh + 3, CW, rh, fill=1, stroke=0)
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 7.5)
+    c.setFont(_F_BOLD, 7.5)
     for label, x_abs, col_w, align in cols:
         if align == 'right':
             c.drawRightString(x_abs + col_w, y - 3, label)
@@ -1838,7 +1865,7 @@ def _table_row(c, y, cells, shade=False):
         c.rect(LM, y - rh + 3, CW, rh, fill=1, stroke=0)
     for text, x_abs, col_w, align, bold, clr in cells:
         c.setFillColor(clr if clr else BLACK)
-        c.setFont('Helvetica-Bold' if bold else 'Helvetica', 7.5)
+        c.setFont(_F_BOLD if bold else _F_REG, 7.5)
         if align == 'right':
             c.drawRightString(x_abs + col_w, y - 3, str(text))
         else:
@@ -1852,7 +1879,7 @@ def _table_total_row(c, y, cells, bg, fg):
     c.setFillColor(bg)
     c.rect(LM, y - rh + 3, CW, rh, fill=1, stroke=0)
     c.setFillColor(fg)
-    c.setFont('Helvetica-Bold', 8)
+    c.setFont(_F_BOLD, 8)
     for text, x_abs, col_w, align in cells:
         if align == 'right':
             c.drawRightString(x_abs + col_w, y - 3, str(text))
@@ -1867,9 +1894,9 @@ def _draw_footer(c, page_num, total_pages, project_name, generated_str):
     c.setFillColor(NAVY)
     c.rect(0, 0, PW, 30, fill=1, stroke=0)
     c.setFillColor(WHITE)
-    c.setFont('Helvetica', 6.5)
+    c.setFont(_F_REG, 6.5)
     c.drawString(LM, 10, f'AquaCell V14 System Summary  |  {project_name}  |  {generated_str}')
-    c.setFont('Helvetica-Bold', 6.5)
+    c.setFont(_F_BOLD, 6.5)
     c.drawRightString(PW - RM, 10, f'Page {page_num} of {total_pages}')
 
 
@@ -1886,12 +1913,12 @@ def _draw_page1_header(c, logo_path, project_name, project_num, location, client
         except Exception:
             pass
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 14)
+    c.setFont(_F_HEAD, 14)
     c.drawRightString(PW - RM, PH - 24, 'AquaCell® Underground Stormwater System')
-    c.setFont('Helvetica', 9)
+    c.setFont(_F_REG, 9)
     c.setFillColor(colors.HexColor('#93c5fd'))
     c.drawRightString(PW - RM, PH - 37, 'Preliminary System Summary — For Engineering Review Only')
-    c.setFont('Helvetica', 7)
+    c.setFont(_F_REG, 7)
     c.setFillColor(colors.HexColor('#94a3b8'))
     c.drawRightString(PW - RM, PH - 50, generated_str)
 
@@ -1909,10 +1936,10 @@ def _draw_page1_header(c, logo_path, project_name, project_num, location, client
 
     def _pf(lbl, val, x, top_y):
         c.setFillColor(GRAY)
-        c.setFont('Helvetica', 6)
+        c.setFont(_F_REG, 6)
         c.drawString(x, top_y - 2, lbl.upper())
         c.setFillColor(BLACK)
-        c.setFont('Helvetica-Bold', 8.5)
+        c.setFont(_F_BOLD, 8.5)
         c.drawString(x, top_y - 13, val if val else '—')
 
     _pf('Project Name',    project_name, col1_x, y - 4)
@@ -1937,9 +1964,9 @@ def _draw_subsequent_header(c, logo_path, project_name, generated_str, section_t
         except Exception:
             pass
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 10)
+    c.setFont(_F_HEAD, 10)
     c.drawString(LM + 110, PH - 22, section_title)
-    c.setFont('Helvetica', 7)
+    c.setFont(_F_REG, 7)
     c.setFillColor(colors.HexColor('#94a3b8'))
     c.drawRightString(PW - RM, PH - 22, f'{project_name}  |  {generated_str}')
     return PH - band_h - 12
@@ -1949,12 +1976,19 @@ def _wrap_disclaimer_lines(text, font_sz=6.5):
     """Word-wrap disclaimer text to CW - 14pt, using pdfmetrics (no canvas needed)."""
     from reportlab.pdfbase.pdfmetrics import stringWidth
     max_w = CW - 14
+    # _draw_disclaimer_block() always prints a bold "DISCLAIMER: " lead-in on line 1;
+    # include it here so the first line is wrapped with its true width.
+    if not text.lstrip().startswith('DISCLAIMER:'):
+        text = 'DISCLAIMER: ' + text
     words = text.split()
     lines = []
     cur = ''
     for w in words:
         test = (cur + ' ' + w).strip()
-        if stringWidth(test, 'Helvetica', font_sz) <= max_w:
+        # Measured in BOLD: some lines (prefix / trigger phrases) are drawn bold,
+        # and Nunito Bold is noticeably wider than Regular — measuring the wider
+        # face keeps every line inside the box whichever weight it is drawn in.
+        if stringWidth(test, _F_BOLD, font_sz) <= max_w:
             cur = test
         else:
             if cur:
@@ -2007,25 +2041,25 @@ def _draw_disclaimer_block(c, y_bottom, disclaimer_lines_raw=None, bold_triggers
 
     ty = box_top - pad - font_sz + 1
     prefix = 'DISCLAIMER: '
-    prefix_w = c.stringWidth(prefix, 'Helvetica-Bold', font_sz)
+    prefix_w = c.stringWidth(prefix, _F_BOLD, font_sz)
 
     for i, line in enumerate(lines):
         if i == 0:
             # Bold amber prefix
-            c.setFont('Helvetica-Bold', font_sz)
+            c.setFont(_F_BOLD, font_sz)
             c.setFillColor(AMBER)
             c.drawString(LM + pad, ty, prefix)
             # Normal black remainder
             rest = line[len(prefix):] if line.startswith(prefix) else line
-            c.setFont('Helvetica', font_sz)
+            c.setFont(_F_REG, font_sz)
             c.setFillColor(BLACK)
             c.drawString(LM + pad + prefix_w, ty, rest)
         elif any(trig in line for trig in bold_triggers):
-            c.setFont('Helvetica-Bold', font_sz)
+            c.setFont(_F_BOLD, font_sz)
             c.setFillColor(BLACK)
             c.drawString(LM + pad, ty, line)
         else:
-            c.setFont('Helvetica', font_sz)
+            c.setFont(_F_REG, font_sz)
             c.setFillColor(BLACK)
             c.drawString(LM + pad, ty, line)
         ty -= line_h
@@ -2124,18 +2158,18 @@ def _draw_load_spread_diagram_pdf(c, x, y_top, w, h, top_width_in, cover_in, bot
     c.setLineWidth(1.0)
     c.line(x, grade_y, x + w, grade_y)
     c.setFillColor(colors.HexColor('#1e293b'))
-    c.setFont('Helvetica-Bold', 5.5)
+    c.setFont(_F_BOLD, 5.5)
     c.drawString(x + 2, grade_y + 2, 'GRADE')
 
     # dimension labels
     c.setFillColor(NAVY)
-    c.setFont('Helvetica-Bold', 6.5)
+    c.setFont(_F_BOLD, 6.5)
     c.drawCentredString(cx, grade_y + 20, f'{top_width_in:.1f} in')
     c.drawCentredString(cx, tank_y - 18, f'{bottom_width_in:.1f} in')
     c.setFillColor(GRAY)
-    c.setFont('Helvetica', 5.5)
+    c.setFont(_F_REG, 5.5)
     c.drawCentredString(cx, tank_y - 27, f'{dim_label} spread at AquaCell')
-    c.setFont('Helvetica', 5.5)
+    c.setFont(_F_REG, 5.5)
     c.drawRightString(x + w - 2, (grade_y + tank_y) / 2 + 4, 'Cover')
     c.drawRightString(x + w - 2, (grade_y + tank_y) / 2 - 4, f'{cover_in / 12.0:.2f} ft')
 
@@ -2206,7 +2240,7 @@ def _draw_buoyancy_diagram_pdf(c, x, y_top, w, h, r):
         c.line(box_left - 6, gw_y, box_right + 6, gw_y)
         c.setDash([])
         c.setFillColor(colors.HexColor('#2563eb'))
-        c.setFont('Helvetica', 5.5)
+        c.setFont(_F_REG, 5.5)
         c.drawRightString(box_left - 8, gw_y - 2, 'GW')
 
     # grade line + label
@@ -2214,7 +2248,7 @@ def _draw_buoyancy_diagram_pdf(c, x, y_top, w, h, r):
     c.setLineWidth(1.0)
     c.line(box_left - 12, grade_y, box_right + 12, grade_y)
     c.setFillColor(colors.HexColor('#1e293b'))
-    c.setFont('Helvetica-Bold', 5.5)
+    c.setFont(_F_BOLD, 5.5)
     c.drawRightString(box_left - 14, grade_y + 2, 'GRADE')
 
     # resisting force arrows (green, down into top of tank)
@@ -2272,12 +2306,12 @@ def build_buoyancy_pdf(inputs, results, project_name=None):
         except Exception:
             pass
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 14)
+    c.setFont(_F_HEAD, 14)
     c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
-    c.setFont('Helvetica', 9)
+    c.setFont(_F_REG, 9)
     c.setFillColor(colors.HexColor('#93c5fd'))
     c.drawRightString(PW - RM, PH - 37, 'Buoyancy / Uplift Check — Preliminary, Non-Stamped Calculation')
-    c.setFont('Helvetica', 7)
+    c.setFont(_F_REG, 7)
     c.setFillColor(colors.HexColor('#94a3b8'))
     c.drawRightString(PW - RM, PH - 50, generated_str)
 
@@ -2285,7 +2319,7 @@ def build_buoyancy_pdf(inputs, results, project_name=None):
 
     if project_name:
         c.setFillColor(GRAY)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_BOLD, 9)
         c.drawString(LM, y, f'Project: {project_name}')
         y -= 16
 
@@ -2294,7 +2328,7 @@ def build_buoyancy_pdf(inputs, results, project_name=None):
         c.setFillColor(BLUE)
         c.rect(LM, y_top - bar_h, CW, bar_h, fill=1, stroke=0)
         c.setFillColor(WHITE)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_HEAD, 9)
         c.drawString(LM + 8, y_top - bar_h + 4, title)
 
         n = len(rows)
@@ -2315,10 +2349,10 @@ def build_buoyancy_pdf(inputs, results, project_name=None):
             x = LM + 10 + col * col_w
             ry = box_top - 14 - row_idx * row_h
             c.setFillColor(GRAY)
-            c.setFont('Helvetica', 7)
+            c.setFont(_F_REG, 7)
             c.drawString(x, ry, str(lbl).upper())
             c.setFillColor(BLACK)
-            c.setFont('Helvetica-Bold', 8.5)
+            c.setFont(_F_BOLD, 8.5)
             c.drawString(x, ry - 11, str(val))
         return box_bottom - 8
 
@@ -2378,13 +2412,13 @@ def build_buoyancy_pdf(inputs, results, project_name=None):
     c.setLineWidth(1)
     c.rect(LM, hero_bottom, CW, hero_h, fill=1, stroke=1)
     c.setFillColor(BLACK)
-    c.setFont('Helvetica-Bold', 30)
+    c.setFont(_F_BOLD, 30)
     c.drawCentredString(PW / 2, hero_bottom + 40, fos_display)
     c.setFillColor(GRAY)
-    c.setFont('Helvetica', 8)
+    c.setFont(_F_REG, 8)
     c.drawCentredString(PW / 2, hero_bottom + 26, f"Factor of Safety  (min. required: {results.get('min_fos')})")
     c.setFillColor(hero_txt)
-    c.setFont('Helvetica-Bold', 12)
+    c.setFont(_F_BOLD, 12)
     c.drawCentredString(PW / 2, hero_bottom + 8, status)
 
     y = hero_bottom - 10
@@ -2401,7 +2435,7 @@ def build_buoyancy_pdf(inputs, results, project_name=None):
         c.setFillColor(BLUE)
         c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
         c.setFillColor(WHITE)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_HEAD, 9)
         c.drawString(LM + 8, y - bar_h + 4, 'CROSS-SECTION (NOT TO SCALE)')
         diagram_top = y - bar_h
         diagram_bottom = diagram_top - diagram_h
@@ -2449,7 +2483,7 @@ def _draw_section_kv(c, y_top, title, rows, ncols=2):
     c.setFillColor(BLUE)
     c.rect(LM, y_top - bar_h, CW, bar_h, fill=1, stroke=0)
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 9)
+    c.setFont(_F_HEAD, 9)
     c.drawString(LM + 8, y_top - bar_h + 4, title)
 
     n = len(rows)
@@ -2470,10 +2504,10 @@ def _draw_section_kv(c, y_top, title, rows, ncols=2):
         x = LM + 10 + col * col_w
         ry = box_top - 14 - row_idx * row_h
         c.setFillColor(GRAY)
-        c.setFont('Helvetica', 7)
+        c.setFont(_F_REG, 7)
         c.drawString(x, ry, str(lbl).upper())
         c.setFillColor(BLACK)
-        c.setFont('Helvetica-Bold', 8.5)
+        c.setFont(_F_BOLD, 8.5)
         c.drawString(x, ry - 11, str(val))
     return box_bottom - 8
 
@@ -2493,13 +2527,13 @@ def _draw_fos_hero(c, y_top, value_display, sub_label, status, hero_h=64):
     c.setLineWidth(1)
     c.rect(LM, hero_bottom, CW, hero_h, fill=1, stroke=1)
     c.setFillColor(BLACK)
-    c.setFont('Helvetica-Bold', 24)
+    c.setFont(_F_BOLD, 24)
     c.drawCentredString(PW / 2, hero_bottom + hero_h - 26, value_display)
     c.setFillColor(GRAY)
-    c.setFont('Helvetica', 7.5)
+    c.setFont(_F_REG, 7.5)
     c.drawCentredString(PW / 2, hero_bottom + hero_h - 40, sub_label)
     c.setFillColor(txt)
-    c.setFont('Helvetica-Bold', 11)
+    c.setFont(_F_BOLD, 11)
     c.drawCentredString(PW / 2, hero_bottom + 8, status)
     return hero_bottom - 8
 
@@ -2522,19 +2556,19 @@ def build_loading_truck_pdf(inputs, results, project_name=None):
         except Exception:
             pass
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 14)
+    c.setFont(_F_HEAD, 14)
     c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
-    c.setFont('Helvetica', 9)
+    c.setFont(_F_REG, 9)
     c.setFillColor(colors.HexColor('#93c5fd'))
     c.drawRightString(PW - RM, PH - 37, f"Loading Model — Truck ({results['traffic_load']}), ASTM F2787")
-    c.setFont('Helvetica', 7)
+    c.setFont(_F_REG, 7)
     c.setFillColor(colors.HexColor('#94a3b8'))
     c.drawRightString(PW - RM, PH - 50, generated_str)
 
     y = PH - band_h - 10
     if project_name:
         c.setFillColor(GRAY)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_BOLD, 9)
         c.drawString(LM, y, f'Project: {project_name}')
         y -= 16
 
@@ -2591,13 +2625,13 @@ def build_loading_truck_pdf(inputs, results, project_name=None):
         c.setLineWidth(1)
         c.rect(box_x, hero_bottom, hero_w, hero_h, fill=1, stroke=1)
         c.setFillColor(BLACK)
-        c.setFont('Helvetica-Bold', 22)
+        c.setFont(_F_BOLD, 22)
         c.drawCentredString(box_x + hero_w / 2, hero_bottom + hero_h - 26, val)
         c.setFillColor(GRAY)
-        c.setFont('Helvetica', 7)
+        c.setFont(_F_REG, 7)
         c.drawCentredString(box_x + hero_w / 2, hero_bottom + hero_h - 39, label)
         c.setFillColor(txt)
-        c.setFont('Helvetica-Bold', 10)
+        c.setFont(_F_BOLD, 10)
         c.drawCentredString(box_x + hero_w / 2, hero_bottom + 8, status)
 
     y = hero_bottom - 10
@@ -2614,7 +2648,7 @@ def build_loading_truck_pdf(inputs, results, project_name=None):
         c.setFillColor(BLUE)
         c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
         c.setFillColor(WHITE)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_HEAD, 9)
         c.drawString(LM + 8, y - bar_h + 4, 'LOAD SPREAD (NOT TO SCALE)')
         diagram_top = y - bar_h
         diagram_bottom = diagram_top - diagram_h
@@ -2681,19 +2715,19 @@ def build_loading_outrigger_pdf(inputs, results, project_name=None):
         except Exception:
             pass
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 14)
+    c.setFont(_F_HEAD, 14)
     c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
-    c.setFont('Helvetica', 9)
+    c.setFont(_F_REG, 9)
     c.setFillColor(colors.HexColor('#93c5fd'))
     c.drawRightString(PW - RM, PH - 37, 'Loading Model — Outrigger / Crane Pad')
-    c.setFont('Helvetica', 7)
+    c.setFont(_F_REG, 7)
     c.setFillColor(colors.HexColor('#94a3b8'))
     c.drawRightString(PW - RM, PH - 50, generated_str)
 
     y = PH - band_h - 10
     if project_name:
         c.setFillColor(GRAY)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_BOLD, 9)
         c.drawString(LM, y, f'Project: {project_name}')
         y -= 16
 
@@ -2732,7 +2766,7 @@ def build_loading_outrigger_pdf(inputs, results, project_name=None):
         c.setFillColor(BLUE)
         c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
         c.setFillColor(WHITE)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_HEAD, 9)
         c.drawString(LM + 8, y - bar_h + 4, 'LOAD SPREAD (NOT TO SCALE)')
         diagram_top = y - bar_h
         diagram_bottom = diagram_top - diagram_h
@@ -2823,16 +2857,16 @@ def _draw_excavation_slope_diagram_pdf(c, x, y_top, w, h, r):
     c.setLineWidth(1.0)
     c.line(x, grade_y, x + w, grade_y)
     c.setFillColor(colors.HexColor('#1e293b'))
-    c.setFont('Helvetica-Bold', 5.5)
+    c.setFont(_F_BOLD, 5.5)
     c.drawString(x + 2, grade_y + 2, 'GRADE')
 
     # dimension labels
     c.setFillColor(NAVY)
-    c.setFont('Helvetica-Bold', 6.5)
+    c.setFont(_F_BOLD, 6.5)
     c.drawCentredString(cx, grade_y + 18, f"{r['top_length_ft']:.1f} ft")
     c.drawCentredString(cx, tank_y - 16, f"{r['bottom_length_ft']:.1f} ft (tank)")
     c.setFillColor(GRAY)
-    c.setFont('Helvetica', 5.5)
+    c.setFont(_F_REG, 5.5)
     c.drawRightString(x + w - 2, (grade_y + tank_y) / 2 + 8, f"{r['slope_ratio']}:1")
     c.drawRightString(x + w - 2, (grade_y + tank_y) / 2 - 2, f"{r['slope_angle_deg']}\u00b0")
     c.drawRightString(x + w - 2, (grade_y + tank_y) / 2 - 12, f"Depth {r['total_depth_ft']:.2f} ft")
@@ -2871,19 +2905,19 @@ def build_excavation_slope_pdf(inputs, results, project_name=None):
         except Exception:
             pass
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 14)
+    c.setFont(_F_HEAD, 14)
     c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
-    c.setFont('Helvetica', 9)
+    c.setFont(_F_REG, 9)
     c.setFillColor(colors.HexColor('#93c5fd'))
     c.drawRightString(PW - RM, PH - 37, 'Excavation Slope — OSHA 29 CFR 1926 Subpart P, Appendix B')
-    c.setFont('Helvetica', 7)
+    c.setFont(_F_REG, 7)
     c.setFillColor(colors.HexColor('#94a3b8'))
     c.drawRightString(PW - RM, PH - 50, generated_str)
 
     y = PH - band_h - 10
     if project_name:
         c.setFillColor(GRAY)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_BOLD, 9)
         c.drawString(LM, y, f'Project: {project_name}')
         y -= 16
 
@@ -2915,7 +2949,7 @@ def build_excavation_slope_pdf(inputs, results, project_name=None):
         c.setFillColor(AMBER)
         c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
         c.setFillColor(WHITE)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_HEAD, 9)
         c.drawString(LM + 8, y - bar_h + 4, 'OSHA FLAGS')
         warn_top = y - bar_h
         line_h = 11
@@ -2928,7 +2962,7 @@ def build_excavation_slope_pdf(inputs, results, project_name=None):
             cur = ''
             for wd in words:
                 test = (cur + ' ' + wd).strip()
-                if stringWidth(test, 'Helvetica', 7.5) <= max_w:
+                if stringWidth(test, _F_REG, 7.5) <= max_w:
                     cur = test
                 else:
                     if cur:
@@ -2943,7 +2977,7 @@ def build_excavation_slope_pdf(inputs, results, project_name=None):
         c.setLineWidth(0.6)
         c.rect(LM, warn_bottom, CW, warn_h, fill=1, stroke=1)
         ty = warn_top - pad - 6
-        c.setFont('Helvetica', 7.5)
+        c.setFont(_F_REG, 7.5)
         c.setFillColor(BLACK)
         for line in wrapped:
             c.drawString(LM + pad, ty, line)
@@ -2959,7 +2993,7 @@ def build_excavation_slope_pdf(inputs, results, project_name=None):
         c.setFillColor(BLUE)
         c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
         c.setFillColor(WHITE)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_HEAD, 9)
         c.drawString(LM + 8, y - bar_h + 4, 'CROSS-SECTION (NOT TO SCALE)')
         diagram_top = y - bar_h
         diagram_bottom = diagram_top - diagram_h
@@ -3059,16 +3093,16 @@ def _draw_stepped_backfill_diagram_pdf(c, x, y_top, w, h, r):
     c.setLineWidth(1.0)
     c.line(x, grade_y, x + w, grade_y)
     c.setFillColor(colors.HexColor('#1e293b'))
-    c.setFont('Helvetica-Bold', 5.5)
+    c.setFont(_F_BOLD, 5.5)
     c.drawString(x + 2, grade_y + 2, 'GRADE')
 
     # dimension labels
     c.setFillColor(NAVY)
-    c.setFont('Helvetica-Bold', 6.5)
+    c.setFont(_F_BOLD, 6.5)
     c.drawCentredString(cx, grade_y + 16, f"{r['outer_length_ft']:.1f} ft")
     c.drawCentredString(cx, tank_y - 16, f"{r['bottom_length_ft']:.1f} ft (tank)")
     c.setFillColor(GRAY)
-    c.setFont('Helvetica', 5.5)
+    c.setFont(_F_REG, 5.5)
     c.drawRightString(x + w - 2, (grade_y + tank_y) / 2 + 6, f"{r['n_steps']} steps")
     c.drawRightString(x + w - 2, (grade_y + tank_y) / 2 - 4, f"Depth {r['total_depth_ft']:.2f} ft")
 
@@ -3107,19 +3141,19 @@ def build_stepped_backfill_pdf(inputs, results, project_name=None):
         except Exception:
             pass
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 14)
+    c.setFont(_F_HEAD, 14)
     c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
-    c.setFont('Helvetica', 9)
+    c.setFont(_F_REG, 9)
     c.setFillColor(colors.HexColor('#93c5fd'))
     c.drawRightString(PW - RM, PH - 37, 'Stepped Perimeter Backfill \u2014 First-Principles Geometry')
-    c.setFont('Helvetica', 7)
+    c.setFont(_F_REG, 7)
     c.setFillColor(colors.HexColor('#94a3b8'))
     c.drawRightString(PW - RM, PH - 50, generated_str)
 
     y = PH - band_h - 10
     if project_name:
         c.setFillColor(GRAY)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_BOLD, 9)
         c.drawString(LM, y, f'Project: {project_name}')
         y -= 16
 
@@ -3149,7 +3183,7 @@ def build_stepped_backfill_pdf(inputs, results, project_name=None):
         c.setFillColor(AMBER)
         c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
         c.setFillColor(WHITE)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_HEAD, 9)
         c.drawString(LM + 8, y - bar_h + 4, 'OSHA FLAGS')
         warn_top = y - bar_h
         line_h = 11
@@ -3162,7 +3196,7 @@ def build_stepped_backfill_pdf(inputs, results, project_name=None):
             cur = ''
             for wd in words:
                 test = (cur + ' ' + wd).strip()
-                if stringWidth(test, 'Helvetica', 7.5) <= max_w:
+                if stringWidth(test, _F_REG, 7.5) <= max_w:
                     cur = test
                 else:
                     if cur:
@@ -3177,7 +3211,7 @@ def build_stepped_backfill_pdf(inputs, results, project_name=None):
         c.setLineWidth(0.6)
         c.rect(LM, warn_bottom, CW, warn_h, fill=1, stroke=1)
         ty = warn_top - pad - 6
-        c.setFont('Helvetica', 7.5)
+        c.setFont(_F_REG, 7.5)
         c.setFillColor(BLACK)
         for line in wrapped:
             c.drawString(LM + pad, ty, line)
@@ -3193,7 +3227,7 @@ def build_stepped_backfill_pdf(inputs, results, project_name=None):
         c.setFillColor(BLUE)
         c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
         c.setFillColor(WHITE)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_HEAD, 9)
         c.drawString(LM + 8, y - bar_h + 4, 'CROSS-SECTION (NOT TO SCALE)')
         diagram_top = y - bar_h
         diagram_bottom = diagram_top - diagram_h
@@ -3252,7 +3286,7 @@ def _draw_min_cover_gauge_pdf(c, x, y_top, w, h, r):
     c.line(bar_right, bar_y - 14, bar_right, bar_y + 14)
 
     c.setFillColor(colors.HexColor('#334155'))
-    c.setFont('Helvetica-Bold', 7)
+    c.setFont(_F_BOLD, 7)
     c.drawCentredString(bar_left, bar_y - 22, f"Min {min_ft:.2f} ft")
     label = f"Max {max_ft:.1f} ft"
     if r['layers'] > 1:
@@ -3272,12 +3306,12 @@ def _draw_min_cover_gauge_pdf(c, x, y_top, w, h, r):
     tri.lineTo(mx, bar_y + 27)
     tri.close()
     c.drawPath(tri, fill=1, stroke=0)
-    c.setFont('Helvetica-Bold', 8)
+    c.setFont(_F_BOLD, 8)
     c.drawCentredString(mx, bar_y + 34, f"Proposed: {cover_ft:.2f} ft")
 
     if r['layers'] > 1:
         c.setFillColor(GRAY)
-        c.setFont('Helvetica', 6.5)
+        c.setFont(_F_REG, 6.5)
         c.drawCentredString(x + w / 2.0, y_top - h + 4, "* single-layer figure \u2014 not Wavin-verified for multi-layer tanks")
 
 
@@ -3311,19 +3345,19 @@ def build_min_cover_burial_pdf(inputs, results, project_name=None):
         except Exception:
             pass
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 14)
+    c.setFont(_F_HEAD, 14)
     c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
-    c.setFont('Helvetica', 9)
+    c.setFont(_F_REG, 9)
     c.setFillColor(colors.HexColor('#93c5fd'))
     c.drawRightString(PW - RM, PH - 37, 'Min Cover / Burial Depth \u2014 Wavin AQ-100-08, Rev 2')
-    c.setFont('Helvetica', 7)
+    c.setFont(_F_REG, 7)
     c.setFillColor(colors.HexColor('#94a3b8'))
     c.drawRightString(PW - RM, PH - 50, generated_str)
 
     y = PH - band_h - 10
     if project_name:
         c.setFillColor(GRAY)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_BOLD, 9)
         c.drawString(LM, y, f'Project: {project_name}')
         y -= 16
 
@@ -3351,7 +3385,7 @@ def build_min_cover_burial_pdf(inputs, results, project_name=None):
         c.setFillColor(AMBER)
         c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
         c.setFillColor(WHITE)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_HEAD, 9)
         c.drawString(LM + 8, y - bar_h + 4, 'FLAGS')
         warn_top = y - bar_h
         line_h = 11
@@ -3364,7 +3398,7 @@ def build_min_cover_burial_pdf(inputs, results, project_name=None):
             cur = ''
             for wd in words:
                 test = (cur + ' ' + wd).strip()
-                if stringWidth(test, 'Helvetica', 7.5) <= max_w:
+                if stringWidth(test, _F_REG, 7.5) <= max_w:
                     cur = test
                 else:
                     if cur:
@@ -3379,7 +3413,7 @@ def build_min_cover_burial_pdf(inputs, results, project_name=None):
         c.setLineWidth(0.6)
         c.rect(LM, warn_bottom, CW, warn_h, fill=1, stroke=1)
         ty = warn_top - pad - 6
-        c.setFont('Helvetica', 7.5)
+        c.setFont(_F_REG, 7.5)
         c.setFillColor(BLACK)
         for line in wrapped:
             c.drawString(LM + pad, ty, line)
@@ -3395,7 +3429,7 @@ def build_min_cover_burial_pdf(inputs, results, project_name=None):
         c.setFillColor(BLUE)
         c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
         c.setFillColor(WHITE)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_HEAD, 9)
         c.drawString(LM + 8, y - bar_h + 4, 'COMPLIANCE GAUGE (NOT TO SCALE)')
         diagram_top = y - bar_h
         diagram_bottom = diagram_top - diagram_h
@@ -3463,24 +3497,24 @@ def _draw_min_dist_struct_diagram_pdf(c, x0, y0, w_area, h_area, r):
     # Finish grade line
     c.setStrokeColor(GRAY); c.setLineWidth(0.8); c.setDash()
     c.line(X(0), grade_y, X(total_w_ft), grade_y)
-    c.setFillColor(GRAY); c.setFont('Helvetica', 6.5)
+    c.setFillColor(GRAY); c.setFont(_F_REG, 6.5)
     c.drawString(X(0), grade_y + 3, 'FINISH GRADE')
 
     # Adjacent structure (foundation) block
     c.setFillColor(MGRAY); c.setStrokeColor(GRAY); c.setLineWidth(0.7)
     c.rect(X(0), Y(h1), (found_face_x) * s, h1 * s, fill=1, stroke=1)
-    c.setFillColor(BLACK); c.setFont('Helvetica-Bold', 6.5)
+    c.setFillColor(BLACK); c.setFont(_F_BOLD, 6.5)
     c.drawCentredString(X(found_face_x / 2.0), Y(h1 / 2.0), 'STRUCTURE')
-    c.setFont('Helvetica', 6)
+    c.setFont(_F_REG, 6)
     c.drawCentredString(X(found_face_x / 2.0), Y(h1 / 2.0) - 8, f'H1 = {h1:.2f} ft')
 
     # Tank block (starts at required setback from foundation face)
     tank_left = found_face_x + max(l_min, 0.0)
     c.setFillColor(LTBLUE); c.setStrokeColor(BLUE); c.setLineWidth(0.9)
     c.rect(X(tank_left), Y(h2), tank_w * s, (h2 - 0.0) * s, fill=1, stroke=1)
-    c.setFillColor(DKBLUE); c.setFont('Helvetica-Bold', 6.5)
+    c.setFillColor(DKBLUE); c.setFont(_F_BOLD, 6.5)
     c.drawCentredString(X(tank_left + tank_w / 2.0), Y(h2 * 0.5), 'AquaCell')
-    c.setFillColor(BLACK); c.setFont('Helvetica', 6)
+    c.setFillColor(BLACK); c.setFont(_F_REG, 6)
     c.drawCentredString(X(tank_left + tank_w / 2.0), Y(h2 * 0.5) - 8, f'H2 = {h2:.2f} ft')
 
     # Wedge line: from tank base (tank_left, h2) up to grade at angle 'a'.
@@ -3488,7 +3522,7 @@ def _draw_min_dist_struct_diagram_pdf(c, x0, y0, w_area, h_area, r):
     c.setStrokeColor(RED); c.setLineWidth(1.3); c.setDash(3, 2)
     c.line(X(tank_left), Y(h2), X(found_face_x), Y(0))
     c.setDash()
-    c.setFillColor(RED); c.setFont('Helvetica-Oblique', 6)
+    c.setFillColor(RED); c.setFont(_F_OBL, 6)
     c.drawString(X((tank_left + found_face_x) / 2.0) + 2,
                  Y(h2 / 2.0) + 2, f'wedge {angle:.0f}\u00b0')
 
@@ -3498,7 +3532,7 @@ def _draw_min_dist_struct_diagram_pdf(c, x0, y0, w_area, h_area, r):
     c.line(X(found_face_x), dim_y, X(tank_left), dim_y)
     for xx in (found_face_x, tank_left):
         c.line(X(xx), dim_y - 3, X(xx), dim_y + 3)
-    c.setFillColor(DKBLUE); c.setFont('Helvetica-Bold', 7)
+    c.setFillColor(DKBLUE); c.setFont(_F_BOLD, 7)
     c.drawCentredString(X((found_face_x + tank_left) / 2.0), dim_y - 10,
                         f'L min = {l_min:.2f} ft')
 
@@ -3522,19 +3556,19 @@ def build_min_dist_struct_pdf(inputs, results, project_name=None):
         except Exception:
             pass
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 14)
+    c.setFont(_F_HEAD, 14)
     c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
-    c.setFont('Helvetica', 9)
+    c.setFont(_F_REG, 9)
     c.setFillColor(colors.HexColor('#93c5fd'))
     c.drawRightString(PW - RM, PH - 37, 'Min Distance from Structure \u2014 Foundation Setback')
-    c.setFont('Helvetica', 7)
+    c.setFont(_F_REG, 7)
     c.setFillColor(colors.HexColor('#94a3b8'))
     c.drawRightString(PW - RM, PH - 50, generated_str)
 
     y = PH - band_h - 10
     if project_name:
         c.setFillColor(GRAY)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_BOLD, 9)
         c.drawString(LM, y, f'Project: {project_name}')
         y -= 16
 
@@ -3565,7 +3599,7 @@ def build_min_dist_struct_pdf(inputs, results, project_name=None):
     y = _draw_section_kv(c, y, 'RESULTS', res_rows, ncols=2)
 
     # Formula line
-    c.setFillColor(GRAY); c.setFont('Helvetica-Oblique', 7.5)
+    c.setFillColor(GRAY); c.setFont(_F_OBL, 7.5)
     c.drawString(LM, y - 2, 'Method: L min = (H2 \u2212 H1) \u00d7 tan(90\u00b0 \u2212 a) = (H2 \u2212 H1) \u00f7 tan(a). '
                  'Internal Wavin method (no standalone drawing number).')
     y -= 16
@@ -3576,7 +3610,7 @@ def build_min_dist_struct_pdf(inputs, results, project_name=None):
         bar_h = 16
         c.setFillColor(AMBER)
         c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
-        c.setFillColor(WHITE); c.setFont('Helvetica-Bold', 9)
+        c.setFillColor(WHITE); c.setFont(_F_HEAD, 9)
         c.drawString(LM + 8, y - bar_h + 4, 'NOTES / FLAGS')
         warn_top = y - bar_h
         line_h = 11; pad = 8
@@ -3587,7 +3621,7 @@ def build_min_dist_struct_pdf(inputs, results, project_name=None):
             words = w_text.split(); cur = ''
             for wd in words:
                 test = (cur + ' ' + wd).strip()
-                if stringWidth(test, 'Helvetica', 7.5) <= max_w:
+                if stringWidth(test, _F_REG, 7.5) <= max_w:
                     cur = test
                 else:
                     if cur:
@@ -3600,7 +3634,7 @@ def build_min_dist_struct_pdf(inputs, results, project_name=None):
         c.setFillColor(LTAMB); c.setStrokeColor(AMBER); c.setLineWidth(0.6)
         c.rect(LM, warn_bottom, CW, warn_h, fill=1, stroke=1)
         ty = warn_top - pad - 6
-        c.setFont('Helvetica', 7.5); c.setFillColor(BLACK)
+        c.setFont(_F_REG, 7.5); c.setFillColor(BLACK)
         for line in wrapped:
             c.drawString(LM + pad, ty, line)
             ty -= line_h
@@ -3615,7 +3649,7 @@ def build_min_dist_struct_pdf(inputs, results, project_name=None):
         bar_h = 16
         c.setFillColor(BLUE)
         c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
-        c.setFillColor(WHITE); c.setFont('Helvetica-Bold', 9)
+        c.setFillColor(WHITE); c.setFont(_F_HEAD, 9)
         c.drawString(LM + 8, y - bar_h + 4, 'CROSS-SECTION (NOT TO SCALE)')
         diagram_top = y - bar_h
         diagram_bottom = diagram_top - diagram_h
@@ -3724,7 +3758,7 @@ def _draw_complex_shape_plan_pdf(c, x0, y0, w_area, h_area, results):
 
     # Dimension labels
     c.setFillColor(GRAY)
-    c.setFont('Helvetica', 7)
+    c.setFont(_F_REG, 7)
     c.drawCentredString(ox + shape_w / 2, oy + shape_h + 4,
                         f"{round(width_ft,2)} ft ({max_col} crates)")
     c.saveState()
@@ -3746,7 +3780,7 @@ def _draw_complex_shape_plan_pdf(c, x0, y0, w_area, h_area, results):
     c.setLineWidth(1)
     c.setFillColor(BLACK)
     c.rect(bx, by, bar_px, 4, fill=1, stroke=0)
-    c.setFont('Helvetica', 7)
+    c.setFont(_F_REG, 7)
     c.drawString(bx, by + 8, f"{bar_ft} ft")
     c.setFillColor(GRAY)
     c.drawRightString(x0 + w_area, by + 8,
@@ -3773,12 +3807,12 @@ def build_complex_shape_pdf(inputs, results, project_name=None):
             except Exception:
                 pass
         c.setFillColor(WHITE)
-        c.setFont('Helvetica-Bold', 14)
+        c.setFont(_F_HEAD, 14)
         c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
-        c.setFont('Helvetica', 9)
+        c.setFont(_F_REG, 9)
         c.setFillColor(colors.HexColor('#93c5fd'))
         c.drawRightString(PW - RM, PH - 37, subtitle)
-        c.setFont('Helvetica', 7)
+        c.setFont(_F_REG, 7)
         c.setFillColor(colors.HexColor('#94a3b8'))
         c.drawRightString(PW - RM, PH - 50, generated_str)
         return PH - band_h - 10
@@ -3787,7 +3821,7 @@ def build_complex_shape_pdf(inputs, results, project_name=None):
     y = header('Complex Shape Builder \u2014 Conceptual Schematic')
     if project_name:
         c.setFillColor(GRAY)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_BOLD, 9)
         c.drawString(LM, y, f'Project: {project_name}')
         y -= 16
 
@@ -3834,7 +3868,7 @@ def build_complex_shape_pdf(inputs, results, project_name=None):
     # ── PAGE 2 ──────────────────────────────────────────────────────
     y = header('Conceptual Plan View (Top-Down)')
     c.setFillColor(GRAY)
-    c.setFont('Helvetica-Bold', 10)
+    c.setFont(_F_BOLD, 10)
     title_bits = f"AquaCell {results['config']} | {results['bounding_width_ft']} x {results['bounding_length_ft']} ft | {results['total_crates_layer']:,} crates/layer"
     c.drawString(LM, y, title_bits)
     y -= 6
@@ -3843,7 +3877,7 @@ def build_complex_shape_pdf(inputs, results, project_name=None):
     c.setFillColor(BLUE)
     c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 9)
+    c.setFont(_F_HEAD, 9)
     c.drawString(LM + 8, y - bar_h + 4, 'PLAN VIEW \u2014 SHADED = CRATE MODULES, BLUE OUTLINE = PERIMETER')
     box_top = y - bar_h
 
@@ -4485,19 +4519,19 @@ def build_crate_comparison_pdf(inputs, results, project_name=None):
         except Exception:
             pass
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 14)
+    c.setFont(_F_HEAD, 14)
     c.drawRightString(PW - RM, PH - 24, 'AquaCell Design Verification Dashboard')
-    c.setFont('Helvetica', 9)
+    c.setFont(_F_REG, 9)
     c.setFillColor(colors.HexColor('#93c5fd'))
     c.drawRightString(PW - RM, PH - 37, 'Crate Comparison (BETA) - Value-Engineering Estimate')
-    c.setFont('Helvetica', 7)
+    c.setFont(_F_REG, 7)
     c.setFillColor(colors.HexColor('#94a3b8'))
     c.drawRightString(PW - RM, PH - 50, generated_str)
 
     y = PH - band_h - 10
     if project_name:
         c.setFillColor(GRAY)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_BOLD, 9)
         c.drawString(LM, y, f'Project: {project_name}')
         y -= 16
 
@@ -4520,7 +4554,7 @@ def build_crate_comparison_pdf(inputs, results, project_name=None):
         c.setFillColor(AMBER)
         c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
         c.setFillColor(WHITE)
-        c.setFont('Helvetica-Bold', 8.5)
+        c.setFont(_F_BOLD, 8.5)
         c.drawString(LM + 8, y - bar_h + 4,
                      'ESTIMATED - competitor system is a preliminary estimate, NOT a manufacturer-engineered design.')
         y -= (bar_h + 8)
@@ -4530,7 +4564,7 @@ def build_crate_comparison_pdf(inputs, results, project_name=None):
     c.setFillColor(BLUE)
     c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 9)
+    c.setFont(_F_HEAD, 9)
     c.drawString(LM + 8, y - bar_h + 4, 'SIDE-BY-SIDE QUANTITIES (NO COST)')
     y -= bar_h
 
@@ -4555,7 +4589,7 @@ def build_crate_comparison_pdf(inputs, results, project_name=None):
     c.setFillColor(MGRAY)
     c.rect(LM, y - header_h, CW, header_h, fill=1, stroke=0)
     c.setFillColor(BLACK)
-    c.setFont('Helvetica-Bold', 7.5)
+    c.setFont(_F_BOLD, 7.5)
     c.drawString(col_metric, y - header_h + 4, 'METRIC')
     c.drawString(col_aq, y - header_h + 4, 'AQUACELL')
     c.drawString(col_cp, y - header_h + 4, 'COMPETITOR')
@@ -4569,9 +4603,9 @@ def build_crate_comparison_pdf(inputs, results, project_name=None):
         c.setLineWidth(0.5)
         c.rect(LM, y - rh, CW, rh, fill=1, stroke=1)
         c.setFillColor(BLACK)
-        c.setFont('Helvetica', 8)
+        c.setFont(_F_REG, 8)
         c.drawString(col_metric, y - rh + 5, metric)
-        c.setFont('Helvetica-Bold', 8)
+        c.setFont(_F_BOLD, 8)
         c.drawString(col_aq, y - rh + 5, aqv)
         c.drawString(col_cp, y - rh + 5, cpv)
         d_val = dl.get('d', 0)
@@ -4601,10 +4635,10 @@ def build_crate_comparison_pdf(inputs, results, project_name=None):
     c.setFillColor(GRAY)
     for i, ln in enumerate(note_lines):
         if i == 0:
-            c.setFont('Helvetica-Bold', 8)
+            c.setFont(_F_BOLD, 8)
             c.setFillColor(BLACK)
         else:
-            c.setFont('Helvetica', 7)
+            c.setFont(_F_REG, 7)
             c.setFillColor(GRAY)
         c.drawString(LM, y, ln)
         y -= 10
@@ -4662,19 +4696,19 @@ def build_site_overlay_pdf(image_data_url, project_name=None, meta=None):
         except Exception:
             pass
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 14)
+    c.setFont(_F_HEAD, 14)
     c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
-    c.setFont('Helvetica', 9)
+    c.setFont(_F_REG, 9)
     c.setFillColor(colors.HexColor('#93c5fd'))
     c.drawRightString(PW - RM, PH - 37, 'Site Overlay \u2014 Conceptual Submittal')
-    c.setFont('Helvetica', 7)
+    c.setFont(_F_REG, 7)
     c.setFillColor(colors.HexColor('#94a3b8'))
     c.drawRightString(PW - RM, PH - 50, generated_str)
     y = PH - band_h - 10
 
     if project_name:
         c.setFillColor(GRAY)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_BOLD, 9)
         c.drawString(LM, y, f'Project: {project_name}')
         y -= 15
 
@@ -4686,7 +4720,7 @@ def build_site_overlay_pdf(image_data_url, project_name=None, meta=None):
     if tanks_meta is None:
         tanks_meta = [meta] if (meta.get('config') or meta.get('tank_wl') or meta.get('view_mode')) else []
 
-    CAPTION_FONT, CAPTION_SIZE, CAPTION_LINE_H = 'Helvetica-Bold', 10, 13
+    CAPTION_FONT, CAPTION_SIZE, CAPTION_LINE_H = _F_BOLD, 10, 13
     caption_max_width = CW - 4  # small margin so text never touches the edge
 
     def _fit_caption_line(text):
@@ -4746,7 +4780,7 @@ def build_site_overlay_pdf(image_data_url, project_name=None, meta=None):
     c.setFillColor(BLUE)
     c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 9)
+    c.setFont(_F_HEAD, 9)
     c.drawString(LM + 8, y - bar_h + 4,
                  'CONCEPTUAL SITE OVERLAY \u2014 SHADED = AQUACELL FOOTPRINT (NOT TO SCALE)')
     box_top = y - bar_h
@@ -4778,7 +4812,7 @@ def build_site_overlay_pdf(image_data_url, project_name=None, meta=None):
                         preserveAspectRatio=True, mask=None)
     except Exception as exc:
         c.setFillColor(colors.HexColor('#b91c1c'))
-        c.setFont('Helvetica-Bold', 10)
+        c.setFont(_F_BOLD, 10)
         c.drawString(LM + 12, box_bottom + box_h / 2.0,
                      f'Overlay image could not be embedded: {exc}')
 
@@ -5076,19 +5110,19 @@ def build_pt_row_pdf(inputs, results, project_name=None):
         except Exception:
             pass
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 14)
+    c.setFont(_F_HEAD, 14)
     c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
-    c.setFont('Helvetica', 9)
+    c.setFont(_F_REG, 9)
     c.setFillColor(colors.HexColor('#93c5fd'))
     c.drawRightString(PW - RM, PH - 37, 'PT-ROW™ Transparent Sizing Calculator')
-    c.setFont('Helvetica', 7)
+    c.setFont(_F_REG, 7)
     c.setFillColor(colors.HexColor('#94a3b8'))
     c.drawRightString(PW - RM, PH - 50, generated_str)
 
     y = PH - band_h - 10
     if project_name:
         c.setFillColor(GRAY)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_BOLD, 9)
         c.drawString(LM, y, f'Project: {project_name}')
         y -= 16
 
@@ -5146,7 +5180,7 @@ def build_pt_row_pdf(inputs, results, project_name=None):
     c.setFillColor(BLUE)
     c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
     c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 9)
+    c.setFont(_F_HEAD, 9)
     c.drawString(LM + 8, y - bar_h + 4, 'CONDENSED REFERENCE NOTES (SEE AQ-400-01 FOR FULL SPEC)')
     notes_top = y - bar_h
     line_h = 10
@@ -5159,7 +5193,7 @@ def build_pt_row_pdf(inputs, results, project_name=None):
         cur = ''
         for wd in words:
             test = (cur + ' ' + wd).strip()
-            if stringWidth(test, 'Helvetica', 7) <= max_w:
+            if stringWidth(test, _F_REG, 7) <= max_w:
                 cur = test
             else:
                 if cur:
@@ -5174,7 +5208,7 @@ def build_pt_row_pdf(inputs, results, project_name=None):
     c.setLineWidth(0.5)
     c.rect(LM, notes_bottom, CW, notes_h, fill=1, stroke=1)
     ty = notes_top - pad - 6
-    c.setFont('Helvetica', 7)
+    c.setFont(_F_REG, 7)
     c.setFillColor(BLACK)
     for line in wrapped:
         c.drawString(LM + pad, ty, line)
@@ -5222,18 +5256,18 @@ def build_stage_storage_pdf(summary, rows, chart_data_url, project_name=None):
             except Exception:
                 pass
         c.setFillColor(WHITE)
-        c.setFont('Helvetica-Bold', 14)
+        c.setFont(_F_HEAD, 14)
         c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
-        c.setFont('Helvetica', 9)
+        c.setFont(_F_REG, 9)
         c.setFillColor(colors.HexColor('#93c5fd'))
         c.drawRightString(PW - RM, PH - 37, 'Stage-Storage Report')
-        c.setFont('Helvetica', 7)
+        c.setFont(_F_REG, 7)
         c.setFillColor(colors.HexColor('#94a3b8'))
         c.drawRightString(PW - RM, PH - 50, generated_str)
         y = PH - band_h - 10
         if project_name:
             c.setFillColor(GRAY)
-            c.setFont('Helvetica-Bold', 9)
+            c.setFont(_F_BOLD, 9)
             c.drawString(LM, y, f'Project: {project_name}')
             y -= 16
         return y
@@ -5243,7 +5277,7 @@ def build_stage_storage_pdf(summary, rows, chart_data_url, project_name=None):
         c.setFillColor(BLUE)
         c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
         c.setFillColor(WHITE)
-        c.setFont('Helvetica-Bold', 9)
+        c.setFont(_F_HEAD, 9)
         c.drawString(LM + 8, y - bar_h + 4, title)
         return y - bar_h
 
@@ -5273,14 +5307,14 @@ def build_stage_storage_pdf(summary, rows, chart_data_url, project_name=None):
         ry = y - 14 - idx * line_h
         lbl_w = col_w - 20
         c.setFillColor(GRAY)
-        c.setFont('Helvetica', 7.5)
+        c.setFont(_F_REG, 7.5)
         val_s = str(val)
-        c.setFont('Helvetica-Bold', 8)
-        vw = c.stringWidth(val_s, 'Helvetica-Bold', 8)
-        c.setFont('Helvetica', 7.5)
-        c.drawString(x0, ry, _fit(lbl, 'Helvetica', 7.5, max(20, lbl_w - vw - 8)))
+        c.setFont(_F_BOLD, 8)
+        vw = c.stringWidth(val_s, _F_BOLD, 8)
+        c.setFont(_F_REG, 7.5)
+        c.drawString(x0, ry, _fit(lbl, _F_REG, 7.5, max(20, lbl_w - vw - 8)))
         c.setFillColor(BLACK)
-        c.setFont('Helvetica-Bold', 8)
+        c.setFont(_F_BOLD, 8)
         c.drawRightString(x1, ry, val_s)
     y = y - body_h - 12
 
@@ -5328,7 +5362,7 @@ def build_stage_storage_pdf(summary, rows, chart_data_url, project_name=None):
         c.setFillColor(MGRAY)
         c.rect(LM, yy - row_h, CW, row_h, fill=1, stroke=0)
         c.setFillColor(BLACK)
-        c.setFont('Helvetica-Bold', 8)
+        c.setFont(_F_BOLD, 8)
         for i, h in enumerate(heads):
             c.drawRightString(LM + (i + 1) * cw4 - 10, yy - row_h + 4, h)
         return yy - row_h
@@ -5347,7 +5381,7 @@ def build_stage_storage_pdf(summary, rows, chart_data_url, project_name=None):
         vals = [f'{elev:,.2f}', f'{tank:,.1f}', f'{stone:,.1f}', f'{total:,.1f}']
         for i, v in enumerate(vals):
             c.setFillColor(BLACK)
-            c.setFont('Helvetica-Bold' if i == 3 else 'Helvetica', 8)
+            c.setFont(_F_BOLD if i == 3 else _F_REG, 8)
             c.drawRightString(LM + (i + 1) * cw4 - 10, y - row_h + 4, v)
         y -= row_h
     y -= 12
@@ -5637,7 +5671,7 @@ def multi_download_quote():
                 c.setLineWidth(stroke)
             c.rect(x, y, w, h, fill=1, stroke=1 if stroke else 0)
 
-        def q_text(x, y, text, font='Helvetica', size=8, color=BLACK, align='left'):
+        def q_text(x, y, text, font=_F_REG, size=8, color=BLACK, align='left'):
             c.setFont(font, size)
             c.setFillColor(color)
             if align == 'right':
@@ -5653,9 +5687,9 @@ def multi_download_quote():
             c.showPage()
             cur_y[0] = H - 28
             q_rect(LQ, cur_y[0] - 30, QW, 30, QNY)
-            q_text(W / 2, cur_y[0] - 20, title, 'Helvetica-Bold', 10, WHITE, 'center')
-            q_text(LQ + 4, cur_y[0] - 20, project_name or '—', 'Helvetica', 8, colors.HexColor('#93c5fd'))
-            q_text(LQ + QW - 4, cur_y[0] - 20, generated_str, 'Helvetica', 8, colors.HexColor('#94a3b8'), 'right')
+            q_text(W / 2, cur_y[0] - 20, title, _F_HEAD, 10, WHITE, 'center')
+            q_text(LQ + 4, cur_y[0] - 20, project_name or '—', _F_REG, 8, colors.HexColor('#93c5fd'))
+            q_text(LQ + QW - 4, cur_y[0] - 20, generated_str, _F_REG, 8, colors.HexColor('#94a3b8'), 'right')
             cur_y[0] -= 38
 
         # ── PAGE 1: HEADER ───────────────────────────────────────────
@@ -5668,55 +5702,61 @@ def multi_download_quote():
                             preserveAspectRatio=True, mask='auto')
             except Exception:
                 pass
-        q_text(W / 2, y - 14, 'MULTI-TANK MATERIALS QUOTE', 'Helvetica-Bold', 18, QNY, 'center')
+        # Title font shrinks if needed so it stays clear of the logo and the project-number box.
+        _mq_title = 'MULTI-TANK MATERIALS QUOTE'
+        _mq_tsz = 18
+        _mq_max_w = 2 * min(W / 2 - (LQ + 134), (W - RQ - 134) - W / 2)
+        while _mq_tsz > 10 and c.stringWidth(_mq_title, _F_HEAD, _mq_tsz) > _mq_max_w:
+            _mq_tsz -= 0.5
+        q_text(W / 2, y - 14, _mq_title, _F_HEAD, _mq_tsz, QNY, 'center')
         q_text(W / 2, y - 28, f'{len(tank_results)} Tank(s)  |  Combined AquaCell System',
-               'Helvetica', 9, GRAY, 'center')
+               _F_REG, 9, GRAY, 'center')
         # Project number box — border only, no fill, so it does not mask the title
         c.setStrokeColor(QMGY)
         c.setLineWidth(0.8)
         c.rect(W - RQ - 130, y - 52, 130, 38, fill=0, stroke=1)
-        q_text(W - RQ - 65, y - 28, project_num if project_num else '—', 'Helvetica-Bold', 16, QNY, 'center')
-        q_text(W - RQ - 65, y - 44, 'PROJECT #', 'Helvetica', 7, GRAY, 'center')
+        q_text(W - RQ - 65, y - 28, project_num if project_num else '—', _F_BOLD, 16, QNY, 'center')
+        q_text(W - RQ - 65, y - 44, 'PROJECT #', _F_REG, 7, GRAY, 'center')
         y -= 62
         q_rule(y)
         y -= 4
 
         # Project info grid
-        q_text(LQ,        y - 8,  'CLIENT:',       'Helvetica-Bold', 8, QNY)
-        q_text(LQ + 50,   y - 8,  client or '—',   'Helvetica', 8, BLACK)
-        q_text(W / 2,     y - 8,  'DATE',           'Helvetica-Bold', 8, QNY)
-        q_text(W/2 + 36,  y - 8,  generated_str,    'Helvetica', 8, BLACK)
-        q_text(LQ,        y - 20, 'PROJECT NAME:',  'Helvetica-Bold', 8, QNY)
-        q_text(LQ + 80,   y - 20, project_name or '—', 'Helvetica', 8, BLACK)
-        q_text(W / 2,     y - 20, 'PREPARED BY:',   'Helvetica-Bold', 8, QNY)
-        q_text(W/2 + 92,  y - 20, estimator or '—', 'Helvetica', 8, BLACK)
-        q_text(LQ,        y - 32, 'LOCATION:',      'Helvetica-Bold', 8, QNY)
-        q_text(LQ + 60,   y - 32, location or '—',  'Helvetica', 8, BLACK)
-        q_text(W / 2,     y - 32, 'EMAIL:',         'Helvetica-Bold', 8, QNY)
-        q_text(W/2 + 52,  y - 32, estimator_email or '—', 'Helvetica', 8, BLACK)
-        q_text(LQ,        y - 44, 'SITE ADDRESS:',  'Helvetica-Bold', 8, QNY)
-        q_text(LQ + 78,   y - 44, site_address or '—', 'Helvetica', 8, BLACK)
+        q_text(LQ,        y - 8,  'CLIENT:',       _F_BOLD, 8, QNY)
+        q_text(LQ + 50,   y - 8,  client or '—',   _F_REG, 8, BLACK)
+        q_text(W / 2,     y - 8,  'DATE',           _F_BOLD, 8, QNY)
+        q_text(W/2 + 36,  y - 8,  generated_str,    _F_REG, 8, BLACK)
+        q_text(LQ,        y - 20, 'PROJECT NAME:',  _F_BOLD, 8, QNY)
+        q_text(LQ + 80,   y - 20, project_name or '—', _F_REG, 8, BLACK)
+        q_text(W / 2,     y - 20, 'PREPARED BY:',   _F_BOLD, 8, QNY)
+        q_text(W/2 + 92,  y - 20, estimator or '—', _F_REG, 8, BLACK)
+        q_text(LQ,        y - 32, 'LOCATION:',      _F_BOLD, 8, QNY)
+        q_text(LQ + 60,   y - 32, location or '—',  _F_REG, 8, BLACK)
+        q_text(W / 2,     y - 32, 'EMAIL:',         _F_BOLD, 8, QNY)
+        q_text(W/2 + 52,  y - 32, estimator_email or '—', _F_REG, 8, BLACK)
+        q_text(LQ,        y - 44, 'SITE ADDRESS:',  _F_BOLD, 8, QNY)
+        q_text(LQ + 78,   y - 44, site_address or '—', _F_REG, 8, BLACK)
         y -= 56
         q_rule(y)
         y -= 8
 
         if project_notes.strip():
             q_rect(LQ, y - 14, QW, 14, QNY)
-            q_text(W / 2, y - 10, project_notes[:120], 'Helvetica-Bold', 7, WHITE, 'center')
+            q_text(W / 2, y - 10, project_notes[:120], _F_BOLD, 7, WHITE, 'center')
             y -= 18
 
         # Storage banner
         q_rect(LQ,        y - 28, QW / 2, 28, QNY)
-        q_text(LQ + 6,    y - 10, 'TOTAL AQUACELL TANK STORAGE (ALL TANKS)', 'Helvetica-Bold', 7, WHITE)
-        q_text(LQ + 6,    y - 22, f'{cum["tank_storage"]:,.0f} FT\u00b3', 'Helvetica-Bold', 12, QYLW)
+        q_text(LQ + 6,    y - 10, 'TOTAL AQUACELL TANK STORAGE (ALL TANKS)', _F_BOLD, 7, WHITE)
+        q_text(LQ + 6,    y - 22, f'{cum["tank_storage"]:,.0f} FT\u00b3', _F_BOLD, 12, QYLW)
         q_rect(LQ + QW/2, y - 28, QW / 2, 28, QTBL)
-        q_text(LQ + QW/2 + 6, y - 10, 'COMBINED SYSTEM TOTAL STORAGE (TANK + STONE)', 'Helvetica-Bold', 7, WHITE)
-        q_text(LQ + QW/2 + 6, y - 22, f'{cum["total_storage"]:,.0f} FT\u00b3', 'Helvetica-Bold', 12, WHITE)
+        q_text(LQ + QW/2 + 6, y - 10, 'COMBINED SYSTEM TOTAL STORAGE (TANK + STONE)', _F_BOLD, 7, WHITE)
+        q_text(LQ + QW/2 + 6, y - 22, f'{cum["total_storage"]:,.0f} FT\u00b3', _F_BOLD, 12, WHITE)
         y -= 34
 
         # Per-tank summary table
         q_rect(LQ, y - 14, QW, 14, QNY)
-        q_text(W / 2, y - 10, 'PER-TANK SUMMARY', 'Helvetica-Bold', 8.5, WHITE, 'center')
+        q_text(W / 2, y - 10, 'PER-TANK SUMMARY', _F_BOLD, 8.5, WHITE, 'center')
         y -= 14
 
         # Per-tank summary columns — W×L removed, space redistributed
@@ -5742,40 +5782,40 @@ def multi_download_quote():
         q_rect(LQ, y - 13, QW, 13, colors.HexColor('#1a5276'))
         for lbl, x in hdr_cols:
             if lbl == 'COVER DEPTH':
-                q_text(x, y - 9, lbl, 'Helvetica-Bold', 6.5, WHITE, 'right')
+                q_text(x, y - 9, lbl, _F_BOLD, 6.5, WHITE, 'right')
             else:
-                q_text(x, y - 9, lbl, 'Helvetica-Bold', 6.5, WHITE)
+                q_text(x, y - 9, lbl, _F_BOLD, 6.5, WHITE)
         y -= 13
 
         for i, r in enumerate(tank_results):
             shade = QLGY if i % 2 == 0 else WHITE
             cov_str = f"{r['cover_depth']} ft  {'OK' if r['cover_ok'] else 'FAIL'}"
             q_rect(LQ, y - 13, QW, 13, shade)
-            q_text(col_lbl, y - 9, r['tank_label'][:16],            'Helvetica-Bold', 7, QNY)
-            q_text(col_cfg, y - 9, f"{r['config']}-{r['layers']}", 'Helvetica', 7, BLACK)
-            q_text(col_ht,  y - 9, f"{r['tank_height']}",          'Helvetica', 7, BLACK)
-            q_text(col_sto, y - 9, f"{r['tank_storage']:,.0f}",     'Helvetica-Bold', 7, QNY)
-            q_text(col_bu,  y - 9, str(r['base_units']),            'Helvetica', 7, BLACK)
-            q_text(col_sp,  y - 9, str(r['side_plates']),           'Helvetica', 7, BLACK)
-            q_text(col_bp,  y - 9, str(r['bottom_plates']),         'Helvetica', 7, BLACK)
-            q_text(col_cov, y - 9, cov_str, 'Helvetica', 7,
+            q_text(col_lbl, y - 9, r['tank_label'][:16],            _F_BOLD, 7, QNY)
+            q_text(col_cfg, y - 9, f"{r['config']}-{r['layers']}", _F_REG, 7, BLACK)
+            q_text(col_ht,  y - 9, f"{r['tank_height']}",          _F_REG, 7, BLACK)
+            q_text(col_sto, y - 9, f"{r['tank_storage']:,.0f}",     _F_BOLD, 7, QNY)
+            q_text(col_bu,  y - 9, str(r['base_units']),            _F_REG, 7, BLACK)
+            q_text(col_sp,  y - 9, str(r['side_plates']),           _F_REG, 7, BLACK)
+            q_text(col_bp,  y - 9, str(r['bottom_plates']),         _F_REG, 7, BLACK)
+            q_text(col_cov, y - 9, cov_str, _F_REG, 7,
                    GREEN if r['cover_ok'] else RED, 'right')
             y -= 13
 
         # Totals row
         q_rect(LQ, y - 14, QW, 14, colors.HexColor('#1e3a8a'))
-        q_text(col_lbl, y - 10, f"TOTAL ({len(tank_results)} TANKS)", 'Helvetica-Bold', 7, WHITE)
-        q_text(col_sto, y - 10, f"{cum['tank_storage']:,.0f}", 'Helvetica-Bold', 8, QYLW)
-        q_text(col_bu,  y - 10, str(cum['base_units']),    'Helvetica-Bold', 7, WHITE)
-        q_text(col_sp,  y - 10, str(cum['side_plates']),   'Helvetica-Bold', 7, WHITE)
-        q_text(col_bp,  y - 10, str(cum['bottom_plates']), 'Helvetica-Bold', 7, WHITE)
+        q_text(col_lbl, y - 10, f"TOTAL ({len(tank_results)} TANKS)", _F_BOLD, 7, WHITE)
+        q_text(col_sto, y - 10, f"{cum['tank_storage']:,.0f}", _F_BOLD, 8, QYLW)
+        q_text(col_bu,  y - 10, str(cum['base_units']),    _F_BOLD, 7, WHITE)
+        q_text(col_sp,  y - 10, str(cum['side_plates']),   _F_BOLD, 7, WHITE)
+        q_text(col_bp,  y - 10, str(cum['bottom_plates']), _F_BOLD, 7, WHITE)
         y -= 20
 
         # Cumulative BOM section
         q_rect(LQ, y - 14, QW, 14, QNY)
         q_text(W / 2, y - 10,
                'CUMULATIVE BILL OF MATERIALS \u2014 AQUACELL COMPONENTS',
-               'Helvetica-Bold', 8.5, WHITE, 'center')
+               _F_BOLD, 8.5, WHITE, 'center')
         y -= 14
 
         bom_col_ln  = LQ + 4;   bom_col_pc = LQ + 32
@@ -5787,9 +5827,9 @@ def multi_download_quote():
                         ('DESCRIPTION', bom_col_ds), ('QTY', bom_col_qt),
                         ('UNITS', bom_col_un), ('WEIGHT (lbs)', bom_col_wt)]:
             if lbl == 'WEIGHT (lbs)':
-                q_text(x, y - 9, lbl, 'Helvetica-Bold', 6.5, WHITE, 'right')
+                q_text(x, y - 9, lbl, _F_BOLD, 6.5, WHITE, 'right')
             else:
-                q_text(x, y - 9, lbl, 'Helvetica-Bold', 6.5, WHITE)
+                q_text(x, y - 9, lbl, _F_BOLD, 6.5, WHITE)
         y -= 13
 
         wt_map = {
@@ -5814,17 +5854,17 @@ def multi_download_quote():
             _, wt_each = wt_map.get(wkey, ('', 0))
             row_wt = round(qt * wt_each, 1) if qt else 0
             total_weight_all += row_wt
-            q_text(bom_col_ln, y - 9, ln,  'Helvetica', 7, BLACK)
-            q_text(bom_col_pc, y - 9, pc,  'Helvetica', 7, BLACK)
-            q_text(bom_col_ds, y - 9, ds,  'Helvetica', 7, BLACK)
-            q_text(bom_col_qt + 30, y - 9, str(qt) if qt else '0', 'Helvetica-Bold', 7.5, QNY, 'right')
-            q_text(bom_col_un, y - 9, un,  'Helvetica', 7, BLACK)
-            q_text(bom_col_wt, y - 9, f'{row_wt:,.1f}', 'Helvetica', 7, GRAY, 'right')
+            q_text(bom_col_ln, y - 9, ln,  _F_REG, 7, BLACK)
+            q_text(bom_col_pc, y - 9, pc,  _F_REG, 7, BLACK)
+            q_text(bom_col_ds, y - 9, ds,  _F_REG, 7, BLACK)
+            q_text(bom_col_qt + 30, y - 9, str(qt) if qt else '0', _F_BOLD, 7.5, QNY, 'right')
+            q_text(bom_col_un, y - 9, un,  _F_REG, 7, BLACK)
+            q_text(bom_col_wt, y - 9, f'{row_wt:,.1f}', _F_REG, 7, GRAY, 'right')
             y -= 13
 
         q_rect(LQ, y - 13, QW, 13, colors.HexColor('#1e3a8a'))
-        q_text(bom_col_ds, y - 9, 'COMBINED SYSTEM WEIGHT', 'Helvetica-Bold', 7.5, WHITE)
-        q_text(bom_col_wt, y - 9, f'{total_weight_all:,.1f} lbs', 'Helvetica-Bold', 8, QYLW, 'right')
+        q_text(bom_col_ds, y - 9, 'COMBINED SYSTEM WEIGHT', _F_BOLD, 7.5, WHITE)
+        q_text(bom_col_wt, y - 9, f'{total_weight_all:,.1f} lbs', _F_BOLD, 8, QYLW, 'right')
         y -= 18
 
         # ════════════════════════════════════════
@@ -5834,7 +5874,7 @@ def multi_download_quote():
         q_rect(LQ, y - 13, QW, 13, QRED_MT2)
         q_text(W / 2, y - 9,
                'RECOMMENDED BY WAVIN — PROVIDED BY OTHERS  (ESTIMATES FOR REFERENCE ONLY — SUBJECT TO VERIFICATION)',
-               'Helvetica-Bold', 7, WHITE, 'center')
+               _F_BOLD, 7, WHITE, 'center')
         y -= 13
 
         # Others table header — LINE, DESCRIPTION, QUANTITY, UNITS
@@ -5844,10 +5884,10 @@ def multi_download_quote():
         oth_col_un  = LQ + QW - 4
 
         q_rect(LQ, y - 13, QW, 13, colors.HexColor('#922b21'))
-        q_text(oth_col_ln, y - 9, 'LINE',        'Helvetica-Bold', 6.5, WHITE)
-        q_text(oth_col_ds, y - 9, 'DESCRIPTION', 'Helvetica-Bold', 6.5, WHITE)
-        q_text(oth_col_qt, y - 9, 'QUANTITY',    'Helvetica-Bold', 6.5, WHITE, 'right')
-        q_text(oth_col_un, y - 9, 'UNITS',       'Helvetica-Bold', 6.5, WHITE, 'right')
+        q_text(oth_col_ln, y - 9, 'LINE',        _F_BOLD, 6.5, WHITE)
+        q_text(oth_col_ds, y - 9, 'DESCRIPTION', _F_BOLD, 6.5, WHITE)
+        q_text(oth_col_qt, y - 9, 'QUANTITY',    _F_BOLD, 6.5, WHITE, 'right')
+        q_text(oth_col_un, y - 9, 'UNITS',       _F_BOLD, 6.5, WHITE, 'right')
         y -= 13
 
         # Cumulative geo conversion ft² → yd²
@@ -5922,18 +5962,18 @@ def multi_download_quote():
             shade = QLGY if i % 2 == 0 else WHITE
             rh = 20 if len(ds) > max_ds_chars else 13
             q_rect(LQ, y - rh, QW, rh, shade)
-            q_text(oth_col_ln, y - (rh // 2) - 2, ln, 'Helvetica-Bold', 7, colors.HexColor('#922b21'))
+            q_text(oth_col_ln, y - (rh // 2) - 2, ln, _F_BOLD, 7, colors.HexColor('#922b21'))
             if len(ds) <= max_ds_chars:
-                q_text(oth_col_ds, y - (rh // 2) - 2, ds, 'Helvetica', 7, BLACK)
+                q_text(oth_col_ds, y - (rh // 2) - 2, ds, _F_REG, 7, BLACK)
             else:
                 split = ds.rfind(' ', 0, max_ds_chars)
                 if split == -1:
                     split = max_ds_chars
-                q_text(oth_col_ds, y - 5,  ds[:split],      'Helvetica', 6.5, BLACK)
-                q_text(oth_col_ds, y - 13, ds[split+1:],    'Helvetica', 6.5, BLACK)
+                q_text(oth_col_ds, y - 5,  ds[:split],      _F_REG, 6.5, BLACK)
+                q_text(oth_col_ds, y - 13, ds[split+1:],    _F_REG, 6.5, BLACK)
             q_text(oth_col_qt, y - (rh // 2) - 2, str(qt) if qt else '0',
-                   'Helvetica-Bold', 7.5, colors.HexColor('#922b21'), 'right')
-            q_text(oth_col_un, y - (rh // 2) - 2, un, 'Helvetica', 7, BLACK, 'right')
+                   _F_BOLD, 7.5, colors.HexColor('#922b21'), 'right')
+            q_text(oth_col_un, y - (rh // 2) - 2, un, _F_REG, 7, BLACK, 'right')
             y -= rh
 
         y -= 8
@@ -5944,12 +5984,12 @@ def multi_download_quote():
             if cost_per_ft3 > 0:
                 _basis = f'${cost_per_ft3:.4f}/ft\u00b3 \u00d7 {tank_storage_total:,.1f} ft\u00b3 tank storage'
             q_rect(LQ, y - 13, QW - 120, 13, QLGY)
-            q_text(LQ + 4, y - 9, _basis, 'Helvetica-Oblique', 7, GRAY)
+            q_text(LQ + 4, y - 9, _basis, _F_OBL, 7, GRAY)
             q_rect(LQ + QW - 120, y - 13, 120, 13, QNY)
-            q_text(LQ + QW - 4, y - 9, 'AQUACELL SUB-TOTAL', 'Helvetica-Bold', 7, WHITE, 'right')
+            q_text(LQ + QW - 4, y - 9, 'AQUACELL SUB-TOTAL', _F_BOLD, 7, WHITE, 'right')
             y -= 13
             q_rect(LQ + QW - 120, y - 13, 120, 13, QLGY)
-            q_text(LQ + QW - 4, y - 9, money(subtotal), 'Helvetica-Bold', 8.5, QNY, 'right')
+            q_text(LQ + QW - 4, y - 9, money(subtotal), _F_BOLD, 8.5, QNY, 'right')
             y -= 18
 
         QGRN_MT = colors.HexColor('#1a7a3a')
@@ -5967,8 +6007,8 @@ def multi_download_quote():
         tx_val = LQ + QW - tot_val_w
         for lbl, val, fg, bg in totals_rows:
             q_rect(tx_lbl - 4, y - 15, tot_lbl_w + tot_val_w + 8, 15, bg)
-            q_text(tx_lbl + tot_lbl_w - 4, y - 5, lbl, 'Helvetica-Bold', 8, fg, 'right')
-            q_text(tx_val + tot_val_w - 4,  y - 5, val, 'Helvetica-Bold', 9, fg, 'right')
+            q_text(tx_lbl + tot_lbl_w - 4, y - 5, lbl, _F_BOLD, 8, fg, 'right')
+            q_text(tx_val + tot_val_w - 4,  y - 5, val, _F_BOLD, 9, fg, 'right')
             q_rule(y - 15, thick=0.3, clr=QMGY)
             y -= 15
 
@@ -5977,7 +6017,7 @@ def multi_download_quote():
             '*ESTIMATED TAXES & FREIGHT TO BE DETERMINED AT TIME OF PURCHASE',
             '*THIS QUOTE IS VALID FOR 30 DAYS FROM THE DATE OF ISSUANCE. SUBJECT TO CHANGE AFTER THIS DATE',
         ]:
-            q_text(W / 2, y, note, 'Helvetica-Bold', 7, QRED_MT, 'center')
+            q_text(W / 2, y, note, _F_BOLD, 7, QRED_MT, 'center')
             y -= 11
 
         y -= 6
@@ -5990,7 +6030,7 @@ def multi_download_quote():
             "DEPTHS MUST BE CONFIRMED BY A LICENSED PROFESSIONAL ENGINEER."
         )
         c.setFillColor(GRAY)
-        c.setFont('Helvetica', 6.5)
+        c.setFont(_F_REG, 6.5)
         disc_words = disc.split()
         dlines, dline = [], ''
         for w in disc_words:
@@ -6167,7 +6207,7 @@ def multi_download_tank_summary():
                 c.setLineWidth(stroke)
             c.rect(x, y, w, h, fill=1, stroke=1 if stroke else 0)
 
-        def q_text(x, y, text, font='Helvetica', size=8, color=BLACK, align='left'):
+        def q_text(x, y, text, font=_F_REG, size=8, color=BLACK, align='left'):
             c.setFont(font, size)
             c.setFillColor(color)
             if align == 'right':
@@ -6187,9 +6227,9 @@ def multi_download_tank_summary():
                 c.showPage()
             cur_y[0] = H - 28
             q_rect(LQ, cur_y[0] - 30, QW, 30, QNY)
-            q_text(W / 2, cur_y[0] - 20, title, 'Helvetica-Bold', 10, WHITE, 'center')
-            q_text(LQ + 4, cur_y[0] - 20, project_name or '—', 'Helvetica', 8, colors.HexColor('#93c5fd'))
-            q_text(LQ + QW - 4, cur_y[0] - 20, generated_str, 'Helvetica', 8, colors.HexColor('#94a3b8'), 'right')
+            q_text(W / 2, cur_y[0] - 20, title, _F_HEAD, 10, WHITE, 'center')
+            q_text(LQ + 4, cur_y[0] - 20, project_name or '—', _F_REG, 8, colors.HexColor('#93c5fd'))
+            q_text(LQ + QW - 4, cur_y[0] - 20, generated_str, _F_REG, 8, colors.HexColor('#94a3b8'), 'right')
             cur_y[0] -= 38
 
         # Per-tank detail pages
@@ -6214,12 +6254,12 @@ def multi_download_tank_summary():
                     c.setFillColor(LGRAY)
                     c.rect(LQ, y - rh + 3, QW, rh, fill=1, stroke=0)
                 c.setFillColor(GRAY)
-                c.setFont('Helvetica', 7.5)
+                c.setFont(_F_REG, 7.5)
                 c.drawString(LQ + 5, y - 3, label)
                 if status in ('PASS', 'FAIL'):
                     scol = GREEN if status == 'PASS' else RED
-                    c.setFont('Helvetica-Bold', 7.5)
-                    sw = c.stringWidth(status, 'Helvetica-Bold', 7.5)
+                    c.setFont(_F_BOLD, 7.5)
+                    sw = c.stringWidth(status, _F_BOLD, 7.5)
                     c.setFillColor(scol)
                     c.drawRightString(LQ + QW - 5, y - 3, status)
                     if value:
@@ -6227,7 +6267,7 @@ def multi_download_tank_summary():
                         c.drawRightString(LQ + QW - 5 - sw - 4, y - 3, str(value))
                 else:
                     c.setFillColor(BLACK)
-                    c.setFont('Helvetica-Bold', 7.5)
+                    c.setFont(_F_BOLD, 7.5)
                     c.drawRightString(LQ + QW - 5, y - 3, str(value))
                 c.setStrokeColor(MGRAY)
                 c.setLineWidth(0.25)
@@ -6241,8 +6281,13 @@ def multi_download_tank_summary():
                 c.setFillColor(NAVY)
                 c.rect(LQ, y - bh + 4, QW, bh, fill=1, stroke=0)
                 c.setFillColor(WHITE)
-                c.setFont('Helvetica-Bold', 8)
-                c.drawString(LQ + 6, y - bh + 8, title)
+                c.setFont(_F_HEAD, 8)
+                _x = LQ + 6
+                if title.startswith('\u25a0'):      # ■ marker — drawn as a square, not a glyph
+                    c.rect(_x, y - bh + 8, 5, 5, fill=1, stroke=0)
+                    _x += 11
+                    title = title.lstrip('\u25a0 ')
+                c.drawString(_x, y - bh + 8, title)
                 y -= bh + 2
 
             section_hdr_mt('\u25a0  STORAGE')
@@ -6278,9 +6323,9 @@ def multi_download_tank_summary():
             _ensure_space(11)
             _sv_pct = int(round(r['stone_void'] * 100))
             c.setFillColor(GRAY)
-            c.setFont('Helvetica-Oblique', 6.5)
+            c.setFont(_F_OBL, 6.5)
             c.drawString(LQ + 5, y - 3,
-                f"Storage by layer  (stone void ratio = {_sv_pct}%  |  net = gross \u00d7 void ratio  |  \u2713 = included in Total System Storage)")
+                f"Storage by layer  (stone void ratio = {_sv_pct}%  |  net = gross \u00d7 void ratio  |  INCLUDED = counted in Total System Storage)")
             y -= 11
 
             _cs_g = LQ + QW - 250   # gross value right edge
@@ -6292,7 +6337,7 @@ def multi_download_tank_summary():
             c.setFillColor(MGRAY)
             c.rect(LQ, y - 13 + 3, QW, 13, fill=1, stroke=0)
             c.setFillColor(NAVY)
-            c.setFont('Helvetica-Bold', 6.8)
+            c.setFont(_F_BOLD, 6.8)
             c.drawString(LQ + 5, y - 3, 'Layer')
             c.drawRightString(_cs_g, y - 3, 'Gross (ft\u00b3)')
             c.drawRightString(_cs_n, y - 3, 'Net (ft\u00b3)')
@@ -6307,16 +6352,16 @@ def multi_download_tank_summary():
                     c.setFillColor(LGRAY)
                     c.rect(LQ, y - rh + 3, QW, rh, fill=1, stroke=0)
                 c.setFillColor(GRAY)
-                c.setFont('Helvetica', 7.5)
+                c.setFont(_F_REG, 7.5)
                 c.drawString(LQ + 5, y - 3, label)
                 c.setFillColor(GRAY)
                 c.drawRightString(_cs_g, y - 3, f'{gross:,.1f}')
                 c.setFillColor(BLACK)
-                c.setFont('Helvetica-Bold', 7.5)
+                c.setFont(_F_BOLD, 7.5)
                 c.drawRightString(_cs_n, y - 3, f'{net:,.1f}')
-                c.setFont('Helvetica-Bold', 7)
+                c.setFont(_F_BOLD, 7)
                 c.setFillColor(GREEN if included else RED)
-                c.drawRightString(_cs_i, y - 3, '\u2713  INCLUDED' if included else '\u2014  EXCLUDED')
+                c.drawRightString(_cs_i, y - 3, 'INCLUDED' if included else '\u2014  EXCLUDED')
                 c.setStrokeColor(MGRAY)
                 c.setLineWidth(0.25)
                 c.line(LQ, y - rh + 3, LQ + QW, y - rh + 3)
@@ -6332,7 +6377,7 @@ def multi_download_tank_summary():
             c.setFillColor(LTGRN)
             c.rect(LQ, y - 14 + 3, QW, 14, fill=1, stroke=0)
             c.setFillColor(GREEN)
-            c.setFont('Helvetica-Bold', 7.5)
+            c.setFont(_F_BOLD, 7.5)
             c.drawString(LQ + 5, y - 4, 'TOTAL NET STORAGE (INCLUDED LAYERS)')
             c.drawRightString(_cs_g, y - 4, f'{_gross_sum:,.1f}')
             c.drawRightString(_cs_n, y - 4, f"{r['stone_layer_total_net']:,.1f} ft\u00b3")
@@ -6392,7 +6437,7 @@ def multi_download_tank_summary():
                 section_hdr_mt('\u25a0  TANK NOTES')
                 _ensure_space(13)
                 c.setFillColor(BLACK)
-                c.setFont('Helvetica', 8)
+                c.setFont(_F_REG, 8)
                 _max_w = QW - 12
                 for _para in _tnotes.split('\n'):
                     _para = _para.rstrip()
@@ -6402,17 +6447,17 @@ def multi_download_tank_summary():
                     _line = ''
                     for _word in _para.split():
                         _test = (_line + ' ' + _word).strip()
-                        if c.stringWidth(_test, 'Helvetica', 8) <= _max_w:
+                        if c.stringWidth(_test, _F_REG, 8) <= _max_w:
                             _line = _test
                         else:
                             _ensure_space(12)
-                            c.setFillColor(BLACK); c.setFont('Helvetica', 8)
+                            c.setFillColor(BLACK); c.setFont(_F_REG, 8)
                             c.drawString(LQ + 6, y - 3, _line)
                             y -= 12
                             _line = _word
                     if _line:
                         _ensure_space(12)
-                        c.setFillColor(BLACK); c.setFont('Helvetica', 8)
+                        c.setFillColor(BLACK); c.setFont(_F_REG, 8)
                         c.drawString(LQ + 6, y - 3, _line)
                         y -= 12
 
@@ -6838,7 +6883,7 @@ def download_pdf():
     # ── SECTION 4: Stone Backfill ─────────────────────────────
     y = _section_header(c, y, '■  STONE BACKFILL  (provided by others — coordination estimates only)')
 
-    y = _sub_label(c, y, f'STORAGE BY LAYER  (stone void ratio = {stone_void_pct}%  |  net = gross × void ratio  |  ✓ = included in Total System Storage)')
+    y = _sub_label(c, y, f'STORAGE BY LAYER  (stone void ratio = {stone_void_pct}%  |  net = gross × void ratio  |  INCLUDED = counted in Total System Storage)')
 
     # Column anchors for 4-column stone table
     C_STN_LAYER = LM + 5
@@ -6856,7 +6901,7 @@ def download_pdf():
     ])
 
     def _stone_row(y, label, gross, net, included, shade):
-        inc_text  = '✓  INCLUDED' if included else '—  EXCLUDED'
+        inc_text  = 'INCLUDED' if included else '—  EXCLUDED'
         inc_color = GREEN         if included else RED
         y = _table_row(c, y, [
             (label,           C_STN_LAYER,              160,       'left',  False, None),
@@ -6886,14 +6931,14 @@ def download_pdf():
     # ── SECTION 5: Project Notes ──────────────────────────────
     if project_notes.strip():
         y = _section_header(c, y, '■  PROJECT NOTES / SPECIAL INSTRUCTIONS / ASSUMPTIONS')
-        c.setFont('Helvetica', 7.5)
+        c.setFont(_F_REG, 7.5)
         c.setFillColor(BLACK)
         max_note_w = CW - 10
         note_words = project_notes.split()
         note_line  = ''
         for word in note_words:
             test = (note_line + ' ' + word).strip()
-            if c.stringWidth(test, 'Helvetica', 7.5) <= max_note_w:
+            if c.stringWidth(test, _F_REG, 7.5) <= max_note_w:
                 note_line = test
             else:
                 if y < 80:
@@ -6990,13 +7035,13 @@ def download_pdf():
             "PROFESSIONAL ENGINEER using project-specific plans (grading, pipe sizes and materials, "
             "invert elevations, loading conditions, and applicable codes/standards)."
         )
-        c.setFont('Helvetica', font_sz)
+        c.setFont(_F_REG, font_sz)
         d_words = disc_text.split()
         d_lines = []
         cur = ''
         for w in d_words:
             test = (cur + ' ' + w).strip()
-            if c.stringWidth(test, 'Helvetica', font_sz) <= max_disc_w:
+            if c.stringWidth(test, _F_REG, font_sz) <= max_disc_w:
                 cur = test
             else:
                 if cur:
@@ -7017,7 +7062,7 @@ def download_pdf():
                 c.drawImage(img, LM, disc_top + 6, width=CW, height=avail_h,
                             preserveAspectRatio=True, mask='auto')
             except Exception:
-                c.setFont('Helvetica', 9)
+                c.setFont(_F_REG, 9)
                 c.setFillColor(GRAY)
                 c.drawString(LM, y - 30, 'Schematic image could not be rendered.')
 
@@ -8391,7 +8436,7 @@ def download_quote():
           else:
               c.rect(x, y, w, h, fill=1, stroke=1 if stroke else 0)
 
-      def q_text(x, y, text, font='Helvetica', size=8, color=BLACK, align='left'):
+      def q_text(x, y, text, font=_F_REG, size=8, color=BLACK, align='left'):
           c.setFont(font, size)
           c.setFillColor(color)
           if align == 'right':
@@ -8421,13 +8466,13 @@ def download_quote():
       _q_title = 'MATERIALS QUOTE: ' + ('MARKET' if quote_type == 'market' else 'DISTRIBUTION')
       _q_tsz = 20
       _q_max_w = 2 * min(W/2 - (LQ + 134), (W - RQ - 144) - W/2)
-      while _q_tsz > 10 and c.stringWidth(_q_title, 'Helvetica-Bold', _q_tsz) > _q_max_w:
+      while _q_tsz > 10 and c.stringWidth(_q_title, _F_HEAD, _q_tsz) > _q_max_w:
           _q_tsz -= 0.5
-      q_text(W/2, y - 14, _q_title, 'Helvetica-Bold', _q_tsz, QNY, 'center')
+      q_text(W/2, y - 14, _q_title, _F_HEAD, _q_tsz, QNY, 'center')
 
       # Project number box (top-right)
       q_rect(W - RQ - 140, y - 52, 140, 52, QLGY)
-      q_text(W - RQ - 70, y - 20, project_num if project_num else '—', 'Helvetica-Bold', 18, QNY, 'center')
+      q_text(W - RQ - 70, y - 20, project_num if project_num else '—', _F_BOLD, 18, QNY, 'center')
 
       y -= 62
 
@@ -8436,32 +8481,32 @@ def download_quote():
       y -= 4
 
       # Row 1
-      q_text(LQ, y - 8, 'CLIENT:', 'Helvetica-Bold', 8, QNY)
-      q_text(LQ + 48, y - 8, client or '—', 'Helvetica', 8, BLACK)
-      q_text(W/2, y - 8, 'DATE', 'Helvetica-Bold', 8, QNY)
-      q_text(W/2 + 36, y - 8, generated_str, 'Helvetica', 8, BLACK)
+      q_text(LQ, y - 8, 'CLIENT:', _F_BOLD, 8, QNY)
+      q_text(LQ + 48, y - 8, client or '—', _F_REG, 8, BLACK)
+      q_text(W/2, y - 8, 'DATE', _F_BOLD, 8, QNY)
+      q_text(W/2 + 36, y - 8, generated_str, _F_REG, 8, BLACK)
 
       # Row 2
-      q_text(LQ, y - 20, 'PROJECT NAME:', 'Helvetica-Bold', 8, QNY)
-      q_text(LQ + 78, y - 20, project_name or '—', 'Helvetica', 8, BLACK)
-      q_text(W/2, y - 20, 'PREPARED BY:', 'Helvetica-Bold', 8, QNY)
-      q_text(W/2 + 90, y - 20, estimator or '—', 'Helvetica', 8, BLACK)
+      q_text(LQ, y - 20, 'PROJECT NAME:', _F_BOLD, 8, QNY)
+      q_text(LQ + 78, y - 20, project_name or '—', _F_REG, 8, BLACK)
+      q_text(W/2, y - 20, 'PREPARED BY:', _F_BOLD, 8, QNY)
+      q_text(W/2 + 90, y - 20, estimator or '—', _F_REG, 8, BLACK)
 
       # Row 3
-      q_text(LQ, y - 32, 'CITY:', 'Helvetica-Bold', 8, QNY)
+      q_text(LQ, y - 32, 'CITY:', _F_BOLD, 8, QNY)
       city_str = location.split(',')[0].strip() if location else '—'
-      q_text(LQ + 48, y - 32, city_str, 'Helvetica', 8, BLACK)
-      q_text(W/2, y - 32, 'EMAIL:', 'Helvetica-Bold', 8, QNY)
-      q_text(W/2 + 50, y - 32, estimator_email or '—', 'Helvetica', 8, BLACK)
+      q_text(LQ + 48, y - 32, city_str, _F_REG, 8, BLACK)
+      q_text(W/2, y - 32, 'EMAIL:', _F_BOLD, 8, QNY)
+      q_text(W/2 + 50, y - 32, estimator_email or '—', _F_REG, 8, BLACK)
 
       # Row 4
-      q_text(LQ, y - 44, 'STATE:', 'Helvetica-Bold', 8, QNY)
+      q_text(LQ, y - 44, 'STATE:', _F_BOLD, 8, QNY)
       state_str = location.split(',')[1].strip() if location and ',' in location else '—'
-      q_text(LQ + 48, y - 44, state_str, 'Helvetica', 8, BLACK)
+      q_text(LQ + 48, y - 44, state_str, _F_REG, 8, BLACK)
 
       # Row 5 — full-width Site Address (requested by CS for ordering/shipping)
-      q_text(LQ, y - 56, 'SITE ADDRESS:', 'Helvetica-Bold', 8, QNY)
-      q_text(LQ + 78, y - 56, site_address or '—', 'Helvetica', 8, BLACK)
+      q_text(LQ, y - 56, 'SITE ADDRESS:', _F_BOLD, 8, QNY)
+      q_text(LQ + 78, y - 56, site_address or '—', _F_REG, 8, BLACK)
 
       y -= 66
       q_rule(y)
@@ -8470,7 +8515,7 @@ def download_quote():
       # ── Notes banner (royal blue / white) ───────────────────────
       if project_notes.strip():
           q_rect(LQ, y - 14, QW, 14, QNY)
-          q_text(W/2, y - 10, project_notes[:120], 'Helvetica-Bold', 7, WHITE, 'center')
+          q_text(W/2, y - 10, project_notes[:120], _F_BOLD, 7, WHITE, 'center')
           y -= 18
 
       # ── Spec summary row (Plans Dated removed) ───────────────────
@@ -8485,20 +8530,20 @@ def download_quote():
       ]
       for i, (lbl, val) in enumerate(specs):
           x = LQ + i * col_w
-          q_text(x + 4, y - 10, lbl, 'Helvetica-Bold', 7, GRAY)
-          q_text(x + 4, y - 22, val, 'Helvetica-Bold', 8.5, QNY)
+          q_text(x + 4, y - 10, lbl, _F_BOLD, 7, GRAY)
+          q_text(x + 4, y - 22, val, _F_BOLD, 8.5, QNY)
 
       y -= 32
 
       # Storage required + tank volume highlight
       q_rect(LQ, y - 28, QW/2, 28, QNY)
-      q_text(LQ + 6, y - 10, 'TOTAL PROJECT STORAGE REQUIRED', 'Helvetica-Bold', 7, WHITE)
+      q_text(LQ + 6, y - 10, 'TOTAL PROJECT STORAGE REQUIRED', _F_BOLD, 7, WHITE)
       req_str = f'{min_storage:,.0f} FT\u00b3' if min_storage > 0 else 'NOT SPECIFIED'
-      q_text(LQ + 6, y - 22, req_str, 'Helvetica-Bold', 11, QYLW)
+      q_text(LQ + 6, y - 22, req_str, _F_BOLD, 11, QYLW)
 
       q_rect(LQ + QW/2, y - 28, QW/2, 28, QTBL)
-      q_text(LQ + QW/2 + 6, y - 10, 'AQUACELL TANK VOLUME  (EXCLUDING STONE)', 'Helvetica-Bold', 7, WHITE)
-      q_text(LQ + QW/2 + 6, y - 22, f'{tank_storage:,.0f} FT\u00b3', 'Helvetica-Bold', 11, WHITE)
+      q_text(LQ + QW/2 + 6, y - 10, 'AQUACELL TANK VOLUME  (EXCLUDING STONE)', _F_BOLD, 7, WHITE)
+      q_text(LQ + QW/2 + 6, y - 22, f'{tank_storage:,.0f} FT\u00b3', _F_BOLD, 11, WHITE)
 
       y -= 34
 
@@ -8506,7 +8551,7 @@ def download_quote():
       #  SECTION 1: AQUACELL COMPONENTS
       # ════════════════════════════════════════
       q_rect(LQ, y - 14, QW, 14, QNY)
-      q_text(W/2, y - 10, 'AQUACELL STORMWATER MANAGEMENT SYSTEM — COMPONENTS', 'Helvetica-Bold', 8.5, WHITE, 'center')
+      q_text(W/2, y - 10, 'AQUACELL STORMWATER MANAGEMENT SYSTEM — COMPONENTS', _F_BOLD, 8.5, WHITE, 'center')
       y -= 14
 
       # Table header
@@ -8520,7 +8565,7 @@ def download_quote():
 
       for lbl, x in [('LINE', col_ln), ('PART CODES', col_pc), ('DESCRIPTION', col_ds),
                      ('QUANTITY', col_qt), ('UNITS', col_un), ('NOTES', col_nt)]:
-          q_text(x, y - 9, lbl, 'Helvetica-Bold', 7, WHITE)
+          q_text(x, y - 9, lbl, _F_BOLD, 7, WHITE)
       y -= 13
 
       bom_rows = [
@@ -8536,12 +8581,12 @@ def download_quote():
       for i, (ln, pc, ds, qt, un, nt) in enumerate(bom_rows):
           shade = QLGY if i % 2 == 0 else WHITE
           q_rect(LQ, y - 13, QW, 13, shade)
-          q_text(col_ln, y - 9, ln,       'Helvetica', 7.5, BLACK)
-          q_text(col_pc, y - 9, pc,       'Helvetica', 7.5, BLACK)
-          q_text(col_ds, y - 9, ds,       'Helvetica', 7.5, BLACK)
-          q_text(col_qt + 30, y - 9, str(qt) if qt else '0', 'Helvetica-Bold', 7.5, QNY, 'right')
-          q_text(col_un, y - 9, un,       'Helvetica', 7.5, BLACK)
-          q_text(col_nt, y - 9, nt,       'Helvetica', 6.5, GRAY)
+          q_text(col_ln, y - 9, ln,       _F_REG, 7.5, BLACK)
+          q_text(col_pc, y - 9, pc,       _F_REG, 7.5, BLACK)
+          q_text(col_ds, y - 9, ds,       _F_REG, 7.5, BLACK)
+          q_text(col_qt + 30, y - 9, str(qt) if qt else '0', _F_BOLD, 7.5, QNY, 'right')
+          q_text(col_un, y - 9, un,       _F_REG, 7.5, BLACK)
+          q_text(col_nt, y - 9, nt,       _F_REG, 6.5, GRAY)
           y -= 13
 
       # Pricing: cost per ft³ note + subtotal
@@ -8549,13 +8594,13 @@ def download_quote():
       q_rect(LQ, y - 13, QW - 120, 13, QLGY)
       # Pricing note — clean, no internal pricing exposed
       pricing_note = f'AquaCell system pricing based on project quantities and current pricing.'
-      q_text(LQ + 4, y - 9, pricing_note, 'Helvetica-Oblique', 7, GRAY)
+      q_text(LQ + 4, y - 9, pricing_note, _F_OBL, 7, GRAY)
 
       q_rect(LQ + QW - 120, y - 13, 120, 13, QNY)
-      q_text(LQ + QW - 4, y - 9, 'SUB-TOTAL', 'Helvetica-Bold', 7.5, WHITE, 'right')
+      q_text(LQ + QW - 4, y - 9, 'SUB-TOTAL', _F_BOLD, 7.5, WHITE, 'right')
       y -= 13
       q_rect(LQ + QW - 120, y - 13, 120, 13, QLGY)
-      q_text(LQ + QW - 4, y - 9, money(subtotal), 'Helvetica-Bold', 8.5, QNY, 'right')
+      q_text(LQ + QW - 4, y - 9, money(subtotal), _F_BOLD, 8.5, QNY, 'right')
       y -= 18
 
       # ════════════════════════════════════════
@@ -8564,14 +8609,14 @@ def download_quote():
       q_rect(LQ, y - 13, QW, 13, QRED)
       q_text(W/2, y - 9,
              'RECOMMENDED BY WAVIN — PROVIDED BY OTHERS  (ESTIMATES FOR REFERENCE ONLY — SUBJECT TO VERIFICATION)',
-             'Helvetica-Bold', 7, WHITE, 'center')
+             _F_BOLD, 7, WHITE, 'center')
       y -= 13
 
       # Others table header — no part codes, no notes, letter line labels
       q_rect(LQ, y - 13, QW, 13, colors.HexColor('#922b21'))
       for lbl, x in [('LINE', col_ln), ('DESCRIPTION', col_pc),
                      ('QUANTITY', col_qt), ('UNITS', col_un)]:
-          q_text(x, y - 9, lbl, 'Helvetica-Bold', 7, WHITE)
+          q_text(x, y - 9, lbl, _F_BOLD, 7, WHITE)
       y -= 13
 
       alpha = ['A','B','C','D','E','F','G','H','I','J']
@@ -8612,7 +8657,7 @@ def download_quote():
           shade = QLGY if i % 2 == 0 else WHITE
           rh = 20
           q_rect(LQ, y - rh, QW, rh, shade)
-          q_text(col_ln, y - 10, _row_letter(i), 'Helvetica-Bold', 7.5, QNY)
+          q_text(col_ln, y - 10, _row_letter(i), _F_BOLD, 7.5, QNY)
           max_chars = 80
           if len(ds) <= max_chars:
               ds_line1, ds_line2 = ds, ''
@@ -8622,11 +8667,11 @@ def download_quote():
                   split_at = max_chars
               ds_line1 = ds[:split_at]
               ds_line2 = ds[split_at+1:split_at+1+max_chars]
-          q_text(col_pc, y - 8,  ds_line1, 'Helvetica', 7.5, BLACK)
+          q_text(col_pc, y - 8,  ds_line1, _F_REG, 7.5, BLACK)
           if ds_line2:
-              q_text(col_pc, y - 16, ds_line2, 'Helvetica', 7.5, BLACK)
-          q_text(col_qt + 30, y - 10, str(qt), 'Helvetica-Bold', 7.5, QNY, 'right')
-          q_text(col_un, y - 10, un, 'Helvetica', 7.5, BLACK)
+              q_text(col_pc, y - 16, ds_line2, _F_REG, 7.5, BLACK)
+          q_text(col_qt + 30, y - 10, str(qt), _F_BOLD, 7.5, QNY, 'right')
+          q_text(col_un, y - 10, un, _F_REG, 7.5, BLACK)
           y -= rh
 
       y -= 6
@@ -8649,8 +8694,8 @@ def download_quote():
       for lbl, val, fg, bg in totals:
           rh = 15
           q_rect(tot_x_label - 4, y - rh, tot_label_w + tot_val_w + 8, rh, bg)
-          q_text(tot_x_label + tot_label_w - 4, y - 5, lbl, 'Helvetica-Bold', 8, fg, 'right')
-          q_text(tot_x_val + tot_val_w - 4,     y - 5, val, 'Helvetica-Bold', 9, fg, 'right')
+          q_text(tot_x_label + tot_label_w - 4, y - 5, lbl, _F_BOLD, 8, fg, 'right')
+          q_text(tot_x_val + tot_val_w - 4,     y - 5, val, _F_BOLD, 9, fg, 'right')
           q_rule(y - rh, thick=0.3, clr=QMGY)
           y -= rh
 
@@ -8665,7 +8710,7 @@ def download_quote():
       ]
 
       for n in notes:
-          q_text(W/2, y, n, 'Helvetica-Bold', 7, QRED, 'center')
+          q_text(W/2, y, n, _F_BOLD, 7, QRED, 'center')
           y -= 11
 
       y -= 6
@@ -8684,7 +8729,7 @@ def download_quote():
           "respect of this quotation will be subject to Wavin's Terms and Conditions of Sale."
       )
       c.setFillColor(GRAY)
-      c.setFont('Helvetica', 6.5)
+      c.setFont(_F_REG, 6.5)
       # Simple word-wrap at ~110 chars per line (safe, no canvas stringWidth)
       disc_words = disc.split()
       dlines = []
