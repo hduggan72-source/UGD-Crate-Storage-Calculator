@@ -5191,6 +5191,179 @@ def build_pt_row_pdf(inputs, results, project_name=None):
 
 
 # ══════════════════════════════════════════════════════════════════
+#  PDF BUILDER  —  Design Verification Dashboard: Stage-Storage Report
+#  Multi-page: summary + volume-curve image, then the full stage-storage
+#  table (header row repeats on every page). The Stage-Storage calculator
+#  runs entirely in the browser, so the browser supplies the already-
+#  rendered summary rows, table rows and chart image; this builder only
+#  lays them out (no engineering math is performed here).
+# ══════════════════════════════════════════════════════════════════
+def build_stage_storage_pdf(summary, rows, chart_data_url, project_name=None):
+    """summary: list of (label, value) strings, exactly as shown on the dashboard.
+    rows: list of (elev, tank, stone, total) numbers. chart_data_url: PNG data URL
+    (may be empty — the chart section is then omitted). Returns a BytesIO at 0."""
+    import base64 as _b64
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    generated_str = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
+    BOTTOM = 40
+    state = {'page': 0}
+
+    def _header():
+        state['page'] += 1
+        band_h = 64
+        c.setFillColor(NAVY)
+        c.rect(0, PH - band_h, PW, band_h, fill=1, stroke=0)
+        logo_path = os.path.join(app.static_folder, 'aquacell-logo.png')
+        if os.path.exists(logo_path):
+            try:
+                c.drawImage(ImageReader(logo_path), LM, PH - band_h + 8, width=160, height=46,
+                            preserveAspectRatio=True, mask='auto')
+            except Exception:
+                pass
+        c.setFillColor(WHITE)
+        c.setFont('Helvetica-Bold', 14)
+        c.drawRightString(PW - RM, PH - 24, 'AquaCell® Design Verification Dashboard')
+        c.setFont('Helvetica', 9)
+        c.setFillColor(colors.HexColor('#93c5fd'))
+        c.drawRightString(PW - RM, PH - 37, 'Stage-Storage Report')
+        c.setFont('Helvetica', 7)
+        c.setFillColor(colors.HexColor('#94a3b8'))
+        c.drawRightString(PW - RM, PH - 50, generated_str)
+        y = PH - band_h - 10
+        if project_name:
+            c.setFillColor(GRAY)
+            c.setFont('Helvetica-Bold', 9)
+            c.drawString(LM, y, f'Project: {project_name}')
+            y -= 16
+        return y
+
+    def _bar(y, title):
+        bar_h = 16
+        c.setFillColor(BLUE)
+        c.rect(LM, y - bar_h, CW, bar_h, fill=1, stroke=0)
+        c.setFillColor(WHITE)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(LM + 8, y - bar_h + 4, title)
+        return y - bar_h
+
+    def _fit(text, font, size, max_w):
+        text = str(text)
+        if c.stringWidth(text, font, size) <= max_w:
+            return text
+        while text and c.stringWidth(text + '...', font, size) > max_w:
+            text = text[:-1]
+        return text + '...'
+
+    # ── Page 1: summary ──
+    y = _header()
+    y = _bar(y, 'SUMMARY')
+    line_h = 13
+    half = (len(summary) + 1) // 2
+    body_h = half * line_h + 12
+    c.setFillColor(LGRAY)
+    c.setStrokeColor(MGRAY)
+    c.setLineWidth(0.5)
+    c.rect(LM, y - body_h, CW, body_h, fill=1, stroke=1)
+    col_w = CW / 2
+    for i, (lbl, val) in enumerate(summary):
+        col, idx = divmod(i, half)
+        x0 = LM + 10 + col * col_w
+        x1 = LM + (col + 1) * col_w - 10
+        ry = y - 14 - idx * line_h
+        lbl_w = col_w - 20
+        c.setFillColor(GRAY)
+        c.setFont('Helvetica', 7.5)
+        val_s = str(val)
+        c.setFont('Helvetica-Bold', 8)
+        vw = c.stringWidth(val_s, 'Helvetica-Bold', 8)
+        c.setFont('Helvetica', 7.5)
+        c.drawString(x0, ry, _fit(lbl, 'Helvetica', 7.5, max(20, lbl_w - vw - 8)))
+        c.setFillColor(BLACK)
+        c.setFont('Helvetica-Bold', 8)
+        c.drawRightString(x1, ry, val_s)
+    y = y - body_h - 12
+
+    # ── Chart image ──
+    if chart_data_url and ',' in chart_data_url:
+        try:
+            raw = _b64.b64decode(chart_data_url.split(',', 1)[1])
+            img = ImageReader(io.BytesIO(raw))
+            iw, ih = img.getSize()
+            draw_w = CW
+            draw_h = draw_w * ih / iw
+            room = y - 16 - BOTTOM
+            if draw_h > room:
+                if room < 200:      # not enough space left — chart gets its own page
+                    c.showPage()
+                    y = _header()
+                    room = y - 16 - BOTTOM
+                if draw_h > room:
+                    draw_h = room
+                    draw_w = draw_h * iw / ih
+            y = _bar(y, 'STAGE-STORAGE VOLUME CURVE')
+            c.drawImage(img, LM + (CW - draw_w) / 2, y - draw_h - 4, width=draw_w, height=draw_h)
+            y = y - draw_h - 12
+        except Exception:
+            pass  # unreadable image: table and summary still export
+
+    # ── Stage-storage table (paginated, repeating header) ──
+    disc_h = _disclaimer_box_height(
+        "DISCLAIMER: This calculator provides preliminary, conceptual estimates only and is not a "
+        "stamped engineering design. Wavin's assistance in sizing or product selection is advisory "
+        "and does not constitute design responsibility or guarantee system performance. The Engineer "
+        "of Record (EoR) is solely responsible for verifying all design parameters and site "
+        "conditions, including hydrology, structural requirements, soils, environmental factors, and "
+        "integration with the overall stormwater system. AquaCell dimensions and assumptions "
+        "(including usable storage and unit base areas) follow published product data. "
+        "FINAL LAYOUTS, CAPACITIES, AND INSTALLATION DEPTHS MUST BE CONFIRMED BY A LICENSED "
+        "PROFESSIONAL ENGINEER using project-specific plans (grading, pipe sizes and materials, "
+        "invert elevations, loading conditions, and applicable codes/standards).")
+    row_h = 14
+    heads = ['Elevation (ft)', 'Tank Storage (ft³)', 'Stone Storage (ft³)', 'Total Storage (ft³)']
+    cw4 = CW / 4
+
+    def _table_head(yy):
+        yy = _bar(yy, 'STAGE-STORAGE TABLE')
+        c.setFillColor(MGRAY)
+        c.rect(LM, yy - row_h, CW, row_h, fill=1, stroke=0)
+        c.setFillColor(BLACK)
+        c.setFont('Helvetica-Bold', 8)
+        for i, h in enumerate(heads):
+            c.drawRightString(LM + (i + 1) * cw4 - 10, yy - row_h + 4, h)
+        return yy - row_h
+
+    if y - 16 - row_h - row_h * 3 < BOTTOM:
+        c.showPage()
+        y = _header()
+    y = _table_head(y)
+    for n, (elev, tank, stone, total) in enumerate(rows):
+        if y - row_h < BOTTOM:
+            c.showPage()
+            y = _table_head(_header())
+        if n % 2 == 1:
+            c.setFillColor(LGRAY)
+            c.rect(LM, y - row_h, CW, row_h, fill=1, stroke=0)
+        vals = [f'{elev:,.2f}', f'{tank:,.1f}', f'{stone:,.1f}', f'{total:,.1f}']
+        for i, v in enumerate(vals):
+            c.setFillColor(BLACK)
+            c.setFont('Helvetica-Bold' if i == 3 else 'Helvetica', 8)
+            c.drawRightString(LM + (i + 1) * cw4 - 10, y - row_h + 4, v)
+        y -= row_h
+    y -= 12
+
+    if y - disc_h < BOTTOM:
+        c.showPage()
+        y = _header()
+    _draw_disclaimer_block(c, BOTTOM)
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
+# ══════════════════════════════════════════════════════════════════
 #  ROUTE: /design-tools  —  Design Verification Dashboard (page)
 # ══════════════════════════════════════════════════════════════════
 @app.route('/design-tools', methods=['GET'])
@@ -5351,6 +5524,18 @@ def design_tools_download_pdf():
             result = calc_pt_row(payload)
             buffer = build_pt_row_pdf(payload, result, project_name=project_name)
             download_name = 'AquaCell_PT-ROW_Sizing.pdf'
+        elif calc_type == 'stage_storage':
+            # Stage-Storage runs client-side; the browser sends the rendered
+            # summary rows, table rows and chart image — layout only here.
+            try:
+                summary = [(str(p[0]), str(p[1])) for p in (data.get('summary') or [])]
+                rows = [tuple(float(v) for v in (r[0], r[1], r[2], r[3])) for r in (data.get('rows') or [])]
+            except (TypeError, ValueError, IndexError):
+                return jsonify({'error': 'Invalid stage-storage data.'}), 400
+            if not rows:
+                return jsonify({'error': 'No stage-storage table was received.'}), 400
+            buffer = build_stage_storage_pdf(summary, rows, data.get('image', ''), project_name=project_name)
+            download_name = 'AquaCell_Stage_Storage_Report.pdf'
         else:
             return jsonify({'error': f'Unknown calc_type: {calc_type}'}), 400
 
