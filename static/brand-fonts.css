@@ -1,0 +1,26 @@
+/* Wavin brand fonts for the on-screen UI (global team direction, Nov 2026):
+   Nunito = body text, Lora Bold = headings. Self-hosted SIL OFL fonts, licences
+   in /static/fonts/. Linked AFTER each template's own <style> so these rules win.
+   Canvas drawing and Chart.js text intentionally keep their existing fonts. */
+@font-face { font-family: 'Nunito'; font-weight: 400; font-style: normal; font-display: swap;
+             src: url('/static/fonts/Nunito-Regular.ttf') format('truetype'); }
+@font-face { font-family: 'Nunito'; font-weight: 400; font-style: italic; font-display: swap;
+             src: url('/static/fonts/Nunito-Italic.ttf') format('truetype'); }
+@font-face { font-family: 'Nunito'; font-weight: 700; font-style: normal; font-display: swap;
+             src: url('/static/fonts/Nunito-Bold.ttf') format('truetype'); }
+@font-face { font-family: 'Nunito'; font-weight: 700; font-style: italic; font-display: swap;
+             src: url('/static/fonts/Nunito-BoldItalic.ttf') format('truetype'); }
+@font-face { font-family: 'Lora'; font-weight: 700; font-style: normal; font-display: swap;
+             src: url('/static/fonts/Lora-Bold.ttf') format('truetype'); }
+
+/* Form controls do not inherit the page font by default. */
+input, select, textarea, button { font-family: inherit; }
+
+/* Headings (selector union across templates; unmatched selectors are harmless). */
+h1, h2, h3, h4,
+.topbar-title, .section-card-header, .result-card-header, .result-card-hdr,
+.calc-nav-heading, .sidebar-header-title, .tank-card-header, .editor-title,
+.cum-title, .tb-box-title {
+    font-family: 'Lora', Georgia, serif;
+    font-weight: 700;
+}
