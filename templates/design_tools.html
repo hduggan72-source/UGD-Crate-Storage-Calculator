@@ -35,6 +35,12 @@
             flex-direction: column;
         }
 
+        /* ── BRAND FONTS (Wavin global team: Nunito body, Lora Bold headers) — self-hosted OFL fonts ── */
+        @font-face { font-family: 'Lora'; font-weight: 700; font-style: normal; font-display: swap;
+                     src: url('/static/fonts/Lora-Bold.ttf') format('truetype'); }
+        @font-face { font-family: 'Nunito'; font-weight: 400; font-style: normal; font-display: swap;
+                     src: url('/static/fonts/Nunito-Regular.ttf') format('truetype'); }
+
         /* ── TOP BAR ── */
         .topbar {
             background: #0f1e3c;
@@ -50,8 +56,8 @@
         }
         .topbar-left { display: flex; align-items: center; gap: 14px; }
         .topbar-left img { height: 38px; }
-        .topbar-title { font-size: 17px; font-weight: bold; color: #a78bfa; }
-        .topbar-sub { font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 2px; }
+        .topbar-title { font-family: 'Lora', Georgia, serif; font-size: 17px; font-weight: 700; color: #a78bfa; }
+        .topbar-sub { font-family: 'Nunito', Arial, sans-serif; font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 2px; }
         .topbar-actions { display: flex; gap: 8px; align-items: center; }
         .topbar-btn {
             padding: 7px 14px; border: none; border-radius: 4px;
@@ -412,6 +418,7 @@
 <!-- ══════════════ TOP BAR ══════════════ -->
 <div class="topbar">
     <div class="topbar-left">
+        <img src="/static/Wavin%20logo%20white.png" alt="Wavin Logo" onerror="this.style.display='none';">
         <div>
             <div class="topbar-title">AquaCell Design Verification Dashboard</div>
             <div class="topbar-sub">Preliminary design checks only. The Engineer of Record is responsible for final design and verification.</div>
